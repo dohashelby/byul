@@ -13,9 +13,7 @@ DOCUMENT = ROOT / "docs" / "내부_기록형식.md"
 # tools (stand-alone report producers documented separately), examples/tests,
 # URLs, and ordinary field-name strings.  runtime-backend/mock is the one
 # versionless internal pseudo schema currently present in src.
-SCHEMA_LITERAL = re.compile(
-    r"(?:runtime|serving-runtime)-[A-Za-z0-9_.-]+/(?:[0-9]+\.[0-9]+|mock)"
-)
+SCHEMA_LITERAL = re.compile(r"(?:runtime|serving-runtime)-[A-Za-z0-9_.-]+/(?:[0-9]+\.[0-9]+|mock)")
 
 
 class InternalRecordFormatDocumentationTests(unittest.TestCase):
@@ -36,11 +34,7 @@ class InternalRecordFormatDocumentationTests(unittest.TestCase):
                 discovered.setdefault(schema, []).append(relative)
 
         self.assertTrue(discovered, "schema scan unexpectedly found no source literals")
-        missing = {
-            schema: paths
-            for schema, paths in discovered.items()
-            if schema not in documented
-        }
+        missing = {schema: paths for schema, paths in discovered.items() if schema not in documented}
         self.assertEqual({}, missing)
 
 

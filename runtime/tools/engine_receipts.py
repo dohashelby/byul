@@ -10,6 +10,7 @@ Known forms (confirm per engine version on the server before relying on them):
   SGLang rid=<id> / "rid": "<id>"   (only if the engine adopts the forwarded ID)
 A missing ID therefore means "not observed in logs", never "not received".
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,7 +43,7 @@ def _stamp(raw: bytes) -> datetime | None:
         if "." in text:  # kubectl prints nanoseconds; Python accepts at most microseconds.
             head, _, tail = text.partition(".")
             digits = re.match(r"\d+", tail).group()
-            text = f"{head}.{digits[:6]}{tail[len(digits):]}"
+            text = f"{head}.{digits[:6]}{tail[len(digits) :]}"
         value = datetime.fromisoformat(text)
         return value if value.tzinfo else None
     except (ValueError, AttributeError):
@@ -68,18 +69,41 @@ def extract(output: bytes) -> dict[str, str]:
 
 
 class Collector:
-    def __init__(self, context: str, namespace: str, selector: str, output: Path, *, container: str | None = None,
-                 since_s: int = 60, runner: Callable[..., Any] = subprocess.run,
-                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> None:
+    def __init__(
+        self,
+        context: str,
+        namespace: str,
+        selector: str,
+        output: Path,
+        *,
+        container: str | None = None,
+        since_s: int = 60,
+        runner: Callable[..., Any] = subprocess.run,
+        clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    ) -> None:
         self.context, self.namespace, self.selector, self.container = context, namespace, selector, container
         self.output, self.since_s, self.run, self.clock = output, since_s, runner, clock
         self.receipts: dict[str, str] = {}
         self.window_started_at: datetime | None = None
 
     def command(self) -> list[str]:
-        command = ["kubectl", "--context", self.context, "-n", self.namespace, "logs", "-l", self.selector,
-                   "--since", f"{self.since_s}s", "--timestamps=true", "--prefix=false", "--tail=-1",
-                   "--max-log-requests=8", "--ignore-errors=false"]
+        command = [
+            "kubectl",
+            "--context",
+            self.context,
+            "-n",
+            self.namespace,
+            "logs",
+            "-l",
+            self.selector,
+            "--since",
+            f"{self.since_s}s",
+            "--timestamps=true",
+            "--prefix=false",
+            "--tail=-1",
+            "--max-log-requests=8",
+            "--ignore-errors=false",
+        ]
         if self.container:
             command += ["-c", self.container]
         return command
@@ -113,10 +137,17 @@ class Collector:
                 self.receipts = dict(keep)
                 # Older IDs were dropped, so absence before the oldest kept is not covered.
                 self.window_started_at = max(self.window_started_at, _stamp(keep[0][1].encode()))
-        return {"schema_version": SCHEMA, "context": self.context, "collected_at": _iso(now),
-                "state": "error" if reason else "ok", "reason": reason,
-                "window_started_at": _iso(self.window_started_at) if self.window_started_at else None,
-                "receipts": [{"request_id": k, "observed_at": v} for k, v in sorted(self.receipts.items(), key=lambda i: i[1])]}
+        return {
+            "schema_version": SCHEMA,
+            "context": self.context,
+            "collected_at": _iso(now),
+            "state": "error" if reason else "ok",
+            "reason": reason,
+            "window_started_at": _iso(self.window_started_at) if self.window_started_at else None,
+            "receipts": [
+                {"request_id": k, "observed_at": v} for k, v in sorted(self.receipts.items(), key=lambda i: i[1])
+            ],
+        }
 
 
 def write(path: Path, value: dict[str, Any], mode: int = 0o640) -> None:
@@ -143,17 +174,24 @@ def main(argv=None) -> int:
     parser.add_argument("--since-seconds", type=int, default=60)
     parser.add_argument("--watch", action="store_true")
     args = parser.parse_args(argv)
-    if not NAME.fullmatch(args.namespace) or not SELECTOR.fullmatch(args.selector) or (
-            args.container and not NAME.fullmatch(args.container)):
+    if (
+        not NAME.fullmatch(args.namespace)
+        or not SELECTOR.fullmatch(args.selector)
+        or (args.container and not NAME.fullmatch(args.container))
+    ):
         parser.error("invalid namespace, selector or container")
     if args.interval < 2 or args.since_seconds < args.interval * 2:
         parser.error("since-seconds must cover at least two intervals")
-    collector = Collector(args.context, args.namespace, args.selector, args.output,
-                          container=args.container, since_s=args.since_seconds)
+    collector = Collector(
+        args.context, args.namespace, args.selector, args.output, container=args.container, since_s=args.since_seconds
+    )
     while True:
         result = collector.collect()
         write(args.output, result)
-        print(json.dumps({"state": result["state"], "reason": result["reason"], "ids": len(result["receipts"])}), flush=True)
+        print(
+            json.dumps({"state": result["state"], "reason": result["reason"], "ids": len(result["receipts"])}),
+            flush=True,
+        )
         if not args.watch:
             return 0 if result["state"] == "ok" else 1
         time.sleep(args.interval)

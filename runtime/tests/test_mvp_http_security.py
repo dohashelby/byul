@@ -14,23 +14,23 @@ import unittest
 from unittest.mock import Mock
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.auth import AuthResult, Principal
-from serving_runtime.mvp.backend import BackendConfig
-from serving_runtime.mvp.config import MVPConfig
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.auth import AuthResult, Principal
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.config.config import MVPConfig
 from serving_runtime.enforcement.events import ObservationQuery
-from serving_runtime.mvp.http_handler import (
+from serving_runtime.gateway.http_handler import (
     HandlerDependencies,
     LimitedThreadingHTTPServer,
     _DeadlineReader,
     create_handler,
 )
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_state import load_revocations
-from serving_runtime.mvp.request_flow import ConcurrencyLimiter, RequestFlow
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_state import load_revocations
+from serving_runtime.gateway.request_flow import ConcurrencyLimiter, RequestFlow
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.observation.store import JsonlStore
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -112,9 +112,7 @@ class ResourceOrderingTests(unittest.TestCase):
     def auth_state(result: AuthResult) -> _AuthState:
         return _AuthState(result)
 
-    def flow(
-        self, temporary: str, *, auth: AuthResult, target_hold
-    ) -> tuple[RequestFlow, RequestRecords]:
+    def flow(self, temporary: str, *, auth: AuthResult, target_hold) -> tuple[RequestFlow, RequestRecords]:
         records = RequestRecords(
             temporary,
             "session",
@@ -136,9 +134,7 @@ class ResourceOrderingTests(unittest.TestCase):
 
     def test_authentication_failure_precedes_target_hold_and_body_read(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            target_hold = Mock(
-                return_value=("TARGET_MISMATCH", "target registration mismatch")
-            )
+            target_hold = Mock(return_value=("TARGET_MISMATCH", "target registration mismatch"))
             flow, _records = self.flow(
                 temporary,
                 auth=AuthResult("missing"),
@@ -156,9 +152,7 @@ class ResourceOrderingTests(unittest.TestCase):
     def test_authenticated_target_hold_precedes_body_and_records_principal(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             principal = Principal("client-a", ("inference",), "")
-            target_hold = Mock(
-                return_value=("TARGET_MISMATCH", "target registration mismatch")
-            )
+            target_hold = Mock(return_value=("TARGET_MISMATCH", "target registration mismatch"))
             flow, records = self.flow(
                 temporary,
                 auth=AuthResult("authenticated", principal),
@@ -226,9 +220,7 @@ class ConnectionCapUnitTests(unittest.TestCase):
         server._rejected_connections = 0
         server._max_connections = 1
         rejected = []
-        server._on_connection_rejected = lambda request_id, decision: rejected.append(
-            (request_id, decision)
-        )
+        server._on_connection_rejected = lambda request_id, decision: rejected.append((request_id, decision))
         server.shutdown_request = lambda _request: None
         request = FakeSocket()
         server.process_request(request, ("127.0.0.1", 1))
@@ -296,9 +288,7 @@ class HandlerSocketPairTests(unittest.TestCase):
             receipt_lookup=lambda _request_id: {},
             observation_session_id="session",
             lab_report=lambda: {"state": "not_configured"},
-            record_transport_error=lambda request_id, decision: self.transport_errors.append(
-                (request_id, decision)
-            ),
+            record_transport_error=lambda request_id, decision: self.transport_errors.append((request_id, decision)),
             request_header_timeout_s=0.03,
             request_body_timeout_s=0.03,
         )
@@ -352,10 +342,7 @@ class HandlerSocketPairTests(unittest.TestCase):
         self.assertEqual(self.transport_errors[-1][1].reason_code, "REQUEST_BODY_TIMEOUT")
 
     def test_normal_and_stream_responses_still_work(self) -> None:
-        request = (
-            b"POST /v1/chat/completions HTTP/1.0\r\nHost: local\r\n"
-            b"Content-Length: 2\r\n\r\n{}"
-        )
+        request = b"POST /v1/chat/completions HTTP/1.0\r\nHost: local\r\nContent-Length: 2\r\n\r\n{}"
 
         def normal(io, request_id: str) -> None:
             self.assertEqual(io.read_request_body(2), b"{}")
@@ -391,9 +378,7 @@ class HandlerSocketPairTests(unittest.TestCase):
                 collectors_status=lambda: {},
                 revalidation_status=lambda: {},
                 queries=None,
-                observations=ObservationQuery(
-                    Path(self.temporary.name) / "observations.jsonl"
-                ),
+                observations=ObservationQuery(Path(self.temporary.name) / "observations.jsonl"),
                 receipt_lookup=lambda _request_id: {},
                 observation_session_id="session",
                 lab_report=lambda: {"state": "not_configured"},
@@ -446,9 +431,7 @@ class HandlerSocketPairTests(unittest.TestCase):
             b"POST /v1/chat/completions HTTP/1.0\r\nHost: local\r\n\r\n",
             lambda _io, _request_id: None,
         )
-        self.assertEqual(
-            self.transport_errors[-1][1].reason_code, "REQUEST_HEADER_TIMEOUT"
-        )
+        self.assertEqual(self.transport_errors[-1][1].reason_code, "REQUEST_HEADER_TIMEOUT")
         if not header_reset:
             self.assertIn(b"408 Request Timeout", header)
 
@@ -460,9 +443,7 @@ class HandlerSocketPairTests(unittest.TestCase):
             b"x" * 20,
             read_body,
         )
-        self.assertEqual(
-            self.transport_errors[-1][1].reason_code, "REQUEST_BODY_TIMEOUT"
-        )
+        self.assertEqual(self.transport_errors[-1][1].reason_code, "REQUEST_BODY_TIMEOUT")
         if not body_reset:
             self.assertIn(b"408 Request Timeout", body)
 
@@ -492,9 +473,7 @@ class SlowClientHttpTests(unittest.TestCase):
             "max_connections": 8,
         }
         options.update(updates)
-        gateway = GatewayApp(
-            MVPConfig(**options), load_policy(POLICY), self.engine.address
-        ).start()
+        gateway = GatewayApp(MVPConfig(**options), load_policy(POLICY), self.engine.address).start()
         self.addCleanup(gateway.stop)
         return gateway
 
@@ -523,11 +502,7 @@ class SlowClientHttpTests(unittest.TestCase):
 
     def final_codes(self) -> list[str]:
         records, _ = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
-        return [
-            record.get("decision", {}).get("reason_code")
-            for record in records
-            if record.get("phase") == "final"
-        ]
+        return [record.get("decision", {}).get("reason_code") for record in records if record.get("phase") == "final"]
 
     def test_slow_header_slow_body_and_incomplete_body_are_recorded(self) -> None:
         gateway = self.start_gateway()
@@ -602,6 +577,7 @@ class SlowClientHttpTests(unittest.TestCase):
         class DelayedRelease:
             def acquire(self, *args, **kwargs):
                 return original.acquire(*args, **kwargs)
+
             def release(self):
                 releasing.set()
                 if not resume.wait(3):
@@ -609,15 +585,21 @@ class SlowClientHttpTests(unittest.TestCase):
                 original.release()
 
         server._connection_slots = DelayedRelease()
-        request = Request(f"http://{gateway.address[0]}:{gateway.address[1]}/v1/chat/completions",
-                          data=body(), headers={"Content-Type": "application/json"}, method="POST")
+        request = Request(
+            f"http://{gateway.address[0]}:{gateway.address[1]}/v1/chat/completions",
+            data=body(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
         with closing(urlopen(request, timeout=2)) as response:
             self.assertEqual(response.status, 200)
             response.read()
         self.assertTrue(releasing.wait(1))
+
         def read_status():
             result.append(server.connection_status())
             observed.set()
+
         observer = threading.Thread(target=read_status)
         observer.start()
         try:

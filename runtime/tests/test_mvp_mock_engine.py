@@ -6,7 +6,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.mock_engine import MockEngine
+from serving_runtime.devtools.mock_engine import MockEngine
 
 
 class MockEngineTests(unittest.TestCase):
@@ -42,11 +42,13 @@ class MockEngineTests(unittest.TestCase):
     def test_chat_response_and_receipt_found_or_missing(self) -> None:
         request = Request(
             self.base_url + "/v1/chat/completions",
-            data=json.dumps({
-                "model": "test-model",
-                "max_tokens": 64,
-                "messages": [{"role": "user", "content": "do not retain this"}],
-            }).encode("utf-8"),
+            data=json.dumps(
+                {
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "messages": [{"role": "user", "content": "do not retain this"}],
+                }
+            ).encode("utf-8"),
             headers={"Content-Type": "application/json", "X-Request-ID": "request-1"},
             method="POST",
         )

@@ -12,8 +12,8 @@ import threading
 import unittest
 
 from serving_runtime.enforcement.events import ObservationQuery
-from serving_runtime.mvp.gpu_state import read_gpu_state
-from serving_runtime.mvp.http_handler import HandlerDependencies, create_handler
+from serving_runtime.observation.gpu_state import read_gpu_state
+from serving_runtime.gateway.http_handler import HandlerDependencies, create_handler
 from tools import gpu_status
 
 L4 = "0, NVIDIA L4, 37, 18120, 23034, 54, 71.52\n"
@@ -27,15 +27,27 @@ def runner(stdout="", returncode=0, error=None):
         if error:
             raise error
         return subprocess.CompletedProcess(command, returncode, stdout, "secret stderr text")
+
     run.calls = calls
     return run
 
 
 class ParseTests(unittest.TestCase):
     def test_parses_l4_row(self):
-        self.assertEqual(gpu_status.parse(L4), [{
-            "index": 0, "name": "NVIDIA L4", "utilization_percent": 37.0, "memory_used_mib": 18120.0,
-            "memory_total_mib": 23034.0, "temperature_c": 54.0, "power_w": 71.52}])
+        self.assertEqual(
+            gpu_status.parse(L4),
+            [
+                {
+                    "index": 0,
+                    "name": "NVIDIA L4",
+                    "utilization_percent": 37.0,
+                    "memory_used_mib": 18120.0,
+                    "memory_total_mib": 23034.0,
+                    "temperature_c": 54.0,
+                    "power_w": 71.52,
+                }
+            ],
+        )
 
     def test_not_supported_fields_are_null(self):
         row = gpu_status.parse("1, NVIDIA L4, [N/A], 0, 23034, 40, [Not Supported]\n")[0]
@@ -43,10 +55,17 @@ class ParseTests(unittest.TestCase):
         self.assertIsNone(row["power_w"])
 
     def test_malformed_rows_reject_whole_output(self):
-        for output in ("", "0, NVIDIA L4, 37\n", "x, NVIDIA L4, 1, 1, 2, 3, 4\n",
-                       "0, NVIDIA L4, 101, 1, 2, 3, 4\n", "0, NVIDIA L4, 1, 5, 2, 3, 4\n",
-                       "0, NVIDIA L4, -1, 1, 2, 3, 4\n", "0, NVIDIA L4, nan, 1, 2, 3, 4\n",
-                       L4 * 17, "x" * (gpu_status.MAX_OUTPUT + 1)):
+        for output in (
+            "",
+            "0, NVIDIA L4, 37\n",
+            "x, NVIDIA L4, 1, 1, 2, 3, 4\n",
+            "0, NVIDIA L4, 101, 1, 2, 3, 4\n",
+            "0, NVIDIA L4, 1, 5, 2, 3, 4\n",
+            "0, NVIDIA L4, -1, 1, 2, 3, 4\n",
+            "0, NVIDIA L4, nan, 1, 2, 3, 4\n",
+            L4 * 17,
+            "x" * (gpu_status.MAX_OUTPUT + 1),
+        ):
             with self.subTest(output=output[:40]), self.assertRaises(ValueError):
                 gpu_status.parse(output)
 
@@ -57,13 +76,19 @@ class CollectTests(unittest.TestCase):
         result = gpu_status.collect(run, "/usr/bin/nvidia-smi")
         self.assertEqual(result["state"], "ok")
         command, kwargs = run.calls[0]
-        self.assertEqual(command[1], "--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw")
+        self.assertEqual(
+            command[1], "--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw"
+        )
         self.assertEqual(kwargs["timeout"], gpu_status.TIMEOUT_S)
         self.assertNotIn("uuid", json.dumps(result))
 
     def test_errors_become_reason_codes_without_output(self):
-        cases = {"NVIDIA_SMI_FAILED": runner("x", 9), "TIMEOUT": runner(error=subprocess.TimeoutExpired("n", 8)),
-                 "EXEC_FAILED": runner(error=PermissionError("denied /dev/nvidia0")), "PARSE_ERROR": runner("junk\n")}
+        cases = {
+            "NVIDIA_SMI_FAILED": runner("x", 9),
+            "TIMEOUT": runner(error=subprocess.TimeoutExpired("n", 8)),
+            "EXEC_FAILED": runner(error=PermissionError("denied /dev/nvidia0")),
+            "PARSE_ERROR": runner("junk\n"),
+        }
         for reason, run in cases.items():
             with self.subTest(reason=reason):
                 result = gpu_status.collect(run, "/usr/bin/nvidia-smi")
@@ -115,7 +140,9 @@ class ReadStateTests(unittest.TestCase):
 
     def test_collector_error_is_preserved(self):
         self.snapshot(state="error", reason="TIMEOUT", gpus=[])
-        self.assertEqual((read_gpu_state(self.path)["state"], read_gpu_state(self.path)["reason"]), ("error", "TIMEOUT"))
+        self.assertEqual(
+            (read_gpu_state(self.path)["state"], read_gpu_state(self.path)["reason"]), ("error", "TIMEOUT")
+        )
 
     def test_nonfinite_snapshot_is_rejected_before_json_response(self):
         for number in (float("nan"), float("inf"), -float("inf")):
@@ -126,9 +153,13 @@ class ReadStateTests(unittest.TestCase):
             self.assertEqual((result["state"], result["reason"], result["gpus"]), ("error", "INVALID_SNAPSHOT", []))
 
     def test_invalid_snapshots_are_errors(self):
-        for change in ({"schema_version": "other"}, {"gpus": [{"index": 0, "name": "x", "power_w": -1}]},
-                       {"gpus": [{"index": True, "name": "x"}]}, {"state": "error", "reason": "free text"},
-                       {"collected_at": "2026-11-09T00:00:00"}):
+        for change in (
+            {"schema_version": "other"},
+            {"gpus": [{"index": 0, "name": "x", "power_w": -1}]},
+            {"gpus": [{"index": True, "name": "x"}]},
+            {"state": "error", "reason": "free text"},
+            {"collected_at": "2026-11-09T00:00:00"},
+        ):
             with self.subTest(change=change):
                 self.snapshot(**change)
                 result = read_gpu_state(self.path)
@@ -141,15 +172,28 @@ class RouteTests(unittest.TestCase):
     def test_gateway_serves_gpu_status(self):
         with tempfile.TemporaryDirectory() as temporary:
             dependencies = HandlerDependencies(
-                chat=None, completions=None, status=lambda: {}, policy_status=lambda: {},
-                baseline_status=lambda: {}, collectors_status=lambda: {}, revalidation_status=lambda: {},
-                queries=None, observations=ObservationQuery(Path(temporary) / "o.jsonl"),
-                receipt_lookup=lambda _r: {}, observation_session_id="s", lab_report=lambda: {},
-                record_transport_error=lambda *_a: None, request_header_timeout_s=0.5, request_body_timeout_s=0.5,
-                gpu_status=lambda: {"state": "ok", "gpus": [{"index": 0}]})
+                chat=None,
+                completions=None,
+                status=lambda: {},
+                policy_status=lambda: {},
+                baseline_status=lambda: {},
+                collectors_status=lambda: {},
+                revalidation_status=lambda: {},
+                queries=None,
+                observations=ObservationQuery(Path(temporary) / "o.jsonl"),
+                receipt_lookup=lambda _r: {},
+                observation_session_id="s",
+                lab_report=lambda: {},
+                record_transport_error=lambda *_a: None,
+                request_header_timeout_s=0.5,
+                request_body_timeout_s=0.5,
+                gpu_status=lambda: {"state": "ok", "gpus": [{"index": 0}]},
+            )
             client, server = socket.socketpair()
             self.addCleanup(client.close)
-            thread = threading.Thread(target=lambda: (create_handler(dependencies)(server, ("local", 0), object()), server.close()))
+            thread = threading.Thread(
+                target=lambda: (create_handler(dependencies)(server, ("local", 0), object()), server.close())
+            )
             thread.start()
             try:
                 client.sendall(b"GET /api/gpu-status HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")

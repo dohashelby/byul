@@ -1,0 +1,954 @@
+"""Validated chat request flow and concurrent-request accounting."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+import threading
+import time
+from typing import Callable, Protocol
+
+from serving_runtime.policy.approval import ApprovalResult
+from serving_runtime.gateway.auth import CHAT_ROUTE, COMPLETIONS_ROUTE, AuthState, not_configured
+from serving_runtime.gateway.cache_isolation import CacheSaltKey, isolation_status, unavailable_message
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.gateway.engine_client import EngineClient
+from serving_runtime.gateway.engine_client import RequestDeadlineExceeded, TokenizeHTTPError
+from serving_runtime.policy.policy import PolicyState
+from serving_runtime.policy.policy_state import RevocationState, evaluate_policy
+from serving_runtime.gateway.relay import Relay, StreamResponse, engine_error
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.gateway.response_timeout import write_response_before
+from serving_runtime.gateway.validator import Decision, validate_request
+
+
+_INVALID_POLICY_BODY_LIMIT = 1024 * 1024
+
+
+class ChatIO(StreamResponse, Protocol):
+    """HTTP request/response operations needed by the chat flow."""
+
+    def request_header(self, name: str) -> str | None: ...
+
+    def read_request_body(self, length: int) -> bytes: ...
+
+    def send_error_decision(
+        self,
+        decision: Decision,
+        request_id: str,
+        *,
+        close_connection: bool = False,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None: ...
+
+    def send_response_body(
+        self,
+        status: int,
+        content_type: str,
+        body: bytes,
+        *,
+        request_id: str | None = None,
+    ) -> None: ...
+
+
+def transport_decision(status: int, code: str, message: str) -> Decision:
+    return Decision(
+        result="INVALID",
+        http_status=status,
+        reason_code=code,
+        rule_id=None,
+        message=message,
+        model=None,
+        max_tokens=None,
+    )
+
+
+class ConcurrencyLimiter:
+    """Non-blocking request slot accounting shared by buffered and stream calls."""
+
+    def __init__(self, limit: int) -> None:
+        self._limit = limit
+        self._lock = threading.Lock()
+        self._in_flight = 0
+
+    def try_acquire(self) -> bool:
+        with self._lock:
+            if self._in_flight >= self._limit:
+                return False
+            self._in_flight += 1
+            return True
+
+    def release(self) -> None:
+        with self._lock:
+            if self._in_flight <= 0:
+                raise RuntimeError("in-flight request counter underflow")
+            self._in_flight -= 1
+
+    def status(self) -> dict[str, int]:
+        with self._lock:
+            return {"in_flight": self._in_flight, "limit": self._limit}
+
+
+@dataclass(frozen=True)
+class _RequestCall:
+    response: ChatIO
+    request_id: str
+    route: str
+    request_kind: str
+
+
+@dataclass(frozen=True)
+class _PreparedRequest:
+    policy_snapshot: PolicyState
+    decision: Decision
+    document: dict[str, object]
+    stream: bool
+    cache_salt: str | None
+
+
+class RequestFlow:
+    """Run one chat request without depending on the application object."""
+
+    def __init__(
+        self,
+        backend: BackendConfig,
+        policy_state: Callable[[], PolicyState],
+        revocation_state: Callable[[], RevocationState],
+        records: RequestRecords,
+        engine_client: EngineClient,
+        relay: Relay,
+        concurrency: ConcurrencyLimiter,
+        auth_state: Callable[[], AuthState] | None = None,
+        target_hold: Callable[[str | None], tuple[str, str] | None] | None = None,
+        approval_result: Callable[[], ApprovalResult | None] | None = None,
+        cache_salt_key: CacheSaltKey | None = None,
+    ) -> None:
+        self._auth_state = auth_state or not_configured
+        self._target_hold = target_hold or (lambda _policy_target: None)
+        self._backend = backend
+        self._policy_state = policy_state
+        self._revocation_state = revocation_state
+        self._approval_result = approval_result or (lambda: None)
+        self._cache_salt_key = cache_salt_key or CacheSaltKey.from_environ({})
+        self._records = records
+        self._engine_client = engine_client
+        self._relay = relay
+        self._concurrency = concurrency
+
+    def finish_without_relay(
+        self,
+        response: ChatIO,
+        request_id: str,
+        decision: Decision,
+        *,
+        close_connection: bool = False,
+        stream: bool = False,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
+        self._records.append(
+            self._records.build(
+                "final",
+                request_id,
+                decision,
+                attempted=False,
+                backend_receipt=self._engine_client.receipt_not_queried(),
+                response="none",
+                error_code=(decision.reason_code if decision.reason_code == "ENGINE_DEADLINE" else None),
+                stream=stream,
+                http_start_status=decision.http_status,
+                final_outcome=decision.reason_code,
+            )
+        )
+        response.send_error_decision(
+            decision,
+            request_id,
+            close_connection=close_connection,
+            extra_headers=extra_headers,
+        )
+
+    def record_without_relay(self, request_id: str, decision: Decision) -> None:
+        """Record a transport rejection produced outside the normal chat path."""
+
+        self._records.append(
+            self._records.build(
+                "final",
+                request_id,
+                decision,
+                attempted=False,
+                backend_receipt=self._engine_client.receipt_not_queried(),
+                response="none",
+                error_code=decision.reason_code,
+                http_start_status=decision.http_status,
+                final_outcome=decision.reason_code,
+            )
+        )
+
+    def _context_decision(
+        self,
+        request_id: str,
+        document: dict[str, object],
+        decision: Decision,
+        policy_snapshot: PolicyState,
+        request_kind: str,
+        deadline_at: float | None = None,
+    ) -> Decision | None:
+        context_limit = policy_snapshot.policy.max_context_tokens if policy_snapshot.policy is not None else None
+        if context_limit is None:
+            return None
+        try:
+            backend_model_id = self._backend.mapped_model(decision.model)
+            if backend_model_id is None:
+                raise ValueError("backend model is unavailable")
+            input_field = "messages" if request_kind == "chat" else "prompt"
+            input_value = document[input_field]
+            if request_kind == "chat" and not isinstance(input_value, list):
+                raise ValueError("validated messages are unavailable")
+            if request_kind == "completions" and not isinstance(input_value, str):
+                raise ValueError("validated prompt is unavailable")
+            # The relay forwards approved extra fields to the engine; the token
+            # count must see the same prompt-shaping inputs.
+            extra_fields = {name: document[name] for name, _mode in decision.extra_fields if name in document}
+            input_tokens = self._engine_client.count_input_tokens(
+                request_id,
+                input_value,
+                backend_model_id,
+                request_kind=request_kind,
+                extra_fields=extra_fields,
+                deadline_at=deadline_at,
+            )
+            if deadline_at is not None and time.monotonic() >= deadline_at:
+                raise RequestDeadlineExceeded()
+        except RequestDeadlineExceeded:
+            return engine_error(504, "ENGINE_DEADLINE", "deadline exceeded", decision)
+        except Exception as error:
+            if (
+                deadline_at is not None
+                and time.monotonic() >= deadline_at
+                and isinstance(error, (TimeoutError, OSError))
+            ):
+                return engine_error(504, "ENGINE_DEADLINE", "deadline exceeded", decision)
+            # Store only the exception class; backend messages may contain secrets.
+            context_error = {
+                "limit": context_limit,
+                "input_tokens": None,
+                "result": "unavailable",
+                "error": type(error).__name__,
+                "endpoint": None,
+                "http_status": None,
+            }
+            message = "input token count is unavailable"
+            if isinstance(error, TokenizeHTTPError):
+                context_error["endpoint"] = error.endpoint
+                context_error["http_status"] = error.http_status
+                message += f" ({error.endpoint} HTTP {error.http_status})"
+            self._records.set_context(context_error)
+            return engine_error(
+                503,
+                "CONTEXT_CHECK_UNAVAILABLE",
+                message,
+                decision,
+                source="gateway",
+            )
+        total = input_tokens + (decision.max_tokens or 0)
+        exceeded = total > context_limit
+        self._records.set_context(
+            {
+                "limit": context_limit,
+                "input_tokens": input_tokens,
+                "requested_total": total,
+                "result": "exceeded" if exceeded else "within_limit",
+            }
+        )
+        if not exceeded:
+            return None
+        return Decision(
+            result="DENIED",
+            http_status=403,
+            reason_code="CONTEXT_LIMIT_EXCEEDED",
+            rule_id="max_context_tokens",
+            message="input tokens plus max_tokens exceed the context limit",
+            model=decision.model,
+            max_tokens=decision.max_tokens,
+        )
+
+    @staticmethod
+    def _auth_rejection(auth_state: AuthState, auth, route: str) -> tuple[Decision, dict[str, str] | None] | None:
+        """Map an authentication outcome to a pre-body rejection, if any."""
+
+        if auth.state == "not_configured":
+            return None
+        if auth.state == "unavailable":
+            # A broken auth config is a Gateway error, not a successful block.
+            return (
+                Decision(
+                    result="ERROR",
+                    http_status=503,
+                    reason_code="AUTH_UNAVAILABLE",
+                    rule_id=None,
+                    message="authentication configuration is unavailable",
+                    model=None,
+                    max_tokens=None,
+                ),
+                None,
+            )
+        if auth.state in {"missing", "invalid"}:
+            code = "AUTH_REQUIRED" if auth.state == "missing" else "AUTH_INVALID"
+            message = "authentication is required" if auth.state == "missing" else "authentication failed"
+            return (
+                Decision(
+                    result="DENIED",
+                    http_status=401,
+                    reason_code=code,
+                    rule_id="authentication",
+                    message=message,
+                    model=None,
+                    max_tokens=None,
+                ),
+                {"WWW-Authenticate": 'Bearer realm="serving-runtime"'},
+            )
+        required = set(auth_state.roles_for(route))
+        if auth.principal is None or not required & set(auth.principal.roles):
+            return (
+                Decision(
+                    result="DENIED",
+                    http_status=403,
+                    reason_code="ROLE_NOT_ALLOWED",
+                    rule_id="route_roles",
+                    message="principal role is not allowed for this route",
+                    model=None,
+                    max_tokens=None,
+                ),
+                None,
+            )
+        return None
+
+    def chat(self, response: ChatIO, request_id: str) -> None:
+        self._handle(response, request_id, route=CHAT_ROUTE, request_kind="chat")
+
+    def completions(self, response: ChatIO, request_id: str) -> None:
+        self._handle(
+            response,
+            request_id,
+            route=COMPLETIONS_ROUTE,
+            request_kind="completions",
+        )
+
+    def _handle(
+        self,
+        response: ChatIO,
+        request_id: str,
+        *,
+        route: str,
+        request_kind: str,
+    ) -> None:
+        call = _RequestCall(response, request_id, route, request_kind)
+        prepared = self._prepare_request(call)
+        if prepared is None:
+            return
+        decision, stream = prepared.decision, prepared.stream
+        if not self._concurrency.try_acquire():
+            self._reject_concurrency(response, request_id, decision, stream)
+            return
+
+        acquired_at = time.monotonic()
+        try:
+            if self._start_request(call, prepared, acquired_at) is None:
+                return
+            if stream:
+                self._relay_stream_and_record(call, prepared, acquired_at)
+                return
+            self._relay_buffered_and_record(call, prepared, acquired_at)
+        finally:
+            self._concurrency.release()
+
+    def _read_content_length(self, response, request_id):
+        if response.request_header("Transfer-Encoding") is not None:
+            self.finish_without_relay(
+                response,
+                request_id,
+                transport_decision(
+                    400,
+                    "UNSUPPORTED_TRANSFER_ENCODING",
+                    "Transfer-Encoding is not supported",
+                ),
+                close_connection=True,
+            )
+            return
+
+        raw_length = response.request_header("Content-Length")
+        if raw_length is None or not raw_length or any(character not in "0123456789" for character in raw_length):
+            self.finish_without_relay(
+                response,
+                request_id,
+                transport_decision(
+                    400,
+                    "INVALID_CONTENT_LENGTH",
+                    "Content-Length must be a non-negative integer",
+                ),
+                close_connection=True,
+            )
+            return
+        try:
+            content_length = int(raw_length)
+        except ValueError:
+            self.finish_without_relay(
+                response,
+                request_id,
+                transport_decision(
+                    400,
+                    "INVALID_CONTENT_LENGTH",
+                    "Content-Length must be a non-negative integer",
+                ),
+                close_connection=True,
+            )
+            return
+        return content_length
+
+    def _check_size_and_policy(self, response, request_id, content_length, policy_snapshot, policy_runtime):
+        policy = policy_snapshot.policy
+        body_limit = policy.max_body_bytes if policy_snapshot.ok and policy is not None else _INVALID_POLICY_BODY_LIMIT
+        if content_length > body_limit:
+            self.finish_without_relay(
+                response,
+                request_id,
+                transport_decision(
+                    413,
+                    "BODY_TOO_LARGE",
+                    "request body exceeds the policy limit",
+                ),
+                close_connection=True,
+            )
+            return
+
+        if not policy_runtime["gateway_active"]:
+            unavailable = Decision(
+                result="ERROR",
+                http_status=503,
+                reason_code=str(policy_runtime["reason_code"]),
+                rule_id=None,
+                message=str(policy_runtime["reason_message"]),
+                model=None,
+                max_tokens=None,
+            )
+            self.finish_without_relay(response, request_id, unavailable, close_connection=True)
+            return
+        return (policy,)
+
+    def _authenticate_request(self, response, request_id, route):
+        auth_state = self._auth_state()
+        auth = auth_state.authenticate(response.request_header("Authorization"))
+        self._records.set_auth(auth.record())
+        auth_rejection = self._auth_rejection(auth_state, auth, route)
+        if auth_rejection is not None:
+            decision, headers = auth_rejection
+            self.finish_without_relay(
+                response,
+                request_id,
+                decision,
+                close_connection=True,
+                extra_headers=headers,
+            )
+            return
+        return auth_state, auth
+
+    def _check_target_and_cache(self, response, request_id, policy, auth_state):
+        hold = self._target_hold(policy.target_id if policy is not None else None)
+        if hold is not None:
+            # Declared target conflicts hold the request; this is not a block result.
+            self.finish_without_relay(
+                response,
+                request_id,
+                Decision(
+                    result="ERROR",
+                    http_status=503,
+                    reason_code=hold[0],
+                    rule_id="target_registration",
+                    message=hold[1],
+                    model=None,
+                    max_tokens=None,
+                ),
+                close_connection=True,
+            )
+            return
+
+        cache_status = isolation_status(
+            policy.cache_isolation if policy is not None else None,
+            auth_state,
+            self._backend.kind,
+            self._cache_salt_key,
+        )
+        if not cache_status["ready"]:
+            unavailable_reason = cache_status["unavailable_reason_code"]
+            self.finish_without_relay(
+                response,
+                request_id,
+                Decision(
+                    result="ERROR",
+                    http_status=503,
+                    reason_code="CACHE_ISOLATION_UNAVAILABLE",
+                    rule_id="cache_isolation",
+                    message=unavailable_message(unavailable_reason),
+                    model=None,
+                    max_tokens=None,
+                ),
+                close_connection=True,
+            )
+            return
+        return True
+
+    def _read_validated_request(self, response, request_id, content_length, policy_snapshot, request_kind):
+        body = response.read_request_body(content_length)
+        incomplete = len(body) != content_length
+        if incomplete:
+            self.finish_without_relay(
+                response,
+                request_id,
+                transport_decision(
+                    400,
+                    "INVALID_CONTENT_LENGTH",
+                    "request body is shorter than Content-Length",
+                ),
+                close_connection=True,
+            )
+            return
+        decision = validate_request(
+            body,
+            response.request_header("Content-Type"),
+            policy_snapshot,
+            request_kind=request_kind,
+        )
+        stream = False
+        document: dict[str, object] | None = None
+        try:
+            parsed_document = json.loads(body.decode("utf-8"))
+            if isinstance(parsed_document, dict):
+                document = parsed_document
+                stream = parsed_document.get("stream") is True
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
+            pass
+        if decision.result != "ALLOWED":
+            self.finish_without_relay(
+                response,
+                request_id,
+                decision,
+                close_connection=incomplete,
+                stream=stream,
+            )
+            return
+        if document is None:
+            self.finish_without_relay(
+                response,
+                request_id,
+                transport_decision(400, "MALFORMED_JSON", "invalid JSON"),
+            )
+            return
+        return decision, document, stream
+
+    def _check_principal_model(self, response, request_id, auth, decision, stream):
+        principal = auth.principal
+        if (
+            principal is not None
+            and principal.allowed_models is not None
+            and decision.model not in principal.allowed_models
+        ):
+            self.finish_without_relay(
+                response,
+                request_id,
+                Decision(
+                    result="DENIED",
+                    http_status=403,
+                    reason_code="PRINCIPAL_MODEL_NOT_ALLOWED",
+                    rule_id="principal_allowed_models",
+                    message="model is not allowed for this principal",
+                    model=decision.model,
+                    max_tokens=decision.max_tokens,
+                ),
+                stream=stream,
+            )
+            return
+        return (principal,)
+
+    def _check_backend(self, response, request_id, decision, stream):
+        if self._backend.external:
+            if self._backend.credential_status == "missing":
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    engine_error(
+                        503,
+                        "BACKEND_CREDENTIAL_MISSING",
+                        "backend credential is configured but unavailable",
+                        decision,
+                        source="gateway",
+                    ),
+                    stream=stream,
+                )
+                return
+            if self._backend.credential_status == "invalid":
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    engine_error(
+                        503,
+                        "BACKEND_CREDENTIAL_INVALID",
+                        "backend credential cannot be used as an HTTP header value",
+                        decision,
+                        source="gateway",
+                    ),
+                    stream=stream,
+                )
+                return
+            if self._backend.mapped_model(decision.model) is None:
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    engine_error(
+                        503,
+                        "BACKEND_MODEL_UNMAPPED",
+                        "allowed policy model has no backend mapping",
+                        decision,
+                        source="gateway",
+                    ),
+                    stream=stream,
+                )
+                return
+        return True
+
+    def _derive_request_cache_salt(self, response, request_id, policy, principal, decision, stream):
+        cache_salt: str | None = None
+        if policy is not None and policy.cache_isolation == "per_principal":
+            if principal is None:
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    engine_error(
+                        503,
+                        "CACHE_ISOLATION_UNAVAILABLE",
+                        "cache isolation authentication is unavailable",
+                        decision,
+                        source="gateway",
+                    ),
+                    stream=stream,
+                )
+                return
+            try:
+                cache_salt = self._cache_salt_key.derive(principal.principal_id)
+            except RuntimeError:
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    engine_error(
+                        503,
+                        "CACHE_ISOLATION_UNAVAILABLE",
+                        "cache isolation key is unavailable",
+                        decision,
+                        source="gateway",
+                    ),
+                    stream=stream,
+                )
+                return
+        return (cache_salt,)
+
+    def _prepare_request(self, call):
+        response, request_id, route, request_kind = call.response, call.request_id, call.route, call.request_kind
+        self._records.clear_context(route)
+        policy_snapshot = self._policy_state()
+        self._records.bind_context(policy_snapshot)
+        policy_runtime = evaluate_policy(
+            policy_snapshot,
+            self._revocation_state(),
+            approval=self._approval_result(),
+        )
+        content_length = self._read_content_length(response, request_id)
+        if content_length is None:
+            return
+        checked_policy = self._check_size_and_policy(
+            response, request_id, content_length, policy_snapshot, policy_runtime
+        )
+        if checked_policy is None:
+            return
+        (policy,) = checked_policy
+        authenticated = self._authenticate_request(response, request_id, route)
+        if authenticated is None:
+            return
+        auth_state, auth = authenticated
+        if self._check_target_and_cache(response, request_id, policy, auth_state) is None:
+            return
+        validated = self._read_validated_request(response, request_id, content_length, policy_snapshot, request_kind)
+        if validated is None:
+            return
+        decision, document, stream = validated
+        checked_principal = self._check_principal_model(response, request_id, auth, decision, stream)
+        if checked_principal is None:
+            return
+        (principal,) = checked_principal
+        if self._check_backend(response, request_id, decision, stream) is None:
+            return
+        derived = self._derive_request_cache_salt(response, request_id, policy, principal, decision, stream)
+        if derived is None:
+            return
+        (cache_salt,) = derived
+        return _PreparedRequest(policy_snapshot, decision, document, stream, cache_salt)
+
+    def _reject_concurrency(self, response, request_id, decision, stream):
+        limited = Decision(
+            result="DENIED",
+            http_status=429,
+            reason_code="CONCURRENCY_LIMIT",
+            rule_id="max_concurrent_requests",
+            message="maximum concurrent requests reached",
+            model=decision.model,
+            max_tokens=decision.max_tokens,
+        )
+        self.finish_without_relay(
+            response,
+            request_id,
+            limited,
+            stream=stream,
+            extra_headers={"Retry-After": "1"},
+        )
+
+    def _start_request(self, call, prepared, acquired_at):
+        response, request_id, request_kind = call.response, call.request_id, call.request_kind
+        policy_snapshot, decision, document, stream, cache_salt = (
+            prepared.policy_snapshot,
+            prepared.decision,
+            prepared.document,
+            prepared.stream,
+            prepared.cache_salt,
+        )
+        context_decision = self._context_decision(
+            request_id,
+            document,
+            decision,
+            policy_snapshot,
+            request_kind,
+            acquired_at + self._relay.request_deadline_s,
+        )
+        if context_decision is not None:
+            self.finish_without_relay(
+                response,
+                request_id,
+                context_decision,
+                close_connection=context_decision.reason_code == "ENGINE_DEADLINE",
+                stream=stream,
+            )
+            return
+        if cache_salt is not None:
+            self._records.mark_cache_isolation_applied()
+        started = self._records.build(
+            "started",
+            request_id,
+            decision,
+            attempted=False,
+            backend_receipt=self._engine_client.receipt_not_queried(),
+            response="none",
+            error_code=None,
+            stream=stream,
+        )
+        if not self._records.append(started):
+            unavailable = engine_error(
+                503,
+                "STORE_UNAVAILABLE",
+                "request record store is unavailable",
+                decision,
+                source="gateway",
+            )
+            self._records.append(
+                self._records.build(
+                    "final",
+                    request_id,
+                    unavailable,
+                    attempted=False,
+                    backend_receipt=self._engine_client.receipt_not_queried(),
+                    response="failed",
+                    error_code="STORE_UNAVAILABLE",
+                    stream=stream,
+                    http_start_status=503,
+                    final_outcome="STORE_UNAVAILABLE",
+                )
+            )
+            response.send_error_decision(unavailable, request_id)
+            return
+        return True
+
+    def _stream_receipts_and_cancel(self, request_id, final_outcome, response_started):
+        backend_receipt = (
+            self._engine_client.receipt_not_queried()
+            if final_outcome == "deadline_exceeded"
+            else self._relay.response_id_receipt(request_id)
+            if self._backend.external
+            else self._engine_client.backend_receipt(request_id)
+        )
+        if final_outcome == "deadline_exceeded":
+            self._relay.response_id_receipt(request_id)
+        abnormal_started = response_started and final_outcome not in {
+            "completed",
+            "backend_truncated",
+        }
+        if self._backend.external:
+            backend_cancel = "not_observed"
+        else:
+            backend_cancel = (
+                self._engine_client.mock_cancel_evidence(
+                    request_id,
+                    wait=final_outcome == "client_disconnected",
+                )
+                if abnormal_started and final_outcome != "deadline_exceeded"
+                else "not_applicable"
+            )
+        return backend_receipt, backend_cancel
+
+    def _finish_stream_record(
+        self, call, final_decision, final_outcome, response_started, backend_receipt, backend_cancel
+    ):
+        response, request_id = call.response, call.request_id
+        completed = final_outcome == "completed"
+        self._records.append(
+            self._records.build(
+                "final",
+                request_id,
+                final_decision,
+                attempted=True,
+                backend_receipt=backend_receipt,
+                response="completed" if completed else "failed",
+                error_code=(None if completed else final_decision.reason_code),
+                stream=True,
+                http_start_status=(200 if response_started else final_decision.http_status),
+                final_outcome=final_outcome,
+                response_started=response_started,
+                backend_cancel=backend_cancel,
+            )
+        )
+        if not response_started:
+            response.send_error_decision(
+                final_decision,
+                request_id,
+                extra_headers=(
+                    {"Retry-After": final_decision.retry_after}
+                    if final_decision.retry_after is not None
+                    else None
+                ),
+            )
+
+    def _relay_stream_and_record(self, call, prepared, acquired_at):
+        response, request_id, route = call.response, call.request_id, call.route
+        document, decision, cache_salt = prepared.document, prepared.decision, prepared.cache_salt
+
+        def record_response_started() -> None:
+            self._records.append(
+                self._records.build(
+                    "response_started",
+                    request_id,
+                    decision,
+                    attempted=True,
+                    backend_receipt=(self._engine_client.receipt_not_queried()),
+                    response="streaming",
+                    error_code=None,
+                    stream=True,
+                    http_start_status=200,
+                    response_started=True,
+                )
+            )
+
+        final_decision, final_outcome, response_started = self._relay.relay_stream(
+            response,
+            request_id,
+            document,
+            decision,
+            acquired_at,
+            record_response_started,
+            route=route,
+            cache_salt=cache_salt,
+        )
+        backend_receipt, backend_cancel = self._stream_receipts_and_cancel(request_id, final_outcome, response_started)
+        self._finish_stream_record(
+            call, final_decision, final_outcome, response_started, backend_receipt, backend_cancel
+        )
+
+    def _deliver_buffered_body(
+        self, response, request_id, decision, engine_body, acquired_at, final_decision, completed
+    ):
+        delivery_attempted = False
+        if completed:
+
+            def deliver_body() -> None:
+                nonlocal delivery_attempted
+                delivery_attempted = True
+                response.send_response_body(
+                    200,
+                    "application/json; charset=utf-8",
+                    engine_body,
+                    request_id=request_id,
+                )
+
+            try:
+                write_response_before(
+                    response,
+                    acquired_at + self._relay.request_deadline_s,
+                    deliver_body,
+                )
+            except OSError:
+                expired = time.monotonic() >= acquired_at + self._relay.request_deadline_s
+                final_decision = engine_error(
+                    200 if delivery_attempted else 504,
+                    "ENGINE_DEADLINE" if expired else "CLIENT_DISCONNECTED",
+                    "response deadline exceeded" if expired else "client disconnected",
+                    decision,
+                    source="gateway" if expired else "client",
+                )
+                completed = False
+        return final_decision, completed, delivery_attempted
+
+    def _finish_buffered_record(self, call, final_decision, backend_receipt, completed, delivery_attempted):
+        response, request_id = call.response, call.request_id
+        self._records.append(
+            self._records.build(
+                "final",
+                request_id,
+                final_decision,
+                attempted=True,
+                backend_receipt=backend_receipt,
+                response="completed" if completed else "failed",
+                error_code=None if completed else final_decision.reason_code,
+                stream=False,
+                http_start_status=final_decision.http_status,
+                final_outcome=("completed" if completed else final_decision.reason_code),
+                response_started=delivery_attempted,
+            )
+        )
+        if not delivery_attempted:
+            response.send_error_decision(
+                final_decision,
+                request_id,
+                close_connection=final_decision.reason_code == "ENGINE_DEADLINE",
+                extra_headers=(
+                    {"Retry-After": final_decision.retry_after} if final_decision.retry_after is not None else None
+                ),
+            )
+
+    def _relay_buffered_and_record(self, call, prepared, acquired_at):
+        response, request_id, route = call.response, call.request_id, call.route
+        document, decision, cache_salt = prepared.document, prepared.decision, prepared.cache_salt
+        final_decision, engine_body = self._relay.relay(
+            request_id,
+            document,
+            decision,
+            route=route,
+            cache_salt=cache_salt,
+            started_at=acquired_at,
+        )
+        backend_receipt = (
+            self._engine_client.receipt_not_queried()
+            if final_decision.reason_code == "ENGINE_DEADLINE"
+            else self._relay.response_id_receipt(request_id)
+            if self._backend.external
+            else self._engine_client.backend_receipt(request_id)
+        )
+        if final_decision.reason_code == "ENGINE_DEADLINE":
+            self._relay.response_id_receipt(request_id)
+        completed = final_decision.result == "ALLOWED" and engine_body is not None
+        final_decision, completed, delivery_attempted = self._deliver_buffered_body(
+            response, request_id, decision, engine_body, acquired_at, final_decision, completed
+        )
+        self._finish_buffered_record(call, final_decision, backend_receipt, completed, delivery_attempted)

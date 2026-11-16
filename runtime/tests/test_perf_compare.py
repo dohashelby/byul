@@ -12,7 +12,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from tools.perf_compare import (
+from labtools.perf_compare import (
     BLOCK_ORDERS,
     PlanError,
     _error_code,
@@ -51,9 +51,7 @@ class _GatewayHandler(BaseHTTPRequestHandler):
             self.seen_authorization.append(self.headers.get("Authorization"))
             request_number = len(self.seen_modes)
         if mode == "B2":
-            payload = json.dumps(
-                {"error": {"code": "INJECTED_B2_FAILURE", "message": SECRET_RESPONSE}}
-            ).encode("utf-8")
+            payload = json.dumps({"error": {"code": "INJECTED_B2_FAILURE", "message": SECRET_RESPONSE}}).encode("utf-8")
             self.send_response(503)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
@@ -76,9 +74,7 @@ class _GatewayHandler(BaseHTTPRequestHandler):
         else:
             chunks = json.dumps(
                 {
-                    "choices": [
-                        {"message": {"role": "assistant", "content": SECRET_RESPONSE}}
-                    ],
+                    "choices": [{"message": {"role": "assistant", "content": SECRET_RESPONSE}}],
                     "usage": {"completion_tokens": 7},
                 }
             ).encode("utf-8")
@@ -174,18 +170,14 @@ class PerfCompareTests(unittest.TestCase):
                 list(BLOCK_ORDERS),
             )
             expected_modes = [
-                mode
-                for order in BLOCK_ORDERS
-                for mode in order
-                for _phase_name in ("warmup", "normal", "stream")
+                mode for order in BLOCK_ORDERS for mode in order for _phase_name in ("warmup", "normal", "stream")
             ]
             self.assertEqual(_GatewayHandler.seen_modes, expected_modes)
             self.assertEqual(set(_GatewayHandler.seen_authorization), {None})
             self.assertEqual([block["status"] for block in report["blocks"]], ["failed"] * 3)
             self.assertTrue(
                 all(
-                    next(run for run in block["runs"] if run["mode"] == "B2")["status"]
-                    == "failed"
+                    next(run for run in block["runs"] if run["mode"] == "B2")["status"] == "failed"
                     for block in report["blocks"]
                 )
             )
@@ -195,19 +187,11 @@ class PerfCompareTests(unittest.TestCase):
             self.assertEqual(report["external_measurements"]["status"], "not_attached")
             self.assertEqual(raw["rows"][0]["included_in_metrics"], False)
             self.assertEqual(
-                next(
-                    row
-                    for row in raw["rows"]
-                    if row["mode"] == "B0" and row["phase"] == "normal"
-                )["output_tokens"],
+                next(row for row in raw["rows"] if row["mode"] == "B0" and row["phase"] == "normal")["output_tokens"],
                 7,
             )
             self.assertEqual(
-                next(
-                    row
-                    for row in raw["rows"]
-                    if row["mode"] == "B0" and row["phase"] == "stream"
-                )["output_tokens"],
+                next(row for row in raw["rows"] if row["mode"] == "B0" and row["phase"] == "stream")["output_tokens"],
                 5,
             )
 
@@ -246,20 +230,15 @@ class PerfCompareTests(unittest.TestCase):
 
 class PerfTokenFileTests(unittest.TestCase):
     def test_cli_accepts_optional_token_env_file(self) -> None:
-        args = build_parser().parse_args(
-            ["plan.json", "--out-dir", "out", "--token-env-file", "tokens.env"]
-        )
+        args = build_parser().parse_args(["plan.json", "--out-dir", "out", "--token-env-file", "tokens.env"])
         self.assertEqual(args.token_env_file, "tokens.env")
-        self.assertIsNone(
-            build_parser().parse_args(["plan.json", "--out-dir", "out"]).token_env_file
-        )
+        self.assertIsNone(build_parser().parse_args(["plan.json", "--out-dir", "out"]).token_env_file)
 
     def test_token_file_rejects_group_or_other_access(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "tokens.env"
             path.write_text(
-                f"RUNTIME_INFERENCE_TOKEN={SECRET_TOKEN}\n"
-                "RUNTIME_VIEWER_TOKEN=viewer-token-for-shared-aws-file\n",
+                f"RUNTIME_INFERENCE_TOKEN={SECRET_TOKEN}\nRUNTIME_VIEWER_TOKEN=viewer-token-for-shared-aws-file\n",
                 encoding="utf-8",
             )
             os.chmod(path, 0o640)
@@ -299,7 +278,7 @@ class PerfTokenFileTests(unittest.TestCase):
             def close(self) -> None:
                 return
 
-        with patch("tools.perf_compare.http.client.HTTPConnection", Connection):
+        with patch("labtools.perf_compare.http.client.HTTPConnection", Connection):
             result = _request_once(
                 "http://gateway.example:8080",
                 {"stream": False},
@@ -310,6 +289,7 @@ class PerfTokenFileTests(unittest.TestCase):
         headers = captured["request"][3]
         self.assertEqual(headers["Authorization"], f"Bearer {SECRET_TOKEN}")
         self.assertNotIn(SECRET_TOKEN, json.dumps(result))
+
 
 class PerfComparisonFormulaTests(unittest.TestCase):
     def test_injected_small_run_keeps_order_failures_and_private_artifacts(self) -> None:
@@ -390,10 +370,7 @@ class PerfComparisonFormulaTests(unittest.TestCase):
             self.assertEqual(report["execution_budget"]["label"], "계획 예산 아님")
             self.assertTrue(
                 all(
-                    next(
-                        run for run in block["runs"] if run["mode"] == "B2"
-                    )["phases"]["normal"]["errors"]
-                    == 1
+                    next(run for run in block["runs"] if run["mode"] == "B2")["phases"]["normal"]["errors"] == 1
                     for block in report["blocks"]
                 )
             )
@@ -513,7 +490,6 @@ class PerfOutputTests(unittest.TestCase):
                 write_outputs(report, raw, root / "out")
 
 
-
 class PerfRealGatewayTests(unittest.TestCase):
     """Run against the real MVP Gateway (mock engine), not a hand-made fake.
 
@@ -522,10 +498,10 @@ class PerfRealGatewayTests(unittest.TestCase):
     """
 
     def test_default_policy_gateway_accepts_plan_requests(self) -> None:
-        from serving_runtime.mvp.app import GatewayApp
-        from serving_runtime.mvp.config import MVPConfig
-        from serving_runtime.mvp.mock_engine import MockEngine
-        from serving_runtime.mvp.policy import load_policy
+        from serving_runtime.gateway.app import GatewayApp
+        from serving_runtime.config.config import MVPConfig
+        from serving_runtime.devtools.mock_engine import MockEngine
+        from serving_runtime.policy.policy import load_policy
 
         root_dir = Path(__file__).resolve().parents[1]
         policy = root_dir / "examples/mvp/policy.json"
@@ -551,9 +527,7 @@ class PerfRealGatewayTests(unittest.TestCase):
             example = json.loads((root_dir / "examples/perf/plan.example.json").read_text(encoding="utf-8"))
             self.assertNotIn("temperature", example)
             example["model"] = "test-model"
-            example["modes"] = {
-                mode: {"gateway_url": url, "description": mode} for mode in ("B0", "B1", "B2")
-            }
+            example["modes"] = {mode: {"gateway_url": url, "description": mode} for mode in ("B0", "B1", "B2")}
             plan_path = root / "plan.json"
             plan_path.write_text(json.dumps(example), encoding="utf-8")
             report, raw = execute_plan(

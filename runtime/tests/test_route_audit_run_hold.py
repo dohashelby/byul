@@ -1,13 +1,14 @@
 """Actual route writer -> existing retention, including scope/hold boundaries."""
+
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import tempfile
 import unittest
 
-from serving_runtime.mvp.retention import HOLD_SCHEMA, RecordRetention
-from serving_runtime.mvp.route_rejections import RouteRejections
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.retention import HOLD_SCHEMA, RecordRetention
+from serving_runtime.gateway.route_rejections import RouteRejections
+from serving_runtime.observation.store import JsonlStore
 
 
 class RouteAuditRunHoldTest(unittest.TestCase):

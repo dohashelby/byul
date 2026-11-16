@@ -7,6 +7,7 @@
 ```bash
 cd runtime
 PYTHONPATH=src:. python3 -m tools.prepare_tetragon_deployment \
+  --context byul-aws-lab \
   --intent deploy/gpu-lab/intent.aws-lab.json \
   --sentinel-image REPOSITORY@sha256:REVIEWED_DIGEST \
   --output /NEW/REVIEW/DIRECTORY

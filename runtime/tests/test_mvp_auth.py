@@ -12,20 +12,15 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.auth import (
-    CHAT_ROUTE,
-    load_auth,
-    not_configured,
-    token_digest,
-)
-from serving_runtime.mvp.backend import load_backend_config
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.fake_backend import FakeBackend
-from serving_runtime.mvp.http_handler import Handler
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.auth import CHAT_ROUTE, load_auth, not_configured, token_digest
+from serving_runtime.gateway.backend import load_backend_config
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.fake_backend import FakeBackend
+from serving_runtime.gateway.http_handler import Handler
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,9 +73,9 @@ def policy_document() -> dict[str, object]:
 
 
 def chat(model: str = "test-model") -> bytes:
-    return json.dumps(
-        {"model": model, "messages": [{"role": "user", "content": "hello"}], "max_tokens": 8}
-    ).encode("utf-8")
+    return json.dumps({"model": model, "messages": [{"role": "user", "content": "hello"}], "max_tokens": 8}).encode(
+        "utf-8"
+    )
 
 
 class TempFiles:
@@ -136,7 +131,9 @@ class AuthConfigTests(TempFiles, unittest.TestCase):
             "empty-models": auth_document(principals=[dict(good, allowed_models=[])]),
             "dup-id": auth_document(principals=[good, dict(good, token_sha256="0" * 64)]),
             "dup-digest": auth_document(principals=[good, dict(good, principal_id="other")]),
-            "unprotectable-route": auth_document(route_roles={CHAT_ROUTE: ["inference"], "GET /api/status": ["viewer"]}),
+            "unprotectable-route": auth_document(
+                route_roles={CHAT_ROUTE: ["inference"], "GET /api/status": ["viewer"]}
+            ),
             "empty-route-roles": auth_document(route_roles={}),
             "not-object": [],
         }
@@ -189,9 +186,7 @@ class AuthHttpBase(TempFiles, unittest.TestCase):
         self.data_dir = Path(self.temporary.name) / "data"
         self.policy_path = self.write_json("policy.json", policy_document())
         try:
-            self.engine = MockEngine(
-                port=0, receipts_path=self.data_dir / "engine_receipts.jsonl"
-            ).start()
+            self.engine = MockEngine(port=0, receipts_path=self.data_dir / "engine_receipts.jsonl").start()
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.addCleanup(self.engine.stop)
@@ -341,7 +336,16 @@ class ReadApiAuthTests(AuthHttpBase):
         status, inference_headers, _ = self.post(chat(), INFERENCE_TOKEN)
         self.assertEqual(status, 200)
         request_id = inference_headers["X-Request-ID"]
-        paths = ["/api/status", "/api/requests", f"/api/requests/{request_id}", f"/api/requests/{request_id}/evidence", "/api/observations", "/api/target", "/api/phase-timeline", "/api/tetragon-status"]
+        paths = [
+            "/api/status",
+            "/api/requests",
+            f"/api/requests/{request_id}",
+            f"/api/requests/{request_id}/evidence",
+            "/api/observations",
+            "/api/target",
+            "/api/phase-timeline",
+            "/api/tetragon-status",
+        ]
         for path in paths:
             with self.subTest(path=path):
                 code, headers, body = self.get(path)
@@ -359,7 +363,11 @@ class ReadApiAuthTests(AuthHttpBase):
         self.assertIn("GET /api/*", status_body["auth"]["protected_routes"])
 
     def test_unprotectable_route_still_rejected(self) -> None:
-        state = load_auth(self.write_json("bad.json", auth_document(route_roles={CHAT_ROUTE: ["inference"], "GET /static/*": ["viewer"]})))
+        state = load_auth(
+            self.write_json(
+                "bad.json", auth_document(route_roles={CHAT_ROUTE: ["inference"], "GET /static/*": ["viewer"]})
+            )
+        )
         self.assertEqual(state.state, "error")
         missing_chat = load_auth(self.write_json("bad2.json", auth_document(route_roles={"GET /api/*": ["viewer"]})))
         self.assertEqual(missing_chat.state, "error")

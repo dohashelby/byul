@@ -20,16 +20,16 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp, run
-from serving_runtime.mvp.backend import BackendConfig, load_backend_config
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.fake_backend import FakeBackend, effective_output_limit
-from serving_runtime.mvp.engine_client import EngineClient
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.relay import relay_payload
-from serving_runtime.mvp.mock_engine import simulated_token_count, simulated_prompt_token_count
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.validator import validate_request
+from serving_runtime.gateway.app import GatewayApp, run
+from serving_runtime.gateway.backend import BackendConfig, load_backend_config
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.fake_backend import FakeBackend, effective_output_limit
+from serving_runtime.gateway.engine_client import EngineClient
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.gateway.relay import relay_payload
+from serving_runtime.devtools.mock_engine import simulated_token_count, simulated_prompt_token_count
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.gateway.validator import validate_request
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,9 +100,7 @@ class SglangConfigTests(unittest.TestCase):
         self.assertEqual(config.output_tokens_field("POST /v1/chat/completions"), "max_completion_tokens")
         self.assertEqual(config.output_tokens_field("POST /v1/completions"), "max_tokens")
         self.assertEqual(config.target.port, 8000)
-        self.assertEqual(
-            config.metrics_map["requests.running"]["metric"], "sglang:num_running_reqs"
-        )
+        self.assertEqual(config.metrics_map["requests.running"]["metric"], "sglang:num_running_reqs")
 
     def test_vllm_example_is_unchanged(self) -> None:
         config = load_backend_config(VLLM_EXAMPLE, environ={})
@@ -133,18 +131,14 @@ class SglangConfigTests(unittest.TestCase):
     def test_unknown_kind_is_rejected(self) -> None:
         for kind in ("tensorrt", "mock", "SGLang", "", [], {}):
             with self.subTest(kind=kind):
-                with self.assertRaisesRegex(
-                    ValueError, "backend kind must be vllm or sglang"
-                ):
+                with self.assertRaisesRegex(ValueError, "backend kind must be vllm or sglang"):
                     load_backend_config(
                         self.write(sglang_document("http://127.0.0.1:1", kind=kind)),
                         environ={},
                     )
 
     def test_unhashable_kind_is_a_clean_cli_failure(self) -> None:
-        backend_path = self.write(
-            sglang_document("http://127.0.0.1:1", kind=[])
-        )
+        backend_path = self.write(sglang_document("http://127.0.0.1:1", kind=[]))
         metrics_path = backend_path.with_name("metrics.txt")
         metrics_path.write_text("", encoding="utf-8")
         commands = (
@@ -196,24 +190,30 @@ class SglangConfigTests(unittest.TestCase):
 class SglangRelayPayloadTests(unittest.TestCase):
     def test_native_fields_are_rejected_before_relay_for_both_routes(self) -> None:
         policy = load_policy(POLICY)
-        for route, base in (("chat", {"model": "test-model", "messages": [{"role": "user", "content": "hi"}]}),
-                            ("completions", {"model": "test-model", "prompt": "hi"})):
+        for route, base in (
+            ("chat", {"model": "test-model", "messages": [{"role": "user", "content": "hi"}]}),
+            ("completions", {"model": "test-model", "prompt": "hi"}),
+        ):
             for field in ("input_ids", "custom_logit_processor", "cache_salt", "session"):
                 with self.subTest(route=route, field=field):
-                    decision = validate_request(json.dumps({**base, field: "probe"}).encode(),
-                                                "application/json", policy, request_kind=route)
+                    decision = validate_request(
+                        json.dumps({**base, field: "probe"}).encode(), "application/json", policy, request_kind=route
+                    )
                     self.assertEqual((decision.http_status, decision.reason_code), (400, "UNSUPPORTED_FIELD"))
 
     def test_ready_collection_uses_status_only_and_never_generates(self) -> None:
         backend = load_backend_config(SGLANG_EXAMPLE, environ={})
+
         class StubClient(EngineClient):
             def __init__(self, status):
                 super().__init__(backend, 1.0)
                 self.status = status
                 self.paths = []
+
             def request(self, method, path, **kwargs):
                 self.paths.append((method, path))
                 return self.status, {}, b""
+
         ready = StubClient(200)
         self.assertTrue(ready.collect_health()[0]["reachable"])
         self.assertEqual(ready.paths, [("GET", "/ready")])
@@ -253,10 +253,13 @@ class SglangRelayPayloadTests(unittest.TestCase):
 
             def fetch_json(self, path: str) -> dict[str, object]:
                 self.paths.append(path)
-                return {"object": "list", "data": [
-                    {"id": "lora-model", "max_model_len": None},
-                    {"id": "backend-test-model", "max_model_len": 2048},
-                ]}
+                return {
+                    "object": "list",
+                    "data": [
+                        {"id": "lora-model", "max_model_len": None},
+                        {"id": "backend-test-model", "max_model_len": 2048},
+                    ],
+                }
 
         document = sglang_document("http://127.0.0.1:1")
         with tempfile.TemporaryDirectory() as directory:
@@ -276,8 +279,13 @@ class SglangRelayPayloadTests(unittest.TestCase):
         class StubClient(EngineClient):
             def fetch_json(self, path):
                 self.asserted_path = path
-                return {"data": [{"id": "backend-test-model", "max_model_len": None},
-                                 {"id": "lora-model", "max_model_len": None}]}
+                return {
+                    "data": [
+                        {"id": "backend-test-model", "max_model_len": None},
+                        {"id": "lora-model", "max_model_len": None},
+                    ]
+                }
+
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "backend.json"
             path.write_text(json.dumps(sglang_document("http://127.0.0.1:1")))
@@ -301,9 +309,7 @@ class SglangRelayPayloadTests(unittest.TestCase):
             BackendConfig.mock(("127.0.0.1", 1)),
         ):
             with self.subTest(kind=backend.kind):
-                relayed = json.loads(
-                    relay_payload(backend, json.loads(chat(max_tokens=64)), decision, stream=False)
-                )
+                relayed = json.loads(relay_payload(backend, json.loads(chat(max_tokens=64)), decision, stream=False))
                 self.assertEqual(relayed["max_tokens"], 64)
                 self.assertNotIn("max_completion_tokens", relayed)
 
@@ -324,9 +330,7 @@ class SglangRelayPayloadTests(unittest.TestCase):
         ):
             backend = load_backend_config(path, environ={})
             client = CapturingClient(backend)
-            self.assertEqual(
-                client.count_input_tokens("request", messages, "backend-model"), 3
-            )
+            self.assertEqual(client.count_input_tokens("request", messages, "backend-model"), 3)
             self.assertEqual(client.payload["model"], "backend-model")
             self.assertEqual(client.payload["messages"], messages)
             self.assertEqual(
@@ -355,8 +359,8 @@ class SglangRelayPayloadTests(unittest.TestCase):
         gateway.stop = lambda: None
         output = io.StringIO()
         with (
-            patch("serving_runtime.mvp.app.GatewayApp") as gateway_class,
-            patch("serving_runtime.mvp.app.threading.Event") as event_class,
+            patch("serving_runtime.gateway.app.GatewayApp") as gateway_class,
+            patch("serving_runtime.gateway.app.threading.Event") as event_class,
             redirect_stdout(output),
         ):
             gateway_class.return_value.start.return_value = gateway
@@ -375,8 +379,17 @@ class SglangGatewayHttpTests(unittest.TestCase):
             for stream in (False, True):
                 with self.subTest(route=route, stream=stream):
                     document = {"model": "test-model", "max_tokens": 64, "stream": stream}
-                    document.update({"messages": [{"role": "user", "content": "hello"}]} if route.endswith("chat/completions") else {"prompt": "hello"})
-                    request = Request(self.url(route), data=json.dumps(document).encode(), headers={"Content-Type": "application/json"}, method="POST")
+                    document.update(
+                        {"messages": [{"role": "user", "content": "hello"}]}
+                        if route.endswith("chat/completions")
+                        else {"prompt": "hello"}
+                    )
+                    request = Request(
+                        self.url(route),
+                        data=json.dumps(document).encode(),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
                     with urlopen(request, timeout=3) as response:
                         self.assertEqual(response.status, 200)
                         if stream:
@@ -436,8 +449,9 @@ class SglangGatewayHttpTests(unittest.TestCase):
                 return error.code, dict(error.headers), error.read()
 
     def post_route(self, route: str, body: dict[str, object]) -> tuple[int, dict[str, str], bytes]:
-        request = Request(self.url(route), data=json.dumps(body).encode(),
-                          headers={"Content-Type": "application/json"}, method="POST")
+        request = Request(
+            self.url(route), data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}, method="POST"
+        )
         try:
             with urlopen(request, timeout=3) as response:
                 return response.status, dict(response.headers), response.read()
@@ -503,16 +517,42 @@ class SglangGatewayHttpTests(unittest.TestCase):
 
     def test_native_route_attempts_never_arrive_at_fake_engine(self) -> None:
         self.start()
-        for path in ("/generate", "/v1/responses", "/v1/messages", "/api/chat",
-                     "/api/generate", "/invocations", "/vertex_generate", "/v1/realtime",
-                     "/v1/score", "/encode", "/classify", "/v1/audio/transcriptions"):
+        for path in (
+            "/generate",
+            "/v1/responses",
+            "/v1/messages",
+            "/api/chat",
+            "/api/generate",
+            "/invocations",
+            "/vertex_generate",
+            "/v1/realtime",
+            "/v1/score",
+            "/encode",
+            "/classify",
+            "/v1/audio/transcriptions",
+        ):
             status, _, _ = self.post_route(path, {"model": "test-model"})
             self.assertIn(status, {404, 405})
-        self.assertFalse(any(item["path"] in {"/generate", "/v1/responses", "/v1/messages",
-                                                    "/api/chat", "/api/generate", "/invocations",
-                                                    "/vertex_generate", "/v1/realtime", "/v1/score",
-                                                    "/encode", "/classify", "/v1/audio/transcriptions"}
-                             for item in self.fake.arrivals))
+        self.assertFalse(
+            any(
+                item["path"]
+                in {
+                    "/generate",
+                    "/v1/responses",
+                    "/v1/messages",
+                    "/api/chat",
+                    "/api/generate",
+                    "/invocations",
+                    "/vertex_generate",
+                    "/v1/realtime",
+                    "/v1/score",
+                    "/encode",
+                    "/classify",
+                    "/v1/audio/transcriptions",
+                }
+                for item in self.fake.arrivals
+            )
+        )
 
     def test_context_check_uses_sglang_tokenize(self) -> None:
         self.start(CONTEXT_POLICY)
@@ -528,10 +568,16 @@ class SglangGatewayHttpTests(unittest.TestCase):
         policy.write_text(json.dumps(document))
         self.start(policy)
         for route, base, count in (
-            ("/v1/chat/completions", {"model": "test-model", "messages": [{"role": "user", "content": "hello there"}]},
-             simulated_token_count([{"role": "user", "content": "hello there"}])),
-            ("/v1/completions", {"model": "test-model", "prompt": "hello there"},
-             simulated_prompt_token_count("hello there")),
+            (
+                "/v1/chat/completions",
+                {"model": "test-model", "messages": [{"role": "user", "content": "hello there"}]},
+                simulated_token_count([{"role": "user", "content": "hello there"}]),
+            ),
+            (
+                "/v1/completions",
+                {"model": "test-model", "prompt": "hello there"},
+                simulated_prompt_token_count("hello there"),
+            ),
         ):
             with self.subTest(route=route):
                 before = self.fake.request_count
@@ -540,13 +586,11 @@ class SglangGatewayHttpTests(unittest.TestCase):
                 self.assertEqual(status, 200)
                 self.assertEqual(self.fake.request_count, before + 1)
                 status, _, body = self.post_route(route, {**base, "max_tokens": max_tokens + 1})
-                self.assertEqual((status, json.loads(body)["error"]["code"]),
-                                 (403, "CONTEXT_LIMIT_EXCEEDED"))
+                self.assertEqual((status, json.loads(body)["error"]["code"]), (403, "CONTEXT_LIMIT_EXCEEDED"))
                 self.assertEqual(self.fake.request_count, before + 1)
                 self.fake.tokenize_failure = True
                 status, _, body = self.post_route(route, {**base, "max_tokens": max_tokens})
-                self.assertEqual((status, json.loads(body)["error"]["code"]),
-                                 (503, "CONTEXT_CHECK_UNAVAILABLE"))
+                self.assertEqual((status, json.loads(body)["error"]["code"]), (503, "CONTEXT_CHECK_UNAVAILABLE"))
                 self.assertEqual(self.fake.request_count, before + 1)
                 self.fake.tokenize_failure = False
 
@@ -569,7 +613,7 @@ class SGLangDeploymentFilesTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1] / "deploy" / "gpu-lab-sglang"
         manifest = (root / "engine.yaml").read_text(encoding="utf-8")
         self.assertIn("- --config", manifest)
-        self.assertIn("- --context-length\n            - \"2112\"", manifest)
+        self.assertIn('- --context-length\n            - "2112"', manifest)
         self.assertNotIn("/bin/sh", manifest)
         self.assertNotIn("--max-model-len", manifest)
         self.assertIn("../gpu-lab", (root / "kustomization.yaml").read_text(encoding="utf-8"))

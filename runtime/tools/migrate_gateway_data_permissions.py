@@ -3,6 +3,7 @@
 Run with the Gateway stopped. Only immediate *.jsonl children are inspected;
 no contents, absolute paths, symlink targets or exception text are printed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -31,8 +32,12 @@ def migrate(data_dir: Path, *, owner_uid: int = 10000, fix: bool = False) -> boo
                 descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
                 info = os.fstat(descriptor)
                 current = os.stat(name, dir_fd=directory, follow_symlinks=False)
-                if (not stat.S_ISREG(info.st_mode) or info.st_uid != owner_uid or info.st_nlink != 1
-                        or (info.st_dev, info.st_ino) != (current.st_dev, current.st_ino)):
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or info.st_uid != owner_uid
+                    or info.st_nlink != 1
+                    or (info.st_dev, info.st_ino) != (current.st_dev, current.st_ino)
+                ):
                     raise PermissionError("unsafe journal identity")
                 if stat.S_IMODE(info.st_mode) & ~0o600:
                     if fix:

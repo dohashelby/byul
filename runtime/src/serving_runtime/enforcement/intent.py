@@ -18,9 +18,7 @@ TETRAGON_RULE_MODES = frozenset({"TG-SECRET-01", "TG-ASSET-01", "TG-ASSET-02", "
 PHASES = ("loading", "compiling", "inferring")
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _KUBERNETES_NAME = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
-_LABEL_NAME = re.compile(
-    r"(?:[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?"
-)
+_LABEL_NAME = re.compile(r"(?:[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?")
 _FQDN = re.compile(
     r"^(?=.{1,253}\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?$"
@@ -102,13 +100,7 @@ class CacheGeneration:
     compile_profile: str
 
     def path(self, cache_root: str) -> str:
-        return str(
-            Path(cache_root)
-            / self.engine
-            / self.image_id
-            / self.model_revision
-            / self.compile_profile
-        )
+        return str(Path(cache_root) / self.engine / self.image_id / self.model_revision / self.compile_profile)
 
 
 @dataclass(frozen=True)
@@ -223,9 +215,7 @@ def _labels(value: Any, path: str) -> dict[str, str]:
         raise IntentError(f"{path} must contain at least one label")
     normalized: dict[str, str] = {}
     for key, item in labels.items():
-        normalized[_nonempty_string(key, f"{path} key")] = _nonempty_string(
-            item, f"{path}.{key}"
-        )
+        normalized[_nonempty_string(key, f"{path} key")] = _nonempty_string(item, f"{path}.{key}")
     return normalized
 
 
@@ -245,9 +235,7 @@ def _absolute_path(value: Any, path: str) -> str:
     return text
 
 
-def _workload(
-    value: Any, path: str, *, engine: bool = False, v11: bool = False
-) -> Workload:
+def _workload(value: Any, path: str, *, engine: bool = False, v11: bool = False) -> Workload:
     allowed = {"labels", "port"} if engine else {"labels"}
     if engine and v11:
         allowed = allowed | {"management_port", "container_name"}
@@ -305,9 +293,7 @@ def _egress_list(raw: Any, path: str, *, allow_endpoint: bool) -> tuple[EgressAl
                 cidr = str(ipaddress.ip_network(cidr, strict=True))
             except ValueError as error:
                 raise IntentError(f"{item_path}.cidr is not a canonical network") from error
-        endpoint = (
-            _labels(item["endpoint"], f"{item_path}.endpoint") if "endpoint" in item else None
-        )
+        endpoint = _labels(item["endpoint"], f"{item_path}.endpoint") if "endpoint" in item else None
         protocol = _nonempty_string(_required(item, "protocol", item_path), f"{item_path}.protocol")
         if protocol not in {"TCP", "UDP"}:
             raise IntentError(f"{item_path}.protocol must be TCP or UDP")
@@ -351,9 +337,7 @@ def _validate_distinct_roles(
     for index, (left_name, left) in enumerate(roles):
         for right_name, right in roles[index + 1 :]:
             if _selectors_overlap(left, right):
-                raise IntentError(
-                    f"{left_name} and {right_name} labels can select the same Pod"
-                )
+                raise IntentError(f"{left_name} and {right_name} labels can select the same Pod")
 
 
 def _validate_kubernetes_selector(labels: dict[str, str], path: str) -> None:
@@ -361,25 +345,14 @@ def _validate_kubernetes_selector(labels: dict[str, str], path: str) -> None:
         prefix, separator, name = key.rpartition("/")
         if not separator:
             prefix, name = "", key
-        prefix_ok = (
-            not prefix
-            or (
-                len(prefix) <= 253
-                and all(_KUBERNETES_NAME.fullmatch(part) for part in prefix.split("."))
-            )
+        prefix_ok = not prefix or (
+            len(prefix) <= 253 and all(_KUBERNETES_NAME.fullmatch(part) for part in prefix.split("."))
         )
-        if (
-            not name
-            or _LABEL_NAME.fullmatch(name) is None
-            or _LABEL_NAME.fullmatch(value) is None
-            or not prefix_ok
-        ):
+        if not name or _LABEL_NAME.fullmatch(name) is None or _LABEL_NAME.fullmatch(value) is None or not prefix_ok:
             raise IntentError(f"{path}.labels must contain valid Kubernetes labels")
 
 
-def parse_intent(document: Any) -> EnforcementIntent:
-    """Validate and normalize one strict ``runtime-enforcement-intent/1.0`` object."""
-
+def _parse_root(document):
     root = _object(
         document,
         "$",
@@ -438,6 +411,10 @@ def parse_intent(document: Any) -> EnforcementIntent:
         present = sorted(v11_fields & set(root))
         if present:
             raise IntentError(f"$ has unknown fields: {', '.join(present)}")
+    return root, schema, v11
+
+
+def _parse_workloads(root, v11):
     namespace = _nonempty_string(_required(root, "namespace", "$"), "$.namespace")
     if type(root.get("tetragon_kernel_identity", False)) is not bool:
         raise IntentError("$.tetragon_kernel_identity must be boolean")
@@ -447,11 +424,11 @@ def parse_intent(document: Any) -> EnforcementIntent:
     raw_collectors = _required(root, "metrics_collectors", "$")
     if not isinstance(raw_collectors, list):
         raise IntentError("$.metrics_collectors must be an array")
-    collectors = tuple(
-        _workload(item, f"$.metrics_collectors[{index}]")
-        for index, item in enumerate(raw_collectors)
-    )
+    collectors = tuple(_workload(item, f"$.metrics_collectors[{index}]") for index, item in enumerate(raw_collectors))
+    return namespace, gateway, engine, collectors
 
+
+def _parse_network(root):
     dns_raw = _object(root.get("dns", {}), "$.dns", {"namespace", "labels", "port"})
     dns = DNSIntent(
         _nonempty_string(dns_raw.get("namespace", "kube-system"), "$.dns.namespace"),
@@ -459,10 +436,11 @@ def parse_intent(document: Any) -> EnforcementIntent:
         _port(dns_raw.get("port", 53), "$.dns.port"),
     )
 
-    egress = _egress_list(
-        root.get("engine_egress_allow", []), "$.engine_egress_allow", allow_endpoint=False
-    )
+    egress = _egress_list(root.get("engine_egress_allow", []), "$.engine_egress_allow", allow_endpoint=False)
+    return dns, egress
 
+
+def _parse_protected_paths(root, v11):
     protected_raw = _object(
         _required(root, "protected_paths", "$"),
         "$.protected_paths",
@@ -481,13 +459,14 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "$.protected_paths.cache_dir",
         ),
         tuple(
-            _absolute_path(item, f"$.protected_paths.secret_paths[{index}]")
-            for index, item in enumerate(raw_secrets)
+            _absolute_path(item, f"$.protected_paths.secret_paths[{index}]") for index, item in enumerate(raw_secrets)
         ),
         tuple(
             _absolute_path(item, f"$.protected_paths.enforce_exact_files[{index}]")
             for index, item in enumerate(protected_raw.get("enforce_exact_files", []))
-        ) if isinstance(protected_raw.get("enforce_exact_files", []), list) else (),
+        )
+        if isinstance(protected_raw.get("enforce_exact_files", []), list)
+        else (),
     )
     if "enforce_exact_files" in protected_raw and not isinstance(protected_raw["enforce_exact_files"], list):
         raise IntentError("$.protected_paths.enforce_exact_files must be an array")
@@ -497,13 +476,15 @@ def parse_intent(document: Any) -> EnforcementIntent:
         raise IntentError("$.protected_paths.enforce_exact_files contains duplicates")
     if set(protected.enforce_exact_files) - set(protected.secret_paths):
         raise IntentError("enforce_exact_files must be listed in secret_paths")
+    return protected
 
+
+def _parse_binaries_and_probe(root):
     raw_binaries = _required(root, "allowed_engine_binaries", "$")
     if not isinstance(raw_binaries, list):
         raise IntentError("$.allowed_engine_binaries must be an array")
     binaries = tuple(
-        _absolute_path(item, f"$.allowed_engine_binaries[{index}]")
-        for index, item in enumerate(raw_binaries)
+        _absolute_path(item, f"$.allowed_engine_binaries[{index}]") for index, item in enumerate(raw_binaries)
     )
     mode = _nonempty_string(root.get("tetragon_mode", "monitor"), "$.tetragon_mode")
     if mode not in {"monitor", "enforce_probe"}:
@@ -513,7 +494,10 @@ def parse_intent(document: Any) -> EnforcementIntent:
         probe = _absolute_path(probe, "$.probe_path")
     if mode == "enforce_probe" and probe is None:
         raise IntentError("$.probe_path is required in enforce_probe mode")
+    return binaries, mode, probe
 
+
+def _parse_rule_modes(root):
     rule_modes: list[tuple[str, str]] = []
     if "tetragon_rule_modes" in root:
         raw_modes = _object(root["tetragon_rule_modes"], "$.tetragon_rule_modes", set(TETRAGON_RULE_MODES))
@@ -525,22 +509,39 @@ def parse_intent(document: Any) -> EnforcementIntent:
             rule_modes.append((rule_id, rule_mode))
     allowed_modes = []
     if "tetragon_allowed_modes" in root:
-        for rule_id, modes in _object(root["tetragon_allowed_modes"], "$.tetragon_allowed_modes", set(TETRAGON_RULE_MODES)).items():
-            if (not isinstance(modes, list) or not modes or any(m not in ("monitor", "enforce") for m in modes)
-                    or len(set(modes)) != len(modes) or "monitor" not in modes):
+        for rule_id, modes in _object(
+            root["tetragon_allowed_modes"], "$.tetragon_allowed_modes", set(TETRAGON_RULE_MODES)
+        ).items():
+            if (
+                not isinstance(modes, list)
+                or not modes
+                or any(m not in ("monitor", "enforce") for m in modes)
+                or len(set(modes)) != len(modes)
+                or "monitor" not in modes
+            ):
                 raise IntentError("allowed modes require unique monitor/enforce values including monitor")
             if "enforce" in modes and rule_id != "TG-SECRET-01":
                 raise IntentError("only TG-SECRET-01 supports enforce")
             if rule_id in dict(rule_modes) and ((dict(rule_modes)[rule_id] == "enforce") != ("enforce" in modes)):
                 raise IntentError("tetragon_rule_modes conflicts with tetragon_allowed_modes")
             allowed_modes.append((rule_id, tuple(modes)))
-    secret_capable = ("enforce" in dict(allowed_modes).get("TG-SECRET-01", ())
-                      or dict(rule_modes).get("TG-SECRET-01") == "enforce")
+    return rule_modes, allowed_modes
+
+
+def _validate_enforcement_method(root, rule_modes, allowed_modes, protected):
+    secret_capable = (
+        "enforce" in dict(allowed_modes).get("TG-SECRET-01", ()) or dict(rule_modes).get("TG-SECRET-01") == "enforce"
+    )
     if "enforce" in dict(allowed_modes).get("TG-SECRET-01", ()) and not root.get("tetragon_enforce_method"):
         raise IntentError("new allowed enforce mode requires an explicit enforcement method")
     if secret_capable:
         method = root.get("tetragon_enforce_method")
-        if method is not None and method not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}:
+        if method is not None and method not in {
+            "lsm_file_open",
+            "override_lsm",
+            "sigkill_fd_install",
+            "override_syscall",
+        }:
             raise IntentError("$.tetragon_enforce_method is unsupported")
         secrets = protected.enforce_exact_files if method is not None else protected.secret_paths
         if not secrets:
@@ -548,18 +549,276 @@ def parse_intent(document: Any) -> EnforcementIntent:
         for path in secrets:
             # Legacy path-only intents retain their old extension check. New
             # methods require an explicit file declaration, including token files.
-            if path.endswith("/") or (method is None and not Path(path).suffix) or any(
-                other != path and Path(other).is_relative_to(path) for other in secrets
+            if (
+                path.endswith("/")
+                or (method is None and not Path(path).suffix)
+                or any(other != path and Path(other).is_relative_to(path) for other in secrets)
             ):
                 raise IntentError("TG-SECRET-01 enforce requires exact files, not directories or prefixes")
         symbol = root.get("tetragon_openat_symbol")
-        if method == "override_syscall" and (not isinstance(symbol, str) or not re.fullmatch(r"(?:__x64_|__arm64_)?sys_openat", symbol)):
+        if method == "override_syscall" and (
+            not isinstance(symbol, str) or not re.fullmatch(r"(?:__x64_|__arm64_)?sys_openat", symbol)
+        ):
             raise IntentError("$.tetragon_openat_symbol must name a checked openat symbol")
         if method != "override_syscall" and symbol is not None:
             raise IntentError("$.tetragon_openat_symbol requires override_syscall")
     elif "tetragon_enforce_method" in root or "tetragon_openat_symbol" in root:
         raise IntentError("tetragon method requires TG-SECRET-01 enforce")
 
+
+def _parse_acquire(root, engine, egress, acquire):
+    if "acquire" in root:
+        acquire_raw = _object(root["acquire"], "$.acquire", {"labels", "egress_allow"})
+        acquire = AcquireIntent(
+            _labels(_required(acquire_raw, "labels", "$.acquire"), "$.acquire.labels"),
+            _egress_list(
+                acquire_raw.get("egress_allow", []),
+                "$.acquire.egress_allow",
+                allow_endpoint=True,
+            ),
+        )
+        if acquire.labels == engine.labels:
+            raise IntentError("$.acquire.labels must differ from $.engine.labels")
+        # SP4: the engine must not be allowed the acquisition destinations.
+        acquire_targets = {
+            (
+                item.fqdn.lower().rstrip(".") if item.fqdn else None,
+                item.cidr,
+                item.port,
+                item.protocol,
+            )
+            for item in acquire.egress_allow
+            if item.endpoint is None
+        }
+        shared = [
+            item.fqdn or item.cidr
+            for item in egress
+            if (
+                item.fqdn.lower().rstrip(".") if item.fqdn else None,
+                item.cidr,
+                item.port,
+                item.protocol,
+            )
+            in acquire_targets
+        ]
+        if shared:
+            raise IntentError(
+                "$.engine_egress_allow must not include acquisition destinations: " + ", ".join(sorted(shared))
+            )
+    return acquire
+
+
+def _parse_receivers(root, acquire, receivers):
+    raw_receivers = root.get("test_receivers", [])
+    if not isinstance(raw_receivers, list):
+        raise IntentError("$.test_receivers must be an array")
+    names: set[str] = set()
+    for index, raw_item in enumerate(raw_receivers):
+        path = f"$.test_receivers[{index}]"
+        item = _object(raw_item, path, {"name", "labels", "port", "protocol", "allowed_from"})
+        name = _segment(_required(item, "name", path), f"{path}.name")
+        if _KUBERNETES_NAME.fullmatch(name) is None:
+            raise IntentError(f"{path}.name must be a Kubernetes DNS label")
+        if name in names:
+            raise IntentError(f"{path}.name must be unique")
+        names.add(name)
+        protocol = _nonempty_string(item.get("protocol", "TCP"), f"{path}.protocol")
+        if protocol not in {"TCP", "UDP"}:
+            raise IntentError(f"{path}.protocol must be TCP or UDP")
+        allowed_from = _required(item, "allowed_from", path)
+        if (
+            not isinstance(allowed_from, list)
+            or not allowed_from
+            or any(role not in {"acquire", "observer"} for role in allowed_from)
+            or len(set(allowed_from)) != len(allowed_from)
+        ):
+            raise IntentError(f"{path}.allowed_from must list acquire and/or observer")
+        if "acquire" in allowed_from and acquire is None:
+            raise IntentError(f"{path}.allowed_from uses acquire but $.acquire is missing")
+        receivers.append(
+            TestReceiver(
+                name,
+                _labels(_required(item, "labels", path), f"{path}.labels"),
+                _port(_required(item, "port", path), f"{path}.port"),
+                protocol,
+                tuple(allowed_from),
+            )
+        )
+    return receivers
+
+
+def _parse_observer_api(root, kube_api_port):
+    kube_api = root.get("observer_kube_api", False)
+    if not isinstance(kube_api, bool):
+        raise IntentError("$.observer_kube_api must be a boolean")
+    if "observer_kube_api_port" in root:
+        if not kube_api:
+            raise IntentError("$.observer_kube_api_port requires observer_kube_api: true")
+        kube_api_port = _port(root["observer_kube_api_port"], "$.observer_kube_api_port")
+    return kube_api, kube_api_port
+
+
+def _parse_asset_values(assets_raw):
+    generation_raw = _object(
+        _required(assets_raw, "cache_generation", "$.assets"),
+        "$.assets.cache_generation",
+        {"engine", "image_id", "model_revision", "compile_profile"},
+    )
+    generation = CacheGeneration(
+        *(
+            _segment(
+                _required(generation_raw, name, "$.assets.cache_generation"),
+                f"$.assets.cache_generation.{name}",
+            )
+            for name in ("engine", "image_id", "model_revision", "compile_profile")
+        )
+    )
+    uids = {
+        name: (_uid(assets_raw[name], f"$.assets.{name}") if name in assets_raw else None)
+        for name in ("acquire_uid", "probe_uid")
+    }
+    assets = AssetsIntent(
+        (
+            _absolute_path(assets_raw["tokenizer_dir"], "$.assets.tokenizer_dir")
+            if "tokenizer_dir" in assets_raw
+            else None
+        ),
+        _absolute_path(_required(assets_raw, "manifest_path", "$.assets"), "$.assets.manifest_path"),
+        _absolute_path(_required(assets_raw, "cache_root", "$.assets"), "$.assets.cache_root"),
+        generation,
+        _uid(_required(assets_raw, "engine_uid", "$.assets"), "$.assets.engine_uid"),
+        uids["acquire_uid"],
+        uids["probe_uid"],
+        (
+            _absolute_path(assets_raw["cache_mount_path"], "$.assets.cache_mount_path")
+            if "cache_mount_path" in assets_raw
+            else None
+        ),
+    )
+    return assets, uids
+
+
+def _parse_assets(root, protected, assets):
+    if "assets" in root:
+        assets_raw = _object(
+            root["assets"],
+            "$.assets",
+            {
+                "tokenizer_dir",
+                "manifest_path",
+                "cache_root",
+                "cache_generation",
+                "engine_uid",
+                "acquire_uid",
+                "probe_uid",
+                "cache_mount_path",
+            },
+        )
+        assets, uids = _parse_asset_values(assets_raw)
+        declared = [assets.engine_uid, *(uid for uid in uids.values() if uid is not None)]
+        if len(set(declared)) != len(declared):
+            raise IntentError("$.assets engine/acquire/probe UIDs must be different accounts")
+        if protected.cache_dir != assets.engine_cache_path:
+            raise IntentError(
+                f"$.protected_paths.cache_dir must equal the engine-side cache path {assets.engine_cache_path}"
+            )
+        if assets.cache_mount_path is not None:
+            mount = Path(assets.cache_mount_path)
+            for supply in filter(
+                None,
+                (protected.model_dir, assets.tokenizer_dir, str(Path(assets.manifest_path).parent)),
+            ):
+                if mount.is_relative_to(supply) or Path(supply).is_relative_to(mount):
+                    raise IntentError("$.assets.cache_mount_path must be separate from supply paths")
+        # Without a separate mount, cache_root and supply paths share the
+        # container coordinate. With one, cache_root is a host path and the
+        # mount check above guards the container side instead.
+        if assets.cache_mount_path is None:
+            for supply in filter(None, (protected.model_dir, assets.tokenizer_dir)):
+                if Path(supply).is_relative_to(assets.cache_root) or Path(assets.cache_root).is_relative_to(supply):
+                    raise IntentError("$.assets.cache_root must be separate from supply paths")
+            manifest = Path(assets.manifest_path)
+            manifest_parent = manifest.parent
+            if manifest.is_relative_to(assets.cache_root) or Path(assets.cache_root).is_relative_to(
+                manifest_parent
+            ):
+                raise IntentError("$.assets.cache_root must be separate from the approved manifest mount")
+    return assets
+
+
+def _parse_phase_and_suspect_binaries(root, binaries, phase_binaries, suspect):
+    if "phase_binaries" in root:
+        phases_raw = _object(root["phase_binaries"], "$.phase_binaries", set(PHASES))
+        for phase in PHASES:
+            if phase in phases_raw:
+                phase_binaries.append(
+                    (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}", allow_literal_parent=True))
+                )
+    allowed_any = set(binaries).union(*(set(items) for _, items in phase_binaries))
+    if "suspect_binaries" in root:
+        suspect = _binary_list(root["suspect_binaries"], "$.suspect_binaries")
+        overlap = sorted(allowed_any & set(suspect))
+        if overlap:
+            raise IntentError(f"$.suspect_binaries overlaps allowed binaries: {', '.join(overlap)}")
+    return phase_binaries, allowed_any, suspect
+
+
+def _parse_parent_contexts(root, allowed_any, suspect, parent_constraints, suspect_parent_contexts):
+    if "parent_constraints" in root:
+        raw = _object(
+            root["parent_constraints"],
+            "$.parent_constraints",
+            set(root["parent_constraints"]) if isinstance(root["parent_constraints"], dict) else set(),
+        )
+        for binary, parents in raw.items():
+            if binary not in allowed_any:
+                raise IntentError(f"$.parent_constraints key is not an allowed binary: {binary}")
+            values = _binary_list(parents, f"$.parent_constraints.{binary}")
+            if not values:
+                raise IntentError(f"$.parent_constraints.{binary} must not be empty")
+            parent_constraints.append((binary, values))
+    if "suspect_parent_contexts" in root:
+        raw = _object(
+            root["suspect_parent_contexts"],
+            "$.suspect_parent_contexts",
+            set(root["suspect_parent_contexts"]) if isinstance(root["suspect_parent_contexts"], dict) else set(),
+        )
+        for binary, context_spec in raw.items():
+            if binary not in suspect:
+                raise IntentError(f"$.suspect_parent_contexts key is not a suspect binary: {binary}")
+            path = f"$.suspect_parent_contexts.{binary}"
+            item = _object(context_spec, path, {"parents", "phases"})
+            parents = _binary_list(_required(item, "parents", path), f"{path}.parents")
+            phases = item.get("phases")
+            if (
+                not parents
+                or not isinstance(phases, list)
+                or not phases
+                or any(phase not in PHASES for phase in phases)
+                or len(set(phases)) != len(phases)
+            ):
+                raise IntentError(f"{path} must have nonempty unique parents and phases")
+            suspect_parent_contexts.append((binary, parents, tuple(phases)))
+    return parent_constraints, suspect_parent_contexts
+
+
+def _validate_roles(namespace, gateway, engine, collectors, acquire, receivers):
+    roles: list[tuple[str, dict[str, str]]] = [
+        ("$.gateway", gateway.labels),
+        ("$.engine", engine.labels),
+        *((f"$.metrics_collectors[{index}]", collector.labels) for index, collector in enumerate(collectors)),
+        *([("$.acquire", acquire.labels)] if acquire is not None else []),
+        *((f"$.test_receivers[{index}]", receiver.labels) for index, receiver in enumerate(receivers)),
+    ]
+    if _KUBERNETES_NAME.fullmatch(namespace) is None:
+        raise IntentError("$.namespace must be a Kubernetes DNS label for schema 1.1")
+    for path, labels in roles:
+        _validate_kubernetes_selector(labels, path)
+    _validate_distinct_roles(roles)
+
+
+def _parse_v11_extras(root, v11, engine, egress, protected, binaries, roles_inputs):
+    namespace, gateway, collectors = roles_inputs
     acquire: AcquireIntent | None = None
     receivers: list[TestReceiver] = []
     assets: AssetsIntent | None = None
@@ -570,236 +829,63 @@ def parse_intent(document: Any) -> EnforcementIntent:
     kube_api = False
     kube_api_port = DEFAULT_KUBE_API_PORT
     if v11:
-        if "acquire" in root:
-            acquire_raw = _object(root["acquire"], "$.acquire", {"labels", "egress_allow"})
-            acquire = AcquireIntent(
-                _labels(_required(acquire_raw, "labels", "$.acquire"), "$.acquire.labels"),
-                _egress_list(
-                    acquire_raw.get("egress_allow", []),
-                    "$.acquire.egress_allow",
-                    allow_endpoint=True,
-                ),
-            )
-            if acquire.labels == engine.labels:
-                raise IntentError("$.acquire.labels must differ from $.engine.labels")
-            # SP4: the engine must not be allowed the acquisition destinations.
-            acquire_targets = {
-                (
-                    item.fqdn.lower().rstrip(".") if item.fqdn else None,
-                    item.cidr,
-                    item.port,
-                    item.protocol,
-                )
-                for item in acquire.egress_allow
-                if item.endpoint is None
-            }
-            shared = [
-                item.fqdn or item.cidr
-                for item in egress
-                if (
-                    item.fqdn.lower().rstrip(".") if item.fqdn else None,
-                    item.cidr,
-                    item.port,
-                    item.protocol,
-                )
-                in acquire_targets
-            ]
-            if shared:
-                raise IntentError(
-                    "$.engine_egress_allow must not include acquisition destinations: "
-                    + ", ".join(sorted(shared))
-                )
-        raw_receivers = root.get("test_receivers", [])
-        if not isinstance(raw_receivers, list):
-            raise IntentError("$.test_receivers must be an array")
-        names: set[str] = set()
-        for index, raw_item in enumerate(raw_receivers):
-            path = f"$.test_receivers[{index}]"
-            item = _object(raw_item, path, {"name", "labels", "port", "protocol", "allowed_from"})
-            name = _segment(_required(item, "name", path), f"{path}.name")
-            if _KUBERNETES_NAME.fullmatch(name) is None:
-                raise IntentError(f"{path}.name must be a Kubernetes DNS label")
-            if name in names:
-                raise IntentError(f"{path}.name must be unique")
-            names.add(name)
-            protocol = _nonempty_string(item.get("protocol", "TCP"), f"{path}.protocol")
-            if protocol not in {"TCP", "UDP"}:
-                raise IntentError(f"{path}.protocol must be TCP or UDP")
-            allowed_from = _required(item, "allowed_from", path)
-            if (
-                not isinstance(allowed_from, list)
-                or not allowed_from
-                or any(role not in {"acquire", "observer"} for role in allowed_from)
-                or len(set(allowed_from)) != len(allowed_from)
-            ):
-                raise IntentError(f"{path}.allowed_from must list acquire and/or observer")
-            if "acquire" in allowed_from and acquire is None:
-                raise IntentError(f"{path}.allowed_from uses acquire but $.acquire is missing")
-            receivers.append(
-                TestReceiver(
-                    name,
-                    _labels(_required(item, "labels", path), f"{path}.labels"),
-                    _port(_required(item, "port", path), f"{path}.port"),
-                    protocol,
-                    tuple(allowed_from),
-                )
-            )
-        kube_api = root.get("observer_kube_api", False)
-        if not isinstance(kube_api, bool):
-            raise IntentError("$.observer_kube_api must be a boolean")
-        if "observer_kube_api_port" in root:
-            if not kube_api:
-                raise IntentError("$.observer_kube_api_port requires observer_kube_api: true")
-            kube_api_port = _port(root["observer_kube_api_port"], "$.observer_kube_api_port")
-        if "assets" in root:
-            assets_raw = _object(
-                root["assets"],
-                "$.assets",
-                {
-                    "tokenizer_dir",
-                    "manifest_path",
-                    "cache_root",
-                    "cache_generation",
-                    "engine_uid",
-                    "acquire_uid",
-                    "probe_uid",
-                    "cache_mount_path",
-                },
-            )
-            generation_raw = _object(
-                _required(assets_raw, "cache_generation", "$.assets"),
-                "$.assets.cache_generation",
-                {"engine", "image_id", "model_revision", "compile_profile"},
-            )
-            generation = CacheGeneration(
-                *(
-                    _segment(
-                        _required(generation_raw, name, "$.assets.cache_generation"),
-                        f"$.assets.cache_generation.{name}",
-                    )
-                    for name in ("engine", "image_id", "model_revision", "compile_profile")
-                )
-            )
-            uids = {
-                name: (_uid(assets_raw[name], f"$.assets.{name}") if name in assets_raw else None)
-                for name in ("acquire_uid", "probe_uid")
-            }
-            assets = AssetsIntent(
-                (
-                    _absolute_path(assets_raw["tokenizer_dir"], "$.assets.tokenizer_dir")
-                    if "tokenizer_dir" in assets_raw
-                    else None
-                ),
-                _absolute_path(_required(assets_raw, "manifest_path", "$.assets"), "$.assets.manifest_path"),
-                _absolute_path(_required(assets_raw, "cache_root", "$.assets"), "$.assets.cache_root"),
-                generation,
-                _uid(_required(assets_raw, "engine_uid", "$.assets"), "$.assets.engine_uid"),
-                uids["acquire_uid"],
-                uids["probe_uid"],
-                (
-                    _absolute_path(assets_raw["cache_mount_path"], "$.assets.cache_mount_path")
-                    if "cache_mount_path" in assets_raw
-                    else None
-                ),
-            )
-            declared = [assets.engine_uid, *(uid for uid in uids.values() if uid is not None)]
-            if len(set(declared)) != len(declared):
-                raise IntentError("$.assets engine/acquire/probe UIDs must be different accounts")
-            if protected.cache_dir != assets.engine_cache_path:
-                raise IntentError(
-                    "$.protected_paths.cache_dir must equal the engine-side cache path "
-                    f"{assets.engine_cache_path}"
-                )
-            if assets.cache_mount_path is not None:
-                mount = Path(assets.cache_mount_path)
-                for supply in filter(
-                    None,
-                    (protected.model_dir, assets.tokenizer_dir, str(Path(assets.manifest_path).parent)),
-                ):
-                    if mount.is_relative_to(supply) or Path(supply).is_relative_to(mount):
-                        raise IntentError("$.assets.cache_mount_path must be separate from supply paths")
-            # Without a separate mount, cache_root and supply paths share the
-            # container coordinate. With one, cache_root is a host path and the
-            # mount check above guards the container side instead.
-            if assets.cache_mount_path is None:
-                for supply in filter(None, (protected.model_dir, assets.tokenizer_dir)):
-                    if Path(supply).is_relative_to(assets.cache_root) or Path(
-                        assets.cache_root
-                    ).is_relative_to(supply):
-                        raise IntentError("$.assets.cache_root must be separate from supply paths")
-                manifest = Path(assets.manifest_path)
-                manifest_parent = manifest.parent
-                if manifest.is_relative_to(assets.cache_root) or Path(
-                    assets.cache_root
-                ).is_relative_to(manifest_parent):
-                    raise IntentError(
-                        "$.assets.cache_root must be separate from the approved manifest mount"
-                    )
-        if "phase_binaries" in root:
-            phases_raw = _object(root["phase_binaries"], "$.phase_binaries", set(PHASES))
-            for phase in PHASES:
-                if phase in phases_raw:
-                    phase_binaries.append(
-                        (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}",
-                                             allow_literal_parent=True))
-                    )
-        allowed_any = set(binaries).union(*(set(items) for _, items in phase_binaries))
-        if "suspect_binaries" in root:
-            suspect = _binary_list(root["suspect_binaries"], "$.suspect_binaries")
-            overlap = sorted(allowed_any & set(suspect))
-            if overlap:
-                raise IntentError(f"$.suspect_binaries overlaps allowed binaries: {', '.join(overlap)}")
-        if "parent_constraints" in root:
-            raw = _object(root["parent_constraints"], "$.parent_constraints",
-                          set(root["parent_constraints"]) if isinstance(root["parent_constraints"], dict) else set())
-            for binary, parents in raw.items():
-                if binary not in allowed_any:
-                    raise IntentError(f"$.parent_constraints key is not an allowed binary: {binary}")
-                values = _binary_list(parents, f"$.parent_constraints.{binary}")
-                if not values:
-                    raise IntentError(f"$.parent_constraints.{binary} must not be empty")
-                parent_constraints.append((binary, values))
-        if "suspect_parent_contexts" in root:
-            raw = _object(root["suspect_parent_contexts"], "$.suspect_parent_contexts",
-                          set(root["suspect_parent_contexts"]) if isinstance(root["suspect_parent_contexts"], dict) else set())
-            for binary, context_spec in raw.items():
-                if binary not in suspect:
-                    raise IntentError(f"$.suspect_parent_contexts key is not a suspect binary: {binary}")
-                path = f"$.suspect_parent_contexts.{binary}"
-                item = _object(context_spec, path, {"parents", "phases"})
-                parents = _binary_list(_required(item, "parents", path), f"{path}.parents")
-                phases = item.get("phases")
-                if (not parents or not isinstance(phases, list) or not phases
-                        or any(phase not in PHASES for phase in phases)
-                        or len(set(phases)) != len(phases)):
-                    raise IntentError(f"{path} must have nonempty unique parents and phases")
-                suspect_parent_contexts.append((binary, parents, tuple(phases)))
+        acquire = _parse_acquire(root, engine, egress, acquire)
+        receivers = _parse_receivers(root, acquire, receivers)
+        kube_api, kube_api_port = _parse_observer_api(root, kube_api_port)
+        assets = _parse_assets(root, protected, assets)
+        phase_binaries, allowed_any, suspect = _parse_phase_and_suspect_binaries(
+            root, binaries, phase_binaries, suspect
+        )
+        parent_constraints, suspect_parent_contexts = _parse_parent_contexts(
+            root, allowed_any, suspect, parent_constraints, suspect_parent_contexts
+        )
+        _validate_roles(namespace, gateway, engine, collectors, acquire, receivers)
+    return (
+        acquire,
+        receivers,
+        assets,
+        phase_binaries,
+        suspect,
+        parent_constraints,
+        suspect_parent_contexts,
+        kube_api,
+        kube_api_port,
+    )
 
-        roles: list[tuple[str, dict[str, str]]] = [
-            ("$.gateway", gateway.labels),
-            ("$.engine", engine.labels),
-            *(
-                (f"$.metrics_collectors[{index}]", collector.labels)
-                for index, collector in enumerate(collectors)
-            ),
-            *([("$.acquire", acquire.labels)] if acquire is not None else []),
-            *(
-                (f"$.test_receivers[{index}]", receiver.labels)
-                for index, receiver in enumerate(receivers)
-            ),
-        ]
-        if _KUBERNETES_NAME.fullmatch(namespace) is None:
-            raise IntentError("$.namespace must be a Kubernetes DNS label for schema 1.1")
-        for path, labels in roles:
-            _validate_kubernetes_selector(labels, path)
-        _validate_distinct_roles(roles)
 
+def _parse_code_paths(root):
     code_paths = _binary_list(root.get("code_load_watch_paths", []), "$.code_load_watch_paths")
     if len(code_paths) > 8 or any(
-        len(path.encode("utf-8")) > 255 or path == "/" or not path.isprintable()
-        for path in code_paths
+        len(path.encode("utf-8")) > 255 or path == "/" or not path.isprintable() for path in code_paths
     ):
-        raise IntentError("code_load_watch_paths requires at most 8 printable directory paths (max 255 characters, not /)")
+        raise IntentError(
+            "code_load_watch_paths requires at most 8 printable directory paths (max 255 characters, not /)"
+        )
+    return code_paths
+
+
+def parse_intent(document: Any) -> EnforcementIntent:
+    """Validate and normalize one strict ``runtime-enforcement-intent/1.0`` object."""
+
+    root, schema, v11 = _parse_root(document)
+    namespace, gateway, engine, collectors = _parse_workloads(root, v11)
+    dns, egress = _parse_network(root)
+    protected = _parse_protected_paths(root, v11)
+    binaries, mode, probe = _parse_binaries_and_probe(root)
+    rule_modes, allowed_modes = _parse_rule_modes(root)
+    _validate_enforcement_method(root, rule_modes, allowed_modes, protected)
+    (
+        acquire,
+        receivers,
+        assets,
+        phase_binaries,
+        suspect,
+        parent_constraints,
+        suspect_parent_contexts,
+        kube_api,
+        kube_api_port,
+    ) = _parse_v11_extras(root, v11, engine, egress, protected, binaries, (namespace, gateway, collectors))
+    code_paths = _parse_code_paths(root)
 
     return EnforcementIntent(
         namespace,

@@ -48,7 +48,9 @@ class RenderTests(unittest.TestCase):
         bindings = [o for o in self.objects if o["kind"].endswith("Binding")]
         self.assertEqual(len(bindings), 3)
         for b in bindings:
-            self.assertEqual(b["subjects"], [{"kind": "ServiceAccount", "name": "runtime-agent", "namespace": "serving-lab"}])
+            self.assertEqual(
+                b["subjects"], [{"kind": "ServiceAccount", "name": "runtime-agent", "namespace": "serving-lab"}]
+            )
         self.assertFalse(self.objects[0]["automountServiceAccountToken"])
 
     def test_only_gateway_deployment_and_tetragon_daemonset_are_accessible(self):
@@ -91,8 +93,12 @@ def least(command):
         base, _, sub = resource.partition("/")
         name = (f"{base}.{group}" if group else base) + (f"/{sub}" if sub else "")
         ns_ok = ("--all-namespaces" in command) == (scope == "cluster")
-        if ns_ok and v == verb and name == target and (
-                scope == "cluster" or command[-1] == ("serving-lab" if scope == "ns" else "kube-system")):
+        if (
+            ns_ok
+            and v == verb
+            and name == target
+            and (scope == "cluster" or command[-1] == ("serving-lab" if scope == "ns" else "kube-system"))
+        ):
             return "yes\n"
     return "no\n"
 
@@ -104,14 +110,28 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(result["state"], "ok")
         self.assertEqual(len(run.commands), len(agent_rbac.REQUIRED) + len(agent_rbac.FORBIDDEN))
         self.assertEqual(run.commands[0][:5], ["kubectl", "--kubeconfig", "/k", "--context", "ctx"])
-        self.assertIn(["auth", "can-i", "create", "pods", "--subresource", "exec", "-n", "kube-system"],
-                      [c[5:] for c in run.commands])
-        self.assertIn(["auth", "can-i", "get", "customresourcedefinitions.apiextensions.k8s.io/ciliumnetworkpolicies.cilium.io",
-                       "--all-namespaces"], [c[5:] for c in run.commands])
-        self.assertIn(["auth", "can-i", "list", "tracingpoliciesnamespaced.cilium.io", "--all-namespaces"],
-                      [c[5:] for c in run.commands])
-        self.assertIn(["auth", "can-i", "patch", "deployments.apps/serving-gateway", "-n", "serving-lab"],
-                      [c[5:] for c in run.commands])
+        self.assertIn(
+            ["auth", "can-i", "create", "pods", "--subresource", "exec", "-n", "kube-system"],
+            [c[5:] for c in run.commands],
+        )
+        self.assertIn(
+            [
+                "auth",
+                "can-i",
+                "get",
+                "customresourcedefinitions.apiextensions.k8s.io/ciliumnetworkpolicies.cilium.io",
+                "--all-namespaces",
+            ],
+            [c[5:] for c in run.commands],
+        )
+        self.assertIn(
+            ["auth", "can-i", "list", "tracingpoliciesnamespaced.cilium.io", "--all-namespaces"],
+            [c[5:] for c in run.commands],
+        )
+        self.assertIn(
+            ["auth", "can-i", "patch", "deployments.apps/serving-gateway", "-n", "serving-lab"],
+            [c[5:] for c in run.commands],
+        )
 
     def test_admin_like_account_is_too_broad(self):
         result = agent_rbac.check("ctx", "serving-lab", "kube-system", runner=Runner(lambda c: "yes\n"))
@@ -123,8 +143,9 @@ class CheckTests(unittest.TestCase):
         result = agent_rbac.check("ctx", "serving-lab", "kube-system", runner=Runner(lambda c: "no\n"))
         self.assertEqual(result["state"], "missing")
         self.assertEqual(len(result["missing"]), len(agent_rbac.REQUIRED))
-        broken = agent_rbac.check("ctx", "serving-lab", "kube-system",
-                                  runner=Runner(lambda c: subprocess.TimeoutExpired("kubectl", 20)))
+        broken = agent_rbac.check(
+            "ctx", "serving-lab", "kube-system", runner=Runner(lambda c: subprocess.TimeoutExpired("kubectl", 20))
+        )
         self.assertEqual(broken["state"], "unknown")
         self.assertNotIn("10.0.0.1", json.dumps(broken))
 

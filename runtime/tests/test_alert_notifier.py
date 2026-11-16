@@ -18,7 +18,11 @@ SECRETS = ("/opt/serving/assets", "serving-engine-def", "198.51.100.10", "/bin/s
 def collectors(**states):
     base = {"engine_health": "ok", "metrics": "disconnected"}
     base.update(states)
-    return {"collectors": [{"source": k, "state": v, "last_error": "free text /opt/serving/assets"} for k, v in base.items()]}
+    return {
+        "collectors": [
+            {"source": k, "state": v, "last_error": "free text /opt/serving/assets"} for k, v in base.items()
+        ]
+    }
 
 
 def request(rid, at, reason="POLICY_MODEL_NOT_ALLOWED"):
@@ -26,19 +30,41 @@ def request(rid, at, reason="POLICY_MODEL_NOT_ALLOWED"):
 
 
 def exec_obs(at, verdict="outside_allowlist", mode="monitor"):
-    return {"observed_at": at, "source": "tetragon", "kind": "process_exec", "binary": "/bin/sh",
-            "pod": {"pod": "serving-engine-def"}, "rule_id": "TG-EXEC-01", "exec_verdict": verdict,
-            "action_mode": mode, "data_origin": "live"}
+    return {
+        "observed_at": at,
+        "source": "tetragon",
+        "kind": "process_exec",
+        "binary": "/bin/sh",
+        "pod": {"pod": "serving-engine-def"},
+        "rule_id": "TG-EXEC-01",
+        "exec_verdict": verdict,
+        "action_mode": mode,
+        "data_origin": "live",
+    }
 
 
 def file_obs(at, mode="enforce"):
-    return {"observed_at": at, "source": "tetragon", "kind": "file_access", "path": "/opt/serving/assets/model",
-            "rule_id": "TG-ASSET-01", "action_mode": mode, "data_origin": "live"}
+    return {
+        "observed_at": at,
+        "source": "tetragon",
+        "kind": "file_access",
+        "path": "/opt/serving/assets/model",
+        "rule_id": "TG-ASSET-01",
+        "action_mode": mode,
+        "data_origin": "live",
+    }
 
 
 def drop_obs(at):
-    return {"observed_at": at, "source": "hubble", "kind": "network_flow", "verdict": "dropped",
-            "dst": {"ip": "198.51.100.10"}, "reason": "POLICY_DENIED", "data_origin": "synthetic"}
+    return {
+        "observed_at": at,
+        "source": "hubble",
+        "kind": "network_flow",
+        "verdict": "dropped",
+        "dst": {"ip": "198.51.100.10"},
+        "reason": "POLICY_DENIED",
+        "data_origin": "synthetic",
+    }
 
 
 class FakeGateway:
@@ -85,21 +111,36 @@ class CollectTests(unittest.TestCase):
     def test_new_denied_requests_are_counted_once_including_same_timestamp(self):
         self.gateway.data["/api/requests"] = {"requests": [request(RID1, "2026-11-09T01:00:00Z")]}
         self.run_once()
-        self.gateway.data["/api/requests"] = {"requests": [
-            request(RID3, "2026-11-09T01:00:05Z", "MAX_TOKENS_EXCEEDED"),
-            request(RID2, "2026-11-09T01:00:00Z"), request(RID1, "2026-11-09T01:00:00Z")]}
+        self.gateway.data["/api/requests"] = {
+            "requests": [
+                request(RID3, "2026-11-09T01:00:05Z", "MAX_TOKENS_EXCEEDED"),
+                request(RID2, "2026-11-09T01:00:00Z"),
+                request(RID1, "2026-11-09T01:00:00Z"),
+            ]
+        }
         alerts = self.run_once()
         self.assertEqual(len(alerts), 1)
         self.assertEqual((alerts[0]["kind"], alerts[0]["count"]), ("gateway_denied", 2))
-        self.assertEqual(alerts[0]["details"]["reason_codes"], {"MAX_TOKENS_EXCEEDED": 1, "POLICY_MODEL_NOT_ALLOWED": 1})
+        self.assertEqual(
+            alerts[0]["details"]["reason_codes"], {"MAX_TOKENS_EXCEEDED": 1, "POLICY_MODEL_NOT_ALLOWED": 1}
+        )
         self.assertEqual(self.run_once(), [])
 
     def test_tetragon_and_hubble_detections_and_blocks(self):
         self.run_once()
-        self.gateway.data["/api/observations?tetragon"] = {"counts": {"total": 4}, "observations": [
-            exec_obs("2026-11-09T01:00:03Z"), exec_obs("2026-11-09T01:00:02Z", "allowed_in_phase"),
-            exec_obs("2026-11-09T01:00:01Z", "phase_unknown"), file_obs("2026-11-09T01:00:04Z")]}
-        self.gateway.data["/api/observations?hubble"] = {"counts": {"total": 1}, "observations": [drop_obs("2026-11-09T01:00:05Z")]}
+        self.gateway.data["/api/observations?tetragon"] = {
+            "counts": {"total": 4},
+            "observations": [
+                exec_obs("2026-11-09T01:00:03Z"),
+                exec_obs("2026-11-09T01:00:02Z", "allowed_in_phase"),
+                exec_obs("2026-11-09T01:00:01Z", "phase_unknown"),
+                file_obs("2026-11-09T01:00:04Z"),
+            ],
+        }
+        self.gateway.data["/api/observations?hubble"] = {
+            "counts": {"total": 1},
+            "observations": [drop_obs("2026-11-09T01:00:05Z")],
+        }
         alerts = {a["kind"]: a for a in self.run_once()}
         self.assertEqual(set(alerts), {"tetragon_exec_detected", "tetragon_file_blocked", "hubble_dropped"})
         self.assertEqual(alerts["tetragon_exec_detected"]["count"], 1)
@@ -125,8 +166,14 @@ class CollectTests(unittest.TestCase):
         self.gateway.data["/api/gpu-status"] = {"state": "ok"}
         self.gateway.data["/api/summary"] = {"record_store": {"ok": False}}
         result = {(a["kind"], a["details"]["target"]) for a in self.run_once()}
-        self.assertEqual(result, {("health_recovered", "collector:engine_health"), ("health_recovered", "gpu_status"),
-                                  ("health_down", "record_store")})
+        self.assertEqual(
+            result,
+            {
+                ("health_recovered", "collector:engine_health"),
+                ("health_recovered", "gpu_status"),
+                ("health_down", "record_store"),
+            },
+        )
         self.gateway.data["/api/status"]["status"] = "degraded"
         self.assertEqual(self.run_once()[0]["details"]["state"], "degraded")
 
@@ -157,8 +204,9 @@ class CollectTests(unittest.TestCase):
     def test_fractional_and_offset_timestamps_do_not_hide_new_requests(self):
         self.gateway.data["/api/requests"] = {"requests": [request(RID1, "2026-11-09T01:00:00Z")]}
         self.run_once()
-        self.gateway.data["/api/requests"]["requests"].extend([
-            request(RID2, "2026-11-09T01:00:00.100Z"), request(RID3, "2026-11-09T10:00:01+09:00")])
+        self.gateway.data["/api/requests"]["requests"].extend(
+            [request(RID2, "2026-11-09T01:00:00.100Z"), request(RID3, "2026-11-09T10:00:01+09:00")]
+        )
         alert = self.run_once()[0]
         self.assertEqual(alert["count"], 2)
         self.assertEqual(alert["last_at"], "2026-11-09T01:00:01.000000Z")
@@ -168,7 +216,9 @@ class CollectTests(unittest.TestCase):
         cursor = {"at": "2026-11-09T01:00:00Z", "keys": [RID1]}
         found, cursor = notifier.denied_alerts({"requests": [request(RID1, cursor["at"])]}, cursor, 200)
         self.assertEqual(found, [])
-        found, _ = notifier.denied_alerts({"requests": [request(RID1, cursor["at"]), request(RID2, cursor["at"])]}, cursor, 200)
+        found, _ = notifier.denied_alerts(
+            {"requests": [request(RID1, cursor["at"]), request(RID2, cursor["at"])]}, cursor, 200
+        )
         self.assertEqual(found[0]["count"], 1)
 
     def test_identifiers_disguised_as_codes_never_leave_host(self):
@@ -202,8 +252,17 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(state["pending"], [])
 
     def test_payload_formats(self):
-        alerts = [notifier._alert("gateway_denied", "warning", "Gateway 요청 차단", count=2,
-                                  details={"reason_codes": {"X": 2}}, first_at="a", last_at="b")]
+        alerts = [
+            notifier._alert(
+                "gateway_denied",
+                "warning",
+                "Gateway 요청 차단",
+                count=2,
+                details={"reason_codes": {"X": 2}},
+                first_at="a",
+                last_at="b",
+            )
+        ]
         self.assertIn("Gateway 요청 차단 2건", notifier.payload(alerts, "lab", "slack")["text"])
         discord = notifier.payload(alerts, "lab", "discord")
         self.assertEqual(discord["allowed_mentions"], {"parse": []})
@@ -218,14 +277,17 @@ class DeliveryTests(unittest.TestCase):
         class Response:
             def __init__(self, status):
                 self.status = status
+
             def __enter__(self):
                 return self
+
             def __exit__(self, *a):
                 return False
 
         class Opener:
             def __init__(self, status):
                 self.status, self.requests = status, []
+
             def open(self, request, timeout):
                 self.requests.append(request)
                 return Response(self.status)
@@ -249,8 +311,10 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             notifier.read_env_file(path)
         os.chmod(path, 0o600)
-        self.assertEqual(notifier.read_env_file(path),
-                         {"ALERT_WEBHOOK_URL": "https://hooks.example.test/a", "RUNTIME_VIEWER_TOKEN": "t"})
+        self.assertEqual(
+            notifier.read_env_file(path),
+            {"ALERT_WEBHOOK_URL": "https://hooks.example.test/a", "RUNTIME_VIEWER_TOKEN": "t"},
+        )
 
     def test_webhook_must_be_https_except_loopback(self):
         self.assertTrue(notifier.check_webhook_url("https://hooks.example.test/a"))
@@ -260,8 +324,13 @@ class ConfigTests(unittest.TestCase):
                 notifier.check_webhook_url(bad)
 
     def test_malformed_webhook_is_rejected_without_echoing_url(self):
-        for bad in ("https:///missing-host", "https://hooks.example.test:bad/x", "https://[broken/x",
-                    "https://hooks.example.test/x#fragment", "https://hooks.example.test/a\nb"):
+        for bad in (
+            "https:///missing-host",
+            "https://hooks.example.test:bad/x",
+            "https://[broken/x",
+            "https://hooks.example.test/x#fragment",
+            "https://hooks.example.test/a\nb",
+        ):
             with self.subTest(case="malformed"), self.assertRaises(SystemExit) as failure:
                 notifier.check_webhook_url(bad)
             self.assertNotIn(bad, str(failure.exception))
@@ -269,8 +338,10 @@ class ConfigTests(unittest.TestCase):
     def test_pending_alerts_are_saved_before_delivery_can_fail(self):
         path = self.root / "state.json"
         alert = notifier._alert("gateway_denied", "warning", "Gateway 요청 차단", count=1)
-        with patch.object(notifier, "collect", return_value=[alert]), \
-                patch.object(notifier, "flush", side_effect=RuntimeError("interrupted")):
+        with (
+            patch.object(notifier, "collect", return_value=[alert]),
+            patch.object(notifier, "flush", side_effect=RuntimeError("interrupted")),
+        ):
             with self.assertRaises(RuntimeError):
                 notifier.main(["--gateway-url", "https://gateway.test", "--state", str(path)])
         self.assertEqual(notifier.load_state(path)["pending"], [alert])

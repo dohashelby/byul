@@ -10,12 +10,8 @@ import tempfile
 import unittest
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.backend import (
-    BackendConfig,
-    parse_prometheus_metrics,
-    unmapped_metric_families,
-)
-from serving_runtime.mvp.engine_client import EngineClient
+from serving_runtime.gateway.backend import BackendConfig, parse_prometheus_metrics, unmapped_metric_families
+from serving_runtime.gateway.engine_client import EngineClient
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,9 +130,7 @@ class MetricsCheckCliTests(unittest.TestCase):
         path.write_bytes(payload)
         output = io.StringIO()
         with redirect_stdout(output):
-            code = main(
-                ["metrics-check", "--backend-config", str(SGLANG_EXAMPLE), "--input", str(path), *extra]
-            )
+            code = main(["metrics-check", "--backend-config", str(SGLANG_EXAMPLE), "--input", str(path), *extra])
         return code, output.getvalue()
 
     def test_all_ok_returns_zero_and_json_report(self) -> None:

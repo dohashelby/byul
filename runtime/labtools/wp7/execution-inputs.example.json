@@ -1,0 +1,10 @@
+{
+  "aws_profile": "byul-lab",
+  "budget_name": "byul-check",
+  "instance_id": "",
+  "ssh_alias": "wp7-dev",
+  "remote_dir": "/home/ubuntu/wp7-7741687d",
+  "server_checkout": "/home/ubuntu/byul-wp7-7741687d",
+  "server_config_file": "/secure/wp7-server.json",
+  "auxiliary_reserve_usd": 3
+}

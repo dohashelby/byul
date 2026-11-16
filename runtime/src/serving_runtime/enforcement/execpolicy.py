@@ -85,7 +85,9 @@ class ExecException:
     valid_until: datetime
     approval_ref: str
 
-    def covers(self, *, binary: str, parent: str | None, image: str | None, phases: set[str], at: datetime | None) -> bool:
+    def covers(
+        self, *, binary: str, parent: str | None, image: str | None, phases: set[str], at: datetime | None
+    ) -> bool:
         if binary != self.executable or self.phase not in phases:
             return False
         if at is None or not self.valid_from <= at < self.valid_until:
@@ -118,8 +120,18 @@ def parse_exceptions(document: Any) -> tuple[ExecException, ...]:
     if not isinstance(raw, list):
         raise IntentError("exceptions must be an array")
     allowed = {
-        "exception_id", "rule_ref", "kind", "executable", "parent", "phase", "image_digest",
-        "reason", "approved_by", "approval_ref", "valid_from", "valid_until",
+        "exception_id",
+        "rule_ref",
+        "kind",
+        "executable",
+        "parent",
+        "phase",
+        "image_digest",
+        "reason",
+        "approved_by",
+        "approval_ref",
+        "valid_from",
+        "valid_until",
     }
     result: list[ExecException] = []
     for index, item in enumerate(raw):
@@ -174,20 +186,28 @@ def parse_exceptions(document: Any) -> tuple[ExecException, ...]:
 def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
     allowed_root = {"schema_version", "target_ref", "entries", "extraction", "collector"}
     if not isinstance(document, dict) or set(document) - allowed_root:
-        raise IntentError(
-            "timeline must contain only schema_version, target_ref, entries, extraction"
-        )
+        raise IntentError("timeline must contain only schema_version, target_ref, entries, extraction")
     if document.get("schema_version") != TIMELINE_SCHEMA:
         raise IntentError(f"schema_version must be {TIMELINE_SCHEMA}")
     collector = document.get("collector")
     if collector is not None:
-        required_collector = {
-            "state", "pod_uid", "pod_name", "written_at", "last_log_at", "log_delivery_lag_seconds"
-        }
+        required_collector = {"state", "pod_uid", "pod_name", "written_at", "last_log_at", "log_delivery_lag_seconds"}
         optional_collector = {"context", "namespace", "container_id"}
-        if (not isinstance(collector, dict) or not required_collector <= set(collector)
-                or set(collector) - required_collector - optional_collector
-                or collector["state"] not in {"running", "no_target", "multiple_targets", "pod_error", "log_error", "incomplete_history", "stopped"}):
+        if (
+            not isinstance(collector, dict)
+            or not required_collector <= set(collector)
+            or set(collector) - required_collector - optional_collector
+            or collector["state"]
+            not in {
+                "running",
+                "no_target",
+                "multiple_targets",
+                "pod_error",
+                "log_error",
+                "incomplete_history",
+                "stopped",
+            }
+        ):
             raise IntentError("timeline.collector is invalid")
         for key in optional_collector:
             if collector.get(key) is not None and (not isinstance(collector[key], str) or not collector[key]):
@@ -197,7 +217,9 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
             _time(collector["last_log_at"], "timeline.collector.last_log_at")
         if collector["pod_uid"] is not None and (not isinstance(collector["pod_uid"], str) or not collector["pod_uid"]):
             raise IntentError("timeline.collector.pod_uid is invalid")
-        if collector["pod_name"] is not None and (not isinstance(collector["pod_name"], str) or not collector["pod_name"]):
+        if collector["pod_name"] is not None and (
+            not isinstance(collector["pod_name"], str) or not collector["pod_name"]
+        ):
             raise IntentError("timeline.collector.pod_name is invalid")
         lag = collector["log_delivery_lag_seconds"]
         if lag is not None and (isinstance(lag, bool) or not isinstance(lag, (int, float)) or not math.isfinite(lag)):
@@ -205,13 +227,27 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
     extraction = document.get("extraction")
     if extraction is not None:
         extraction_fields = {
-            "engine", "pattern_set", "support_level", "year", "timezone",
-            "runs_observed", "lines_read", "unparsed_lines", "last_position", "matched_signals",
-            "omitted_boundaries", "open_phases", "limitations",
+            "engine",
+            "pattern_set",
+            "support_level",
+            "year",
+            "timezone",
+            "runs_observed",
+            "lines_read",
+            "unparsed_lines",
+            "last_position",
+            "matched_signals",
+            "omitted_boundaries",
+            "open_phases",
+            "limitations",
         }
         optional_extraction_fields = {
-            "follow", "collector_state", "clock_sources", "health_probe",
-            "skipped_lines", "history_incomplete",
+            "follow",
+            "collector_state",
+            "clock_sources",
+            "health_probe",
+            "skipped_lines",
+            "history_incomplete",
         }
         if (
             not isinstance(extraction, dict)
@@ -236,16 +272,9 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
         ):
             raise IntentError("timeline.extraction.last_position is invalid")
         signals = extraction["matched_signals"]
-        if (
-            not isinstance(signals, dict)
-            or any(
-                not isinstance(name, str)
-                or not name
-                or isinstance(value, bool)
-                or not isinstance(value, int)
-                or value < 1
-                for name, value in signals.items()
-            )
+        if not isinstance(signals, dict) or any(
+            not isinstance(name, str) or not name or isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for name, value in signals.items()
         ):
             raise IntentError("timeline.extraction.matched_signals is invalid")
         omitted = extraction["omitted_boundaries"]
@@ -266,18 +295,29 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
             if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
                 raise IntentError(f"timeline.extraction.{name} must be a string array")
         skipped = extraction.get("skipped_lines")
-        if skipped is not None and (not isinstance(skipped, dict) or any(
-            not isinstance(name, str) or not name or isinstance(count, bool)
-            or not isinstance(count, int) or count < 0
-            for name, count in skipped.items()
-        )):
+        if skipped is not None and (
+            not isinstance(skipped, dict)
+            or any(
+                not isinstance(name, str)
+                or not name
+                or isinstance(count, bool)
+                or not isinstance(count, int)
+                or count < 0
+                for name, count in skipped.items()
+            )
+        ):
             raise IntentError("timeline.extraction.skipped_lines is invalid")
         if "history_incomplete" in extraction and not isinstance(extraction["history_incomplete"], bool):
             raise IntentError("timeline.extraction.history_incomplete is invalid")
         follow = extraction.get("follow")
         if follow is not None:
             follow_fields = {
-                "mode", "existing", "state", "last_updated_at", "input_identity", "events",
+                "mode",
+                "existing",
+                "state",
+                "last_updated_at",
+                "input_identity",
+                "events",
             }
             if not isinstance(follow, dict) or set(follow) != follow_fields:
                 raise IntentError("timeline.extraction.follow has invalid fields")
@@ -293,8 +333,7 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
                 not isinstance(identity, dict)
                 or set(identity) != {"device", "inode"}
                 or any(
-                    isinstance(value, bool) or not isinstance(value, int) or value < 0
-                    for value in identity.values()
+                    isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in identity.values()
                 )
             ):
                 raise IntentError("timeline.extraction.follow.input_identity is invalid")
@@ -315,10 +354,18 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
         collector = extraction.get("collector_state")
         if collector is not None:
             required_collector = {
-                "run_active", "run_init_ended", "compile_seen", "inferring_seen", "health_ready_at",
+                "run_active",
+                "run_init_ended",
+                "compile_seen",
+                "inferring_seen",
+                "health_ready_at",
             }
             optional_collector = {"compile_open_from", "compile_cap_at", "capture_end_at"}
-            if not isinstance(collector, dict) or not required_collector <= set(collector) or set(collector) - required_collector - optional_collector:
+            if (
+                not isinstance(collector, dict)
+                or not required_collector <= set(collector)
+                or set(collector) - required_collector - optional_collector
+            ):
                 raise IntentError("timeline.extraction.collector_state has invalid fields")
             for name in ("run_active", "run_init_ended", "compile_seen", "inferring_seen"):
                 if not isinstance(collector[name], bool):
@@ -341,8 +388,13 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
         health = extraction.get("health_probe")
         if health is not None:
             if not isinstance(health, dict) or set(health) != {
-                "configured", "clock_source", "attempts", "successes", "failures",
-                "last_checked_at", "last_result",
+                "configured",
+                "clock_source",
+                "attempts",
+                "successes",
+                "failures",
+                "last_checked_at",
+                "last_result",
             }:
                 raise IntentError("timeline.extraction.health_probe has invalid fields")
             if not isinstance(health["configured"], bool):
@@ -427,19 +479,24 @@ class ExecPolicy:
         self._timeline = _ReloadingFile(timeline_path, parse_timeline)
         self._lock = threading.Lock()
 
-    def classify_suspect(self, binary: str, *, parent: str | None = None,
-                         image: str | None = None) -> dict[str, Any]:
+    def classify_suspect(self, binary: str, *, parent: str | None = None, image: str | None = None) -> dict[str, Any]:
         """Classify an intent suspect without assigning an engine phase to its Pod."""
         if binary not in self.intent.suspect_binaries:
             raise ValueError("binary is not a suspect path")
         return {
-            "phase": ["unknown"], "phase_basis": [], "phase_trusted": [],
-            "phase_source_error": None, "exec_verdict": "suspect_binary",
-            "exception_id": None, "exception_kind": None, "exception_candidate_id": None,
+            "phase": ["unknown"],
+            "phase_basis": [],
+            "phase_trusted": [],
+            "phase_source_error": None,
+            "exec_verdict": "suspect_binary",
+            "exception_id": None,
+            "exception_kind": None,
+            "exception_candidate_id": None,
             "binary_location": "other",
             "parent_attribution": "available" if parent else "unavailable",
             "suspect_context": None,
-            "image_digest": image, "rule_refs": ["SP3-EXEC"],
+            "image_digest": image,
+            "rule_refs": ["SP3-EXEC"],
         }
 
     def status(self) -> dict[str, Any]:
@@ -491,12 +548,14 @@ class ExecPolicy:
             timeline, timeline_error = (), "stale"
         elif collector is not None and collector["state"] != "running":
             timeline, timeline_error = (), collector["state"]
-        elif collector is not None and (
-            not isinstance(pod_uid, str) or not pod_uid or pod_uid != collector["pod_uid"]
-        ):
-            timeline, timeline_error = (), (
-                "pod_uid_unavailable" if not isinstance(pod_uid, str) or not pod_uid or not collector["pod_uid"]
-                else "pod_uid_mismatch"
+        elif collector is not None and (not isinstance(pod_uid, str) or not pod_uid or pod_uid != collector["pod_uid"]):
+            timeline, timeline_error = (
+                (),
+                (
+                    "pod_uid_unavailable"
+                    if not isinstance(pod_uid, str) or not pod_uid or not collector["pod_uid"]
+                    else "pod_uid_mismatch"
+                ),
             )
         entries = [entry for entry in timeline if at is not None and entry.active(at)]
         active = sorted({entry.phase for entry in entries})
@@ -514,12 +573,17 @@ class ExecPolicy:
             parent_check = "mismatch"
         parent_allowed = parent_check in {"matched", "not_constrained"}
         suspect_parent_context = next(
-            ((parents, phases) for executable, parents, phases in intent.suspect_parent_contexts
-             if executable == binary), None
+            (
+                (parents, phases)
+                for executable, parents, phases in intent.suspect_parent_contexts
+                if executable == binary
+            ),
+            None,
         )
         suspect_context = (
             "compile_toolchain_parent"
-            if suspect_parent_context is not None and parent in suspect_parent_context[0]
+            if suspect_parent_context is not None
+            and parent in suspect_parent_context[0]
             and bool(set(active) & set(suspect_parent_context[1]))
             else None
         )

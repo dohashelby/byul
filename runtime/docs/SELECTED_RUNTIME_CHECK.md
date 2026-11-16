@@ -1,6 +1,6 @@
 # A1·A4 추가 인수
 
-`tools/selected_runtime_check.py`는 고정 통합 소스에서 실행한다. 기존 AWS-01~20의 네트워크·권한·정책 시험은 그 도구를 사용하고, 이 도구는 Unicode 이후 정상 요청·동시 UUID·명시한 응답 키의 관측·관측원별 조회 창·Platform 상세 캐시/보존의 추가 경계만 검사한다. 새로운 보안 판정을 만들지 않는다.
+`labtools/selected_runtime_check.py`는 고정 통합 소스에서 실행한다. 기존 AWS-01~20의 네트워크·권한·정책 시험은 그 도구를 사용하고, 이 도구는 Unicode 이후 정상 요청·동시 UUID·명시한 응답 키의 관측·관측원별 조회 창·Platform 상세 캐시/보존의 추가 경계만 검사한다. 새로운 보안 판정을 만들지 않는다.
 
 ## 현재 Gateway 읽기·요청
 
@@ -9,7 +9,7 @@
 ```sh
 cd /path/to/frozen/byul
 export PYTHONPATH=runtime:runtime/src:update/src:platform/api/src
-/path/to/validated/python runtime/tools/selected_runtime_check.py live \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py live \
   --gateway-url http://127.0.0.1:18080 --platform-url http://127.0.0.1:18700 \
   --model test-model --inference-token-env RUNTIME_INFERENCE_TOKEN \
   --viewer-token-env RUNTIME_VIEWER_TOKEN --timeout 30 \
@@ -28,7 +28,7 @@ export PYTHONPATH=runtime:runtime/src:update/src:platform/api/src
 `requests`는 기존 client/watchdog와 구조화 저널·Platform API를 사용한다. 보호된 viewer 조회와 출력 상한을 먼저 확인한 뒤 정상 전후 대조, 누락·오류·중복 인증, 위조 principal/priority/session/rank/request ID, 여러 줄 본문의 예약필드 유사 문자열, token/KV/embedding/tool/반환 옵션, 출력 상한+1과 경로·method 변형을 확인한다. 실제 프로필이 선택해 연 필드는 거부 대상으로 보내지 않고 조건부 미실행으로 남긴다.
 
 ```sh
-/path/to/validated/python runtime/tools/selected_runtime_check.py requests \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py requests \
   --gateway-url http://127.0.0.1:18080 --platform-url http://127.0.0.1:18700 \
   --model test-model --inference-token-env RUNTIME_INFERENCE_TOKEN \
   --viewer-token-env RUNTIME_VIEWER_TOKEN --timeout 15 \
@@ -46,7 +46,7 @@ export PYTHONPATH=runtime:runtime/src:update/src:platform/api/src
 기존 동시 buffered/SSE 표식 실측은 REQ011 근거로 재사용한다. `separation`은 남은 REQ012 순차 분기만 실행한다. SSE A를 느리게 읽고 닫은 뒤 같은 client label의 새 B를 즉시/250ms 뒤 보내며, buffered A도 header 뒤1byte를 읽고 닫은 다음 새 B를 보낸다. 총6 POST이며 재시도하지 않는다.
 
 ```sh
-/path/to/validated/python runtime/tools/selected_runtime_check.py separation \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py separation \
   --gateway-url http://127.0.0.1:18080 --model test-model \
   --inference-token-env RUNTIME_INFERENCE_TOKEN --viewer-token-env RUNTIME_VIEWER_TOKEN \
   --timeout 15 --output /NEW/evidence/selected-separation.json
@@ -61,7 +61,7 @@ export PYTHONPATH=runtime:runtime/src:update/src:platform/api/src
 실엔진을 사용하는 예:
 
 ```sh
-/path/to/validated/python runtime/tools/selected_runtime_check.py isolated \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py isolated \
   --test-data-dir /NEW/test-data/selected-isolated-vllm \
   --backend vllm --backend-config /READONLY/validated/backend-vllm.json \
   --model test-model --fixture-count 200 --timeout 30 \
@@ -87,7 +87,7 @@ hold 검사는 보고서의 held_units만 사용하지 않는다. 실제4파일�
 `copies`는 현재 배포에서 명시한 일반 파일만 최대16개·각8MiB까지 완전 읽고, 합성표식/자격값의 존재 수와 hash·owner/group/mode를 저장한다. 디렉터리를 순회하거나 symlink를 따라가지 않는다. 초과·변경 중·읽기 불가 파일의 부재 판정은 UNKNOWN이다. 원문·표식값·자격값은 파일에 저장하지 않고 환경변수 이름으로만 입력한다.
 
 ```sh
-/path/to/validated/python runtime/tools/selected_runtime_check.py copies \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py copies \
   --file /EXPLICIT/run/gateway_records.jsonl --file /EXPLICIT/run/engine-log.txt \
   --marker-env SYNTHETIC_PROMPT_MARKER --credential-env RUNTIME_INFERENCE_TOKEN \
   --allowed-reader ubuntu --denied-reader nobody \
@@ -104,14 +104,14 @@ scan 전후와 두 reader 검사 후의 열린 descriptor/현재 path를 dev·in
 `lifecycle`은 배포 담당자가 기존 절차로 승인 모델/정책을 변경하기 전후에 각각 실행한다. 도구는 배포·정책·인증을 바꾸지 않는다. before는 old 정상/new MODEL_NOT_ALLOWED와 old 정상 후속, after는 new 정상/old MODEL_NOT_ALLOWED와 new 정상 후속을 기록한다. 각 명령은3 POST이며 동일 검증 주체·policy/target/run/generation을 phase 안에서 대조한다.
 
 ```sh
-/path/to/validated/python runtime/tools/selected_runtime_check.py lifecycle \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py lifecycle \
   --phase before --gateway-url http://127.0.0.1:18080 \
   --model OLD_APPROVED_NAME --replacement-model NEW_APPROVED_NAME \
   --backend-config /PUBLIC/backend-before.json \
   --inference-token-env RUNTIME_INFERENCE_TOKEN --viewer-token-env RUNTIME_VIEWER_TOKEN \
   --output /NEW/evidence/model-before.json
 # 담당자의 기존 승인·배포 절차로 모델/정책 변경 후 같은 old/new 명칭 사용
-/path/to/validated/python runtime/tools/selected_runtime_check.py lifecycle \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py lifecycle \
   --phase after --gateway-url http://127.0.0.1:18080 \
   --model OLD_APPROVED_NAME --replacement-model NEW_APPROVED_NAME \
   --backend-config /PUBLIC/backend-after.json --before-report /NEW/evidence/model-before.json \
@@ -126,7 +126,7 @@ after는 완전한 before의5개 필수 사례와 UUID/정상·거부 원장, �
 수집기 중단·무해 사건·복구는 기존 담당 actor가 수행한다. 각 단계에서 다음 GET 전용 명령을 호출해 상태·손실 수·원인/시각·gap 참조와 Platform 전파를 저장한다. 최대30초/30snapshot이며 source가 API 조회 사이에 변하면 그 sample은 UNKNOWN이다. 같은 runtime 세션/정책/target/run/instance의 안정된 source를 API와 비교한다. API contract 오류와 기한 내 반복된 안정된 불일치는 실패로 남긴다.
 
 ```sh
-/path/to/validated/python runtime/tools/selected_runtime_check.py observe \
+/path/to/validated/python runtime/labtools/selected_runtime_check.py observe \
   --gateway-url http://127.0.0.1:18080 --platform-url http://127.0.0.1:18700 \
   --viewer-token-env RUNTIME_VIEWER_TOKEN --source tetragon --expected-state error \
   --wait-seconds 5 --output /NEW/evidence/collector-gap.json

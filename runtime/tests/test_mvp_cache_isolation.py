@@ -11,18 +11,15 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.auth import token_digest
-from serving_runtime.mvp.backend import load_backend_config
-from serving_runtime.mvp.cache_isolation import (
-    CACHE_SALT_KEY_ENV,
-    CacheSaltKey,
-)
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.fake_backend import FakeBackend
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.auth import token_digest
+from serving_runtime.gateway.backend import load_backend_config
+from serving_runtime.gateway.cache_isolation import CACHE_SALT_KEY_ENV, CacheSaltKey
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.fake_backend import FakeBackend
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
 
 
 KEY = "cache-isolation-key-material-32-bytes-minimum"
@@ -178,9 +175,7 @@ class CacheIsolationHttpTests(unittest.TestCase):
                 ],
             },
         )
-        self.backend_path = self.write_json(
-            "backend.json", backend_document(self.fake.base_url)
-        )
+        self.backend_path = self.write_json("backend.json", backend_document(self.fake.base_url))
 
     def tearDown(self) -> None:
         for gateway in reversed(self.gateways):
@@ -277,9 +272,7 @@ class CacheIsolationHttpTests(unittest.TestCase):
         return value
 
     def records(self, suffix: str) -> list[dict[str, object]]:
-        rows, corrupt = JsonlStore(
-            self.root / f"data-{suffix}" / "gateway_records.jsonl"
-        ).read_all()
+        rows, corrupt = JsonlStore(self.root / f"data-{suffix}" / "gateway_records.jsonl").read_all()
         self.assertEqual(corrupt, [])
         return rows
 
@@ -317,9 +310,7 @@ class CacheIsolationHttpTests(unittest.TestCase):
                     cache_salt="client-controlled-value",
                 )
                 self.assertEqual(status, 400)
-                self.assertEqual(
-                    json.loads(body)["error"]["code"], "UNSUPPORTED_FIELD"
-                )
+                self.assertEqual(json.loads(body)["error"]["code"], "UNSUPPORTED_FIELD")
         self.assertEqual(self.fake.request_count, before)
         for record in self.records("client"):
             self.assertEqual(
@@ -354,9 +345,7 @@ class CacheIsolationHttpTests(unittest.TestCase):
                 self.assertEqual(self.fake.request_count, before)
                 cache_status = self.get_json(gateway, "/api/status")["cache_isolation"]
                 self.assertFalse(cache_status["ready"])
-                self.assertEqual(
-                    cache_status["unavailable_reason_code"], readiness_code
-                )
+                self.assertEqual(cache_status["unavailable_reason_code"], readiness_code)
 
     def test_mock_backend_is_unavailable_for_enabled_policy(self) -> None:
         try:
@@ -402,18 +391,13 @@ class CacheIsolationHttpTests(unittest.TestCase):
         )
         public_text = json.dumps([status, policy, requests], ensure_ascii=False)
         public_text += response_body.decode("utf-8")
-        stored_text = "".join(
-            path.read_text(encoding="utf-8")
-            for path in (self.root / "data-secret").glob("*.jsonl")
-        )
+        stored_text = "".join(path.read_text(encoding="utf-8") for path in (self.root / "data-secret").glob("*.jsonl"))
         for secret in (KEY, salt):
             self.assertNotIn(secret, public_text)
             self.assertNotIn(secret, stored_text)
 
     def test_off_mode_is_explicit_and_does_not_inject(self) -> None:
-        off_path = self.write_json(
-            "policy-off.json", policy_document(cache_isolation="off")
-        )
+        off_path = self.write_json("policy-off.json", policy_document(cache_isolation="off"))
         gateway = self.start_external(
             policy_path=off_path,
             auth_path=None,

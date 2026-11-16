@@ -4,8 +4,10 @@
 서버 값 → `target.json.launch_settings` → `TargetRegistration.launch_settings`로 전달한다.
 환경·정책 판본 해시와 bundle 파일 해시가 기존 승인 경로에 결속한다. 0.1 문서는 기존
 형태로 수용하고 승인 실행 설정이 없는 것으로 다룬다. 실행 설정의 bundle 수동 override는
-거부하며 환경 판본을 갱신해야 한다. 키 생략은 비교 제외,
-명시적 null은 승인값 확인 안 됨이며 false로 대체하지 않는다.
+거부하며 환경 판본을 갱신해야 한다. 생략한 키는 승인값 없음으로 표시하며,
+명시적 null은 승인값 확인 안 됨으로 표시하고 false로 대체하지 않는다.
+승인값이 없거나 null인 불리언 보안 스위치가 기본값 false와 다른 true로 관측되면
+재검증 조건을 만든다. 문자열 키(리비전류)는 승인값이 없거나 null이면 조건을 만들지 않는다.
 
 엔진 종류는 target의 `engine.kind`, 컨테이너는 환경의 `deployment.engine_container`에서
 변환한 Kubernetes 등록을 사용한다. 해당 Pod spec의 command와 args를 합쳐 허용 목록만
@@ -37,10 +39,18 @@ unknown으로 처리한다. 실행 인자 전체, 다른 플래그 값, 설정 �
 오래된 호스트 수집기가 만든 스냅샷에는 실행 설정이 없어 unknown으로 표시된다.
 
 `/api/baseline`의 `launch_settings.*` 비교 행은 플랫폼 대상 엔진 화면의 기준 비교에
-출처·승인값·관측값·상태로 표시한다. 승인값 없는 관측 행은 unapproved, 대응 설정이
-없는 키는 not_applicable로 표시하고 비교하지 않는다. 확정값의 차이는 기존
-`config_drift` 흐름으로 재검증을 요청하며 동일 근거는 중복 생성하지 않는다.
-unknown은 이전 drift를 해제하지 않는다. 설정이 같아지면 현재 차이 근거가 해소되지만
+출처·승인값·관측값·상태로 표시한다. 승인값 없는 관측 행은 unapproved,
+명시적 null 승인은 unknown을 유지한다. 각 행에는 엔진 기본값 `default`와
+불리언 보안 스위치의 기본값 이탈 여부 `deviates_from_default`를 추가한다.
+관측 불가·해당 없음·엔진 미상·문자열 키의 이탈 여부는 null이다. unapproved 행의
+note는 승인 설정 자체가 없으면 "승인값 없음 (launch_settings 미등록)", 키만 없으면
+"승인값 없음"이다. 대응 설정이 없는 키는 not_applicable로 표시한다.
+확정 승인값과의 차이, 또는 승인값 없음/null인 trust_remote_code·trust_request_mm_kwargs·
+enable_multimodal의 기본값 false 대비 true 관측은 기존 `config_drift` 흐름으로
+재검증을 요청한다. 증거와 식별값의 기존 모양을 유지하며 같은 근거는 중복 생성하지 않는다.
+관측 불가 unknown은 이전 drift를 해제하지 않는다. null 승인이라도 기본값으로 복귀한
+관측은 기존 조건을 해소한다. 승인값을 관측값과 같게 등록해도 조건이 해소된다.
+설정이 같아지면 현재 차이 근거가 해소되지만
 열린 재검증 요청의 최종 처리는 기존 운영 절차를 따른다. 자동 차단·재시작은 없다.
 
 주 근거는 CHK-SUP-002이며 현재 선정 CHECKS에 없어서 추가하지 않았다.

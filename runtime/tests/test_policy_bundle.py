@@ -16,10 +16,10 @@ from unittest.mock import patch
 import pytest
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_bundle import PolicyBundleError, verify_policy_bundle
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_bundle import PolicyBundleError, verify_policy_bundle
 from serving_runtime.enforcement.intent import load_intent
 
 
@@ -28,8 +28,9 @@ SOURCE_BUNDLE = ROOT.parent / "contracts" / "examples" / "bundle"
 NOW = datetime(2026, 10, 26, 0, 0, tzinfo=timezone.utc)
 
 
-@pytest.mark.parametrize("error", [PermissionError("records.jsonl: reader permissions are unsafe"),
-                                  OSError("body failed")])
+@pytest.mark.parametrize(
+    "error", [PermissionError("records.jsonl: reader permissions are unsafe"), OSError("body failed")]
+)
 def test_materialized_body_oserror_is_propagated_and_snapshot_cleaned(error):
     bundle = verify_policy_bundle(SOURCE_BUNDLE, now=NOW)
     with pytest.raises(type(error)) as raised:
@@ -43,7 +44,9 @@ def test_materialized_body_oserror_is_propagated_and_snapshot_cleaned(error):
 
 def test_materialized_snapshot_creation_oserror_has_bundle_context():
     bundle = verify_policy_bundle(SOURCE_BUNDLE, now=NOW)
-    with patch("serving_runtime.mvp.policy_bundle.tempfile.TemporaryDirectory", side_effect=PermissionError("private")):
+    with patch(
+        "serving_runtime.policy.policy_bundle.tempfile.TemporaryDirectory", side_effect=PermissionError("private")
+    ):
         with pytest.raises(PolicyBundleError, match=r"bundle.json: .*스냅샷.*PermissionError"):
             with bundle.materialized_files():
                 pytest.fail("snapshot creation must fail")
@@ -60,9 +63,7 @@ def _manifest(directory: Path) -> dict[str, object]:
 
 
 def _write_manifest(directory: Path, document: dict[str, object]) -> None:
-    (directory / "bundle.json").write_text(
-        json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    (directory / "bundle.json").write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _entry(document: dict[str, object], role: str) -> dict[str, object]:
@@ -201,7 +202,9 @@ class PolicyBundleVerificationTests(unittest.TestCase):
             with bundle.materialized_files() as paths:
                 options, status = bundle.mvp_options((("tetragon", "events.jsonl"),), role_paths=paths)
                 self.assertEqual(load_intent(options["observation_intent_path"]).schema, intent["schema"])
-                self.assertTrue(next(item for item in status["files"] if item["role"] == "enforcement_intent")["applied"])
+                self.assertTrue(
+                    next(item for item in status["files"] if item["role"] == "enforcement_intent")["applied"]
+                )
             entry["schema_version"] = "runtime-enforcement-intent/1.0"
             _write_manifest(directory, document)
             with self.assertRaisesRegex(PolicyBundleError, "intent.json.*내부 schema"):
@@ -264,7 +267,7 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
             _write_manifest(directory, document)
             expected_policy = (directory / "runtime-policy.json").read_bytes()
             expected_approvals = (directory / "policy-approvals.json").read_bytes()
-            with patch("serving_runtime.mvp.app.run", side_effect=inspect_config):
+            with patch("serving_runtime.gateway.app.run", side_effect=inspect_config):
                 result = main(["mvp", "--policy-bundle", str(directory)])
         self.assertEqual(result, 0)
         self.assertEqual(captured["policy"], expected_policy)
@@ -307,7 +310,7 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
                 }
             )
             _write_manifest(directory, document)
-            with patch("serving_runtime.mvp.app.run", side_effect=inspect_config):
+            with patch("serving_runtime.gateway.app.run", side_effect=inspect_config):
                 result = main(
                     [
                         "mvp",
@@ -348,7 +351,10 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
                 ("exec_exceptions", "exceptions.json", "runtime-exec-exceptions/1.0"),
             ):
                 path = directory / name
-                path.write_text(json.dumps({"schema" if role == "enforcement_intent" else "schema_version": schema}), encoding="utf-8")
+                path.write_text(
+                    json.dumps({"schema" if role == "enforcement_intent" else "schema_version": schema}),
+                    encoding="utf-8",
+                )
                 raw = path.read_bytes()
                 files.append(
                     {
@@ -367,14 +373,10 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
         applied = {item["role"]: item["applied"] for item in status["files"]}
         self.assertFalse(applied["enforcement_intent"])
         self.assertFalse(applied["exec_exceptions"])
-        applied_options, applied_status = bundle.mvp_options(
-            (("tetragon", "tetragon.jsonl"),)
-        )
+        applied_options, applied_status = bundle.mvp_options((("tetragon", "tetragon.jsonl"),))
         self.assertIn("observation_intent_path", applied_options)
         self.assertIn("observation_exceptions_path", applied_options)
-        applied = {
-            item["role"]: item["applied"] for item in applied_status["files"]
-        }
+        applied = {item["role"]: item["applied"] for item in applied_status["files"]}
         self.assertTrue(applied["enforcement_intent"])
         self.assertTrue(applied["exec_exceptions"])
 

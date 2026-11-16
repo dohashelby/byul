@@ -1,5 +1,7 @@
 # 런타임 노드 설치
 
+새 서버의 토큰·첫 LAB 묶음·update 의존성·모델/digest·GID 연결은 [첫 설치 준비](첫_설치_준비.md)를 먼저 따른다.
+
 AWS 5–8회차의 계정·권한·baseline·systemd 수동 절차를 묶은 **호스트 설치기**다. 클러스터, 엔진, Gateway, sentinel, CRI 도구를 배포하지 않는다. 플랫폼·에이전트는 같은 판을 사용한다. 실제 서버 설치·재부팅 검증은 별도다.
 
 1. Python 3.12 이상과 venv 모듈, sudo(인자 정규식 지원 1.9.10 이상), systemd/systemd-analyze, visudo, kubectl, 계정 관리 도구를 준비한다. `crictl`이 없으면 설치기는 중단한다. 운영자가 버전·체크섬을 확인해 별도 설치하고 `/etc/crictl.yaml`의 CRI endpoint를 검수한다. 설치기는 자동 다운로드하지 않는다.
@@ -121,3 +123,10 @@ PYVERIFY
 ## 선택 캐시 관측
 
 [캐시 관측 설정](../../docs/cache-observer.md)의 root 승인 파일·전용 namespace 한정 read-only kubeconfig를 준비하고 `install.env.example`의 CACHE 세 필드를 함께 채운다. 비어 있으면 설치/시작하지 않는다. 기존 agent 수동 시작, baseline 보존, BPF 재부팅 필요 시 수집 서비스 중지 규칙은 그대로 적용한다.
+
+
+### 번들 읽기 그룹 전달
+
+`GATEWAY_DATA_GID=12000`처럼 그룹을 바꿔 설치하면 설치기가 번들 루트를 `root:12000`, 모드 `2750`으로 준비합니다. 번들 적용·기존 번들 검증은 이 루트의 그룹을 사용합니다. 기본값은 10000입니다. 루트가 root 소유가 아니거나 그룹이 0이면 적용을 거부합니다. 그룹을 바꿀 때는 Gateway와 서비스의 그룹 설정도 같은 설치 입력으로 준비하세요.
+
+보존 결과의 `over_size_limit_after`는 enforce 모드에서는 작업 뒤 관리 저널의 실제 크기로 계산합니다. report_only 모드에서는 삭제 계획을 반영한 예상값입니다. 삭제가 hold 오류로 막히거나 실패해도 enforce 결과에는 남은 실제 크기를 반영합니다.

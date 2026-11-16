@@ -1,4 +1,5 @@
 """TG-CODE-01 synthetic evidence, kernel filters and unchanged platform contract."""
+
 import copy
 from datetime import datetime, timedelta, timezone
 import json
@@ -14,8 +15,8 @@ from serving_runtime.enforcement.intent import IntentError, parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests, render_monitor_manifests
 from serving_runtime.enforcement.attribution import KERNEL_DATA
 from tools.tetragon_identities import IdentityCollector
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed
 from byul_platform.config import DEFAULT_CONTRACTS_DIR
 from byul_platform.contracts import Contracts
 from byul_platform.sources.checklist_links import checks_for_record, coverage
@@ -30,18 +31,33 @@ def intent_document(engine="gpu-lab"):
 
 
 def raw_event(path="/cache/hf/modules/demo.py"):
-    return {"time": AT.isoformat(), "process_kprobe": {
-        "function_name": "security_file_open", "policy_name": "runtime-tg-code-01",
-        "action": "KPROBE_ACTION_POST",
-        "process": {"pid": 42, "binary": "/usr/bin/python3", "pod": {
-            "namespace": "serving-lab", "name": "serving-engine-demo", "uid": "pod-1",
-            "pod_labels": {"app": "serving-engine"}, "container": {"name": "engine"}}},
-        "args": [{"file_arg": {"path": path}}, {"file_arg": {"path": path}}]}}
+    return {
+        "time": AT.isoformat(),
+        "process_kprobe": {
+            "function_name": "security_file_open",
+            "policy_name": "runtime-tg-code-01",
+            "action": "KPROBE_ACTION_POST",
+            "process": {
+                "pid": 42,
+                "binary": "/usr/bin/python3",
+                "pod": {
+                    "namespace": "serving-lab",
+                    "name": "serving-engine-demo",
+                    "uid": "pod-1",
+                    "pod_labels": {"app": "serving-engine"},
+                    "container": {"name": "engine"},
+                },
+            },
+            "args": [{"file_arg": {"path": path}}, {"file_arg": {"path": path}}],
+        },
+    }
 
 
 def phase_policy(tmp_path, phase="inferring", *, basis="engine_signal", collector=None, engine="gpu-lab"):
-    document = {"schema_version": "runtime-phase-timeline/1.0", "entries": [{
-        "phase": phase, "basis": basis, "from": (AT - timedelta(seconds=10)).isoformat(), "until": None}]}
+    document = {
+        "schema_version": "runtime-phase-timeline/1.0",
+        "entries": [{"phase": phase, "basis": basis, "from": (AT - timedelta(seconds=10)).isoformat(), "until": None}],
+    }
     if collector is not None:
         document["collector"] = collector
     path = tmp_path / "timeline.json"
@@ -79,10 +95,21 @@ def test_render_kernel_scope_and_suffix_conjunction_monitor_only(engine, kernel_
             assert (suffix["args"], suffix["operator"]) == ([1], "Postfix")
             assert suffix["values"] == [".py", ".pyc", ".pyo", ".so"]
             assert selector["matchActions"] == [{"action": "Post"}]
+
         def kernel_match(path):
-            return any(any(path.startswith(p) for p in s["matchArgs"][0]["values"])
-                       and any(path.endswith(p) for p in s["matchArgs"][1]["values"]) for s in selectors)
-        for path in ("/cache/hf/modules/a.py", "/tmp/b.pyc", "/models/c.so", "/home/user/.cache/huggingface/modules/a.py", "/download/hf_modules/a.py"):
+            return any(
+                any(path.startswith(p) for p in s["matchArgs"][0]["values"])
+                and any(path.endswith(p) for p in s["matchArgs"][1]["values"])
+                for s in selectors
+            )
+
+        for path in (
+            "/cache/hf/modules/a.py",
+            "/tmp/b.pyc",
+            "/models/c.so",
+            "/home/user/.cache/huggingface/modules/a.py",
+            "/download/hf_modules/a.py",
+        ):
             assert kernel_match(path)
         for path in ("/cache/a.safetensors", "/usr/local/lib/python3.12/site-packages/a.py", "/tmp-other/a.py"):
             assert not kernel_match(path)
@@ -92,28 +119,47 @@ def test_default_code_policy_identity_index_can_classify_kernel_only_event(tmp_p
     document = intent_document()
     assert document.get("tetragon_kernel_identity", False) is False
     manifests = render_manifests(parse_intent(document))
+
     # Exercise the collector's actual spec-based decision, without a cluster.
     def runner(command):
         items = list(manifests.values()) if "tracingpoliciesnamespaced" in command else []
         return SimpleNamespace(returncode=0, stdout=json.dumps({"items": items}))
-    index = IdentityCollector("test", "serving-lab", "app=serving-engine",
-                              tmp_path / "identities.json", runner=runner).collect()
+
+    index = IdentityCollector(
+        "test", "serving-lab", "app=serving-engine", tmp_path / "identities.json", runner=runner
+    ).collect()
     assert index["state"] == "ok"
     code = next(p for p in index["policies"] if p["name"] == "runtime-tg-code-01")
     assert code["kernel_identity"] is True
     assert all(not p["kernel_identity"] for p in index["policies"] if p != code)
     index["generated_at"] = AT.isoformat()
-    index["records"] = [{"node": "node", "namespace": "serving-lab", "pod_name": "serving-engine-demo",
-        "pod_uid": "pod-1", "container_name": "engine", "container_id": "a" * 64,
-        "binary": "/usr/bin/python3", "node_pid": 77, "ns_pid": 12, "pidns": 123,
-        "start_ticks": 1000, "clock_ticks": 100, "stable": True, "labels": {"app": "serving-engine"}}]
+    index["records"] = [
+        {
+            "node": "node",
+            "namespace": "serving-lab",
+            "pod_name": "serving-engine-demo",
+            "pod_uid": "pod-1",
+            "container_name": "engine",
+            "container_id": "a" * 64,
+            "binary": "/usr/bin/python3",
+            "node_pid": 77,
+            "ns_pid": 12,
+            "pidns": 123,
+            "start_ticks": 1000,
+            "clock_ticks": 100,
+            "stable": True,
+            "labels": {"app": "serving-engine"},
+        }
+    ]
     raw = raw_event()
     raw["node_name"] = "node"
     event = raw["process_kprobe"]
     event["process"] = {"pid": 42, "flags": "unknown"}
-    event["data"] = [{"label": "runtime_pid", "int_arg": 42},
+    event["data"] = [
+        {"label": "runtime_pid", "int_arg": 42},
         {"label": "runtime_start_ns", "size_arg": "10005000000"},
-        {"label": "runtime_pidns", "uint_arg": 123}]
+        {"label": "runtime_pidns", "uint_arg": 123},
+    ]
     result = parse(raw, phase_policy(tmp_path), identity_index=index)
     assert result["identity"]["state"] == "confirmed"
     assert result["identity"]["source"] == "kernel_task_procfs"
@@ -131,7 +177,12 @@ def test_inferring_code_open_maps_to_sup_008_and_contract(tmp_path, engine, suff
     assert item["phase_trusted"] == []  # observation signal is not an approval
     assert (item["pod_uid"], item["container_name"]) == ("pod-1", "engine")
     event = observation_event(item)
-    assert (event["source"], event["category"], event["outcome"], event["phase"]) == ("tetragon", "file", "detected", "inferring")
+    assert (event["source"], event["category"], event["outcome"], event["phase"]) == (
+        "tetragon",
+        "file",
+        "detected",
+        "inferring",
+    )
     assert event["related_checks"] == ["SUP-08"]
     assert Contracts(DEFAULT_CONTRACTS_DIR).errors("runtime-event", event) == []
     row = next(r for r in coverage([event])["items"] if r["framework_id"] == "CHK-SUP-008")
@@ -141,10 +192,17 @@ def test_inferring_code_open_maps_to_sup_008_and_contract(tmp_path, engine, suff
     assert checks_for_record({"rule_id": "TG-CODE-01"}, "gateway") == ["OBS-01"]
 
 
-@pytest.mark.parametrize("phase,path", [("loading", "/tmp/demo.py"), ("compiling", "/cache/jit.so"),
-    ("inferring", "/usr/local/lib/python3.12/site-packages/lazy.py"),
-    ("inferring", "/opt/venv/lib/python3.12/site-packages/lazy.py"),
-    ("inferring", "/cache/weights.safetensors"), ("inferring", "/cache-other/demo.py")])
+@pytest.mark.parametrize(
+    "phase,path",
+    [
+        ("loading", "/tmp/demo.py"),
+        ("compiling", "/cache/jit.so"),
+        ("inferring", "/usr/local/lib/python3.12/site-packages/lazy.py"),
+        ("inferring", "/opt/venv/lib/python3.12/site-packages/lazy.py"),
+        ("inferring", "/cache/weights.safetensors"),
+        ("inferring", "/cache-other/demo.py"),
+    ],
+)
 def test_startup_or_image_lazy_import_is_observed(tmp_path, phase, path):
     item = parse(raw_event(path), phase_policy(tmp_path, phase))
     assert item["code_load_verdict"] == "observed"
@@ -157,8 +215,13 @@ def test_unknown_phase_and_attribution_are_unknown(tmp_path):
     policy = ExecPolicy(parse_intent(intent_document()))
     assert observation_event(parse(raw_event(), policy))["outcome"] == "unknown"
     policy = phase_policy(tmp_path)
-    for key, value in (("namespace", "other"), ("pod_labels", {}), ("container", {}),
-                       ("container", {"name": "sidecar"}), ("uid", None)):
+    for key, value in (
+        ("namespace", "other"),
+        ("pod_labels", {}),
+        ("container", {}),
+        ("container", {"name": "sidecar"}),
+        ("uid", None),
+    ):
         raw = raw_event()
         raw["process_kprobe"]["process"]["pod"][key] = value
         item = parse(raw, policy)
@@ -169,17 +232,35 @@ def test_unknown_phase_and_attribution_are_unknown(tmp_path):
     assert observation_event(item)["outcome"] == "unknown"
 
 
-@pytest.mark.parametrize("state,age,pod", [("log_error", 0, "pod-1"), ("running", 30, "pod-1"), ("running", 0, "other")])
+@pytest.mark.parametrize(
+    "state,age,pod", [("log_error", 0, "pod-1"), ("running", 30, "pod-1"), ("running", 0, "other")]
+)
 def test_phase_collector_gap_stale_and_restart_are_unknown(tmp_path, state, age, pod):
-    collector = {"state": state, "pod_uid": pod, "pod_name": "serving-engine-demo",
-                 "written_at": (datetime.now(timezone.utc) - timedelta(seconds=age)).isoformat(),
-                 "last_log_at": None, "log_delivery_lag_seconds": None}
+    collector = {
+        "state": state,
+        "pod_uid": pod,
+        "pod_name": "serving-engine-demo",
+        "written_at": (datetime.now(timezone.utc) - timedelta(seconds=age)).isoformat(),
+        "last_log_at": None,
+        "log_delivery_lag_seconds": None,
+    }
     item = parse(raw_event(), phase_policy(tmp_path, collector=collector))
     assert item["phase"] == ["unknown"] and item["phase_source_error"]
     assert observation_event(item)["outcome"] == "unknown"
 
 
-@pytest.mark.parametrize("path", ["/tmp/bad\n.py", "/tmp/bad\x00.py", "/tmp/bad\x7f.py", "/tmp/\u202e.py", "/tmp/../cache/a.py", "relative.py", "/tmp/" + "a" * 5000 + ".py"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/tmp/bad\n.py",
+        "/tmp/bad\x00.py",
+        "/tmp/bad\x7f.py",
+        "/tmp/\u202e.py",
+        "/tmp/../cache/a.py",
+        "relative.py",
+        "/tmp/" + "a" * 5000 + ".py",
+    ],
+)
 def test_paths_are_bounded_sanitized_and_not_approved(tmp_path, path):
     item = parse(raw_event(path), phase_policy(tmp_path))
     assert len(item["path"]) <= 4096
@@ -190,8 +271,11 @@ def test_paths_are_bounded_sanitized_and_not_approved(tmp_path, path):
 
 def test_missing_unresolved_or_inconsistent_path_is_unknown(tmp_path):
     policy = phase_policy(tmp_path)
-    for args in ([], [{"file_arg": {"path": "/tmp/a.py", "flags": "unresolvedPathComponents"}}],
-                 [{"file_arg": {"path": "/tmp/a.py"}}, {"file_arg": {"path": "/tmp/b.py"}}]):
+    for args in (
+        [],
+        [{"file_arg": {"path": "/tmp/a.py", "flags": "unresolvedPathComponents"}}],
+        [{"file_arg": {"path": "/tmp/a.py"}}, {"file_arg": {"path": "/tmp/b.py"}}],
+    ):
         raw = raw_event()
         raw["process_kprobe"]["args"] = args
         item = parse(raw, policy)
@@ -233,21 +317,39 @@ def test_code_rule_cannot_be_configured_to_enforce():
 def test_collection_gap_is_unavailable_and_feed_keeps_status(tmp_path):
     policy = phase_policy(tmp_path)
     item = parse(raw_event(), policy)
-    for heartbeat in ({}, {"configured": True, "state": "reconnecting"},
-                      {"configured": True, "state": "running", "open_gap": {"gap_id": "g1"}}):
+    for heartbeat in (
+        {},
+        {"configured": True, "state": "reconnecting"},
+        {"configured": True, "state": "running", "open_gap": {"gap_id": "g1"}},
+    ):
         event = copy.deepcopy(item)
         apply_collection_evidence(event, heartbeat)
         assert observation_event(event)["outcome"] == "unknown"
     feed_path = tmp_path / "feed.jsonl"
     feed_path.write_text(json.dumps(raw_event()) + "\n")
     heartbeat_path = tmp_path / "heartbeat.json"
-    heartbeat = {"schema": HEARTBEAT_SCHEMA, "kind": "tetragon", "feed_path": str(feed_path),
-                 "started_at": (AT - timedelta(seconds=1)).isoformat(), "updated_at": AT.isoformat(),
-                 "state": "reconnecting", "open_gap": {"gap_id": "g1", "opened_at": AT.isoformat()},
-                 "processes": [{"name": "tetragon", "running": False, "returncode": 1}]}
+    heartbeat = {
+        "schema": HEARTBEAT_SCHEMA,
+        "kind": "tetragon",
+        "feed_path": str(feed_path),
+        "started_at": (AT - timedelta(seconds=1)).isoformat(),
+        "updated_at": AT.isoformat(),
+        "state": "reconnecting",
+        "open_gap": {"gap_id": "g1", "opened_at": AT.isoformat()},
+        "processes": [{"name": "tetragon", "running": False, "returncode": 1}],
+    }
     heartbeat_path.write_text(json.dumps(heartbeat))
-    feed = ObservationFeed(kind="tetragon", path=feed_path, data_dir=tmp_path / "data", data_origin="synthetic",
-                           environment="lab", run_id=None, exec_policy=policy, heartbeat_path=heartbeat_path)
+    feed = ObservationFeed(
+        kube_context="kind-runtime-lab",
+        kind="tetragon",
+        path=feed_path,
+        data_dir=tmp_path / "data",
+        data_origin="synthetic",
+        environment="lab",
+        run_id=None,
+        exec_policy=policy,
+        heartbeat_path=heartbeat_path,
+    )
     collector = Collector("observation_feed_tetragon", feed.collect)
     collector.collect()
     status = collector.snapshot()

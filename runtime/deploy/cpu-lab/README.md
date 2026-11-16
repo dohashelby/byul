@@ -1,6 +1,6 @@
 # CPU vLLM 로컬 API 점검
 
-이 디렉터리는 새 Docker 컨테이너 `byul-vllm-cpu-031`의 vLLM v0.31.0 CPU 이미지를 통합 저장소 runtime Gateway로 점검하기 위한 비밀값 없는 입력이다. 정식 GPU S3B 결과가 아니며, 서버를 시작한 뒤 `tools/cpu_vllm_check.py` 한 번으로 CPU-01~CPU-14를 실행한다. 기존 `s3b-vllm-cpu`(v0.29.0) 컨테이너는 삭제하거나 변경하지 않고 정지 상태로 둔다.
+이 디렉터리는 새 Docker 컨테이너 `byul-vllm-cpu-031`의 vLLM v0.31.0 CPU 이미지를 통합 저장소 runtime Gateway로 점검하기 위한 비밀값 없는 입력이다. 정식 GPU S3B 결과가 아니며, 서버를 시작한 뒤 `labtools/cpu_vllm_check.py` 한 번으로 CPU-01~CPU-14를 실행한다. 기존 `s3b-vllm-cpu`(v0.29.0) 컨테이너는 삭제하거나 변경하지 않고 정지 상태로 둔다.
 
 이 노트북 CPU에는 AVX2와 AVX-VNNI가 있지만 AVX-512가 없다. 따라서 `vllm/vllm-openai-cpu:v0.31.0-x86_64` 이미지가 시작하지 못할 수 있다. 그 경우 이 CPU 실행은 runtime 기능 실패가 아니라 환경 제약에 따른 `not_run`으로 기록한다.
 
@@ -175,7 +175,7 @@ CPU_LAB_STATE="$HOME/.local/state/serving-runtime/cpu-vllm"
 
 ```bash
 cd /home/bobgy/bobproject/byul/runtime
-.venv/bin/python -B tools/cpu_vllm_check.py \
+.venv/bin/python -B labtools/cpu_vllm_check.py \
   --token-env-file "$HOME/.local/state/serving-runtime/cpu-vllm/tokens.env" \
   --evidence-dir "$HOME/.local/state/serving-runtime/cpu-vllm/evidence"
 ```
@@ -183,7 +183,7 @@ cd /home/bobgy/bobproject/byul/runtime
 기본 실행은 CPU-01~CPU-14만 요청한다. CPU-15 logprobs는 과거 CPU 엔진 정지 이력 때문에 명시한 경우에만 요청한다. 현재 제공 정책은 요구대로 `runtime-mvp/1.1`이며 `logprobs`를 허용하지 않으므로, 이 묶음에서 `--include-logprobs`를 주면 CPU-15는 `not_run`이고 전체 결과도 통과가 아니다. 추후 `runtime-mvp/1.2` 시험 정책이 `logprobs`를 허용할 때만 실제 요청하며, 클라이언트 전체 제한시간 뒤에도 `/health`를 확인한다.
 
 ```bash
-.venv/bin/python -B tools/cpu_vllm_check.py \
+.venv/bin/python -B labtools/cpu_vllm_check.py \
   --token-env-file "$HOME/.local/state/serving-runtime/cpu-vllm/tokens.env" \
   --evidence-dir "$HOME/.local/state/serving-runtime/cpu-vllm/evidence" \
   --include-logprobs --logprobs-timeout 45

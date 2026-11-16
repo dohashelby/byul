@@ -11,15 +11,15 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from serving_runtime.mvp.collectors import Collector, CollectorManager
-from serving_runtime.mvp.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
-from serving_runtime.mvp.backend import BackendConfig
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_state import load_revocations
-from serving_runtime.mvp.relay import Relay
-from serving_runtime.mvp.request_flow import ConcurrencyLimiter, RequestFlow
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.validator import Decision
+from serving_runtime.observation.collectors import Collector, CollectorManager
+from serving_runtime.gateway.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_state import load_revocations
+from serving_runtime.gateway.relay import Relay
+from serving_runtime.gateway.request_flow import ConcurrencyLimiter, RequestFlow
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.gateway.validator import Decision
 
 
 ALLOWED = Decision("ALLOWED", 200, "REQUEST_ALLOWED", None, "allowed", "model", 8)
@@ -153,8 +153,7 @@ class GatewayIO:
         self.sent = None
 
     def request_header(self, name):
-        return {"Content-Length": str(len(self.request_body)),
-                "Content-Type": "application/json"}.get(name)
+        return {"Content-Length": str(len(self.request_body)), "Content-Type": "application/json"}.get(name)
 
     def read_request_body(self, length):
         return self.request_body[:length]
@@ -194,17 +193,29 @@ class RelayDeadlineTests(unittest.TestCase):
     def test_gateway_flow_forwards_closing_http_1_0_responses_for_both_routes(self):
         policy_path = Path(__file__).resolve().parents[1] / "examples/mvp/policy.json"
         cases = (
-            ("chat", {"model": "test-model", "messages": [{"role": "user", "content": "hi"}],
-                      "max_tokens": 8}, {"id": "chat-1", "choices": []}),
-            ("completions", {"model": "test-model", "prompt": "hi", "max_tokens": 8},
-             {"object": "text_completion", "choices": [{"text": "ok"}],
-              "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}),
+            (
+                "chat",
+                {"model": "test-model", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 8},
+                {"id": "chat-1", "choices": [{}]},
+            ),
+            (
+                "completions",
+                {"model": "test-model", "prompt": "hi", "max_tokens": 8},
+                {
+                    "object": "text_completion",
+                    "choices": [{"text": "ok"}],
+                    "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                },
+            ),
         )
         for request_kind, document, engine_document in cases:
             with self.subTest(request_kind=request_kind), tempfile.TemporaryDirectory() as directory:
                 body = json.dumps(engine_document).encode("utf-8")
-                wire = (b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n"
-                        + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body)
+                wire = (
+                    b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n"
+                    + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+                    + body
+                )
                 upstream = HTTPResponse(ClosedResponseSocket(wire))
                 upstream.begin()
                 backend = FakeBackend(upstream)
@@ -217,7 +228,9 @@ class RelayDeadlineTests(unittest.TestCase):
                     BackendConfig.mock(("127.0.0.1", 1)),
                     lambda: load_policy(policy_path),
                     lambda: load_revocations(None),
-                    records, engine_client, Relay(backend, 0.3, 0.3, 1),
+                    records,
+                    engine_client,
+                    Relay(backend, 0.3, 0.3, 1),
                     ConcurrencyLimiter(1),
                 )
                 response = GatewayIO(document)
@@ -228,33 +241,32 @@ class RelayDeadlineTests(unittest.TestCase):
                 self.assertEqual(stored[-1]["final_outcome"], "completed")
 
     def test_http_1_0_closing_response_relayed_as_200(self):
-        body = json.dumps({"ok": True}).encode("utf-8")
-        wire = (b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n"
-                + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body)
+        body = json.dumps({"choices": [{}]}).encode("utf-8")
+        wire = (
+            b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n"
+            + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+            + body
+        )
         socket = ClosedResponseSocket(wire)
         upstream = HTTPResponse(socket)
         upstream.begin()
         self.assertTrue(upstream.will_close)
         backend = FakeBackend(upstream)
-        decision, forwarded = Relay(backend, 0.3, 0.3, 1).relay(
-            "id", {"messages": []}, ALLOWED)
-        self.assertEqual((decision.http_status, decision.reason_code, forwarded),
-                         (200, "REQUEST_ALLOWED", body))
+        decision, forwarded = Relay(backend, 0.3, 0.3, 1).relay("id", {"messages": []}, ALLOWED)
+        self.assertEqual((decision.http_status, decision.reason_code, forwarded), (200, "REQUEST_ALLOWED", body))
         self.assertEqual(socket.timeout_attempts, 1)
         self.assertTrue(backend.conn.closed)
 
     def test_closed_response_socket_does_not_break_either_stream(self):
-        for route, document in ((CHAT_ROUTE, {"messages": []}),
-                                (COMPLETIONS_ROUTE, {"prompt": "hi"})):
+        for route, document in ((CHAT_ROUTE, {"messages": []}), (COMPLETIONS_ROUTE, {"prompt": "hi"})):
             with self.subTest(route=route):
                 backend, response, engine = relay(True, [EVENT, DONE])
                 socket = ClosedResponseSocket()
                 backend.conn.response.fp = SimpleNamespace(raw=SimpleNamespace(_sock=socket))
                 decision, outcome, started = engine.relay_stream(
-                    response, "id", document, ALLOWED, time.monotonic(),
-                    lambda: None, route=route)
-                self.assertEqual((decision.reason_code, outcome, started),
-                                 ("REQUEST_ALLOWED", "completed", True))
+                    response, "id", document, ALLOWED, time.monotonic(), lambda: None, route=route
+                )
+                self.assertEqual((decision.reason_code, outcome, started), ("REQUEST_ALLOWED", "completed", True))
                 self.assertEqual(socket.timeout_attempts, 1)
 
     def test_engine_poll_does_not_stall_security_and_target_collectors(self):
@@ -271,11 +283,13 @@ class RelayDeadlineTests(unittest.TestCase):
             counts[source] += 1
             return {"count": counts[source]}
 
-        manager = CollectorManager([
-            Collector("engine_health", health, 0.02, 0.2, engine_group=True),
-            *[Collector(name, lambda name=name: fetch(name), 0.02, 0.2)
-              for name in counts],
-        ], startup_timeout_s=0.02)
+        manager = CollectorManager(
+            [
+                Collector("engine_health", health, 0.02, 0.2, engine_group=True),
+                *[Collector(name, lambda name=name: fetch(name), 0.02, 0.2) for name in counts],
+            ],
+            startup_timeout_s=0.02,
+        )
         manager.start()
         self.addCleanup(manager.stop)
         self.addCleanup(release.set)
@@ -287,19 +301,16 @@ class RelayDeadlineTests(unittest.TestCase):
         self.assertTrue(all(counts[name] >= 2 for name in counts))
 
     def test_nonstream_deadline_covers_dripping_body(self):
-        backend, _, engine = relay(False, [b"{", lambda: (time.sleep(0.04), b'"ok":true')[1]] * 10,
-                                   deadline=0.07)
+        backend, _, engine = relay(False, [b"{", lambda: (time.sleep(0.04), b'"ok":true')[1]] * 10, deadline=0.07)
         socket = ClosedResponseSocket()
         backend.conn.response.fp = SimpleNamespace(raw=SimpleNamespace(_sock=socket))
         decision, body = engine.relay("id", {"messages": []}, ALLOWED)
-        self.assertEqual((decision.http_status, decision.reason_code, body),
-                         (504, "ENGINE_DEADLINE", None))
+        self.assertEqual((decision.http_status, decision.reason_code, body), (504, "ENGINE_DEADLINE", None))
         self.assertEqual(socket.timeout_attempts, 1)
         self.assertTrue(backend.conn.closed)
 
     def test_deadline_interrupts_dripping_headers_for_buffered_and_both_streams(self):
-        for route, document in ((CHAT_ROUTE, {"messages": []}),
-                                (COMPLETIONS_ROUTE, {"prompt": "hi"})):
+        for route, document in ((CHAT_ROUTE, {"messages": []}), (COMPLETIONS_ROUTE, {"prompt": "hi"})):
             for stream in (False, True):
                 with self.subTest(route=route, stream=stream):
                     backend = FakeBackend(FakeResponse([]))
@@ -308,52 +319,53 @@ class RelayDeadlineTests(unittest.TestCase):
                     started = time.monotonic()
                     if stream:
                         decision, outcome, response_started = engine.relay_stream(
-                            ClientStream(), "id", document, ALLOWED, started,
-                            lambda: None, route=route)
+                            ClientStream(), "id", document, ALLOWED, started, lambda: None, route=route
+                        )
                         self.assertEqual((outcome, response_started), ("ENGINE_TIMEOUT", False))
                     else:
-                        decision, body = engine.relay(
-                            "id", document, ALLOWED, route=route, started_at=started)
+                        decision, body = engine.relay("id", document, ALLOWED, route=route, started_at=started)
                         self.assertIsNone(body)
-                    self.assertEqual((decision.http_status, decision.reason_code),
-                                     (504, "ENGINE_TIMEOUT" if stream else "ENGINE_DEADLINE"))
+                    self.assertEqual(
+                        (decision.http_status, decision.reason_code),
+                        (504, "ENGINE_TIMEOUT" if stream else "ENGINE_DEADLINE"),
+                    )
                     self.assertGreater(backend.conn.header_parts, 0)
                     self.assertTrue(backend.conn.sock.closed.is_set())
 
     def test_stream_deadline_exhausted_before_headers_keeps_engine_timeout(self):
-        for route, document in ((CHAT_ROUTE, {"messages": []}),
-                                (COMPLETIONS_ROUTE, {"prompt": "hi"})):
+        for route, document in ((CHAT_ROUTE, {"messages": []}), (COMPLETIONS_ROUTE, {"prompt": "hi"})):
             with self.subTest(route=route):
                 backend, response, engine = relay(True, [], deadline=0.01)
                 decision, outcome, started = engine.relay_stream(
-                    response, "id", document, ALLOWED, time.monotonic() - 0.02,
-                    lambda: None, route=route)
-                self.assertEqual((decision.http_status, decision.reason_code, outcome, started),
-                                 (504, "ENGINE_TIMEOUT", "ENGINE_TIMEOUT", False))
+                    response, "id", document, ALLOWED, time.monotonic() - 0.02, lambda: None, route=route
+                )
+                self.assertEqual(
+                    (decision.http_status, decision.reason_code, outcome, started),
+                    (504, "ENGINE_TIMEOUT", "ENGINE_TIMEOUT", False),
+                )
                 self.assertFalse(response.started)
 
     def test_nonstream_body_limit(self):
         backend, _, engine = relay(False, [b"12345", b"67890"])
-        with patch("serving_runtime.mvp.relay._COMPLETION_BODY_LIMIT", 8):
+        with patch("serving_runtime.gateway.relay._COMPLETION_BODY_LIMIT", 8):
             decision, body = engine.relay("id", {"messages": []}, ALLOWED)
-        self.assertEqual((decision.http_status, decision.reason_code, body),
-                         (502, "ENGINE_BAD_RESPONSE", None))
+        self.assertEqual((decision.http_status, decision.reason_code, body), (502, "ENGINE_BAD_RESPONSE", None))
         self.assertTrue(backend.conn.closed)
 
     def test_token_count_is_inside_shared_deadline(self):
         flow = object.__new__(RequestFlow)
         flow._backend = FakeBackend(FakeResponse([]))
-        flow._engine_client = SimpleNamespace(count_input_tokens=lambda *_args, **_kwargs: (
-            time.sleep(0.02), 1
-        )[1])
+        flow._engine_client = SimpleNamespace(count_input_tokens=lambda *_args, **_kwargs: (time.sleep(0.02), 1)[1])
         flow._records = SimpleNamespace(set_context=lambda *_args: None)
         decision = flow._context_decision(
-            "id", {"messages": []}, ALLOWED,
+            "id",
+            {"messages": []},
+            ALLOWED,
             SimpleNamespace(policy=SimpleNamespace(max_context_tokens=100)),
-            "chat", time.monotonic() + 0.01,
+            "chat",
+            time.monotonic() + 0.01,
         )
-        self.assertEqual((decision.http_status, decision.reason_code),
-                         (504, "ENGINE_DEADLINE"))
+        self.assertEqual((decision.http_status, decision.reason_code), (504, "ENGINE_DEADLINE"))
 
     def test_token_count_timeout_after_shared_deadline_closes_client_response(self):
         policy_path = Path(__file__).resolve().parents[1] / "examples/mvp/policy.json"
@@ -361,7 +373,8 @@ class RelayDeadlineTests(unittest.TestCase):
             records = RequestRecords(directory, "session", lambda: load_policy(policy_path), "mock")
             engine_client = SimpleNamespace(
                 count_input_tokens=lambda *_args, **_kwargs: (
-                    time.sleep(0.03), (_ for _ in ()).throw(OSError("watchdog closed"))
+                    time.sleep(0.03),
+                    (_ for _ in ()).throw(OSError("watchdog closed")),
                 )[1],
                 receipt_not_queried=lambda: "not_queried",
             )
@@ -371,11 +384,16 @@ class RelayDeadlineTests(unittest.TestCase):
             flow._records = records
             response = GatewayIO({"messages": [{"role": "user", "content": "hi"}]})
             decision = flow._context_decision(
-                "a" * 32, {"messages": [{"role": "user", "content": "hi"}]}, ALLOWED,
+                "a" * 32,
+                {"messages": [{"role": "user", "content": "hi"}]},
+                ALLOWED,
                 SimpleNamespace(policy=SimpleNamespace(max_context_tokens=100)),
-                "chat", time.monotonic() + 0.01)
-            flow.finish_without_relay(response, "a" * 32, decision,
-                                      close_connection=decision.reason_code == "ENGINE_DEADLINE")
+                "chat",
+                time.monotonic() + 0.01,
+            )
+            flow.finish_without_relay(
+                response, "a" * 32, decision, close_connection=decision.reason_code == "ENGINE_DEADLINE"
+            )
             self.assertEqual(response.sent, (504, "ENGINE_DEADLINE", True))
             stored, _ = records.store.read_all()
             self.assertEqual(stored[-1]["delivery"]["error_code"], "ENGINE_DEADLINE")
@@ -384,14 +402,18 @@ class RelayDeadlineTests(unittest.TestCase):
         flow = object.__new__(RequestFlow)
         flow._backend = FakeBackend(FakeResponse([]))
         flow._engine_client = SimpleNamespace(
-            count_input_tokens=lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError()))
+            count_input_tokens=lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError())
+        )
         flow._records = SimpleNamespace(set_context=lambda *_args: None)
         decision = flow._context_decision(
-            "id", {"messages": []}, ALLOWED,
+            "id",
+            {"messages": []},
+            ALLOWED,
             SimpleNamespace(policy=SimpleNamespace(max_context_tokens=100)),
-            "chat", time.monotonic() + 1)
-        self.assertEqual((decision.http_status, decision.reason_code),
-                         (503, "CONTEXT_CHECK_UNAVAILABLE"))
+            "chat",
+            time.monotonic() + 1,
+        )
+        self.assertEqual((decision.http_status, decision.reason_code), (503, "CONTEXT_CHECK_UNAVAILABLE"))
 
     def test_completion_first_event_arrives_before_generation_finishes(self):
         release = threading.Event()
@@ -404,9 +426,13 @@ class RelayDeadlineTests(unittest.TestCase):
 
         backend, response, engine = relay(True, [EVENT, delayed_done])
         result = []
-        worker = threading.Thread(target=lambda: result.append(engine.relay_stream(
-            response, "id", {"prompt": "hi"}, ALLOWED, time.monotonic(), lambda: None,
-            route=COMPLETIONS_ROUTE)))
+        worker = threading.Thread(
+            target=lambda: result.append(
+                engine.relay_stream(
+                    response, "id", {"prompt": "hi"}, ALLOWED, time.monotonic(), lambda: None, route=COMPLETIONS_ROUTE
+                )
+            )
+        )
         worker.start()
         self.addCleanup(release.set)
         worker.join(0.01)
@@ -428,15 +454,13 @@ class RelayDeadlineTests(unittest.TestCase):
         ]
         for chunks, disconnect, deadline, expected in cases:
             with self.subTest(expected=expected):
-                backend, response, engine = relay(True, chunks, deadline=deadline,
-                                                  disconnect=disconnect)
+                backend, response, engine = relay(True, chunks, deadline=deadline, disconnect=disconnect)
                 decision, outcome, started = engine.relay_stream(
-                    response, "id", {"prompt": "hi"}, ALLOWED, time.monotonic(),
-                    lambda: None, route=COMPLETIONS_ROUTE)
+                    response, "id", {"prompt": "hi"}, ALLOWED, time.monotonic(), lambda: None, route=COMPLETIONS_ROUTE
+                )
                 self.assertEqual(decision.reason_code, expected)
                 if expected == "STREAM_DEADLINE":
-                    self.assertEqual((decision.http_status, outcome),
-                                     (200, "deadline_exceeded"))
+                    self.assertEqual((decision.http_status, outcome), (200, "deadline_exceeded"))
                 self.assertTrue(started)
                 self.assertTrue(backend.conn.closed)
 
@@ -453,24 +477,22 @@ class RelayDeadlineTests(unittest.TestCase):
                 response = ClientStream()
                 engine = Relay(backend, 0.5, 0.5, 0.03)
                 decision, outcome, started = engine.relay_stream(
-                    response, "id", document, ALLOWED, time.monotonic(),
-                    lambda: None, route=route)
+                    response, "id", document, ALLOWED, time.monotonic(), lambda: None, route=route
+                )
                 self.assertTrue(socket.closed.is_set())
-                self.assertEqual((decision.reason_code, outcome, started),
-                                 ("STREAM_DEADLINE", "deadline_exceeded", expected_started))
+                self.assertEqual(
+                    (decision.reason_code, outcome, started), ("STREAM_DEADLINE", "deadline_exceeded", expected_started)
+                )
                 self.assertEqual(decision.http_status, 200 if expected_started else 504)
                 self.assertEqual(response.started, expected_started)
 
     def test_completion_accepts_comment_and_crlf_events(self):
-        chunks = [b": keepalive\r\n\r\n",
-                  b'data: {"choices":[{"text":"ok"}]}\r\n\r\n',
-                  b"data: [DONE]\r\n\r\n"]
+        chunks = [b": keepalive\r\n\r\n", b'data: {"choices":[{"text":"ok"}]}\r\n\r\n', b"data: [DONE]\r\n\r\n"]
         _, response, engine = relay(True, chunks)
         decision, outcome, started = engine.relay_stream(
-            response, "id", {"prompt": "hi"}, ALLOWED, time.monotonic(),
-            lambda: None, route=COMPLETIONS_ROUTE)
-        self.assertEqual((decision.reason_code, outcome, started),
-                         ("REQUEST_ALLOWED", "completed", True))
+            response, "id", {"prompt": "hi"}, ALLOWED, time.monotonic(), lambda: None, route=COMPLETIONS_ROUTE
+        )
+        self.assertEqual((decision.reason_code, outcome, started), ("REQUEST_ALLOWED", "completed", True))
         self.assertEqual(response.chunks, chunks[1:])
 
 

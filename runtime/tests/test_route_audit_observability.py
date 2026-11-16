@@ -6,9 +6,9 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from serving_runtime.mvp.http_handler import Handler
-from serving_runtime.mvp.management_listener import AccessRecorder, ManagementListenerConfig
-from serving_runtime.mvp.route_rejections import RouteRejections, QUERY_MAX_BYTES
+from serving_runtime.gateway.http_handler import Handler
+from serving_runtime.gateway.management_listener import AccessRecorder, ManagementListenerConfig
+from serving_runtime.gateway.route_rejections import RouteRejections, QUERY_MAX_BYTES
 
 
 class RouteAuditObservabilityTest(unittest.TestCase):
@@ -70,7 +70,9 @@ class RouteAuditObservabilityTest(unittest.TestCase):
         handler.command, handler.path = "GET", "/api/route-rejections?limit=1"
         handler.request_header = Mock(return_value=None)
         query = Mock(return_value={"items": []})
-        handler.dependencies = SimpleNamespace(authorize_read=lambda _: (401, "AUTH_REQUIRED", "required"), route_rejections=query)
+        handler.dependencies = SimpleNamespace(
+            authorize_read=lambda _: (401, "AUTH_REQUIRED", "required"), route_rejections=query
+        )
         handler._send_read_refusal, handler._send_json = Mock(), Mock()
         handler.do_GET()
         query.assert_not_called()
@@ -82,10 +84,17 @@ class RouteAuditObservabilityTest(unittest.TestCase):
         self.assertEqual(handler._send_json.call_args.args[0], 400)
 
     def test_management_access_identity_and_scope_use_server_configuration(self):
-        config = ManagementListenerConfig.build(engine_url="http://127.0.0.1:8000", target_ref="target1", run_id="run1", environment="lab", policy_ref="p1")
+        config = ManagementListenerConfig.build(
+            engine_url="http://127.0.0.1:8000", target_ref="target1", run_id="run1", environment="lab", policy_ref="p1"
+        )
         stream = io.StringIO()
         recorder = AccessRecorder(stream=stream, scope={"target_ref": config.target_ref, "run_id": config.run_id})
-        recorder.record(allowed=False, path="http://user:password@adapter.invalid/manage?token=secret", method="POST", status_code=405)
+        recorder.record(
+            allowed=False,
+            path="http://user:password@adapter.invalid/manage?token=secret",
+            method="POST",
+            status_code=405,
+        )
         recorder.record(allowed=True, path="/health", method="GET", status_code=200)
         rows = [json.loads(line) for line in stream.getvalue().splitlines()]
         self.assertNotEqual(rows[0]["event_id"], rows[1]["event_id"])
@@ -111,8 +120,12 @@ class RouteAuditObservabilityTest(unittest.TestCase):
     def test_long_absolute_uri_userinfo_is_removed_before_path_truncation(self):
         sink = io.StringIO()
         recorder = AccessRecorder(stream=sink)
-        recorder.record(allowed=False, method="GET", status_code=404,
-                        path="http://user:" + "SYNTHETIC_CREDENTIAL_" * 1000 + "@adapter.invalid/health")
+        recorder.record(
+            allowed=False,
+            method="GET",
+            status_code=404,
+            path="http://user:" + "SYNTHETIC_CREDENTIAL_" * 1000 + "@adapter.invalid/health",
+        )
         record = json.loads(sink.getvalue())
         self.assertEqual(record["path"], "http://adapter.invalid/health")
         self.assertNotIn("SYNTHETIC_CREDENTIAL", sink.getvalue())

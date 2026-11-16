@@ -12,8 +12,8 @@ from serving_runtime.enforcement.cilium import render_manifests as render_cilium
 from serving_runtime.enforcement.cilium import write_manifests
 from serving_runtime.enforcement.intent import load_intent
 from serving_runtime.enforcement.tetragon import render_manifests as render_tetragon
-from serving_runtime.mvp.fake_backend import FakeBackend
-from tools.k8s_lab_check import (
+from serving_runtime.devtools.fake_backend import FakeBackend
+from labtools.k8s_lab_check import (
     ContextSafetyError,
     DNS_SCRIPT,
     EXEC_PREP_SCRIPT,
@@ -104,10 +104,7 @@ class PreRunCleanupRunner:
             return ProcessResult(command, 0, "kind-runtime-lab\n", "")
         if "get" in command:
             kind = command[command.index("get") + 1]
-            items = [
-                {"metadata": {"name": name, "namespace": "serving-lab"}}
-                for name in self.policies.get(kind, [])
-            ]
+            items = [{"metadata": {"name": name, "namespace": "serving-lab"}} for name in self.policies.get(kind, [])]
             return ProcessResult(command, 0, json.dumps({"items": items}), "")
         if "delete" in command:
             index = command.index("delete")
@@ -173,9 +170,7 @@ class CommandConstructionTests(unittest.TestCase):
 
     def test_kubectl_and_hubble_commands_are_argument_lists(self) -> None:
         self.assertEqual(
-            kubectl_command(
-                "kind-runtime-lab", "serving-lab", "get", "pods", "-o", "json"
-            ),
+            kubectl_command("kind-runtime-lab", "serving-lab", "get", "pods", "-o", "json"),
             [
                 "kubectl",
                 "--context",
@@ -208,9 +203,7 @@ class CommandConstructionTests(unittest.TestCase):
 
     def test_tetragon_wait_option_defaults_to_ninety_seconds(self) -> None:
         default = build_parser().parse_args(["--state-dir", "/tmp/lab-state"])
-        custom = build_parser().parse_args(
-            ["--state-dir", "/tmp/lab-state", "--tetragon-wait", "15"]
-        )
+        custom = build_parser().parse_args(["--state-dir", "/tmp/lab-state", "--tetragon-wait", "15"])
         self.assertEqual(default.tetragon_wait, 90.0)
         self.assertEqual(custom.tetragon_wait, 15.0)
 
@@ -255,16 +248,12 @@ class PreRunCleanupTests(unittest.TestCase):
             sleeper=lambda _seconds: None,
         )
 
-    def run_with_stubbed_lab(
-        self, checker: LabChecker, baseline
-    ) -> tuple[dict, tuple[Path, Path]]:
+    def run_with_stubbed_lab(self, checker: LabChecker, baseline) -> tuple[dict, tuple[Path, Path]]:
         def passed(case: dict) -> None:
             checker._set(case, "passed", "stubbed")
 
         with (
-            patch.object(
-                checker, "_check_tetragon_export_denylist", return_value=False
-            ),
+            patch.object(checker, "_check_tetragon_export_denylist", return_value=False),
             patch.object(checker, "_l01", side_effect=baseline),
             patch.object(checker, "_l02", side_effect=passed),
             patch.object(checker, "_l03", side_effect=passed),
@@ -296,9 +285,7 @@ class PreRunCleanupTests(unittest.TestCase):
                 checker._set(case, "passed", "baseline proceeded")
 
             report, paths = self.run_with_stubbed_lab(checker, baseline)
-            persisted_cleanup = json.loads(
-                paths[0].read_text(encoding="utf-8")
-            )["pre_run_cleanup"]
+            persisted_cleanup = json.loads(paths[0].read_text(encoding="utf-8"))["pre_run_cleanup"]
             markdown = paths[1].read_text(encoding="utf-8")
 
         self.assertEqual(baseline_calls, ["called"])
@@ -312,18 +299,10 @@ class PreRunCleanupTests(unittest.TestCase):
                 "TracingPolicyNamespaced/runtime-tg-deny-01",
             ],
         )
-        delete_commands = [
-            command
-            for command in cleanup["commands"]
-            if "delete" in command["argv"]
-        ]
+        delete_commands = [command for command in cleanup["commands"] if "delete" in command["argv"]]
         self.assertTrue(delete_commands)
-        self.assertTrue(
-            all("--namespace" in command["argv"] for command in delete_commands)
-        )
-        self.assertTrue(
-            all("--wait=true" in command["argv"] for command in delete_commands)
-        )
+        self.assertTrue(all("--namespace" in command["argv"] for command in delete_commands))
+        self.assertTrue(all("--wait=true" in command["argv"] for command in delete_commands))
         self.assertTrue(all(command["returncode"] == 0 for command in delete_commands))
         self.assertEqual(persisted_cleanup["deleted_policies"], cleanup["deleted_policies"])
         self.assertIn("runtime-engine-egress", markdown)
@@ -369,11 +348,7 @@ class PreRunCleanupTests(unittest.TestCase):
             report, paths = self.run_with_stubbed_lab(checker, baseline)
             markdown = paths[1].read_text(encoding="utf-8")
 
-        deleted_commands = [
-            command
-            for command in runner.calls
-            if "delete" in command
-        ]
+        deleted_commands = [command for command in runner.calls if "delete" in command]
         self.assertEqual(len(deleted_commands), 1)
         self.assertIn("runtime-gateway-egress", deleted_commands[0])
         self.assertNotIn("team-owned-egress", " ".join(deleted_commands[0]))
@@ -406,7 +381,7 @@ class OutputParsingTests(unittest.TestCase):
             }
         )
         self.assertEqual(parse_running_pod(output), "engine-b")
-        self.assertEqual(parse_last_json("noise\n{\"status\": 200}\n"), {"status": 200})
+        self.assertEqual(parse_last_json('noise\n{"status": 200}\n'), {"status": 200})
 
     def test_observation_loader_ignores_corrupt_lines(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -421,22 +396,12 @@ class OutputParsingTests(unittest.TestCase):
             )
 
     def test_export_denylist_detects_empty_namespace_rule(self) -> None:
-        blocked = json.dumps({
-            "data": {
-                "export-denylist": (
-                    '{"health_check":true}\n'
-                    '{"namespace":["", "cilium", "kube-system"]}'
-                )
-            }
-        })
-        lab_override = json.dumps({
-            "data": {
-                "export-denylist": (
-                    '{"health_check":true}\n'
-                    '{"namespace":["cilium", "kube-system"]}'
-                )
-            }
-        })
+        blocked = json.dumps(
+            {"data": {"export-denylist": ('{"health_check":true}\n{"namespace":["", "cilium", "kube-system"]}')}}
+        )
+        lab_override = json.dumps(
+            {"data": {"export-denylist": ('{"health_check":true}\n{"namespace":["cilium", "kube-system"]}')}}
+        )
         self.assertTrue(export_denylist_blocks_empty_namespace(blocked))
         self.assertFalse(export_denylist_blocks_empty_namespace(lab_override))
 
@@ -461,9 +426,7 @@ ID   NAME                   STATE     NAMESPACE     SENSORS          KERNELMEMOR
 1    runtime-tg-asset-01    enabled   serving-lab   generic_kprobe   1.88 MB        monitor   2       0          0
 2    runtime-tg-deny-01     enabled   serving-lab   generic_kprobe   1.88 MB        enforce   4       16         0
 """
-        self.assertEqual(
-            parse_tracingpolicy_nenforce(output, "runtime-tg-deny-01"), 16
-        )
+        self.assertEqual(parse_tracingpolicy_nenforce(output, "runtime-tg-deny-01"), 16)
 
     def test_podless_tetragon_event_matches_policy_path_access_and_time(self) -> None:
         item = {
@@ -606,14 +569,10 @@ class TetragonCollectionTests(unittest.TestCase):
                 cleanup=False,
                 repo_root=ROOT,
             )
-            asset_path = (
-                f"/opt/serving/assets/model/lab-write-{placeholder.run_id}.txt"
-            )
+            asset_path = f"/opt/serving/assets/model/lab-write-{placeholder.run_id}.txt"
             exec_path = f"/opt/serving/cache/lab-exec-{placeholder.run_id}"
             asset = tetragon_file_event("runtime-tg-asset-01", asset_path, 2)
-            secret = tetragon_file_event(
-                "runtime-tg-secret-01", "/opt/serving/secret/read-probe.txt", 4
-            )
+            secret = tetragon_file_event("runtime-tg-secret-01", "/opt/serving/secret/read-probe.txt", 4)
             process_exec = tetragon_exec_event(exec_path)
             checker, runner = self.prepare_checker(
                 temporary,
@@ -641,17 +600,10 @@ class TetragonCollectionTests(unittest.TestCase):
                     "process_exec": 5.0,
                 },
             )
-            since_values = [
-                command[command.index("--since-time") + 1]
-                for command in runner.log_calls
-            ]
+            since_values = [command[command.index("--since-time") + 1] for command in runner.log_calls]
             self.assertEqual(len(set(since_values)), 1)
-            ingest_command = next(
-                command for command in runner.calls if "ingest" in command
-            )
-            ingested_path = Path(
-                ingest_command[ingest_command.index("--input") + 1]
-            )
+            ingest_command = next(command for command in runner.calls if "ingest" in command)
+            ingested_path = Path(ingest_command[ingest_command.index("--input") + 1])
             self.assertEqual(
                 ingested_path.read_text(encoding="utf-8").splitlines(),
                 [asset, secret, process_exec],
@@ -667,13 +619,9 @@ class TetragonCollectionTests(unittest.TestCase):
                 cleanup=False,
                 repo_root=ROOT,
             )
-            asset_path = (
-                f"/opt/serving/assets/model/lab-write-{placeholder.run_id}.txt"
-            )
+            asset_path = f"/opt/serving/assets/model/lab-write-{placeholder.run_id}.txt"
             asset = tetragon_file_event("runtime-tg-asset-01", asset_path, 2)
-            secret = tetragon_file_event(
-                "runtime-tg-secret-01", "/opt/serving/secret/read-probe.txt", 4
-            )
+            secret = tetragon_file_event("runtime-tg-secret-01", "/opt/serving/secret/read-probe.txt", 4)
             checker, runner = self.prepare_checker(
                 temporary,
                 [f"{asset}\n{secret}\n"],
@@ -689,23 +637,17 @@ class TetragonCollectionTests(unittest.TestCase):
 
             case = checker.cases["L-04"]
             self.assertEqual(case["status"], "failed")
-            self.assertIn(
-                "serving-lab process_exec(고유 실행 파일 경로)", case["summary"]
-            )
+            self.assertIn("serving-lab process_exec(고유 실행 파일 경로)", case["summary"])
             self.assertNotIn("TG-ASSET-01 write", case["summary"])
             self.assertNotIn("TG-SECRET-01 read", case["summary"])
             self.assertEqual(len(runner.log_calls), 2)
             self.assertEqual(sleeps, [3, 5.0])
-            self.assertIsNone(
-                case["tetragon_wait"]["first_seen_seconds"]["process_exec"]
-            )
+            self.assertIsNone(case["tetragon_wait"]["first_seen_seconds"]["process_exec"])
 
     def test_collection_removes_duplicate_lines_before_ingest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             sleeps: list[float] = []
-            asset = tetragon_file_event(
-                "runtime-tg-asset-01", "/opt/serving/assets/model/duplicate.txt", 2
-            )
+            asset = tetragon_file_event("runtime-tg-asset-01", "/opt/serving/assets/model/duplicate.txt", 2)
             checker, _runner = self.prepare_checker(
                 temporary,
                 [f"{asset}\n{asset}\n"],
@@ -800,9 +742,7 @@ class L02ConnectivityTests(unittest.TestCase):
     def result(returncode: int, stdout: str = "") -> ProcessResult:
         return ProcessResult(("stub",), returncode, stdout, "")
 
-    def run_l02(
-        self, checker: LabChecker, *, engine_dns: int, gateway_dns: int
-    ) -> list[str]:
+    def run_l02(self, checker: LabChecker, *, engine_dns: int, gateway_dns: int) -> list[str]:
         dns_pods: list[str] = []
 
         def execute(_case: dict, pod: str, *arguments: str, **_kwargs) -> ProcessResult:
@@ -845,9 +785,7 @@ class L02ConnectivityTests(unittest.TestCase):
         ):
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
                 checker = self.checker(directory)
-                self.run_l02(
-                    checker, engine_dns=engine_dns, gateway_dns=gateway_dns
-                )
+                self.run_l02(checker, engine_dns=engine_dns, gateway_dns=gateway_dns)
                 self.assertEqual(checker.cases["L-02"]["status"], "failed")
 
 
@@ -891,9 +829,7 @@ class ReportTests(unittest.TestCase):
 class LabIntentTests(unittest.TestCase):
     def test_dockerfile_and_lab_workloads_keep_requested_runtime_shape(self) -> None:
         dockerfile = (ROOT / "deploy/lab/Dockerfile").read_text(encoding="utf-8")
-        manifest = (ROOT / "deploy/lab/manifests/lab.yaml").read_text(
-            encoding="utf-8"
-        )
+        manifest = (ROOT / "deploy/lab/manifests/lab.yaml").read_text(encoding="utf-8")
         runner = (ROOT / "deploy/lab/run_fake_engine.py").read_text(encoding="utf-8")
         self.assertIn("FROM python:3.12-slim", dockerfile)
         self.assertIn("pip install --no-cache-dir --no-deps .", dockerfile)
@@ -910,16 +846,15 @@ class LabIntentTests(unittest.TestCase):
             self.assertIn(label, manifest)
         self.assertIn("http://serving-engine.serving-lab.svc.cluster.local:8000", manifest)
         self.assertIn('command: ["serving-runtime"]', manifest)
-        gateway_deployment = manifest.split(
-            "kind: Deployment\nmetadata:\n  name: serving-gateway", 1
-        )[1].split("---", 1)[0]
+        gateway_deployment = manifest.split("kind: Deployment\nmetadata:\n  name: serving-gateway", 1)[1].split(
+            "---", 1
+        )[0]
         self.assertIn("image: serving-runtime-lab:dev", gateway_deployment)
         self.assertIn("FROM python:3.12-slim", dockerfile)
-        self.assertIn("FakeBackend(host=\"0.0.0.0\", port=8000)", runner)
+        self.assertIn('FakeBackend(host="0.0.0.0", port=8000)', runner)
         self.assertIn("TEST ONLY", runner)
-        tetragon_values = (ROOT / "deploy/lab/tetragon-values.yaml").read_text(
-            encoding="utf-8"
-        )
+        tetragon_values = (ROOT / "deploy/lab/tetragon-values.yaml").read_text(encoding="utf-8")
+
         def json_lines(key: str) -> list[dict[str, object]]:
             marker = f"  {key}: |-"
             lines = tetragon_values.splitlines()
@@ -957,7 +892,7 @@ class LabIntentTests(unittest.TestCase):
                 {"namespace": ["cilium", "kube-system"]},
             ],
         )
-        self.assertIn('exportDenyList: |-', tetragon_values)
+        self.assertIn("exportDenyList: |-", tetragon_values)
         self.assertIn('{"namespace":["cilium","kube-system"]}', tetragon_values)
         self.assertNotIn('{"namespace":["",', tetragon_values)
 
@@ -1015,10 +950,7 @@ class TaskCheckRunner:
         self.calls.append(command)
         if "delete" in command and "task-check-pods.yaml" in " ".join(command):
             return ProcessResult(command, 1 if self.fail_task_pod_delete else 0, "", "")
-        if "delete" in command and any(
-            name in " ".join(command)
-            for name in ("acquire-egress", "receiver-fixture")
-        ):
+        if "delete" in command and any(name in " ".join(command) for name in ("acquire-egress", "receiver-fixture")):
             return ProcessResult(command, 1 if self.fail_policy_delete else 0, "", "")
         if "jsonpath={.status.podIP}" in command:
             return ProcessResult(command, 0, "10.0.0.9", "")
@@ -1033,14 +965,14 @@ class TaskCheckRunner:
             stage = "after" if self.applied_policies else "before"
             ok = self.connect.get((stage, pod, host), self.connect.get((stage, pod), False))
             return ProcessResult(command, 0 if ok else 7, json.dumps({"connected": ok}), "")
-        if command[-3:] == ("supply-check", "-o", "json") or ("pod" in command and "supply-check" in command and "json" in command):
+        if command[-3:] == ("supply-check", "-o", "json") or (
+            "pod" in command and "supply-check" in command and "json" in command
+        ):
             mount = {"mountPath": "/opt/serving/assets/model", "readOnly": self.readonly}
             document = {
                 "spec": {
                     "automountServiceAccountToken": False,
-                    "initContainers": [
-                        {"name": "acquire-step", "securityContext": {"runAsUser": 10002}}
-                    ],
+                    "initContainers": [{"name": "acquire-step", "securityContext": {"runAsUser": 10002}}],
                     "containers": [
                         {
                             "name": "engine",
@@ -1088,7 +1020,13 @@ class TaskCheckTests(unittest.TestCase):
 
     def test_task_cases_are_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            default = LabChecker(context="kind-runtime-lab", namespace="serving-lab", state_dir=Path(directory), cleanup=False, runner=FakeRunner())
+            default = LabChecker(
+                context="kind-runtime-lab",
+                namespace="serving-lab",
+                state_dir=Path(directory),
+                cleanup=False,
+                runner=FakeRunner(),
+            )
             self.assertNotIn("L-07", default.cases)
             self.assertIn("L-08", self.checker(FakeRunner(), directory).cases)
         self.assertTrue(build_parser().parse_args(["--state-dir", "x", "--task-checks"]).task_checks)
@@ -1096,9 +1034,14 @@ class TaskCheckTests(unittest.TestCase):
 
     def test_l05c_partial_apply_removes_disposable_resources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            checker = LabChecker(context="kind-runtime-lab", namespace="serving-lab",
-                                 state_dir=Path(directory), cleanup=False,
-                                 sigkill_probe_check=True, runner=FakeRunner())
+            checker = LabChecker(
+                context="kind-runtime-lab",
+                namespace="serving-lab",
+                state_dir=Path(directory),
+                cleanup=False,
+                sigkill_probe_check=True,
+                runner=FakeRunner(),
+            )
             self.assertIn("L-05c", checker.cases)
             calls: list[tuple[str, ...]] = []
 
@@ -1109,8 +1052,9 @@ class TaskCheckTests(unittest.TestCase):
             with patch.object(checker, "_kubectl", side_effect=kubectl):
                 checker._l05c(checker.cases["L-05c"])
             self.assertEqual(checker.cases["L-05c"]["status"], "unknown")
-            self.assertEqual([call[1] for call in calls if call[0] == "delete"],
-                             ["tracingpolicynamespaced", "pod", "configmap"])
+            self.assertEqual(
+                [call[1] for call in calls if call[0] == "delete"], ["tracingpolicynamespaced", "pod", "configmap"]
+            )
         self.assertTrue(build_parser().parse_args(["--state-dir", "x", "--sigkill-probe-check"]).sigkill_probe_check)
 
     def test_task_cases_pass_and_always_clean_up(self) -> None:

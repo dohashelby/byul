@@ -1,4 +1,5 @@
 """Read scoped procfs identities and inode-verified argv0 paths, never arguments."""
+
 from __future__ import annotations
 
 import argparse
@@ -17,7 +18,7 @@ from tools.k8s_observation_feed import check_reader_group
 # metadata is read. Only argv0 and PATH are used locally to verify an alias;
 # neither arguments nor environment values are returned in the snapshot.
 # Re-read start time, cgroup, exe and file identity to fence exit/exec races.
-PROC_SCAN = r'''
+PROC_SCAN = r"""
 root=/procRoot
 allowed="$*"
 hz=$(getconf CLK_TCK) || exit 3
@@ -99,7 +100,7 @@ for dir in "$root"/[0-9]*; do
   printf '%s\000%s\000%s\000%s\000%s\000%s\000%s\000%s\000%s\000' "$matched" "${dir##*/}" "$ns" "$ticks" "$npid" "$exe" "$hz" "$file_id" "$alias"
   count=$((count+1)); [ "$count" -lt 10000 ] || exit 4
 done
-'''
+"""
 
 
 class IdentityCollector:
@@ -116,22 +117,37 @@ class IdentityCollector:
         return result.stdout
 
     def collect(self):
-        result = {"schema_version": SCHEMA, "context": self.context, "namespace": self.namespace,
-                  "selector": self.selector, "generated_at": datetime.now(timezone.utc).isoformat(),
-                  "state": "ok", "error": None, "records": [], "policies": [], "agents": []}
+        result = {
+            "schema_version": SCHEMA,
+            "context": self.context,
+            "namespace": self.namespace,
+            "selector": self.selector,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "state": "ok",
+            "error": None,
+            "records": [],
+            "policies": [],
+            "agents": [],
+        }
         try:
             pods = json.loads(self.kube("get", "pods", "-l", self.selector, "-o", "json"))["items"]
-            agents = json.loads(self.kube("get", "pods", "-l", "app.kubernetes.io/name=tetragon", "-o", "json", namespace="kube-system"))["items"]
+            agents = json.loads(
+                self.kube("get", "pods", "-l", "app.kubernetes.io/name=tetragon", "-o", "json", namespace="kube-system")
+            )["items"]
             by_node = {}
             policies = json.loads(self.kube("get", "tracingpoliciesnamespaced", "-o", "json"))["items"]
             label_keys = {k for p in policies for k in p.get("spec", {}).get("podSelector", {}).get("matchLabels", {})}
             for agent in agents:
-                state = next((s for s in agent.get("status", {}).get("containerStatuses", []) if s.get("name") == "tetragon"), {})
+                state = next(
+                    (s for s in agent.get("status", {}).get("containerStatuses", []) if s.get("name") == "tetragon"), {}
+                )
                 node = agent["spec"]["nodeName"]
                 if not state.get("ready") or node in by_node:
                     raise ValueError("identity agent is unavailable or ambiguous")
                 by_node[node] = agent["metadata"]["name"]
-                result["agents"].append({"node": node, "pod_uid": agent["metadata"]["uid"], "restart_count": state.get("restartCount")})
+                result["agents"].append(
+                    {"node": node, "pod_uid": agent["metadata"]["uid"], "restart_count": state.get("restartCount")}
+                )
             containers = {}
             for pod in pods:
                 if pod.get("status", {}).get("phase") != "Running" or pod["metadata"].get("deletionTimestamp"):
@@ -140,38 +156,74 @@ class IdentityCollector:
                     cid = str(c.get("containerID", "")).removeprefix("containerd://")
                     if not re.fullmatch(r"[a-f0-9]{64}", cid) or not c.get("state", {}).get("running"):
                         continue
-                    containers[cid] = {"node": pod["spec"]["nodeName"], "namespace": self.namespace,
-                        "pod_uid": pod["metadata"]["uid"], "pod_name": pod["metadata"]["name"],
-                        "labels": {k: v for k, v in pod["metadata"].get("labels", {}).items()
-                                   if k in label_keys},
-                        "container_id": cid, "container_name": c["name"]}
+                    containers[cid] = {
+                        "node": pod["spec"]["nodeName"],
+                        "namespace": self.namespace,
+                        "pod_uid": pod["metadata"]["uid"],
+                        "pod_name": pod["metadata"]["name"],
+                        "labels": {k: v for k, v in pod["metadata"].get("labels", {}).items() if k in label_keys},
+                        "container_id": cid,
+                        "container_name": c["name"],
+                    }
             for node in sorted({c["node"] for c in containers.values()}):
                 if node not in by_node:
                     raise ValueError("scoped node has no ready Tetragon agent")
                 cids = sorted(cid for cid, c in containers.items() if c["node"] == node)
-                raw = self.kube("exec", by_node[node], "-c", "tetragon", "--", "sh", "-c", PROC_SCAN, "byul-proc-scan", *cids, namespace="kube-system")
+                raw = self.kube(
+                    "exec",
+                    by_node[node],
+                    "-c",
+                    "tetragon",
+                    "--",
+                    "sh",
+                    "-c",
+                    PROC_SCAN,
+                    "byul-proc-scan",
+                    *cids,
+                    namespace="kube-system",
+                )
                 if len(raw) > 2 * 1024 * 1024:
                     raise ValueError("identity process snapshot exceeds limit")
                 fields = raw.split("\0")
-                if fields[-1] != "" or (len(fields)-1) % 9:
+                if fields[-1] != "" or (len(fields) - 1) % 9:
                     raise ValueError("identity process snapshot is incomplete")
-                for i in range(0, len(fields)-1, 9):
-                    cid, pid, ns, ticks, npid, binary, hz, file_id, alias = fields[i:i+9]
-                    if (cid not in containers or not re.fullmatch(r"pid:\[\d+\]", ns) or not binary.startswith("/")
-                        or not re.fullmatch(r"\d+:\d+", file_id) or (alias and not alias.startswith("/"))):
+                for i in range(0, len(fields) - 1, 9):
+                    cid, pid, ns, ticks, npid, binary, hz, file_id, alias = fields[i : i + 9]
+                    if (
+                        cid not in containers
+                        or not re.fullmatch(r"pid:\[\d+\]", ns)
+                        or not binary.startswith("/")
+                        or not re.fullmatch(r"\d+:\d+", file_id)
+                        or (alias and not alias.startswith("/"))
+                    ):
                         raise ValueError("invalid identity process sample")
-                    row = {**containers[cid], "node_pid": int(pid), "pidns": int(ns[5:-1]),
-                           "start_ticks": int(ticks), "clock_ticks": int(hz), "ns_pid": int(npid),
-                           "binary": binary, "binary_file_id": file_id,
-                           "binary_aliases": [{"path": alias, "file_id": file_id}] if alias else [], "stable": True}
+                    row = {
+                        **containers[cid],
+                        "node_pid": int(pid),
+                        "pidns": int(ns[5:-1]),
+                        "start_ticks": int(ticks),
+                        "clock_ticks": int(hz),
+                        "ns_pid": int(npid),
+                        "binary": binary,
+                        "binary_file_id": file_id,
+                        "binary_aliases": [{"path": alias, "file_id": file_id}] if alias else [],
+                        "stable": True,
+                    }
                     result["records"].append(row)
             for policy in policies:
                 probes = comparable_spec(policy["spec"]).get("kprobes", [])
-                result["policies"].append({"namespace": self.namespace, "name": policy["metadata"]["name"],
-                    "selector": policy["spec"].get("podSelector", {}).get("matchLabels", {}),
-                    "kernel_identity": bool(probes) and all(p.get("data") == KERNEL_DATA for p in probes)})
+                result["policies"].append(
+                    {
+                        "namespace": self.namespace,
+                        "name": policy["metadata"]["name"],
+                        "selector": policy["spec"].get("podSelector", {}).get("matchLabels", {}),
+                        "kernel_identity": bool(probes) and all(p.get("data") == KERNEL_DATA for p in probes),
+                    }
+                )
         except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration):
-            result.update(state="error", error="scoped process identities could not be verified", records=[], policies=[])
+            result.update(
+                state="error", error="scoped process identities could not be verified", records=[], policies=[]
+            )
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
         atomic_json(self.output, result, mode=0o640, reader_gid=self.reader_gid)
         return result
@@ -189,7 +241,9 @@ def main():
     args = parser.parse_args()
     if args.interval < 1:
         parser.error("interval must be at least one second")
-    collector = IdentityCollector(args.context, args.namespace, args.selector, args.output, reader_gid=args.reader_group)
+    collector = IdentityCollector(
+        args.context, args.namespace, args.selector, args.output, reader_gid=args.reader_group
+    )
     while True:
         result = collector.collect()
         print(json.dumps({"state": result["state"], "processes": len(result["records"])}), flush=True)

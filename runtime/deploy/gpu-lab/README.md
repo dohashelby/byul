@@ -14,17 +14,17 @@ kubectl --context byul-aws-lab -n serving-lab get pods -l app=serving-engine -o 
 # 실제 확인한 값으로 바꾸고, 최종 Gateway 서버 사본의 model.hostPath.path도 동일하게 설정
 MODEL_HOST_PATH=/REPLACE_WITH_CONFIRMED_MODEL_HOSTPATH
 # 승인본 게시 후 Gateway가 배치될 호스트에서 실행. 실패하면 && 뒤의 적용은 실행하지 않음
-sudo /opt/byul/runtime/.venv/bin/python -B -m tools.gpu_lab_gateway_preflight \
+sudo /opt/byul/runtime/.venv/bin/python -B -m labtools.gpu_lab_gateway_preflight \
   --approved-dir /srv/serving/verification/approved --model-root "$MODEL_HOST_PATH" &&
   kubectl --context byul-aws-lab -n serving-lab apply -k deploy/gpu-lab
 ```
 
 사전 점검은 두 hostPath 디렉터리 존재/형식과 `revocations.json`의 읽기·기존 Gateway 형식을 검사한다. 누락/오류는 종료 1과 고정 이유 코드로 중단하고 파일·빈 목록·승인을 만들지 않는다. root의 로컬 점검은 실제 Pod UID 읽기·노드 배치·실엔진 경로 일치까지 증명하지 않으므로 별도로 확인한다. 재시작 전에도 같은 점검을 먼저 실행한다. 모델 경로 자동 반영은 이번에 구현하지 않았으며, 후속으로 확인한 경로 하나에서 Kustomize patch와 점검 인자를 함께 생성하는 적용 도구를 제안한다.
 
-1. **자산:** 설치기로 `verification/{candidates,approved}`(2750)를 준비하고, 실행 엔진의 `/models` hostPath가 Gateway의 모델 snapshot 경로와 같은지 확인한다. `/models`에 tokenizer도 있으며 `/cache`는 가변 캐시다. UID 10000의 모델 읽기·쓰기 거부를 확인한다. 새 `tools.verification_material assets`로 실제 파일 해시 **후보**를 만들고 외부 근거와 검토한 뒤 `approve`로 게시한다. 승인본 없는 collector의 `ASSET_MANIFEST_NOT_APPROVED`·미설정/미승인 → 게시 후 일치/변경 표시를 확인한다. 원본 모델을 변조하지 말고 별도 시험 snapshot으로 변경/누락/읽기 오류를 점검한다.
+1. **자산:** 설치기로 `verification/{candidates,approved}`(2750)를 준비하고, 실행 엔진의 `/models` hostPath가 Gateway의 모델 snapshot 경로와 같은지 확인한다. `/models`에 tokenizer도 있으며 `/cache`는 가변 캐시다. UID 10000의 모델 읽기·쓰기 거부를 확인한다. 새 `labtools.verification_material assets`로 실제 파일 해시 **후보**를 만들고 외부 근거와 검토한 뒤 `approve`로 게시한다. 승인본 없는 collector의 `ASSET_MANIFEST_NOT_APPROVED`·미설정/미승인 → 게시 후 일치/변경 표시를 확인한다. 원본 모델을 변조하지 말고 별도 시험 snapshot으로 변경/누락/읽기 오류를 점검한다.
 2. **기준/선언:** 환경 후보의 확인 필드로 `declaration --kind baseline`과 `--kind manifest` 후보를 각각 만들고 승인할 필드·값을 검토한다. baseline을 현재값으로 자동 채택하지 않는다. 승인 전 `not_configured`·승인본 없음, 승인 후 Gateway 재시작과 `/api/baseline`·대상 화면의 선언/실측 구분을 확인한다. 업데이트 후 기존 baseline을 보존하고 새 manifest와 비교한다.
 3. **폐기 목록:** `approved/revocations.json`을 사람이 검토·게시한다(빈 목록도 명시 승인). **새 배포 인자에서 파일 없음/읽기 오류는 기존 fail-closed 동작으로 추론 503을 만든다.** 운영 재배포 전에 게시하고, 유지보수용 시험 경로에서 파일 없음·읽기 오류·유효한 빈 목록이 화면에 서로 다르게 표시되는지 확인한다. 목록 변경 후 Gateway 재시작이 필요하다.
-4. **환경:** `tools.aws_environment_candidate`는 ubuntu로 실행한다. root:serving-bundles·2750 묶음은 serving-observe만 가진 ubuntu가 읽지 못하므로 운영자가 sudo 읽기만으로 같은 current 세대의 target/Gateway policy를 전용 0700 폴더·0400 사본으로 준비한다. [후보 생성 명령](../../docs/업데이트검증_후보와승인.md#후보-생성-runtime-디렉터리에서)을 따른다. 도구 전체를 sudo로 실행하면 ubuntu kubeconfig와 달라질 수 있으므로 피한다. 고정 이유코드·입력이름으로 권한/누락/JSON 실패를 구분하고 환경 후보 성공 후 declaration을 실행한다. 단일 Ready 엔진의 imageID digest, 해당 노드 커널·GPU/드라이버·Tetragon/Cilium 판본을 후보에서 대조한다. 권한 실패·다중 대상은 ‘미확인+이유’이며 선언 digest로 대체하지 않는다. 계약에 자리가 없는 커널/에이전트 판본은 동반 관측 자료에 둔다. 필수 미확인 필드가 생략된 환경 후보는 `import_ready: false`이므로 source commit·모델 출처 revision·사실·승인 intent를 사람이 완성하고 **기존 계약 검증 → 환경/정책 새 판본 → 묶음 내보내기**까지 확인한다. `null` 허용 여부는 다음 회차 결정 사항이며 자동 입력하지 않는다.
+4. **환경:** `labtools.aws_environment_candidate`는 ubuntu로 실행한다. root:serving-bundles·2750 묶음은 serving-observe만 가진 ubuntu가 읽지 못하므로 운영자가 sudo 읽기만으로 같은 current 세대의 target/Gateway policy를 전용 0700 폴더·0400 사본으로 준비한다. [후보 생성 명령](../../docs/업데이트검증_후보와승인.md#후보-생성-runtime-디렉터리에서)을 따른다. 도구 전체를 sudo로 실행하면 ubuntu kubeconfig와 달라질 수 있으므로 피한다. 고정 이유코드·입력이름으로 권한/누락/JSON 실패를 구분하고 환경 후보 성공 후 declaration을 실행한다. 단일 Ready 엔진의 imageID digest, 해당 노드 커널·GPU/드라이버·Tetragon/Cilium 판본을 후보에서 대조한다. 권한 실패·다중 대상은 ‘미확인+이유’이며 선언 digest로 대체하지 않는다. 계약에 자리가 없는 커널/에이전트 판본은 동반 관측 자료에 둔다. 필수 미확인 필드가 생략된 환경 후보는 `import_ready: false`이므로 source commit·모델 출처 revision·사실·승인 intent를 사람이 완성하고 **기존 계약 검증 → 환경/정책 새 판본 → 묶음 내보내기**까지 확인한다. `null` 허용 여부는 다음 회차 결정 사항이며 자동 입력하지 않는다.
 
 5. **외부 규칙 최초 적용:** 승인·검증된 current 묶음과 Gateway 활성 상태를 먼저 확인한 뒤 [외부 규칙 처음 적용·동기화](../../docs/외부규칙_최초적용.md)에 따라 `enforcement.apply`를 요청하고 별도 approver 승인을 받는다. 기본 dry-run 결과를 검토한 뒤 새 요청을 실행한다. Tetragon은 monitor로만 만들며 Cilium 실제 적용은 기본 꺼짐이다. 외부 정책 spec이 바뀌면 수집 상태·baseline·모니터 창·시험 근거를 다시 확인하고, 그 다음 기존 readiness와 `tetragon.mode`로 차단 전환한다. `unknown`은 재실행하지 말고 실제 객체·Gateway·복원을 먼저 확인한다.
 
@@ -59,7 +59,7 @@ Gateway의 새 mount는 모두 readOnly이고 후보 폴더는 마운트하지 �
 | [`ACCEPTANCE.md`](ACCEPTANCE.md) | AWS 첫 완료 기준 8개 사례의 실행·증거·비용 절약 절차 |
 | `policy.aws-lab.json` | 정책 묶음의 gateway policy 역할에 넣을 LAB 시험 정책(아래 "LAB 시험값") |
 | `policy-approvals.aws-lab.json` | 위 정책의 LAB 승인 목록(SHA-256 대조). runtime 자체 기록이며 정식 승인 아님 |
-| `perf-plan.aws-lab.json` | B0/B1/B2 성능 비교 계획(`tools/perf_compare.py`) |
+| `perf-plan.aws-lab.json` | B0/B1/B2 성능 비교 계획(`labtools/perf_compare.py`) |
 
 ## BPF LSM 서버 준비와 파일 거부 방식
 
@@ -115,7 +115,7 @@ openat Equal 값 끝의 `\u0000`은 기존 코드가 명시적으로 붙인 종�
 정책 파일을 한 글자라도 고치면 SHA-256이 바뀌어 Gateway가 503으로 막는다. 고칠 때는 `policy_version`을 올리고 `sha256sum policy.aws-lab.json` 값으로 승인 목록을 함께 갱신한다. 성능 계획의 B0/B1/B2 주소는 운영자가 준비하는 Gateway 구성의 자리값이다. 인증이 고정된 이 Gateway로 성능 비교를 실행할 때는 소유자만 읽는 인수용 token 파일에서 inference token을 읽힌다. 옵션을 생략하면 기존처럼 Authorization 헤더를 보내지 않는다.
 
 ```bash
-.venv/bin/python -B tools/perf_compare.py deploy/gpu-lab/perf-plan.aws-lab.json \
+.venv/bin/python -B labtools/perf_compare.py deploy/gpu-lab/perf-plan.aws-lab.json \
   --token-env-file ~/runtime-acceptance.env \
   --out-dir evidence/perf
 ```
@@ -154,7 +154,7 @@ AWS Lab 보고서는 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 준비 조건과 사례
 ```bash
 # 서버 runtime/에서 실행. 토큰 파일 내용은 출력하지 않는다.
 umask 027
-.venv/bin/python -B tools/aws_lab_acceptance.py \
+.venv/bin/python -B labtools/aws_lab_acceptance.py \
   --kube-context byul-aws-lab --namespace serving-lab \
   --token-env-file "$HOME/runtime-acceptance.env" \
   --observation-dir /srv/serving/observation \
@@ -165,7 +165,7 @@ umask 027
 
 `--public-report-dir`는 설치기가 준비한 관측 GID·2750 폴더에 실행 결과를 **0640 원자 게시**한다. 새 회차 파일만 생성하며 기존 회차를 덮어쓰지 않는다. 공개 형식 `serving-runtime-aws-lab-report/1.0`을 Gateway가 kind 형식과 구분해 읽는다. AWS-01~20 중 선택한 사례의 passed/failed/unknown/not_run만 그대로 표시하며 전체 결과도 그 선택 범위다. run_id·시작/완료 시각·환경(context/namespace)·엔진을 보존한다. 주소/클라우드 식별자/자격값이 든 환경명은 안정된 해시 별칭으로 표시한다. 원시 명령·facts·예외 이유·주소는 공개하지 않고, 상세 JSON/Markdown은 기존 evidence 회차 폴더의 0600 파일로 남긴다. 공개 게시 실패는 종료 2이며 상세 evidence는 남는다. 실패·미확인 실행도 게시하고 해당 인수 시험 종료 코드(1/3)를 유지한다. 실행 전 오류로 결과가 없으면 게시하지 않는다.
 
-**kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.** kind의 `--public-report-dir`은 kind 시험 workload·유지보수 복원 절차가 갖춰진 별도 환경에서만 사용한다. AWS에서 Lab 칸을 채우려고 kind checker나 과거 JSON을 실행/복사하지 않는다. 공용 계약 `runtime-lab-report`가 kind L-01~L-08과 AWS-01~AWS-20을 함께 허용하며(2026-11-08 사용자 승인), 웹은 ID·환경·시각을 그대로 표시한다.
+**kind 전용 `labtools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.** kind의 `--public-report-dir`은 kind 시험 workload·유지보수 복원 절차가 갖춰진 별도 환경에서만 사용한다. AWS에서 Lab 칸을 채우려고 kind checker나 과거 JSON을 실행/복사하지 않는다. 공용 계약 `runtime-lab-report`가 kind L-01~L-08과 AWS-01~AWS-20을 함께 허용하며(2026-11-08 사용자 승인), 웹은 ID·환경·시각을 그대로 표시한다.
 
 Gateway는 디렉터리의 최신 JSON(mtime, 동률이면 파일명)을 선택한다. 과거 보고서를 복사해 이번 결과로 삼지 말고 화면의 실행 시각·환경을 확인한다. 아직 JSON이 없으면 `missing`으로 표시하며 배포 때 예시를 채우지 않는다. 서버에서는 `stat`으로 상위/하위 폴더 2750·관측 GID와 두 공개 JSON의 0640·GID를 확인하고, Gateway UID 10000/보조 그룹 10010으로 읽기 성공·쓰기 거부, `/api/runtime/tetragon-status`의 fresh/오류·실제 모드 및 `/api/runtime/lab-report`의 missing→실행 결과·시각을 대조한다. 이번 수정에서는 AWS 접속·서버 실행을 하지 않았다.
 
@@ -225,7 +225,7 @@ Gateway는 디렉터리의 최신 JSON(mtime, 동률이면 파일명)을 선택�
 4. **인증 Secret** — `kubectl --context byul-aws-lab -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json`(토큰 해시만 든 `runtime-auth/1.0`).
 5. **적용** — 위 12회차 순서대로 폴더·실제 모델 경로를 확인하고 승인본을 게시한 뒤 실행한다. `MODEL_HOST_PATH`는 최종 Gateway 서버 사본과 같은 확인값이어야 한다. 점검 실패 시 아래 적용을 진행하지 않는다.
    ```bash
-   sudo /opt/byul/runtime/.venv/bin/python -B -m tools.gpu_lab_gateway_preflight \
+   sudo /opt/byul/runtime/.venv/bin/python -B -m labtools.gpu_lab_gateway_preflight \
      --approved-dir /srv/serving/verification/approved --model-root "$MODEL_HOST_PATH" &&
    kubectl --context byul-aws-lab apply -k deploy/gpu-lab &&
    kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine \
@@ -233,7 +233,7 @@ Gateway는 디렉터리의 최신 JSON(mtime, 동률이면 파일명)을 선택�
    ```
    patch는 묶음 `engine.yaml.template`의 엔진 args를 유지하면서 `--enable-log-requests`, `--enable-request-id-headers`를 더한다. 첫 옵션은 AWS-01의 `Received request` 로그 매칭에 필요한 전제이고, 둘째는 응답의 `X-Request-Id` 헤더를 켠다. patch는 엔진 Pod를 다시 만든다(Recreate: GPU 반납 후 재기동·cold start). 시험 시간 계획에 넣는다. vLLM 0.31.0의 `request_logger.py`는 INFO에 요청 ID·sampling params를, DEBUG에는 prompt·토큰 ID·JSON 본문을 남길 수 있다. 시험에는 무해한 고정 문장만 쓰고 원시 엔진 로그를 반출할 때는 요청 내용이 담긴 기록으로 취급한다.
    적용한 이미지 tag·patch·실제 Deployment/Pod imageID·정책과 run ID는 **통합 기록**으로 저장하고, 03의 `evidence/smoke-*`(기반 점검)와 섞지 않는다. 일반 시험 중에는 사이드카를 그대로 둔다. 03을 다시 돌릴 때만 아래 "03 기준 상태와 runtime 통합 층" 절차로 뗐다가 다시 붙인다.
-6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. 이 intent의 빈 `engine_egress_allow`는 DNS 허용 없이 Cilium의 deny-all egress 규칙으로 렌더돼 AWS 묶음의 "엔진 egress 없음"과 맞는다. AWS 인수 확인은 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 `tools/aws_lab_acceptance.py`를 사용한다. kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.
+6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. 이 intent의 빈 `engine_egress_allow`는 DNS 허용 없이 Cilium의 deny-all egress 규칙으로 렌더돼 AWS 묶음의 "엔진 egress 없음"과 맞는다. AWS 인수 확인은 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 `labtools/aws_lab_acceptance.py`를 사용한다. kind 전용 `labtools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.
 7. 접속: 서버에서 `kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 8080`, 노트북에서 SSH 터널(`ssh -L 18081:127.0.0.1:8080 ubuntu@<host>`). 노트북의 개발 서버(`byul-dev`)가 8080을 쓰므로 로컬 포트는 다른 번호(예: 18081)를 쓴다.
 
 ## 03 기준 상태와 runtime 통합 층 (AWS 묶음 방침)

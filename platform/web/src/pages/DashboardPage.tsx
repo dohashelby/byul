@@ -59,8 +59,8 @@ export function DashboardPage() {
       {(requests.isError || events.isError) && <StateView kind="disconnected" detail="실시간 관측에 문제가 있어 일부 집계가 빠졌을 수 있습니다. 수집 상태를 확인해 주세요." />}
       {requestPartial && <p className="notice" aria-label="대시보드 집계 범위">선택한 기간·환경·대상의 요청 이력 중 일부만 조회했습니다. 표시된 건수는 확인된 최소 건수입니다.</p>}
       <EventWindowNote data={events.data} />
-      {attention.length > 0 && <section className="card card-pad" aria-label="현재 확인할 항목">
-        <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>현재 확인할 항목</h2>
+      {attention.length > 0 && <section className={`card card-pad ${p.attentionPanel}`} aria-label="현재 확인할 항목">
+        <h2><span className={p.attentionIcon} aria-hidden="true">!</span>현재 확인할 항목</h2>
         <ul style={{ margin: 0, paddingLeft: 20 }}>{attention.map((item) => <li key={item.label} style={{ margin: "6px 0" }}>
           <Link to={`${item.path}${carry(params)}`}>{item.label}</Link>
         </li>)}</ul>

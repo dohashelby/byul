@@ -1,3 +1,9 @@
+## 2026-11-16 — #288 첫 CI의 stream/native 지점 충돌 보수
+
+- 원 결과: 공개 head eefd7c21의 기본 suite는169 failed·4378 passed·1336 errors·6 warnings(pytest116.27초·부모117.502초)였다. /33에 넣은 두 Uvicorn 구현의 RequestResponseCycle 동명 메서드가 일반 native 지점 목록의 기존 중복 검사를 통과하지 못해 import가 연쇄 실패했다. Docker stub도 같은 오류로 수집 단계에서1 error였다. 이 결과를 테스트 통과로 집계하지 않는다.
+- 보수: 일반 지점 중복 검사를 유지하고 /33의 Uvicorn 행은 정확 source SHA/크기만 고정한다. 실제 stream hook은 기존 /12 전용 installer의 module-qualified TARGETS와 정확 source/code 검증을 사용한다. native point 목록은 /28과 같고 새로운 중복 native 지점은 계속 거부하는 직접 회귀를 더했다. 원 /12 bytes·기존 private pins·HMAC/runtime·기본 gate는 보존했다.
+- 검토/검증: 1b902eca 정적 집중 검토에서 blocker가 없었으며 source 목록·고유 영수증을 갱신했다. 로컬 Python/pytest는 실행하지 않았다. 승인된 같은 PR의 CI 원인 보수로 공개해 재검증한다.
+
 ## 2026-11-16 — 병합 뒤 슬롯·stream 보완과 고정 helper 보존
 
 - 한 일: 다른 세션이 병합한 main3aab9c8c 위에 검토된 슬롯 이동/불확실 경계 보완과 기준 stream /33 준비를 옮겼다. CPython3.12.8 CI의 임시 pycache·rank 시험과 stream 시험을 함께 보존했다. /31·/32는 과거 rank helper bfa843de bytes를 별도 고정 자료로 준비하고 host 측 경로만 선택해, 현재 M-A3 helper 확장과 기존 비공개 의존 파일·rendered profile을 함께 보존한다.

@@ -420,6 +420,11 @@
       "manifest_sha256": "47b2743fd9d921a0b38276597ec78bb74538896680eddebd2a2c36a833bcc59e",
       "reviewed_by": "Codex slot45 / streamc79 / helper1795 review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T04:04:36.257Z"
+    },
+    {
+      "manifest_sha256": "16a472a9680564eb2ed6d245b873ac382dcde86de7ff78a787bd57e108f90683",
+      "reviewed_by": "Codex 1b902eca stream/native ownership review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:13:00.463Z"
     }
   ]
 }

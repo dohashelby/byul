@@ -98,6 +98,14 @@
     "vllm/sampling_params.py.txt": {
       "source": "vllm/sampling_params.py",
       "sha256": "c43343b437b675d4ed5dd16479636db1f621a3a408a30b81817923913419aa62"
+    },
+    "vllm/v1/attention/backends/flash_attn.py.txt": {
+      "source": "vllm/v1/attention/backends/flash_attn.py",
+      "sha256": "8fe8b9b56dfbefd5db474df21f81c9cbda11f9a49cb611e7d41a0ffc298627ee"
+    },
+    "csrc/cache_kernels.cu.txt": {
+      "source": "csrc/cache_kernels.cu",
+      "sha256": "63393506877eb333debb5df93b6f4f9f396d7e61ae90ef62fa2e67a4c069efad"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

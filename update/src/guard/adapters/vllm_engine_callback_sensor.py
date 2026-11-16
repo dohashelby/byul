@@ -135,6 +135,7 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.slot_identity_namespace = os.urandom(32)
+        self.slot_sampling_enabled = False
 
     def _batch_identity(self, receiver):
         token = self.token(receiver)
@@ -174,8 +175,8 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
             fields = cache.base.attrs(value)
             allowed = cache.base.attrs(fields.get('sampling_params')).get('allowed_token_ids')
             row = {'request_sha256': self.fingerprint(fields.get('req_id')), 'restricted': type(allowed) is list and bool(allowed)}
-            if baseline:
-                row.update(restricted=slot_sampling.restricted(fields.get('sampling_params')),
+            if baseline and self.slot_sampling_enabled:
+                row.update(supported_restricted=slot_sampling.restricted(fields.get('sampling_params')),
                     supported_restrictions=slot_sampling.restrictions(fields.get('sampling_params')))
         else:
             row = {'request_sha256': self.fingerprint(value)}
@@ -385,7 +386,8 @@ class EngineCallbacks:
         self.kernel = KernelObserver(session, **options) if kernel_checks else None
         self.graph = GraphObserver(session, kernel=self.kernel, **options) if kernel_checks else None
         self.cache.secret = self.distributed.secret = self.slot.secret = self.slot_v2.secret = self.weights.secret = self.comm.secret = secret
-        self.slot_sampling = self.slot if baseline_slot_sampling else None
+        self.slot_sampling = self.slot if baseline_slot_sampling is True else None
+        self.slot.slot_sampling_enabled = self.slot_sampling is not None
         if self.kernel is not None:
             self.kernel.secret = self.graph.secret = secret
         # 매 단계 scheduler를 감싸므로 명시한 세션에서만 만든다(다른 점검의 시간 측정에 부담을 주지 않게).

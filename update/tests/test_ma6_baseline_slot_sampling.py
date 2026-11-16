@@ -262,3 +262,90 @@ def test_default_unsupported_properties_are_not_executed_and_assets_are_opt_in(t
     assert engine_callbacks.load_prepared(tmp_path / 'assets') == prepared
     with pytest.raises(ValueError, match='SLOT_SAMPLING_EXCLUSIVE'):
         engine_callbacks.prepare_assets(tmp_path / 'other', baseline_slot_sampling=True, runner_consumption=True)
+
+
+def test_sampling_before_condense_does_not_attach_to_later_reuse_without_a_new_sample(tmp_path):
+    w = setup(tmp_path)
+    restricted, reused = 'byul-cb-' + '9' * 32, 'byul-cb-' + 'a' * 32
+    add(w, restricted, restricted=True, slot=0)
+    add(w, reused, slot=1)
+    sample(w)  # B metadata really reached the sampler at old slot 1.
+    w.batch.remove_request(restricted)
+    w.runner.requests.pop(restricted)
+    w.batch.num_reqs = 1
+    w.batch.condense([0])
+    before = slot_projection(w.rows, restricted, reused)
+    assert before['rows'][0]['slot_index_match_candidate'] is True
+    assert len(before['sampling_metadata_lineage']['chains']) == 1
+    assert before['rows'][0]['sampling_metadata_lineage_observed'] is False
+    sample(w)  # Fresh metadata is now tied to the actual slot-0 reuse boundary.
+    after = slot_projection(w.rows, restricted, reused)
+    assert after['rows'][0]['sampling_metadata_lineage_observed'] is True
+    assert after['rows'][0]['sampler_restriction_values_verified'] is False
+    assert after['violation'] is None and not after['full_scope']
+
+
+def test_default_off_preserves_original_restricted_field_for_supported_top_k(tmp_path):
+    w = setup(tmp_path, enabled=False)
+    tag = 'byul-cb-' + 'b' * 32
+    add(w, tag, restricted=True)
+    row = next(row for row in w.rows if row['point'] == 'InputBatch.add_request' and row['phase'] == 'RETURN')
+    assert row['fields']['restricted'] is False  # legacy allowed_token_ids presence, untouched when off
+    assert 'supported_restricted' not in row['fields'] and 'supported_restrictions' not in row['fields']
+    assert w.runner.requests[tag].sampling_params.top_k == 1
+    assert w.runner.requests[tag].sampling_params.allowed_token_ids is None
+
+
+@pytest.mark.parametrize('missing', [sampling.SELECTION_POINT, sampling.TEMPERATURE_POINT])
+def test_row_lineage_requires_both_qualified_sampler_child_pairs(tmp_path, missing):
+    w = setup(tmp_path)
+    restricted, reused = 'byul-cb-' + 'c' * 32, 'byul-cb-' + 'd' * 32
+    add(w, restricted, restricted=True)
+    w.batch.remove_request(restricted)
+    w.runner.requests.pop(restricted)
+    add(w, reused)
+    sample(w)
+    assert slot_projection(w.rows, restricted, reused)['rows'][0]['sampling_metadata_lineage_observed'] is True
+    selected = [row for row in w.rows if row['point'] != missing]
+    result = slot_projection(selected, restricted, reused)
+    assert result['rows'][0]['sampling_metadata_lineage_observed'] is False
+    chain, = result['sampling_metadata_lineage']['chains']
+    assert chain['metadata_reached_sampler_forward'] is True
+    assert chain['selection_same_metadata_observed'] is (missing != sampling.SELECTION_POINT)
+    assert chain['temperature_argument_same_tensor_observed'] is (missing != sampling.TEMPERATURE_POINT)
+    assert result['violation'] is None and not result['full_scope']
+
+
+def test_stability_facts_include_intermediate_model_and_terminal_snapshots(tmp_path, monkeypatch):
+    w = setup(tmp_path)
+    add(w, 'byul-cb-' + 'e' * 32)
+    original_snapshot = sampling.snapshot
+    def intermediate_change(observer, point, args, kwargs, result=None, returned=False):
+        if point in sampling.MODEL_POINTS and not returned:
+            metadata = args[2]
+            flag, tensor = metadata.no_top_p, metadata.temperature
+            try:
+                # EXAMPLE observer hook sees a transient changed field. Both
+                # batch RETURN and later forward CALL retain the original values.
+                metadata.no_top_p = not flag
+                metadata.temperature = OpaqueTensor()
+                return original_snapshot(observer, point, args, kwargs, result, returned)
+            finally:
+                metadata.no_top_p, metadata.temperature = flag, tensor
+        return original_snapshot(observer, point, args, kwargs, result, returned)
+    monkeypatch.setattr(sampling, 'snapshot', intermediate_change)
+    sample(w)
+    chain, = projection._slot_sampling_lineage(w.rows)['chains']
+    assert chain['metadata_flags_stable_observed'] is False
+    assert chain['metadata_tensor_identities_stable_observed'] is False
+    assert chain['gpu_values_verified'] is chain['copy_completion_verified'] is False
+    # A terminal callback discrepancy must likewise not inherit endpoint equality.
+    monkeypatch.setattr(sampling, 'snapshot', original_snapshot)
+    w.rows.clear()
+    sample(w)
+    assert projection._slot_sampling_lineage(w.rows)['chains'][0]['metadata_flags_stable_observed'] is True
+    selected = deepcopy(w.rows)
+    for row in selected:
+        if row['point'] == sampling.FORWARD_POINT and row['phase'] == 'RETURN':
+            row['fields']['sampling_metadata']['flags']['no_top_k'] = not row['fields']['sampling_metadata']['flags']['no_top_k']
+    assert projection._slot_sampling_lineage(selected)['chains'][0]['metadata_flags_stable_observed'] is False

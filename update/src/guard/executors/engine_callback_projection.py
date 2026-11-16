@@ -456,8 +456,9 @@ def _baseline_slot_history(events):
         for former, removed in leases:
             if removed['restricted'] is True and removed['slot'] == current['slot']:
                 frozen.setdefault((generation, former, request), {'slot': current['slot'],
-                    'restricted': True, 'reuse_call_sha256': current['call_sha256']})
-    for event in events:
+                    'restricted': True, 'reuse_call_sha256': current['call_sha256'],
+                    'reuse_event_index': current['event_index'], 'reuse_finished_ns': current['finished_ns']})
+    for event_index, event in enumerate(events):
         fields = event.get('fields') or {}
         point, phase = event.get('point'), event.get('phase')
         if point == sampling_adapter.BATCH_POINT and fields.get('sampling_stage') == point:
@@ -521,7 +522,8 @@ def _baseline_slot_history(events):
                     if slot != before[request]:moves += 1
                     if request not in state['active']:continue
                     previous = state['active'][request]
-                    state['active'][request] = {**previous, 'slot': slot, 'call_sha256': call}
+                    state['active'][request] = {**previous, 'slot': slot, 'call_sha256': call,
+                        'event_index': event_index, 'finished_ns': event.get('operation_finished_ns')}
                     record(scope, state, request, leases)
             continue
         if any(candidate[0] == scope for candidate in pending):
@@ -536,7 +538,9 @@ def _baseline_slot_history(events):
             generation = (*scope, state['epoch'])
             if (generation, request) in observed:ambiguous.add(request)
             state['removed'].pop(request, None)
-            state['active'][request] = {'slot': slot, 'restricted': fields.get('restricted'), 'call_sha256': call}
+            state['active'][request] = {'slot': slot,
+                'restricted': fields.get('supported_restricted') if 'supported_restricted' in fields else fields.get('restricted'), 'call_sha256': call,
+                'event_index': event_index, 'finished_ns': event.get('operation_finished_ns')}
             record(scope, state, request)
         elif point == 'InputBatch.remove_request':
             previous = state['active'].pop(request, None)
@@ -600,7 +604,7 @@ def _slot_sampling_lineage(events):
                 or any(fields.get(key) is not False for key in ('gpu_values_verified', 'copy_completion_verified', 'full_sampling_lineage_verified'))):
             missing.append('sampling_source_process_or_call_unavailable');continue
         grouped.setdefault((*scope, call), []).append((number, event))
-    complete = {}
+    complete = {};complete_refs = {}
     for key, rows in grouped.items():
         if (len(rows) != 2 or rows[0][1].get('phase') != 'CALL' or rows[1][1].get('phase') != 'RETURN'
                 or rows[1][1].get('entry_qualified_after') is not True
@@ -613,6 +617,7 @@ def _slot_sampling_lineage(events):
                        or not 0 <= row['operation_started_ns'] <= row['operation_finished_ns'] < 2**63 for _, row in rows)):
             missing.append('sampling_unique_successful_call_pair_unavailable');continue
         complete[key] = (rows[0][1], rows[1][1])
+        complete_refs[key] = (rows[0][0], rows[1][0])
     def nested(parent, child):
         return (parent[0]['operation_started_ns'] <= child[0]['operation_started_ns']
                 <= child[1]['operation_finished_ns'] <= parent[1]['operation_finished_ns'])
@@ -652,13 +657,24 @@ def _slot_sampling_lineage(events):
         selections = [call for child_key, call in complete.items() if child_key[:2] == key[:2]
             and call[0].get('parent_call_sha256') == forward_key[2] and call[1]['point'] == adapter.SELECTION_POINT
             and nested(forward, call) and call[0]['fields'].get('sampler_sha256') == forward[0]['fields']['sampler_sha256']
-            and metadata(call[0]['fields']) == actual]
+            and metadata(call[0]['fields']) is not None
+            and metadata(call[0]['fields'])['metadata_sha256'] == actual['metadata_sha256']]
+        if len(temperatures) != 1:missing.append('sampling_temperature_input_binding_unavailable')
+        if len(selections) != 1:missing.append('sampling_selection_input_binding_unavailable')
+        transfers = [value, metadata(runner[1]['fields']), metadata(model[0]['fields']), metadata(model[1]['fields']),
+            actual, metadata(forward[1]['fields'])]
+        if len(selections) == 1:transfers += [metadata(selections[0][0]['fields']), metadata(selections[0][1]['fields'])]
+        known_transfers = all(item is not None and item['metadata_sha256'] == value['metadata_sha256'] for item in transfers)
+        if not known_transfers:missing.append('sampling_transfer_terminal_metadata_unavailable')
         chains.append({'session_sha256': key[0], 'process_sha256': key[1], 'batch_sha256': fields['batch_sha256'],
             'metadata_sha256': value['metadata_sha256'], 'runner_call_sha256': parent_key[2], 'batch_call_sha256': key[2],
             'model_call_sha256': model_key[2], 'sampler_call_sha256': forward_key[2],
+            'batch_event_ref': list(complete_refs[key]), 'model_event_ref': list(complete_refs[model_key]),
+            'batch_started_ns': batch[0]['operation_started_ns'], 'model_started_ns': model[0]['operation_started_ns'],
             'request_slots': request_rows(fields.get('slot_mapping')), 'declared_restrictions': declared_rows(runner[1]['fields'].get('declared_restrictions')),
-            'same_metadata_object_observed': True, 'metadata_flags_stable_observed': value['flags'] == actual['flags'],
-            'metadata_tensor_identities_stable_observed': value['tensor_sha256'] == actual['tensor_sha256'],
+            'same_metadata_object_observed': True, 'metadata_reached_sampler_forward': True,
+            'metadata_flags_stable_observed': all(item['flags'] == value['flags'] for item in transfers) if known_transfers else None,
+            'metadata_tensor_identities_stable_observed': all(item['tensor_sha256'] == value['tensor_sha256'] for item in transfers) if known_transfers else None,
             'sampler_flags': actual['flags'], 'temperature_argument_same_tensor_observed': len(temperatures) == 1,
             'selection_same_metadata_observed': len(selections) == 1, 'gpu_values_verified': False,
             'copy_completion_verified': False, 'sampler_restriction_values_verified': False, 'scope_complete': False})
@@ -748,16 +764,24 @@ def project_slot(cases, outputs, events, secret, tags):
             former_scopes = history['scopes'].get(former_id, set())
             current_scopes = history['scopes'].get(current_id, set())
             row = {'slot_reused': None, 'output_matches_standalone': bool(alone) and outputs.get(case['case_id']) == alone[0]}
+            reuse = None
             if (not history['unbound'] and former_id not in history['ambiguous'] and current_id not in history['ambiguous']
                     and len(former_scopes) == len(current_scopes) == 1 and former_scopes == current_scopes):
                 generation, = current_scopes
-                row['slot_index_match_candidate'] = (generation, former_id, current_id) in history['frozen']
+                reuse = history['frozen'].get((generation, former_id, current_id))
+                row['slot_index_match_candidate'] = reuse is not None
             else:
                 missing.append('slot_batch_process_binding_unavailable')
             missing.append('slot_movement_unobserved')  # Index history is not final sampler consumption.
             if sampling is not None:
                 matches = [chain for chain in sampling['chains']
-                    if any(item['request_sha256'] == current_id for item in chain['request_slots'])
+                    if reuse is not None and type(reuse['reuse_finished_ns']) is int and 0 <= reuse['reuse_finished_ns'] < 2**63
+                    and chain['temperature_argument_same_tensor_observed'] and chain['selection_same_metadata_observed']
+                    and chain['batch_event_ref'][0] > reuse['reuse_event_index']
+                    and chain['model_event_ref'][0] > reuse['reuse_event_index']
+                    and chain['batch_started_ns'] >= reuse['reuse_finished_ns']
+                    and chain['model_started_ns'] >= reuse['reuse_finished_ns']
+                    and any(item['request_sha256'] == current_id and item['slot'] == reuse['slot'] for item in chain['request_slots'])
                     and any(tuple(generation) == (chain['session_sha256'], chain['process_sha256'], chain['batch_sha256'],
                         history['sampling_epochs'].get((chain['session_sha256'], chain['process_sha256'], chain['batch_sha256'], chain['batch_call_sha256'])))
                             for generation in current_scopes)]

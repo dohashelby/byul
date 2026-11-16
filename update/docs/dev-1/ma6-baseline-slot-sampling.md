@@ -34,8 +34,10 @@ adapter 자극은 A `(temperature=1, top_p=1, top_k=1, seed=0)`와 B
 실제 검증 함수로 이 입력과 0 거부 회귀를 둔다. 비교용 summary의 비활성 top_k
 정규 값은 기존 consumption과 같은 0이며 원 자극을 0으로 보내지 않는다.
 온도/top_p에는 정수 요약과 정확한 float hex를 함께 남겨 반올림 허용 기준을
-만들지 않는다. baseline의 `restricted`는 실제 지원하는 이 제한으로 계산하고,
-allowed_token_ids는 존재 여부와 `supported=False`만 남긴다.
+만들지 않는다. 기본 모드의 기존 `restricted` 필드는 보존한다. opt-in 모드에만 별도
+`supported_restricted`와 지원 제한 summary를 더하고, 그 모드의 slot 소비가
+이 명시된 필드를 선택한다. allowed_token_ids는 존재 여부와
+`supported=False`만 남긴다.
 
 ## 기존 관측기와 소비 연결
 
@@ -56,7 +58,10 @@ allowed_token_ids는 존재 여부와 `supported=False`만 남긴다.
   기록한다. SamplerOutput의 token 값은 읽지 않는다.
 - 기존 project_slot은 이 사슬의 부분 사실을 붙이되 source/process/parent/
   metadata 객체가 다르거나 여러 transfer가 가능한 경우 사슬을 만들지 않는다.
-  reuse row와 연결할 때는 해당 batch의 clear/movement epoch도 대조한다.
+  reuse row와 연결할 때는 해당 batch의 clear/movement epoch, 실제 재사용 slot,
+  allocation/move 경계 뒤의 metadata/model sampling 순서도 대조하고 두 sampler
+  child의 자격 있는 call pair를 요구한다. flags/tensor 안정성은 모든 관측된
+  transfer와 terminal snapshot을 비교하며 endpoint equality만으로 삼지 않는다.
   객체 동일성을 GPU 제한 값·copy 완료·최종 출력 귀속으로 승격하지 않는다.
 
 `gpu_values_verified`·`copy_completion_verified`·

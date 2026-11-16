@@ -424,7 +424,8 @@ def _baseline_slot_history(events):
     A complete same-batch condense pair can reconnect its quarantined history.
     Missing/invalid/failed boundaries permanently cut the epoch for future calls.
     """
-    states = {}; scopes = {}; frozen = {}; observed = {}; pending = {}; ambiguous = set()
+    from guard.adapters import vllm_baseline_slot_sampling as sampling_adapter
+    states = {}; scopes = {}; frozen = {}; observed = {}; pending = {}; ambiguous = set(); sampling_epochs = {}
     unbound = False; gap = False; moves = 0; condense_seen = False
     fingerprint = lambda value: type(value) is str and re.fullmatch('[0-9a-f]{64}', value) is not None
     def mapping(value):
@@ -459,6 +460,14 @@ def _baseline_slot_history(events):
     for event in events:
         fields = event.get('fields') or {}
         point, phase = event.get('point'), event.get('phase')
+        if point == sampling_adapter.BATCH_POINT and fields.get('sampling_stage') == point:
+            scope = (event.get('session_sha256'), event.get('process_sha256'), fields.get('batch_sha256'))
+            call = event.get('call_sha256')
+            if (phase == 'RETURN' and event.get('entry_qualified_before') is True and event.get('entry_qualified_after') is True
+                    and all(fingerprint(value) for value in (*scope, call)) and scope in states
+                    and not any(key[0] == scope for key in pending)):
+                sampling_epochs[(*scope, call)] = states[scope]['epoch']
+            continue
         if point not in {'InputBatch.add_request', 'InputBatch.remove_request', 'InputBatch.condense', 'InputBatch.clear'}:
             continue
         movement = point in {'InputBatch.condense', 'InputBatch.clear'}
@@ -535,7 +544,126 @@ def _baseline_slot_history(events):
                 state['removed'][request] = dict(previous)
     return {'scopes': scopes, 'frozen': frozen, 'observed': observed, 'unbound': unbound,
             'moves': moves, 'condense_seen': condense_seen, 'ambiguous': ambiguous,
-            'gap': gap or bool(pending)}
+            'gap': gap or bool(pending), 'sampling_epochs': sampling_epochs}
+
+
+def _slot_sampling_lineage(events):
+    """Exact source-call and weak-object transfers; never GPU value truth."""
+    from guard.adapters import vllm_baseline_slot_sampling as adapter
+    fingerprint = lambda value: type(value) is str and re.fullmatch('[0-9a-f]{64}', value) is not None
+    grouped = {};missing = [];chains = []
+    def request_rows(value):
+        if (type(value) is not list or len(value) > adapter.MAX_REQUESTS
+                or any(type(row) is not dict or set(row) != {'request_sha256', 'slot'}
+                    or not fingerprint(row['request_sha256']) or type(row['slot']) is not int
+                    or not 0 <= row['slot'] < 2**63 for row in value)
+                or len({row['request_sha256'] for row in value}) != len(value)
+                or len({row['slot'] for row in value}) != len(value)):return None
+        return value
+    def declared_rows(value):
+        names = {'temperature_milli', 'top_p_milli', 'temperature_hex', 'top_p_hex', 'top_k',
+                 'allowed_token_ids_supported', 'allowed_token_ids_present'}
+        if type(value) is not list or len(value) > adapter.MAX_REQUESTS:return None
+        for row in value:
+            if (type(row) is not dict or set(row) != {'request_sha256', 'slot', 'restrictions'}
+                    or not fingerprint(row['request_sha256']) or type(row['slot']) is not int
+                    or not 0 <= row['slot'] < 2**63 or type(row['restrictions']) is not dict
+                    or set(row['restrictions']) != names):return None
+            fields = row['restrictions']
+            if fields['allowed_token_ids_supported'] is not False or type(fields['allowed_token_ids_present']) is not bool:return None
+            if any(fields[name] is not None and (type(fields[name]) is not int or not 0 <= fields[name] < 2**63)
+                   for name in ('temperature_milli', 'top_p_milli', 'top_k')):return None
+            if any(fields[name] is not None and (type(fields[name]) is not str or len(fields[name]) > 64
+                   or re.fullmatch(r'0x[0-9a-f]+\.[0-9a-f]+p[+-][0-9]+', fields[name]) is None)
+                   for name in ('temperature_hex', 'top_p_hex')):return None
+        return value
+    def metadata(fields):
+        value = fields.get('sampling_metadata')
+        if (type(value) is not dict or set(value) != {'metadata_sha256', 'flags', 'tensor_sha256', 'gpu_values_verified', 'copy_completion_verified'}
+                or not fingerprint(value['metadata_sha256']) or value['gpu_values_verified'] is not False
+                or value['copy_completion_verified'] is not False or type(value['flags']) is not dict
+                or set(value['flags']) != set(adapter.FLAGS) or any(type(item) is not bool for item in value['flags'].values())
+                or type(value['tensor_sha256']) is not dict or set(value['tensor_sha256']) != set(adapter.TENSORS)
+                or any(not fingerprint(item) for item in value['tensor_sha256'].values())):
+            return None
+        return value
+    for number, event in enumerate(events):
+        point = event.get('point');fields = event.get('fields') or {}
+        if point not in adapter.POINT_MODULES or fields.get('sampling_stage') != point:continue
+        module = adapter.POINT_MODULES[point]
+        scope = (event.get('session_sha256'), event.get('process_sha256'))
+        call = event.get('call_sha256')
+        if (not all(fingerprint(value) for value in (*scope, call))
+                or event.get('schema') != adapter.SCHEMA or not fingerprint(event.get('entry_code_sha256'))
+                or event.get('source_file_sha256') != adapter.SOURCES[module]
+                or event.get('entry_qualified_before') is not True
+                or any(fields.get(key) is not False for key in ('gpu_values_verified', 'copy_completion_verified', 'full_sampling_lineage_verified'))):
+            missing.append('sampling_source_process_or_call_unavailable');continue
+        grouped.setdefault((*scope, call), []).append((number, event))
+    complete = {}
+    for key, rows in grouped.items():
+        if (len(rows) != 2 or rows[0][1].get('phase') != 'CALL' or rows[1][1].get('phase') != 'RETURN'
+                or rows[1][1].get('entry_qualified_after') is not True
+                or rows[0][1]['point'] != rows[1][1]['point']
+                or any(rows[0][1].get(name) != rows[1][1].get(name) for name in ('schema', 'source_file_sha256', 'entry_code_sha256'))
+                or rows[0][1].get('parent_call_sha256') != rows[1][1].get('parent_call_sha256')
+                or any(rows[0][1]['fields'].get(name) != rows[1][1]['fields'].get(name)
+                       for name in ('batch_sha256', 'runner_sha256', 'model_sha256', 'sampler_sha256', 'temperature_tensor_sha256'))
+                or any(type(row.get('operation_started_ns')) is not int or type(row.get('operation_finished_ns')) is not int
+                       or not 0 <= row['operation_started_ns'] <= row['operation_finished_ns'] < 2**63 for _, row in rows)):
+            missing.append('sampling_unique_successful_call_pair_unavailable');continue
+        complete[key] = (rows[0][1], rows[1][1])
+    def nested(parent, child):
+        return (parent[0]['operation_started_ns'] <= child[0]['operation_started_ns']
+                <= child[1]['operation_finished_ns'] <= parent[1]['operation_finished_ns'])
+    for key, batch in complete.items():
+        if batch[1]['point'] != adapter.BATCH_POINT:continue
+        fields = batch[1]['fields'];value = metadata(fields)
+        parent_key = (*key[:2], batch[1].get('parent_call_sha256'))
+        runner = complete.get(parent_key)
+        if (value is None or request_rows(fields.get('slot_mapping')) is None or not fingerprint(fields.get('batch_sha256')) or runner is None
+                or runner[1]['point'] != adapter.RUNNER_POINT or not nested(runner, batch)
+                or runner[1]['fields'].get('batch_sha256') != fields['batch_sha256']
+                or metadata(runner[1]['fields']) != value or not fingerprint(runner[1]['fields'].get('model_sha256'))):
+            missing.append('sampling_batch_runner_metadata_binding_unavailable');continue
+        selected = [(model_key, model) for model_key, model in complete.items() if model_key[:2] == key[:2]
+            and model[1]['point'] in adapter.MODEL_POINTS
+            and model[0]['fields'].get('model_sha256') == runner[1]['fields']['model_sha256']
+            and metadata(model[0]['fields']) is not None
+            and metadata(model[0]['fields'])['metadata_sha256'] == value['metadata_sha256']
+            and model[0]['operation_started_ns'] >= runner[1]['operation_finished_ns']]
+        if len(selected) != 1:
+            missing.append('sampling_unique_metadata_model_transfer_unavailable');continue
+        model_key, model = selected[0]
+        forwards = [(forward_key, forward) for forward_key, forward in complete.items() if forward_key[:2] == key[:2]
+            and forward[1]['point'] == adapter.FORWARD_POINT and forward[0].get('parent_call_sha256') == model_key[2]
+            and nested(model, forward) and fingerprint(forward[0]['fields'].get('sampler_sha256'))
+            and forward[0]['fields']['sampler_sha256'] == model[0]['fields'].get('sampler_sha256')
+            and metadata(forward[0]['fields']) is not None
+            and metadata(forward[0]['fields'])['metadata_sha256'] == value['metadata_sha256']]
+        if len(forwards) != 1:
+            missing.append('sampling_model_final_sampler_binding_unavailable');continue
+        forward_key, forward = forwards[0]
+        actual = metadata(forward[0]['fields'])
+        temperatures = [call for child_key, call in complete.items() if child_key[:2] == key[:2]
+            and call[0].get('parent_call_sha256') == forward_key[2] and call[1]['point'] == adapter.TEMPERATURE_POINT
+            and nested(forward, call) and call[0]['fields'].get('sampler_sha256') == forward[0]['fields']['sampler_sha256']
+            and call[0]['fields'].get('temperature_tensor_sha256') == actual['tensor_sha256']['temperature']]
+        selections = [call for child_key, call in complete.items() if child_key[:2] == key[:2]
+            and call[0].get('parent_call_sha256') == forward_key[2] and call[1]['point'] == adapter.SELECTION_POINT
+            and nested(forward, call) and call[0]['fields'].get('sampler_sha256') == forward[0]['fields']['sampler_sha256']
+            and metadata(call[0]['fields']) == actual]
+        chains.append({'session_sha256': key[0], 'process_sha256': key[1], 'batch_sha256': fields['batch_sha256'],
+            'metadata_sha256': value['metadata_sha256'], 'runner_call_sha256': parent_key[2], 'batch_call_sha256': key[2],
+            'model_call_sha256': model_key[2], 'sampler_call_sha256': forward_key[2],
+            'request_slots': request_rows(fields.get('slot_mapping')), 'declared_restrictions': declared_rows(runner[1]['fields'].get('declared_restrictions')),
+            'same_metadata_object_observed': True, 'metadata_flags_stable_observed': value['flags'] == actual['flags'],
+            'metadata_tensor_identities_stable_observed': value['tensor_sha256'] == actual['tensor_sha256'],
+            'sampler_flags': actual['flags'], 'temperature_argument_same_tensor_observed': len(temperatures) == 1,
+            'selection_same_metadata_observed': len(selections) == 1, 'gpu_values_verified': False,
+            'copy_completion_verified': False, 'sampler_restriction_values_verified': False, 'scope_complete': False})
+    return {'chains': chains, 'missing': sorted(set(missing + ['sampler_gpu_restriction_values_unobserved',
+        'sampling_copy_completion_unobserved', 'slot_to_output_full_lifetime_unverified'])), 'scope_complete': False}
 
 
 def project_slot(cases, outputs, events, secret, tags):
@@ -546,6 +674,7 @@ def project_slot(cases, outputs, events, secret, tags):
         or (event.get('fields') or {}).get('slot_lineage_complete') is False
         or event.get('point') in {'InputBatch.condense', 'InputBatch.clear'} for event in events)
     history = _baseline_slot_history(events) if baseline else None
+    sampling = _slot_sampling_lineage(events) if any((event.get('fields') or {}).get('sampling_stage') for event in events) else None
     def mapping_rows(value):
         if (type(value) is not list or len(value) > 256
                 or any(type(row) is not dict or set(row) != {'request_sha256', 'slot'}
@@ -626,6 +755,14 @@ def project_slot(cases, outputs, events, secret, tags):
             else:
                 missing.append('slot_batch_process_binding_unavailable')
             missing.append('slot_movement_unobserved')  # Index history is not final sampler consumption.
+            if sampling is not None:
+                matches = [chain for chain in sampling['chains']
+                    if any(item['request_sha256'] == current_id for item in chain['request_slots'])
+                    and any(tuple(generation) == (chain['session_sha256'], chain['process_sha256'], chain['batch_sha256'],
+                        history['sampling_epochs'].get((chain['session_sha256'], chain['process_sha256'], chain['batch_sha256'], chain['batch_call_sha256'])))
+                            for generation in current_scopes)]
+                row['sampling_metadata_lineage_observed'] = len(matches) == 1
+                row['sampler_restriction_values_verified'] = False
             rows.append(row)
             continue
         former = slot_of(previous).copy() if previous else {}
@@ -655,6 +792,7 @@ def project_slot(cases, outputs, events, secret, tags):
     if history is not None:
         slot_moves, condense_seen = history['moves'], history['condense_seen']
     return {'rows': rows, 'runner': 'v2' if v2 else 'v1', **({'observed_slot_moves': slot_moves} if condense_seen else {}),
+        **({'sampling_metadata_lineage': sampling} if sampling is not None else {}),
         'violation': True if violations else (None if missing else False),
         'full_scope': not missing and not violations, 'missing': missing}
 

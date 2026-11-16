@@ -146,9 +146,9 @@ def test_partial_final_write_cannot_reuse_previous_healthy_marker():
 
 def test_stalled_current_monitor_preserves_previously_verified_request_checkpoint(monkeypatch):
     from datetime import datetime,timezone
-    from serving_runtime.mvp import native_receipts
-    from serving_runtime.mvp.collectors import CollectionFailure
-    from serving_runtime.mvp.update_engine_link import project_termination
+    from serving_runtime.observation import native_receipts
+    from serving_runtime.observation.collectors import CollectionFailure
+    from serving_runtime.bridge_update.update_engine_link import project_termination
     from tests.test_runtime_termination_native23 import inputs,RID,UPSTREAM,replace
     records,original,binding=inputs();p=replace(live_packet(),EXT,hashlib.sha256(UPSTREAM.encode()).hexdigest())
     for side in ('before','after'):p[side]['owner']=deepcopy(original[side]['owner'])

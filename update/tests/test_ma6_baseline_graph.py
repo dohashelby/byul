@@ -315,3 +315,20 @@ def test_prepared_callback_path_installs_only_explicit_graph_observation(tmp_pat
     assert settings['baseline_piecewise_graph'] is enabled
     assert 'guard_engine_callbacks/vllm_baseline_graph_callback.py' in prepared['assets']
     assert engine_callbacks.load_prepared(tmp_path / 'assets') == prepared
+
+
+@pytest.mark.parametrize('container', [tuple, list])
+def test_actual_nonweak_output_container_keeps_native_return_but_not_generation_claim(tmp_path, container):
+    item = world(tmp_path)
+    output = container([Result()])
+    item.owner.concrete_size_entries[4].output = output
+    assert item.owner(4) is output and item.replay.calls == 1
+    report = item.observer.report()
+    assert report['events'][-1]['fields']['returned_entry_output'] is True
+    assert report['events'][-1]['fields']['output_token'] is None
+    assert 'CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE' in report['missing']
+    projected = graph.project_piecewise(report)
+    assert projected['qualified_returns'] == 1
+    assert projected['replay_returns_cached_output'] == 0
+    assert 'baseline_graph_object_generation_unavailable' in projected['missing']
+    assert projected['violation'] is None and projected['full_scope'] is False

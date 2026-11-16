@@ -1121,3 +1121,7 @@ REQ-17의 빠른 control timing만으로 cache가 켜졌다고 추론하지 않�
 새 `/33` 구성은 기존 `/28`의 비공개 세션 키 검증과 HMAC 요청 식별을 먼저 적용하고, 원본 `/12` stream 확장을 정확 bytes로 검증한 뒤 0.34.0 파일 SHA만 선택한다. CPython 3.12.8 stream 코드 지문 `9ce758b7…`는 검토된 ABI 행으로 추가하며 원 `/12`의 3.12.3 계약과 bytes는 그대로 둔다. Uvicorn `send`의 0.34.0 경로는 body type 확인 전에 message type을 읽고 기존 연결 닫힘/헤더 처리 의미가 다르므로 정확 소스·code 재검증을 요구한다. 실제 이미지 bytes/transport·GPU producer, 전체 buffer inventory·close release epoch은 여전히 미검증이다.
 
 WORK_ORDER 1.2의 부분 snapshot 범위에서 `/33`은 source qualified `run_asgi`·`send`·`drain`·`connection_lost`의 실제 selected transport 표본과 HTTP trial을 연결할 준비를 한다. 준비 key와 원 확장 SHA/코드·선택 설치 Uvicorn 파일 SHA/함수 코드 검증이 실패하면 hook/HTTP 결합을 막거나 미지원 공백으로 남긴다. 다만 WORK_ORDER 7절의 후속 profile·HMAC 키 자산 승인 경계 때문에 0.7.0 기본 `stream_buffer` 실행기 gate는 열지 않는다. wheel source 후보는 `image_pin`이 아니며, 집중 검토·CI 뒤 기본 gate 활성화는 별도 사용자 결정을 받는다. 정상 buffer 전체 목록, close 뒤 release epoch, 프로세스 RSS의 연결별 귀속은 이 관측으로 판정하지 않는다. LIF-03 전체 budget·GPU 등록도 UNKNOWN이다.
+
+## 2026-11-16 M-A6 기준 V1 REQ-20 graph 부분 관측
+
+0.7.0 `PiecewiseBackend.__call__`의 정확 소스·선택 함수 코드로 shape별 graph replay 분기와 `entry.output` 객체 반환을 부분 관측한다. `copy_and_call` closure, tensor 원값, property, CUDA 완료는 관측 범위 밖이다. 기존 V2 `ModelCudaGraphManager.run_fullgraph`/`GPUModelRunner.sample` 소비와 의미가 다르므로 판정이나 수락 기준을 바꾸지 않고 별도 adapter projection을 둔다. 이는 default `engine_sensor` gate나 GPU 등록을 열지 않으며 REQ-20 전체 결과는 UNKNOWN이다. 근거와 공백은 `docs/dev-1/ma6-baseline-graph-candidate.md`에 기록한다.

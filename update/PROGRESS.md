@@ -3113,3 +3113,10 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 후속 연결: profiler `/32` 고정 source를 병합한 뒤 lifecycle catalog·준비 자산·recording parser·stream 소비자·Kubernetes 실행기의 명시적 `/33` 경로를 연결했다. 기존 `/12`·`/29`의 source/runtime 기본값은 유지하고 `/33`에서만 새 행·3.12.8 ABI·HMAC 준비 키를 선택한다. 실제 함수 body→parser→기존 소비자와 파일/키 변조 회귀는 새 head CI 대상이다. WORK_ORDER 7절의 후속 승인 경계에 따라 기준 0.7.0 기본 stream 실행기 gate는 닫혀 있다.
 - 다음 단계: 고정 source 집중 검토와 CI 뒤 `/33` 기본 gate 활성화 여부를 사용자에게 별도 결정받는다. 실제 이미지 Python 파일 대조/생산자 등록/GPU 실측도 별개다.
 - 집중 검토 보수: `/33`의 runtime 계약은 CPython 3.12.3·3.12.8 두 행만 받도록 독립 표로 고정했다. 원 `/12`의 3.12.14·3.12.15 행은 새 parser·소비자에도 상속하지 않으며 실제 생산 record의 runtime 변조 재체인 거부를 CI에 넣었다. 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-16 M-A6 기준 REQ-20 PiecewiseBackend source 후보
+
+- `0.7.0`의 정확 `vllm.compilation.backends.PiecewiseBackend.__call__` 소스 SHA·size를 fixture와 새 adapter에 고정했다. 기존 source-qualified wrapper로 실제 일반/미지원/replay/예외 함수 body가 만든 CALL·RETURN·RAISE record를 adapter projection에 연결했다.
+- 얻은 사실은 shape별 replay 분기와 cached `entry.output` 객체 반환뿐이다. copied 입력 갱신, 요청별 sample 소비, 값 보존, GPU 완료·독립 graph-off 대조는 관측하지 않았다. 기존 V2 판정과 baseline default gate는 유지한다. M-B4 보류도 유지한다.
+- 로컬 Python/pytest는 사용자 지시로 실행하지 않았다. 정확 source/live code 변조 거부와 기본/미지원 producer→consumer 회귀는 CI 대상이다.
+- 집중 검토 보수: 부분 replay·capture 사실은 동일 세션/프로세스/소스/코드/entry 세대의 유일하고 시간순인 CALL·종결 쌍에서만 인정한다. graph/output 토큰이 없거나 바뀌면 count하지 않는다. 실제 함수 body의 capture→replay와 누락·중복·재정렬·타 세션/소스/코드/시간·용량 부족 record를 새 소비자에 넣는 회귀를 추가했다. fixture에 원 LICENSE와 provenance를 보존했다.

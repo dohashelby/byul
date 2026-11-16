@@ -124,7 +124,8 @@ class DistributedObserver(_Keyed, distributed.DistributedCallbackObserver):
 
 class SlotObserver(_Keyed, cache.CacheCallbackObserver):
     """요청이 받은 batch 자리와 제한 여부만 남긴다. 값 자체는 남기지 않는다."""
-    targets = {SLOT_MODULE: SLOT_TARGETS[SLOT_MODULE] + BASELINE_SLOT_EXTRA}
+    # Public default targets remain valid for every registered candidate row.
+    targets = SLOT_TARGETS
     sources = SLOT_SOURCE
     schema = 'guard-vllm-slot-callback/1'
     profile = 'source-bound-slot-callback-candidate-v1'
@@ -138,8 +139,10 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
         return self.fingerprint(self.slot_identity_namespace + token.encode()) if token is not None else None
 
     def wrap(self, module, point):
-        if point in BASELINE_SLOT_EXTRA and cache.source_pin(module, self.sources) != BASELINE_ROWS[SLOT_MODULE]['sha256']:
-            raise ValueError('SLOT_BASELINE_SOURCE_UNSUPPORTED')
+        if point in BASELINE_SLOT_EXTRA:
+            if cache.source_pin(module, self.sources) != BASELINE_ROWS[SLOT_MODULE]['sha256']:
+                raise ValueError('SLOT_BASELINE_SOURCE_UNSUPPORTED')
+            self.targets = {**self.targets, SLOT_MODULE: SLOT_TARGETS[SLOT_MODULE] + BASELINE_SLOT_EXTRA}
         return super().wrap(module, point)
 
     def _mapping(self, receiver):

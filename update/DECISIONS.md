@@ -1,3 +1,7 @@
+## 2026-11-16 — #288 기준 관측 후속 묶음 추가 push 승인
+
+사용자는 검토/소스 고정97830616에 대해 “#288에 후속 묶음 추가 push 승인”으로 답했다. sampler·piecewise graph·attention metadata·profiler local segment와 기존 callback 준비/설치/소유 기록 연결을 같은 draft PR에 추가한다. 기본값 False·기존 실행 gate·정책/판정/수락·V2·원 /15·/31·/32·PACK38 Ref를 보존한다. 이 범위의 승인/CI 보수는 잇되 main 병합·기본 gate 활성화·GPU/새 비용은 포함하지 않는다. 사용자는 로컬 테스트 금지를 재강조했고 로컬 Python/pytest/모의 실행 없이 GitHub Linux CI에서만 검증한다.
+
 ## 2026-11-16 — 병합 뒤 관측 보완 push·draft PR 생성 승인
 
 사용자는 검토 커밋618c36ba의 “push·draft PR 생성 승인”으로 답했다. codex/ma6-post284-observations-20261116의 슬롯 이동 보완·기준 stream /33 준비·고정 helper 호환 수정과 해당 source 목록/검토 기록을 새 draft PR로 공개한다. 필요한 승인/CI 원인 기록은 같은 범위로 잇는다. 기본 stream gate는 닫혀 있고 sampler/graph 별도 개발·main 병합·실제 GPU/등록·새 비용 승인은 포함하지 않는다.

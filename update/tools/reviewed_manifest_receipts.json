@@ -415,6 +415,11 @@
       "manifest_sha256": "94b8de497fbe4605ddff451b8de99bfc124aa5532acd6d11a7c4209de530b12d",
       "reviewed_by": "Codex / PR284 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T16:21:07.483Z"
+    },
+    {
+      "manifest_sha256": "88eb78db537d1faa2a6c2c878f2d5c2d90548140c9e177e779244e2e8711e16c",
+      "reviewed_by": "Codex / PR287 legacy qualification and startup dependency review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:14:58Z"
     }
   ]
 }

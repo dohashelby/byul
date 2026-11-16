@@ -146,7 +146,7 @@
   "update/src/guard/adapters/vllm_baseline_profiler.py": "9d25935754a7b3f8dad2df1a0229afe9d28b3584d7d0901f7c6654e0d67c4641",
   "update/src/guard/adapters/vllm_baseline_profiler_composition.py": "d407865905c3adc442fe2df6ed7aa46022e64f065853fb6e511b060fbb504d16",
   "update/src/guard/adapters/vllm_baseline_startup.py": "eae41581ae04d9edf571c458824840f0d8877ef31bf79e08d218116a588ec842",
-  "update/src/guard/adapters/vllm_baseline_startup_composition.py": "775b1ad4cc5e0c64a95bc400380ef7be14da907ff2aeaa63b6579b7a952a640f",
+  "update/src/guard/adapters/vllm_baseline_startup_composition.py": "b7b8d8717f8127821ccaf14edce72fb19069de921f5cc8fabe23265ef3f41586",
   "update/src/guard/adapters/vllm_cache_callback.py": "240346a4549eeed49cf402b482ed2641e5e1b21a72ceb55bf94a7682a72f7867",
   "update/src/guard/adapters/vllm_comm_buffer_callback.py": "1e178832248c5323db03b3d556a5e83de3f49a1a1cb5371e09c37f9da3c682ef",
   "update/src/guard/adapters/vllm_common_input_metadata.py": "fd8957466729ecdc1806013b799ae1386970b4b1c973783d80fd9bf527e33b7d",

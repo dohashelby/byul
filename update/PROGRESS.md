@@ -3085,3 +3085,9 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 fixture 소스 몸체의 기본/소스 불일치 경로를 기존 소비자에 전달하는 새 회귀 시험은 CI에서 검증한다. 로컬에서는 shell SHA·diff 검사만 한다.
 - 다음 단계: 집중 소스 검토 후 CI에서 실제 반환 형태·보수적 투영·기존 프로필 회귀를 확인한다.
 - 집중 검토 후속: REQ-17에서 cache 비활성화의 정확 원 생산자 0-token 행을 기존 timing 소비자에 전달해 빠른 대조만으로 정상/전체 범위가 되는 공백을 막았다. control-present의 native 적중이 확인되지 않으면 UNKNOWN으로 남긴다. CI 실행 전이다.
+
+## 2026-11-16 — PR287 startup 의존 소스 검토
+
+- 한 일: CI의 update-default·observer 11개 실패를 추적했다. 8bac1ab3에서 원 함수·파일 검증을 `_qualified`로 옮기고 별도 V1 검토 경로를 추가했지만 startup의 의존 소스 고정값은 이전 bytes를 가리켰다. 이전 소스 원본을 시험 자료로 보존하고, 공유 함수·기존 qualify의 관문/본문/거부 처리를 AST로 대조하는 회귀와 전체 7개 의존 bytes 검사를 추가했다. 검토한 현재 소스를 정확히 지정하도록 startup 고정값과 소스 목록·검토 기록을 갱신했다.
+- 검증 경계: 기존 시험·단언·해시/심볼릭 링크 거부·인터프리터 제한은 유지한다. 새 회귀를 별도 3.12.8 job에도 포함했다. 로컬 Python·pytest는 실행하지 않았으며 Linux CI 결과를 기다린다.
+- 다음 단계: 두 update job과 나머지 CI를 끝까지 확인한다. 실제 엔진·GPU 실행 및 생산자 등록 변경은 없다.

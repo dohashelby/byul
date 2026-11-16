@@ -430,6 +430,11 @@
       "manifest_sha256": "8f5b166ddded3070dab69a09e90672ad2e7c736d06ab1100e853b631dea01d5a",
       "reviewed_by": "Codex 2de0a45b candidate target isolation review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T04:29:29.247Z"
+    },
+    {
+      "manifest_sha256": "c62c9f8685f722cded234153471224a4eda9a0c9cd5f722919ba69ff8e9f38f5",
+      "reviewed_by": "Codex baseline lineage reviews 357/909/119/54de/44b; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:51:56.548Z"
     }
   ]
 }

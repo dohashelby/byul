@@ -141,8 +141,7 @@ export function UpdateExecutionPage() {
           {environment.isError && <div className={s.error}>환경 판본을 불러오지 못했습니다. 등록한 판본을 다시 선택하세요.</div>}
           {bindingMismatch && <div className={s.notice} role="alert">이 정책의 기준 환경은 {expected!.id} · 판본 {expected!.revision}입니다. 해당 환경 판본을 선택하세요.</div>}
           {sameSides && <div className={s.notice} role="alert">기준과 후보는 서로 다른 환경 판본을 선택하세요.</div>}
-          {environment.data && <p className="small muted">{environment.data.document.target.engine.name} · {environment.data.document.target.engine.version ?? "판본 미입력"}
-            {" · "}{environment.data.document.data_origin} · 선택한 판본을 고정해 검증합니다.</p>}
+          {environment.data && <p className="small muted">{environment.data.document.target.engine.name} · {environment.data.document.target.engine.version ?? "판본 미입력"} · 선택한 판본을 고정해 검증합니다.</p>}
           <p className="small muted">정책의 기준 환경을 기본으로 선택합니다. 검증 기준과 실행 설정은 서버에서 자동으로 적용합니다.
             {form.mode === "update" && " 기준 환경의 정책을 두 환경에 동일하게 적용해 비교합니다."}</p>
           {(!environments.data?.items.length || !policies.data?.items.length) && !environments.isPending && !policies.isPending &&

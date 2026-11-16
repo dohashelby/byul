@@ -415,6 +415,11 @@
       "manifest_sha256": "94b8de497fbe4605ddff451b8de99bfc124aa5532acd6d11a7c4209de530b12d",
       "reviewed_by": "Codex / PR284 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T16:21:07.483Z"
+    },
+    {
+      "manifest_sha256": "47b2743fd9d921a0b38276597ec78bb74538896680eddebd2a2c36a833bcc59e",
+      "reviewed_by": "Codex slot45 / streamc79 / helper1795 review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:04:36.257Z"
     }
   ]
 }

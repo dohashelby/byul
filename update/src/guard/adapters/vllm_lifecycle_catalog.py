@@ -11,6 +11,7 @@ from . import vllm_baseline_startup_composition as startup
 from . import vllm_baseline_startup as startup_native
 from . import vllm_baseline_profiler_composition as direct_profiler
 from . import vllm_baseline_profiler as profiler_native
+from . import vllm_baseline_stream_composition as baseline_stream
 
 
 def _catalog():
@@ -18,6 +19,7 @@ def _catalog():
     if data.get('schema') != 'guard-native-release-rows/1':
         raise ValueError('LIFECYCLE_CATALOG_INVALID')
     rows = data['profiles']
+    baseline = next((row for row in rows if row.get('profile') == baseline_stream.BASE_PROFILE), None)
     if len({row['profile'] for row in rows}) != len(rows):
         raise ValueError('LIFECYCLE_CATALOG_INVALID')
     for row in rows:
@@ -48,6 +50,17 @@ def _catalog():
                 or row['sources'] != {profiler_native.WORKER: {'sha256': profiler_native.SOURCE['sha256'],
                     'bytes': profiler_native.SOURCE['bytes'], 'classes': {}}} or row['void_return_argument_ids'] != []):
             raise ValueError('LIFECYCLE_PROFILER_CATALOG_INVALID')
+        if 'baseline_stream' in row and (baseline is None or row['baseline_stream'] != 'uvicorn-0.34-wheel-source'
+                or row['profile'] != baseline_stream.PROFILE or row['schema'] != baseline_stream.SCHEMA
+                or row['version'] != baseline['version'] or row['commit'] != baseline['commit']
+                or row['images'] != baseline['images'] or row['runtimes'] != baseline['runtimes']
+                or row.get('request_binding') != baseline.get('request_binding')
+                or row['void_return_argument_ids'] != baseline['void_return_argument_ids']
+                or {name: source for name, source in row['sources'].items() if name not in baseline_stream.SOURCE_ROWS}
+                   != baseline['sources']
+                or any(row['sources'].get(name) != source
+                       for name, source in baseline_stream.SOURCE_LAYOUT.items())):
+            raise ValueError('LIFECYCLE_STREAM_CATALOG_INVALID')
         binding = row.get('request_binding')
         if binding is not None and (type(binding) is not dict or set(binding) != {
                 'handler_point', 'selection_point', 'caller_point', 'input_point',
@@ -97,14 +110,22 @@ def profiler_observation(profile):
     return contains(profile) and row(profile).get('baseline_profiler') == 'worker-direct-torch'
 
 
+def stream_observation(profile):
+    return contains(profile) and row(profile).get('baseline_stream') == 'uvicorn-0.34-wheel-source'
+
+
 def startup_assets(profile):
     dependencies = {filename: (logical, digest) for logical, (filename, digest) in startup.DEPENDENCIES.items()} if startup_observation(profile) or profiler_observation(profile) else {}
     return dependencies | (direct_profiler.EXTRA_ASSETS if profiler_observation(profile) else {})
 
 
+def stream_assets(profile):
+    return {'guard_stream_buffer_extension.py': ('vllm_stream_buffer_sensor', baseline_stream.EXTENSION_SHA256)} if stream_observation(profile) else {}
+
+
 def asset_names(profile):
     return {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py', 'sitecustomize.py', 'settings.json'} | (
-        {'request-binding-key.json'} if request_binding(profile) else set()) | set(startup_assets(profile))
+        {'request-binding-key.json'} if request_binding(profile) else set()) | set(startup_assets(profile)) | set(stream_assets(profile))
 
 
 def render_source(profile, *, request_key_sha256=None):
@@ -123,6 +144,8 @@ def render_source(profile, *, request_key_sha256=None):
         extension += b'\n' + Path(startup.__file__).read_bytes()
     if profiler_observation(profile):
         extension += b'\n' + Path(startup.__file__).read_bytes() + b'\n' + Path(direct_profiler.__file__).read_bytes()
+    if stream_observation(profile):
+        extension += b'\n' + Path(baseline_stream.__file__).read_bytes()
     return Path(template.__file__).read_bytes() + extension + (
         '\nSPEC = ' + repr(spec) + "\nif __name__ == '__main__':\n    main()\n").encode()
 

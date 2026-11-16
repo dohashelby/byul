@@ -2,7 +2,7 @@
 from copy import deepcopy
 import hashlib
 import pytest
-from serving_runtime.mvp.update_engine_link import project_termination
+from serving_runtime.bridge_update.update_engine_link import project_termination
 from tests.test_request_termination_projection23 import packet,EXT
 
 RID='f'*32;UPSTREAM='byul-cb-'+RID

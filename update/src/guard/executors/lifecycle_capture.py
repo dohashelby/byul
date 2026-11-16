@@ -32,6 +32,7 @@ from guard.adapters import vllm_profiler_sensor as profiler_sensor,vllm_profiler
 from guard.adapters import vllm_release_observation_sensor as release_observation
 from guard.adapters import vllm_baseline_startup as baseline_startup
 from guard.adapters import vllm_baseline_profiler as baseline_profiler
+from guard.adapters import vllm_baseline_stream_composition as baseline_stream
 from guard.collectors import baseline_startup as baseline_startup_input
 from guard.adapters import vllm_file_read_sensor as read_sensor,vllm_file_read_metadata as read_metadata
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor,vllm_weight_iteration_metadata as weight_metadata
@@ -123,15 +124,16 @@ def parse_recording(raw, prepared):
     is_generation = prepared["profile"] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_online = prepared["profile"] == online.PROFILE
     is_output = prepared["profile"] == output_sensor.PROFILE
-    is_stream = prepared["profile"] in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE}
+    is_stream = prepared["profile"] in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE,baseline_stream.PROFILE}
     is_rank = prepared["profile"]in {fault_sensor.PROFILE,rank_sensor.PROFILE}
     is_read = prepared["profile"] == read_sensor.PROFILE
     is_worker_startup = prepared["profile"] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_mapping = prepared["profile"] in {mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_weight = prepared["profile"] in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_profiler = prepared["profile"] in {profiler_sensor.PROFILE,release_observation.PROFILER_PROFILE}
-    base_profile = release_sensor.PROFILE if prepared['profile'] in {release_observation.STREAM_PROFILE,
-        release_observation.PROFILER_PROFILE} else prepared['profile']
+    base_profile = (release_sensor.PROFILE if prepared['profile'] in {release_observation.STREAM_PROFILE,
+        release_observation.PROFILER_PROFILE} else baseline_stream.BASE_PROFILE
+        if prepared['profile'] == baseline_stream.PROFILE else prepared['profile'])
     is_init = prepared["profile"] in {init_release.PROFILE,init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_attempt = prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
     if type(raw) is not bytes or not 0 < len(raw) <= (termination_sensor.MAX_BYTES if is_termination else weight_sensor.MAX_BYTES if is_weight else profiler_sensor.MAX_BYTES if is_profiler else init_sensor.MAX_BYTES if is_init else rank_sensor.MAX_BYTES if is_rank else stream_sensor.MAX_BYTES if is_stream else attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES):
@@ -192,7 +194,10 @@ def parse_recording(raw, prepared):
     if is_stream:
         keys=keys|stream_metadata.FIELDS
         words=words|{'STREAM_BUFFER',stream_sensor.STREAM_SCHEMA,*stream_sensor.PHASES,*stream_sensor.SOURCE_ADDITIONS,
-            *stream_sensor.RUNTIME_CODE_CONTRACTS,'unsupported','asyncio-selector-tcp'}
+            *(baseline_stream.RUNTIME_CODES if prepared['profile'] == baseline_stream.PROFILE else stream_sensor.RUNTIME_CODE_CONTRACTS),
+            'unsupported','asyncio-selector-tcp'}
+        if prepared['profile'] == baseline_stream.PROFILE:
+            words = words | {*baseline_stream.SOURCE_ROWS, *baseline_stream.RUNTIME_CODES.values()}
     if is_rank:
         keys=keys|rank_metadata.FIELDS
         words=words|{"RANK_FAILURE",rank_sensor.EVENT_SCHEMA,*rank_sensor.POINTS,*rank_sensor.SOURCES,*rank_sensor.RUNTIME_CODE_CONTRACTS,
@@ -384,7 +389,9 @@ def parse_recording(raw, prepared):
                 raise ValueError('RANK_FAILURE_RUNTIME_MISMATCH')
             rank_runtime=payload['observer_runtime'];rank_events+=1
         if row['event']=='STREAM_BUFFER':
-            stream_metadata.validate_sample(payload)
+            sources = baseline_stream.SOURCE_ROWS if prepared['profile'] == baseline_stream.PROFILE else None
+            runtime_codes = baseline_stream.RUNTIME_CODES if sources else None
+            stream_metadata.validate_sample(payload, sources=sources, runtime_codes=runtime_codes)
             if not is_stream or payload['source_verified'] and payload['source_module'] not in ready:
                 raise ValueError('STREAM_BUFFER_SOURCE_PROVENANCE_UNAVAILABLE')
             if payload['operation_finished_ns'] is not None and payload['operation_finished_ns']>row['monotonic_ns']:
@@ -591,7 +598,8 @@ def parse_recording(raw, prepared):
         **({'rank_observer_runtime':rank_runtime,'rank_event_count':rank_events,
             'rank_observer_code_sha256':rank_sensor.RUNTIME_CODE_CONTRACTS.get(rank_runtime)} if is_rank else {}),
         **({'stream_observer_runtime':stream_runtime,'stream_event_count':stream_events,
-            'stream_observer_code_sha256':stream_sensor.RUNTIME_CODE_CONTRACTS.get(stream_runtime)} if is_stream else {}),
+            'stream_observer_code_sha256':(baseline_stream.RUNTIME_CODES.get(stream_runtime)
+                if prepared['profile'] == baseline_stream.PROFILE else stream_sensor.RUNTIME_CODE_CONTRACTS.get(stream_runtime))} if is_stream else {}),
         **({"output_observer_runtime":output_runtime,"output_event_count":output_events,
             "output_incomplete_calls":sum(v["calls"]!=1 or v["ends"]!=1 for v in output_calls.values()),
             "output_observer_code_sha256":output_sensor.RUNTIME_CODE_CONTRACTS.get(output_runtime)} if is_output else {}),
@@ -648,7 +656,7 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     is_termination=prepared["profile"]in {fault_sensor.PROFILE,termination_sensor.PROFILE}
     is_online = prepared["profile"] == online.PROFILE
     is_attempt=prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
-    is_stream=prepared["profile"] in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE}
+    is_stream=prepared["profile"] in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE,baseline_stream.PROFILE}
     is_rank=prepared["profile"]==rank_sensor.PROFILE
     is_weight=prepared["profile"] in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_profiler=prepared["profile"] in {profiler_sensor.PROFILE,release_observation.PROFILER_PROFILE}

@@ -326,6 +326,165 @@
       "engine_mode": "V1",
       "baseline_profiler": "worker-direct-torch",
       "profiler_image": "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
+    },
+    {
+      "profile": "vllm-native-lifecycle-metadata/33",
+      "schema": "guard-native-lifecycle-events/33",
+      "engine": "vllm",
+      "version": "0.7.0",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+        "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
+      ],
+      "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8",
+      "runtimes": {
+        "cpython-3.12.3": [
+          "posix"
+        ],
+        "cpython-3.12.8": [
+          "posix"
+        ]
+      },
+      "sources": {
+        "vllm.v1.core.scheduler": {
+          "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985",
+          "bytes": 26643,
+          "classes": {
+            "Scheduler": [
+              "add_request",
+              "finish_requests",
+              "_free_request"
+            ]
+          }
+        },
+        "vllm.v1.core.kv_cache_manager": {
+          "sha256": "39f087609c2049d6383d45ae098d5b5a54749d32f14ab6d4cf779d3f54390355",
+          "bytes": 22785,
+          "classes": {
+            "KVCacheManager": [
+              "free"
+            ]
+          }
+        },
+        "vllm.v1.engine.processor": {
+          "sha256": "b3b66559ce98fb31f89a1ca3a8b9b4d7bc942df090305ea5f765d8bcf21e5d43",
+          "bytes": 9515,
+          "classes": {
+            "Processor": [
+              "process_inputs"
+            ]
+          }
+        },
+        "vllm.v1.engine.async_llm": {
+          "sha256": "c6386700282f55a46b1f103331020e5713d59acf06b12a3e64b0eca40a3aa9b7",
+          "bytes": 14054,
+          "classes": {
+            "AsyncLLM": [
+              "abort",
+              "add_request"
+            ]
+          }
+        },
+        "vllm.v1.engine.core": {
+          "sha256": "091b574c562202ccc60139e3d1a9cdd29f0fd33cbffa286ca4ae76f460ee3a16",
+          "bytes": 11486,
+          "classes": {
+            "EngineCore": [
+              "abort_requests"
+            ]
+          }
+        },
+        "vllm.v1.engine.output_processor": {
+          "sha256": "12baa6cb772527d52b0fe4e0b69b12d9365dec280f20395dadc7286593ce99ce",
+          "bytes": 7214,
+          "classes": {
+            "OutputProcessor": [
+              "add_request",
+              "abort_requests"
+            ]
+          }
+        },
+        "vllm.v1.worker.gpu_input_batch": {
+          "sha256": "89770d22d9398a061d96e4aa547a8afbacaf0eeff589e1dcf3df45503a4ab40c",
+          "bytes": 18246,
+          "classes": {
+            "InputBatch": [
+              "remove_request"
+            ]
+          }
+        },
+        "vllm.v1.worker.gpu_model_runner": {
+          "sha256": "1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813",
+          "bytes": 51313,
+          "classes": {
+            "GPUModelRunner": [
+              "_update_states",
+              "execute_model",
+              "load_model",
+              "get_model"
+            ]
+          }
+        },
+        "vllm.entrypoints.openai.serving_engine": {
+          "sha256": "ac5e16bc8bc63b6f16a6f78509f0e773056be57dcfdc5f810c91dc3bbbd7282b",
+          "bytes": 20568,
+          "classes": {
+            "OpenAIServing": [
+              "_base_request_id",
+              "_log_inputs"
+            ]
+          }
+        },
+        "vllm.entrypoints.openai.serving_completion": {
+          "sha256": "95184b6b6ceaa3642e6ab86526536ab890728155a929d9dfb3b2f16adc372018",
+          "bytes": 22662,
+          "classes": {
+            "OpenAIServingCompletion": [
+              "create_completion"
+            ]
+          }
+        },
+        "uvicorn.protocols.http.h11_impl": {
+          "sha256": "e1bf8ab302b9ec505a44f7875e52bfa32f2928ceaf1b585a00b0887911fed5b0",
+          "bytes": 20694,
+          "classes": {
+          }
+        },
+        "uvicorn.protocols.http.httptools_impl": {
+          "sha256": "b6e4010a20faadfe4341ec90c0755ce39af11fda2ea233299178bd286e8d4419",
+          "bytes": 21805,
+          "classes": {
+          }
+        },
+        "uvicorn.protocols.http.flow_control": {
+          "sha256": "d39d16560df512f3ce907c329c2a0c3f5cd7165fef3b753876eae5739bf2a785",
+          "bytes": 1701,
+          "classes": {
+          }
+        }
+      },
+      "void_return_argument_ids": [
+        "Scheduler.finish_requests",
+        "OutputProcessor.abort_requests",
+        "EngineCore.abort_requests"
+      ],
+      "review": "원 함수·frame/globals/self/owner·live ASGI scope와 입력 ID를 함께 대조하는 후속 관측. 기존 profile/원본 bytes는 보존하고 실제 엔진/worker/그룹·수락·등록을 주장하지 않는다.",
+      "installation_review": "docs/dev-1/ma3-image-qualification-20261114.json",
+      "scope": "Exact 0.7.0 V1 /28 native request HMAC plus Uvicorn 0.34.0 wheel source-bound stream samples; installed Uvicorn Python bytes and full buffer release unverified",
+      "engine_mode": "V1",
+      "request_binding": {
+        "handler_point": "OpenAIServingCompletion.create_completion",
+        "selection_point": "OpenAIServing._base_request_id",
+        "caller_point": "AsyncLLM.add_request",
+        "input_point": "Processor.process_inputs",
+        "engine_attribute": "engine_client",
+        "processor_attribute": "processor",
+        "native_prefix": "cmpl-",
+        "entry_path": "/v1/completions",
+        "entry_method": "POST",
+        "native_selection_point": "OpenAIServing._log_inputs"
+      },
+      "baseline_stream": "uvicorn-0.34-wheel-source"
     }
   ]
 }

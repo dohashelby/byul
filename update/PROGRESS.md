@@ -5,6 +5,53 @@
 - 다음 단계: CI 확인 뒤 공용 계약 변경의 사용자 검토. SUP-08 0.30.0 FAIL은 `security: FAIL because code_selection_confirmed_violations nonempty (observed …)`로 표시된다. 사람이 읽는 설명이 필요하면 팩 규칙 데이터에 설명 필드를 두는 안을 따로 검토한다.
 - 막힌 것: 없음. 과거 RPT에는 이유가 없으므로 다시 보고서를 만들어야 표시된다.
 
+## 2026-11-16 — 프로파일러 local segment의 소유 callback 연결
+
+- 한 일: 검토된54de2366 router를 기존 callback 준비 경로의 기본 False 옵션으로 연결했다. 명시적 검토 image 선택을 요구하고 실제 로드된 API2/core3 module만 각 segment에 전달한다. engine 추가 import·원격 요청 연결·프로파일러 실행을 하지 않는다. raw source record는 기존 sink로 보내며 엄격한 local consumer의 실제 원 함수 경로 회귀를 추가했다.
+- 경계: 기존 profiler_control과의 같은 지점 소유를 분리한다. 부모의 sink를 상속한 callback은 fork 후 router를 재설치하지 않고 원 함수로 통과하며, 자식 소유 sink/새 installer 없음을 전체 관측으로 올리지 않는다. 기존 auxiliary 경로와 다른 callback 지점은 보존한다.
+- 검증/다음 단계: 생산 연결44b5115b의 집중 정적 검토에서 blocker가 없고 source578개 목록·고유 영수증을 고정했다. 사용자가97830616의 sampler·graph·attention·profiler 묶음을 #288에 추가 push하도록 승인했다. 정확 공개 head의 GitHub Linux CI를 확인한다. 로컬 Python/pytest·기타 테스트 실행은 하지 않았다. GitHub Linux CI에서만 검증한다.
+
+## 2026-11-16 — 기준 attention 메타데이터의 명시적 준비 연결
+
+- 한 일: 검토한1194698c의 실제 준비 반환→attention 입력/분기·반환 사실과000beb96의 프로세스별 profiler local call을 미공개 통합 분기에 보존했다. attention은 기존 callback 경로에 기본 False인 명시 옵션으로만 넣고 정확 source/공유 키·소유 sink·직접 consumer 회귀를 연결했다. source 지점 목록은 같은 runner의 sampling 지점을 덮지 않고 합친다.
+- 경계: NumPy scalar interface·실제 native op/library·tensor 범위·초기화·GPU 완료는 검증하지 않았다. profiler local call은 API와 core 내부 segment만 관측하며 원격 causal/RPC 전체·auth·출력 완료는 미확인이다. /15·/31·/32·과거 private pins·기존 기본 실행기 gate를 유지한다.
+- 다음 단계: 생산 연결 집중 검토와 최종 source 목록 고정 후 같은 #288의 후속 범위 공개를 별도 요청한다. 공개된7145627e의 CI는 이 미공개 source의 검증으로 세지 않는다. 로컬 Python/pytest·GPU는 실행하지 않았다.
+
+## 2026-11-16 — 기준 sampler·piecewise 관측의 다음 로컬 통합
+
+- 한 일: 고정599494ed·보완35771d72의 sampler 연결과 graph90963b4e를 별도 미공개 분기에 통합했다. sampler는 이동 전 기록의 잘못된 재연결·기본 restricted 의미 변경·단계별 안정성 누락·필수 child 관측 누락을 집중 검토 뒤 보완했다. graph는 고유 session/process/call/source/code/time pair와 비어 있지 않은 객체 세대를 요구한다.
+- 연결: graph를 기존 engine callback 준비 자산·import installer·소유 스트리밍 sink·gap 배출에 opt-in으로 넣었다. 기본값은 False이며 sampler·graph 직접 회귀를 CPython3.12.8 CI 목록에 추가했다. 이 분기는 공개 승인/CI 전이고 #288의 공개 snapshot과 구분한다.
+- 검증/다음 단계: 두 고정 소스의 정적 집중 검토는 blocker가 없다. 새 graph 생산 연결은 추가 검토하며 최종 source 목록은 후속 묶음 고정 뒤 갱신한다. 로컬 Python/pytest는 실행하지 않았다. REQ19의 bounded metadata/lineage와 기준 profiler local call 경로는 독립 개발을 계속한다.
+
+## 2026-11-16 — #288 기존 fixture 증거 경로 보존
+
+- 결과: head7145627e CPython3.12.8은1 failed·180 passed(pytest10.81초·부모11.577초)였다. 공용 case가 이미 소유한 assets 디렉터리에 새 /33 자산을 만들려 해 기존 증거 덮어쓰기 거부가 올바르게 동작했다.
+- 보수: 새 stream 자산은 별도 baseline-stream/assets 아래에 준비하고 기존 case evidence를 보존한다. 덮어쓰기 거부·기존 assert·제품 source/관문은 바꾸지 않았다. 기본 suite 결과도 수집해 같은 PR의 시험 보수로 재검증한다. 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-16 — #288 기준 전용 슬롯 대상과 후보 계약 분리
+
+- 원 결과: head31954efe 기본 suite는3 failed·13792 passed·기존34 skipped·10 warnings·1 error(pytest627.85초·부모628.717초)였다. stream 두 시험의 fixture/envelope 오류 외에 기준 전용 clear를 후보 판본 대상 목록에도 광고한 충돌과, 새 승인 대기 원인을 이전 원인 집합만 받던 시험의 불일치가 있었다. 원 로그 SHA d47fd0eb72157f5371e2bac4184225b10594a1c2ec2992670e1d21024874af90.
+- 보수: SlotObserver의 공통 class 대상은 기존 두 함수 그대로이며 정확 baseline pin을 선택한 instance에서만 추가 함수를 감싼다. 후보의 추가 함수 거부와 class 대상 불변을 직접 검사한다. stream은 기본 gate를 계속 닫고 기준 stream 한 쌍에서 승인 대기 원인·basis·next를 정확히 요구한다. 다른 원인 집합·assert·판정/수락 기준은 유지했다.
+- 검토/검증: 2de0a45b·fixture 보수45764f2e 집중 정적 검토에서 blocker가 없었으며 source574개 목록/고유 영수증을 고정했다. 승인된 같은 PR의 원인 보수로 공개한다. 로컬 Python/pytest·GPU 실측은 실행하지 않았다.
+
+## 2026-11-16 — #288 stream 회귀의 fixture 연결 보수
+
+- 결과: head31954efe에서 catalog import 차단이 해소돼 Docker stub·platform 계약 검사가 통과했다. CPython3.12.8은1 failed·179 passed·1 error(pytest11.10초·부모11.907초)다. 새 시험이 공용 case에 필요한 external/writer_factory fixture를 import하지 않았고, 다른 새 시험이 기록 envelope의 source_module을 payload 밖에서 찾았다.
+- 보수: 필요한 두 fixture를 명시적으로 가져오고 실제 envelope의 payload.source_module을 고른다. 기존 assert·기대값·제품 소스·엄격한 source 목록·관문은 바꾸지 않았다. 기본 suite가 진행 중이므로 원 결과를 확인한 뒤 같은 시험 보수 snapshot을 공개한다. 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-16 — #288 첫 CI의 stream/native 지점 충돌 보수
+
+- 원 결과: 공개 head eefd7c21의 기본 suite는169 failed·4378 passed·1336 errors·6 warnings(pytest116.27초·부모117.502초)였다. /33에 넣은 두 Uvicorn 구현의 RequestResponseCycle 동명 메서드가 일반 native 지점 목록의 기존 중복 검사를 통과하지 못해 import가 연쇄 실패했다. Docker stub도 같은 오류로 수집 단계에서1 error였다. 이 결과를 테스트 통과로 집계하지 않는다.
+- 보수: 일반 지점 중복 검사를 유지하고 /33의 Uvicorn 행은 정확 source SHA/크기만 고정한다. 실제 stream hook은 기존 /12 전용 installer의 module-qualified TARGETS와 정확 source/code 검증을 사용한다. native point 목록은 /28과 같고 새로운 중복 native 지점은 계속 거부하는 직접 회귀를 더했다. 원 /12 bytes·기존 private pins·HMAC/runtime·기본 gate는 보존했다.
+- 검토/검증: 1b902eca 정적 집중 검토에서 blocker가 없었으며 source 목록·고유 영수증을 갱신했다. 로컬 Python/pytest는 실행하지 않았다. 승인된 같은 PR의 CI 원인 보수로 공개해 재검증한다.
+
+## 2026-11-16 — 병합 뒤 슬롯·stream 보완과 고정 helper 보존
+
+- 한 일: 다른 세션이 병합한 main3aab9c8c 위에 검토된 슬롯 이동/불확실 경계 보완과 기준 stream /33 준비를 옮겼다. CPython3.12.8 CI의 임시 pycache·rank 시험과 stream 시험을 함께 보존했다. /31·/32는 과거 rank helper bfa843de bytes를 별도 고정 자료로 준비하고 host 측 경로만 선택해, 현재 M-A3 helper 확장과 기존 비공개 의존 파일·rendered profile을 함께 보존한다.
+- 테스트 결과: #284 마지막 head821dc10f의 update-default·CPython3.12.8 CI 실패를 확인했다. 원 로그의 기본11 failed·13753 passed·기존34 skipped(pytest966.44초·부모967.525초), ABI11 failed·159 passed(pytest10.26초·부모11.040초)는 모두 같은 고정 의존 파일 오류다. 새 보완은 CI 미실행이다. 로컬 Python/pytest는 실행하지 않았다. 정확 고정 helper SHA와 통합 diff는 셸로 대조했다.
+- 다음 단계: slot45·streamc79·helper1795 집중 검토를 마쳤고 574개 source 목록과 고유 검토 행을 고정했다. 사용자가618c36ba의 push·새 draft PR 생성을 승인했으며 정확 공개 head의 CI를 확인한다. REQ18 batch→metadata→sampler lineage와 REQ20 개발을 계속한다. REQ20의 실제 piecewise capture/replay 분기는 별도 독립 개발한다.
+- 막힌 것: /33 기본 stream gate는 BASELINE_STREAM_DEFAULT_GATE_PENDING_APPROVAL로 닫혀 있다. 실제 이미지 설치 소스·GPU 관측·생산자 등록·공식 RPT는 준비/CI와 별개다.
+
 ## 2026-11-16 — PR #284 일괄 통합·기존 실패 두 건 보수
 
 - 한 일: main47bee7fc의 #283·#285·#286을 통합했다. 문서·검토 영수증·원 fixture 출처를 양쪽 보존하고 CPython 3.12.8 CI의 임시 pycache와 두 PR의 직접 시험 목록을 함께 유지했다. 캐시 시험의 kwargs 인자 누락과 SlotObserver의 스트리밍 sink 미수집만 고쳤다. 기존 assert·UNKNOWN·판정 조건과 제품 소스 범위는 유지했다. 별도 worktree의 미공개 슬롯 이동 후속 커밋은 이번 병합에 넣지 않았다.
@@ -3092,9 +3139,33 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 fixture 소스 몸체의 기본/소스 불일치 경로를 기존 소비자에 전달하는 새 회귀 시험은 CI에서 검증한다. 로컬에서는 shell SHA·diff 검사만 한다.
 - 다음 단계: 집중 소스 검토 후 CI에서 실제 반환 형태·보수적 투영·기존 프로필 회귀를 확인한다.
 - 집중 검토 후속: REQ-17에서 cache 비활성화의 정확 원 생산자 0-token 행을 기존 timing 소비자에 전달해 빠른 대조만으로 정상/전체 범위가 되는 공백을 막았다. control-present의 native 적중이 확인되지 않으면 UNKNOWN으로 남긴다. CI 실행 전이다.
+- 독립 후속: 기준 V1 `InputBatch.condense`·`clear`를 정확 소스에서만 설치하고 전후 요청/자리 mapping을 세션 키 지문으로 기록한다. 실제 이동과 회수 자리를 REQ-18의 재사용 후보에 반영하지만 sampler 최종 상태·소비가 없어 verdict/full_scope는 UNKNOWN으로 유지한다. 원 0.31.0 설치 지점은 늘리지 않았다. 실제 소스 몸체의 이동/초기화 기록을 소비자에 전달하는 회귀는 CI 대상이며 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-15 — M-A6 기준 V1 `/33` stream 구성 (로컬 준비)
+
+- 한 일: 사용자 승인으로 받은 단일 Uvicorn 0.34.0 wheel의 세 Python 원본을 검증된 SHA로 fixture에 보존하고, 기존 `/28` HMAC composition 뒤에 원본 `/12` stream 확장을 비공개 정확 bytes로 읽는 새 구성 코드를 추가했다. 새 구성은 0.34.0 Uvicorn 세 소스 행과 검토된 CPython 3.12.8 stream 코드 지문만 선택한다. 기존 `/12`·`/29` 코드/정책은 유지한다.
+- 경계: wheel metadata는 기준 이미지 dist metadata와 일치하지만 이미지 Python 세 파일은 아직 미대조라 source 후보이다. 개인 키/확장 실패는 hook 전에 중단한다. stream 요청 식별은 `/28`과 같은 세션 HMAC이며 raw SHA를 새 stream 행에 넣지 않는다. buffer 전체 목록·client close release epoch·실제 이미지/GPU 자격은 미검증이다.
+- 테스트 결과: 로컬 Python/pytest는 사용자 지시로 실행하지 않았다. 실제 0.34.0 h11 함수 몸체의 stream 생산자·기존 소비자, 엄격한 header HMAC, private key 선행 실패와 소스 변조 거부 회귀는 CI 대상이다. 로컬 shell SHA·diff/JSON 검증만 한다.
+- 후속 연결: profiler `/32` 고정 source를 병합한 뒤 lifecycle catalog·준비 자산·recording parser·stream 소비자·Kubernetes 실행기의 명시적 `/33` 경로를 연결했다. 기존 `/12`·`/29`의 source/runtime 기본값은 유지하고 `/33`에서만 새 행·3.12.8 ABI·HMAC 준비 키를 선택한다. 실제 함수 body→parser→기존 소비자와 파일/키 변조 회귀는 새 head CI 대상이다. WORK_ORDER 7절의 후속 승인 경계에 따라 기준 0.7.0 기본 stream 실행기 gate는 닫혀 있다.
+- 다음 단계: 고정 source 집중 검토와 CI 뒤 `/33` 기본 gate 활성화 여부를 사용자에게 별도 결정받는다. 실제 이미지 Python 파일 대조/생산자 등록/GPU 실측도 별개다.
+- 집중 검토 보수: `/33`의 runtime 계약은 CPython 3.12.3·3.12.8 두 행만 받도록 독립 표로 고정했다. 원 `/12`의 3.12.14·3.12.15 행은 새 parser·소비자에도 상속하지 않으며 실제 생산 record의 runtime 변조 재체인 거부를 CI에 넣었다. 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-16 M-A6 기준 REQ-20 PiecewiseBackend source 후보
+
+- `0.7.0`의 정확 `vllm.compilation.backends.PiecewiseBackend.__call__` 소스 SHA·size를 fixture와 새 adapter에 고정했다. 기존 source-qualified wrapper로 실제 일반/미지원/replay/예외 함수 body가 만든 CALL·RETURN·RAISE record를 adapter projection에 연결했다.
+- 얻은 사실은 shape별 replay 분기와 cached `entry.output` 객체 반환뿐이다. copied 입력 갱신, 요청별 sample 소비, 값 보존, GPU 완료·독립 graph-off 대조는 관측하지 않았다. 기존 V2 판정과 baseline default gate는 유지한다. M-B4 보류도 유지한다.
+- 로컬 Python/pytest는 사용자 지시로 실행하지 않았다. 정확 source/live code 변조 거부와 기본/미지원 producer→consumer 회귀는 CI 대상이다.
+- 집중 검토 보수: 부분 replay·capture 사실은 동일 세션/프로세스/소스/코드/entry 세대의 유일하고 시간순인 CALL·종결 쌍에서만 인정한다. graph/output 토큰이 없거나 바뀌면 count하지 않는다. 실제 함수 body의 capture→replay와 누락·중복·재정렬·타 세션/소스/코드/시간·용량 부족 record를 새 소비자에 넣는 회귀를 추가했다. fixture에 원 LICENSE와 provenance를 보존했다.
 
 ## 2026-11-16 — PR287 startup 의존 소스 검토
 
 - 한 일: CI의 update-default·observer 11개 실패를 추적했다. 8bac1ab3에서 원 함수·파일 검증을 `_qualified`로 옮기고 별도 V1 검토 경로를 추가했지만 startup의 의존 소스 고정값은 이전 bytes를 가리켰다. 이전 소스 원본을 시험 자료로 보존하고, 공유 함수·기존 qualify의 관문/본문/거부 처리를 AST로 대조하는 회귀와 전체 7개 의존 bytes 검사를 추가했다. 검토한 현재 소스를 정확히 지정하도록 startup 고정값과 소스 목록·검토 기록을 갱신했다.
 - 검증 경계: 기존 시험·단언·해시/심볼릭 링크 거부·인터프리터 제한은 유지한다. 새 회귀를 별도 3.12.8 job에도 포함했다. 로컬 Python·pytest는 실행하지 않았으며 Linux CI 결과를 기다린다.
 - 다음 단계: 두 update job과 나머지 CI를 끝까지 확인한다. 실제 엔진·GPU 실행 및 생산자 등록 변경은 없다.
+
+## 2026-11-16 — #288 main 통합과 CI 22건 보수
+
+- 한 일: main(#287)을 병합했다. startup helper 고정값은 사용자 결정(2026-11-16)에 따라 main 방식(현재 `vllm_rank_ipc_sources.py` bytes `d54a7984…`)을 따른다. #288의 이전 bytes 보존 자산(`startup_rank_ipc_sources_bfa843de.py.txt`), `dependency_source_path` 분기와 그 전용 시험 1개를 뺐다. 이전 bytes는 main의 검토 fixture(`tests/fixtures/baseline-startup-review/`)에 남아 있다. `/33` stream 자산 경로는 그대로다.
+- 실패 원인과 보수: (1) profiler 15건 — 0.7.0 `_handle_client_request`는 `EngineCoreProc`에 정의돼 있는데 관측 지점을 `EngineCore.`로 적어 정확 소스에서 함수를 찾지 못했다. 지점 이름을 `EngineCoreProc._handle_client_request`로 고쳤다(시험 도우미·설계 문서 포함). (2) graph 7건 — `base.attrs()`가 dict가 아닌 `Fields`(`.get`만 제공)를 반환하는데 snapshot이 `state['…']`로 읽어 예외가 났고 CALL·종결 필드가 비었다. `.get()`으로 바꿨다. 시험·단언·기대값은 바꾸지 않았다.
+- 테스트 결과: 로컬 Python/pytest는 실행하지 않았다. 소스 목록은 셸 SHA·jq로 다시 만들었고(같은 방법으로 main 목록을 바이트 단위로 재현함) Linux CI 결과를 기다린다.
+- 다음 단계: 새 head의 update-default·observer 3.12.8 job 확인.

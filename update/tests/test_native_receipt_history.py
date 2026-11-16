@@ -3,11 +3,11 @@ from copy import deepcopy
 from datetime import datetime,timezone
 import hashlib
 import pytest
-from serving_runtime.mvp import native_receipts
-from serving_runtime.mvp.collectors import CollectionFailure
-from serving_runtime.mvp.query import QueryService
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.update_engine_link import project_termination
+from serving_runtime.observation import native_receipts
+from serving_runtime.observation.collectors import CollectionFailure
+from serving_runtime.observation.query import QueryService
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.bridge_update.update_engine_link import project_termination
 from tests.test_live_termination_checkpoint import live_packet,SESSION
 from tests.test_request_termination_projection23 import EXT
 from tests.test_runtime_termination_native23 import inputs,RID,UPSTREAM,replace
@@ -111,7 +111,7 @@ def test_native_history_row_cannot_become_mock_engine_receipt(tmp_path):
 def test_native_only_held_run_survives_existing_retention_without_gateway_pair(tmp_path,monkeypatch):
     import json
     from datetime import timedelta
-    from serving_runtime.mvp.retention import RecordRetention,HOLD_SCHEMA
+    from serving_runtime.observation.retention import RecordRetention,HOLD_SCHEMA
     doc,_=document();store=JsonlStore(tmp_path/'engine_receipts.jsonl')
     monkeypatch.setattr(native_receipts,'read_host_feed',lambda *a:deepcopy(doc))
     reader=feed(store);reader.collect()

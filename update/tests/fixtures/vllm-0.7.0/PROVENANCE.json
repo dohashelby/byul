@@ -74,6 +74,38 @@
     "vllm/v1/worker/gpu_worker.py.txt": {
       "source": "vllm/v1/worker/gpu_worker.py",
       "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a"
+    },
+    "vllm/v1/sample/sampler.py.txt": {
+      "source": "vllm/v1/sample/sampler.py",
+      "sha256": "9082d291c73104024f5658d5858393aedc192d3d4a7ebfd3d415a249c4d4f019"
+    },
+    "vllm/v1/sample/metadata.py.txt": {
+      "source": "vllm/v1/sample/metadata.py",
+      "sha256": "98e600dee71a9f06a190bb748124b57ca78adb01614417142adc0a9640734afd"
+    },
+    "vllm/v1/sample/ops/topk_topp_sampler.py.txt": {
+      "source": "vllm/v1/sample/ops/topk_topp_sampler.py",
+      "sha256": "eb5b602f5ebd06ac116f927a608db7e2f20234d4fea233d6b6e3feec69d5501c"
+    },
+    "vllm/model_executor/models/qwen2.py.txt": {
+      "source": "vllm/model_executor/models/qwen2.py",
+      "sha256": "10015a92c8ed412de2cb33ade19067fd71f628a7ac5e45792feced88b60e37c6"
+    },
+    "vllm/model_executor/models/llama.py.txt": {
+      "source": "vllm/model_executor/models/llama.py",
+      "sha256": "723d0728fd985f9a9b0197fc888f6e74de65ff2c84ab15c18a17d6d2b6016144"
+    },
+    "vllm/sampling_params.py.txt": {
+      "source": "vllm/sampling_params.py",
+      "sha256": "c43343b437b675d4ed5dd16479636db1f621a3a408a30b81817923913419aa62"
+    },
+    "vllm/v1/attention/backends/flash_attn.py.txt": {
+      "source": "vllm/v1/attention/backends/flash_attn.py",
+      "sha256": "8fe8b9b56dfbefd5db474df21f81c9cbda11f9a49cb611e7d41a0ffc298627ee"
+    },
+    "csrc/cache_kernels.cu.txt": {
+      "source": "csrc/cache_kernels.cu",
+      "sha256": "63393506877eb333debb5df93b6f4f9f396d7e61ae90ef62fa2e67a4c069efad"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

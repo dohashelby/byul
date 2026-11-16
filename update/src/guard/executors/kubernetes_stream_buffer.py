@@ -6,6 +6,8 @@ from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_stream_buffer_http import KubernetesStreamBufferHTTP,HTTP_PROFILE,SLOTS
 from guard.adapters import vllm_stream_buffer_sensor as sensor,vllm_stream_buffer_metadata as metadata
 from guard.adapters import vllm_release_observation_sensor as release_observation
+from guard.adapters import vllm_lifecycle_catalog as configured
+from guard.adapters import vllm_baseline_stream_composition as baseline_stream
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
@@ -39,7 +41,7 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
             digest=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end,profiles=normalize_policy(policy_values)
             if (digest!=policy_values['buffer_target_sha256'] or env.ref().sha256!=policy_values['buffer_environment_sha256']
                     or self.expected_target is not None and digest!=self.expected_target
-                    or prepared['profile'] not in {sensor.PROFILE,release_observation.STREAM_PROFILE}
+                    or prepared['profile'] not in {sensor.PROFILE,release_observation.STREAM_PROFILE,baseline_stream.PROFILE}
                     or sha256_hex(canonical_json(prepared))!=policy_values['buffer_prepared_sha256'] or not start<=utcnow()<=end):raise ValueError
         except (ValueError,KeyError,TypeError,RuntimeError,OSError):raise ValueError('STREAM_BUFFER_CONFIGURATION_INVALID') from None
         transport=KubernetesStreamBufferHTTP(target,env,read_profiles=profiles,runner=self.runner,
@@ -66,7 +68,8 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
             for slot in SLOTS:
                 if slot in {'normal','slow','slow-close'} and not trials[0].get('normal_shape_verified'):continue
                 rid='byul-lif04-'+token+'-'+slot;streaming=slot not in {'normal-before','normal-after'}
-                private=ctx._buffer_prepared['profile']==release_observation.STREAM_PROFILE
+                private=(ctx._buffer_prepared['profile']==release_observation.STREAM_PROFILE
+                    or configured.stream_observation(ctx._buffer_prepared['profile']))
                 try:
                     identity=(request_header_fingerprint(self.cfg['prepared'],ctx._buffer_prepared,rid)
                         if private else sha256_hex(rid.encode()))
@@ -109,7 +112,10 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
                     if not packet.get('recorded_files_covered'):diagnostics.append('STREAM_BUFFER_NATIVE_COVERAGE_UNAVAILABLE')
                     if budget_profile:rss_samples.extend(reader.sample_packet(packet,'after'))
                 except Exception:diagnostics.append('STREAM_BUFFER_CAPTURE_UNAVAILABLE')
-        projection=metadata.project(packet,trials,ctx.policy_values)
+        sources=baseline_stream.SOURCE_ROWS if configured.stream_observation(ctx._buffer_prepared['profile']) else None
+        runtime_codes=baseline_stream.RUNTIME_CODES if sources else None
+        projection=metadata.project(packet,trials,ctx.policy_values,sources=sources,runtime_codes=runtime_codes,
+            require_live_context=bool(sources))
         try:http=ctx.cprobe.report()
         except Exception:
             diagnostics.append('STREAM_BUFFER_HTTP_REPORT_UNAVAILABLE')

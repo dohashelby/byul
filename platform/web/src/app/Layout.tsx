@@ -4,9 +4,10 @@ import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { useDocList, useMeta, useRevalidation, useRuntimeStatus } from "../api/hooks";
 import { useRuntimeProblems, type RuntimeProblems } from "../pages/runtime/problems";
 import { observationState } from "../pages/runtime/parts";
-import { Banner, Dot } from "../components/Misc";
+import { Banner } from "../components/Misc";
+import { ApiError } from "../api/client";
+import type { Meta } from "../api/types";
 import { SourceExampleBanner } from "../components/SourceExampleBanner";
-import { SOURCE_MODE, label } from "../lib/labels";
 import { PERIODS, fromLocalInput, toLocalInput, type PeriodKey } from "../lib/time";
 import { carry, useGlobalFilters, useParams } from "../lib/url";
 import { AREAS, areaFor, titleFor, type AreaKey } from "./nav";
@@ -91,13 +92,10 @@ export function ThemeToggle() {
 function Sidebar({ areaKey }: { areaKey: AreaKey }) {
   const [params] = useSearchParams();
   const current = AREAS.find((a) => a.key === areaKey)!;
-  const meta = useMeta();
   const reval = useRevalidation();
   const keep = carry(params);
   const openReval = reval.data?.items.filter((r) => r.status === "open").length ?? 0;
   const problems = useRuntimeProblems();
-  const conn = meta.data?.runtime_connection ?? (meta.isError ? "disconnected" : null);
-  const connText: Record<string, string> = { connected: "연결 정상", disconnected: "연결 단절", unauthorized: "인증 거부", example: "예시 데이터" };
   const badgeOf = (key: string | undefined): number => {
     if (!key) return 0;
     if (key === "revalidation") return openReval;
@@ -152,7 +150,7 @@ function Sidebar({ areaKey }: { areaKey: AreaKey }) {
         <div className={l.footItem}>
           <Dot state={meta.data?.example_mode ? "warn" : "none"} />
           <span className={l.footText}>
-            <span>자료 출처</span>
+            <Link className={l.link} to={`/runtime/settings${keep}#system-info`}>시스템 정보</Link>
             <span className={l.navSub}>
               {meta.data
                 ? meta.data.sources.map((x) => `${x.name === "store" ? "저장소" : x.name === "evidence" ? "증거" : x.name} ${label(SOURCE_MODE, x.mode)}`).join(" · ")
@@ -181,7 +179,6 @@ function Pagebar({ areaKey }: { areaKey: AreaKey }) {
   const { period, from, to, env } = useGlobalFilters();
   const [, patch] = useParams();
   const envs = useDocList("environments");
-  const meta = useMeta();
   const qc = useQueryClient();
   const fetching = useIsFetching();
   const [refreshedAt, setRefreshedAt] = useState(() => new Date());
@@ -285,12 +282,15 @@ function pad2(n: number) {
 }
 
 /** runtime 대시보드처럼 연결이 끊기면 마지막 성공 시각과 함께 띠를 띄우고 화면을 흐리게 한다. */
-function useRuntimeStale(): string | null {
+function useRuntimeStale(connection: Meta["runtime_connection"] | undefined): string | null {
   const q = useRuntimeStatus();
-  if (!q.isError) return null;
+  if (connection === "unauthorized" || (q.isError && q.error instanceof ApiError && q.error.kind === "unauthorized")) {
+    return "런타임 인증에 실패했습니다. 조회 인증 정보를 확인하세요.";
+  }
+  if (!q.isError && connection !== "disconnected") return null;
   const last = q.dataUpdatedAt ? new Date(q.dataUpdatedAt) : null;
-  const since = last ? `마지막 수집 ${pad2(last.getHours())}시 ${pad2(last.getMinutes())}분 ${pad2(last.getSeconds())}초` : "수신 기록 없음";
-  return `런타임 연결 단절 · ${since}`;
+  const since = last ? `마지막 수집 ${pad2(last.getHours())}:${pad2(last.getMinutes())}:${pad2(last.getSeconds())}` : "수신 기록 없음";
+  return `런타임 연결 단절 · ${since}. 서버와 연결 설정을 확인하세요.`;
 }
 
 export function Layout() {
@@ -322,7 +322,8 @@ export function Layout() {
         {unavailable.length > 0 && (
           <Banner kind="unofficial">관측 불가: 해당 구간 이벤트 누락 가능 ({unavailable.join(", ")})</Banner>
         )}
-        {stale && <Banner kind="unofficial">{stale}</Banner>}
+        {meta.isError && !stale && <Banner kind="unofficial">자료 출처를 확인하지 못했습니다. 시스템 정보에서 연결 상태를 확인하세요.</Banner>}
+        {stale && <Banner kind="unofficial">{stale} <Link to="/runtime/settings#system-info">연결 설정 보기</Link></Banner>}
         <main style={stale ? { opacity: 0.5, transition: "opacity 0.2s" } : undefined}>
           <Outlet />
         </main>

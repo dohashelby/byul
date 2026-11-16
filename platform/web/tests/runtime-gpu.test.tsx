@@ -65,6 +65,8 @@ describe("현황(대시보드) 화면의 GPU 패널", () => {
     const { DashboardPage } = await import("../src/pages/DashboardPage");
     mockApi({ ...routes({ schema_version: "runtime-gpu-status/1.0", state: "not_configured", fresh: false, collected_at: null, reason: null, gpus: [] }), "/api/overview": overview });
     renderAt("/runtime/overview", "/runtime/overview", <DashboardPage />);
-    expect(await screen.findByText(/GPU 수집기가 연결되지 않았습니다/)).toBeTruthy();
+    expect(await screen.findByText(/GPU 수집이 설정되지 않았습니다/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "수집 상태 보기" })).toBeTruthy();
+    expect(screen.queryByText(/--gpu-state/)).toBeNull();
   });
 });

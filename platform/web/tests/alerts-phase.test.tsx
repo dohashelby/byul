@@ -7,7 +7,7 @@ import { AlertsPage } from "../src/pages/runtime/AlertsPage";
 import { PhaseTimelinePage } from "../src/pages/runtime/PhaseTimelinePage";
 import { groupAlerts } from "../src/lib/alerts";
 import { isTetragonOverride } from "../src/lib/tetragon";
-import { alertSeverity, GATEWAY_REASON, PHASE, EXEC_VERDICT } from "../src/lib/labels";
+import { alertSeverity, GATEWAY_REASON, GATEWAY_PRE_ENGINE_REASONS, PHASE, EXEC_VERDICT } from "../src/lib/labels";
 import type { RuntimeEvent } from "../src/api/types";
 import { SOURCE, mockApi, renderAt } from "./helpers";
 
@@ -28,8 +28,14 @@ function flagged(id: string, verdict: string): RuntimeEvent {
 }
 
 describe("알림 심각도와 묶음", () => {
-  it("Gateway 사유 59개를 전문 용어로 표시하고 미전달 사유를 명시한다", () => {
-    expect(Object.keys(GATEWAY_REASON)).toHaveLength(59);
+  it("Gateway 사유 62개를 전문 용어로 표시하고 미전달 사유를 명시한다", () => {
+    expect(Object.keys(GATEWAY_REASON)).toHaveLength(62);
+    expect(GATEWAY_REASON.CODE_SELECTION_FIELD).toBe("요청의 코드 선택 필드 거부");
+    expect(GATEWAY_REASON.INPUT_PROCESSOR_FIELD).toBe("요청의 입력 처리기 선택 거부");
+    expect(GATEWAY_REASON.INVALID_UNICODE).toBe("유효하지 않은 문자 인코딩");
+    for (const code of ["CODE_SELECTION_FIELD", "INPUT_PROCESSOR_FIELD", "INVALID_UNICODE"]) {
+      expect(GATEWAY_PRE_ENGINE_REASONS.has(code)).toBe(true);
+    }
     expect(GATEWAY_REASON.TARGET_UNVERIFIED).toBe("대상 미확인 (엔진 미전달)");
     expect(GATEWAY_REASON.REQUEST_HEADER_TIMEOUT).toBe("요청 헤더 수신 시간 초과 (엔진 미전달)");
     expect(GATEWAY_REASON.UNSUPPORTED_MEDIA_TYPE).toBe("JSON 외 미디어 유형 (엔진 미전달)");
@@ -147,7 +153,7 @@ describe("통합 개요", () => {
       "/api/runtime/events": { items: [...gatewayEvents, ...observations], invalid: [], source: SOURCE, truncated: false },
     });
     renderAt("/dashboard", "/dashboard", <DashboardPage />);
-    const chart = (await screen.findByRole("heading", { name: "시간별 요청" })).closest("article")!;
+    const chart = (await screen.findByRole("heading", { name: "요청 추이" })).closest("article")!;
     const eventChart = screen.getByRole("heading", { name: "시간별 관측 이벤트" }).closest("article")!;
     expect(screen.queryByRole("heading", { name: "시간대별 추이" })).toBeNull();
     expect(chart.querySelector(".bigNumber")?.textContent).toBe("56조회된 요청 · 선택한 기간");
@@ -168,11 +174,11 @@ describe("통합 개요", () => {
     expect(chartRow.children).toHaveLength(2);
     expect(chartRow.className).toContain("dashboardChartRow");
     const left = chartRow.children[0];
-    expect(Array.from(left.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["시간별 요청", "시간별 관측 이벤트"]);
+    expect(Array.from(left.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["요청 추이", "시간별 관측 이벤트"]);
     expect(eventChart.querySelector(".bigNumber")).toBeNull();
     const side = chartRow.children[1];
-    expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["구성 비율", "거부·오류 사유"]);
-    expect(screen.getAllByRole("heading", { name: "구성 비율" })).toHaveLength(1);
+    expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["요청 처리 결과", "거부·오류 사유"]);
+    expect(screen.getAllByRole("heading", { name: "요청 처리 결과" })).toHaveLength(1);
     const donut = side.children[0].querySelector(".row")!;
     expect(donut.className).not.toContain("donutCompact");
     expect((donut as HTMLElement).style.height).toBe("240px");

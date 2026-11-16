@@ -14,7 +14,6 @@ import { EventWindowNote } from "./runtime/EventWindowNote";
 import { GpuPanel } from "./runtime/GpuPanel";
 
 const AREAS = ["SUP", "REQ", "PLT", "LIF", "OBS"] as const;
-const DAY = 24 * 60 * 60 * 1000;
 
 export function DashboardPage() {
   const overview = useOverview();
@@ -33,10 +32,9 @@ export function DashboardPage() {
   const dropped = evRows.filter((e) => e.source === "hubble" && e.observation?.verdict?.toLowerCase() === "dropped").length;
   const process = evRows.filter((e) => e.source === "tetragon" && e.observation?.kind === "process_exec").length;
   const files = evRows.filter((e) => e.source === "tetragon" && e.observation?.kind === "file_access").length;
-  const processDetected = evRows.some((e) => e.source === "tetragon" && e.observation?.kind === "process_exec" && e.outcome === "detected");
-  const fileDetected = evRows.some((e) => e.source === "tetragon" && e.observation?.kind === "file_access" && e.outcome === "detected");
+  const processDetected = evRows.filter((e) => e.source === "tetragon" && e.observation?.kind === "process_exec" && e.outcome === "detected").length;
+  const fileDetected = evRows.filter((e) => e.source === "tetragon" && e.observation?.kind === "file_access" && e.outcome === "detected").length;
   const reqChart = bucketize(reqRows, (r) => r.recorded_at, (r) => r.outcome as RequestKey, REQUEST_SERIES.map((x) => x.key), range);
-  const reqDayChart = bucketize(reqRows, (r) => r.recorded_at, (r) => r.outcome as RequestKey, REQUEST_SERIES.map((x) => x.key), range, DAY);
   const evChart = bucketize(observationRows, (e) => e.recorded_at, (e) => eventKey(e.outcome), EVENT_SERIES.map((x) => x.key), range);
   const openRequests = (from: number, to: number) => go("/runtime/requests", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() });
   const reasons = new Map<string, number>();
@@ -57,11 +55,11 @@ export function DashboardPage() {
       <section className={p.statusPanel} aria-labelledby="control-observation-heading">
         <div className={p.statusPanelHead}><h2 id="control-observation-heading">통제·관측 현황</h2><span className="small muted">선택한 기간 기준</span></div>
         <div className={p.fiveCards}>
-        <MetricCard title="요청 통제 (Gateway)" value={blockedRequests} caption="엔진 미전달" dot={blockedRequests ? "bad" : "ok"} onClick={() => go("/runtime/blocked", { section: "requests" })} label="차단 내역의 엔진 미전달 요청 보기"><span className="small muted">엔진에 전달되지 않은 거부·입력 오류 등</span></MetricCard>
-        <MetricCard title="네트워크 차단" value={dropped} caption="DROPPED · 정보" dot="none" onClick={() => go("/runtime/blocked", { section: "network" })} label="차단 내역의 네트워크 차단 보기"><span className="small muted">네트워크 이벤트 (Hubble)의 DROPPED 기록</span></MetricCard>
-        <MetricCard title="프로세스 이벤트" value={process} caption={processDetected ? "탐지 · 주의" : "관측 · 정보"} dot={processDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="프로세스 이벤트 보기"><span className="small muted">프로세스·파일 이벤트 (Tetragon): 실행 기록</span></MetricCard>
-        <MetricCard title="파일 이벤트" value={files} caption={fileDetected ? "탐지 · 주의" : "관측 · 정보"} dot={fileDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="파일 이벤트 보기"><span className="small muted">프로세스·파일 이벤트 (Tetragon): 파일 접근 기록</span></MetricCard>
-        <MetricCard title="수집 상태" value={`${connected}/${total}`} caption={total && connected === total ? "정상" : "주의"} dot={total && connected === total ? "ok" : "warn"} onClick={() => go("/runtime/observe/collectors")} label="수집 상태 보기"><span className="small muted">정상 수집기 / 전체 수집기</span></MetricCard>
+        <MetricCard title="요청 통제 (Gateway)" value={blockedRequests} caption="엔진에 닿기 전 거부" dot={blockedRequests ? "bad" : "ok"} onClick={() => go("/runtime/blocked", { section: "requests" })} label="차단 내역의 엔진 미전달 요청 보기"><span className="small muted">엔진에 닿기 전 거부·입력 오류 등</span></MetricCard>
+        <MetricCard title="네트워크 차단" value={dropped} caption="차단됨 · 참고" dot="none" onClick={() => go("/runtime/blocked", { section: "network" })} label="차단 내역의 네트워크 차단 보기"><span className="small muted">네트워크 이벤트 (Hubble)의 DROPPED 기록</span></MetricCard>
+        <MetricCard title="프로세스 이벤트" value={process} caption={processDetected ? `탐지 ${processDetected}건` : "관측 · 참고"} dot={processDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="프로세스 이벤트 보기"><span className="small muted">프로세스·파일 이벤트 (Tetragon): 실행 기록</span></MetricCard>
+        <MetricCard title="파일 이벤트" value={files} caption={fileDetected ? `탐지 ${fileDetected}건` : "관측 · 참고"} dot={fileDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="파일 이벤트 보기"><span className="small muted">프로세스·파일 이벤트 (Tetragon): 파일 접근 기록</span></MetricCard>
+        <MetricCard title="수집 상태" value={`${connected}/${total}`} caption={total && connected === total ? "정상" : "주의"} dot={total && connected === total ? "ok" : "warn"} onClick={() => go("/runtime/observe/collectors")} label="수집 상태 보기"><span className="small muted">정상 / 전체</span></MetricCard>
         </div>
       </section>
       <GpuPanel />
@@ -69,7 +67,7 @@ export function DashboardPage() {
       <div className={`${p.chartRow} ${p.dashboardChartRow}`}>
         <div className={p.chartSide}>
           <ChartCard
-            title="시간별 요청"
+            title="요청 추이"
             tabs={[
               { id: "total", label: "전체" },
               { id: "results", label: "결과별" },
@@ -80,7 +78,7 @@ export function DashboardPage() {
             note="조회된 요청 · 선택한 기간"
           >
             {requestMode === "total"
-              ? <TimeLine buckets={reqDayChart.buckets} size={reqDayChart.size} keys={REQUEST_SERIES.map((x) => x.key)} onSelectRange={openRequests} />
+              ? <TimeLine buckets={reqChart.buckets} size={reqChart.size} keys={REQUEST_SERIES.map((x) => x.key)} onSelectRange={openRequests} />
               : <TimeBars buckets={reqChart.buckets} size={reqChart.size} series={[...REQUEST_SERIES]} onSelectRange={openRequests} />}
           </ChartCard>
           <ChartCard title="시간별 관측 이벤트">
@@ -89,7 +87,7 @@ export function DashboardPage() {
           </ChartCard>
         </div>
         <div className={p.chartSide}>
-          <ChartCard title="구성 비율" note="조회된 요청의 결과 비율 · 선택한 기간" total={reqRows.length}>
+          <ChartCard title="요청 처리 결과" note="조회된 요청의 결과 비율 · 선택한 기간" total={reqRows.length}>
             <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
           </ChartCard>
           <ChartCard title="거부·오류 사유" footer={<p className="small muted">최근 요청 중 거부·오류 상위 5개 사유</p>}>

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useOverview, useRequests, useRuntimeEvents } from "../api/hooks";
 import { OriginBadge, VerdictBadge } from "../components/Badges";
 import { KeyValue } from "../components/DetailPanel";
 import { MetricCard, Query, StateView, ui } from "../components/Misc";
 import { ChartCard, Donut, EVENT_SERIES, REQUEST_SERIES, TimeBars, TimeLine, eventKey, type EventKey, type RequestKey } from "../components/StackedBars";
-import { AREA, GATEWAY_REASON } from "../lib/labels";
+import { AREA, GATEWAY_REASON, GATEWAY_PRE_ENGINE_REASONS } from "../lib/labels";
 import { matchesTarget, useEnvTarget } from "../lib/filters";
 import { bucketize, inRange } from "../lib/time";
 import { carry, useGlobalFilters } from "../lib/url";
@@ -48,10 +48,23 @@ export function DashboardPage() {
     const total = status?.collectors.length ?? 0;
     const verification = o.latest_verification;
     const requestPartial = requests.data?.truncated || o.requests?.counts_lower_bound || o.requests?.history_truncated;
+    const attention: { label: string; path: string }[] = [];
+    if (status?.policy.gateway_active === false) attention.push({ label: "요청 통제 꺼짐", path: "/runtime/policy" });
+    if (status && !["not_configured", "verified"].includes(status.policy.approval_state)) attention.push({ label: "정책 승인 확인 필요", path: "/runtime/policy" });
+    const collectorProblems = status?.collectors.filter((collector) => !["ok", "disconnected"].includes(collector.state)
+      || (collector.state === "disconnected" && collector.source.startsWith("observation_feed"))).length ?? 0;
+    if (collectorProblems) attention.push({ label: `수집기 ${collectorProblems}개 확인 필요`, path: "/runtime/observe/collectors" });
+    if (o.open_revalidation) attention.push({ label: `재검증 대기 ${o.open_revalidation}건`, path: "/runtime/revalidation" });
     return <>
       {(requests.isError || events.isError) && <StateView kind="disconnected" detail="실시간 관측에 문제가 있어 일부 집계가 빠졌을 수 있습니다. 수집 상태를 확인해 주세요." />}
       {requestPartial && <p className="notice" aria-label="대시보드 집계 범위">선택한 기간·환경·대상의 요청 이력 중 일부만 조회했습니다. 표시된 건수는 확인된 최소 건수입니다.</p>}
       <EventWindowNote data={events.data} />
+      {attention.length > 0 && <section className="card card-pad" aria-label="현재 확인할 항목">
+        <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>현재 확인할 항목</h2>
+        <ul style={{ margin: 0, paddingLeft: 20 }}>{attention.map((item) => <li key={item.label} style={{ margin: "6px 0" }}>
+          <Link to={`${item.path}${carry(params)}`}>{item.label}</Link>
+        </li>)}</ul>
+      </section>}
       <section className={p.statusPanel} aria-labelledby="control-observation-heading">
         <div className={p.statusPanelHead}><h2 id="control-observation-heading">통제·관측 현황</h2></div>
         <div className={p.fiveCards}>
@@ -62,8 +75,6 @@ export function DashboardPage() {
         <MetricCard title="수집 상태" value={`${connected}/${total}`} caption={total && connected === total ? undefined : "확인 필요"} dot={total && connected === total ? "ok" : "warn"} onClick={() => go("/runtime/observe/collectors")} label="수집 상태 보기" />
         </div>
       </section>
-      <GpuPanel />
-      {status && <details className="card" style={{ padding: 16 }}><summary>요청 통제 정책 자세히</summary><KeyValue items={[["Gateway 활성", status.policy.gateway_active ? "활성" : "비활성"], ["사용자별 캐시 분리", <span style={status.policy.cache_isolation.mode === "per_principal" && !status.policy.cache_isolation.ready ? { color: "var(--error)" } : undefined}>{status.policy.cache_isolation.mode === "off" ? "비활성 (사용자 간 prefix cache 공유)" : status.policy.cache_isolation.mode === "per_principal" ? status.policy.cache_isolation.ready ? "활성" : `준비 불가(${status.policy.cache_isolation.unavailable_reason_code ?? "unknown"})` : "미확인"}</span>]]} /></details>}
       <div className={`${p.chartRow} ${p.dashboardChartRow}`}>
         <div className={p.chartSide}>
           <ChartCard
@@ -75,7 +86,6 @@ export function DashboardPage() {
             active={requestMode}
             onTab={setRequestMode}
             total={reqRows.length}
-            note="조회된 요청 · 선택한 기간"
           >
             {requestMode === "total"
               ? <TimeLine buckets={reqChart.buckets} size={reqChart.size} keys={REQUEST_SERIES.map((x) => x.key)} onSelectRange={openRequests} />
@@ -87,22 +97,24 @@ export function DashboardPage() {
           </ChartCard>
         </div>
         <div className={p.chartSide}>
-          <ChartCard title="요청 처리 결과" note="조회된 요청의 결과 비율 · 선택한 기간" total={reqRows.length}>
-            <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
-          </ChartCard>
-          <ChartCard title="거부·오류 사유" footer={<p className="small muted">조회된 요청의 상위 5개 사유</p>}>
+          <ChartCard title="거부·오류 사유">
             {topReasons.length ? <ol className={p.reasonList}>{topReasons.map(([reason, count], index) => {
               const label = GATEWAY_REASON[reason] ?? "사유 확인 필요";
               const undelivered = label.endsWith(" (엔진 미전달)") || GATEWAY_PRE_ENGINE_REASONS.has(reason);
-              return <li key={reason}><button type="button" onClick={() => go("/runtime/requests", { reason })}>
+              return <li key={reason}><button type="button" title={undelivered ? "엔진에 전달하기 전에 거부된 요청" : undefined} onClick={() => go("/runtime/requests", { reason })}>
                 <span className={`${p.reasonRank} ${index === 0 ? p.reasonRankFirst : ""}`} aria-hidden="true">{index + 1}</span>
-                <span className={p.reasonLabel}>{label.replace(/ \(엔진 미전달\)$/, "")}{undelivered && <small className={p.reasonTag} title="엔진에 전달하기 전에 거부된 요청">전달 전 거부</small>}</span>
+                <span className={p.reasonLabel}>{label.replace(/ \(엔진 미전달\)$/, "")}</span>
                 <span className={p.reasonCount}><strong>{count}</strong>건</span>
               </button></li>;
             })}</ol> : <p className="small muted">거부·오류 사유가 없습니다. 요청 내역에서 전체 결과를 확인하세요.</p>}
           </ChartCard>
+          <ChartCard title="요청 처리 결과" total={reqRows.length}>
+            <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
+          </ChartCard>
         </div>
       </div>
+      <GpuPanel />
+      {status && <details className="card" style={{ padding: 16 }}><summary>요청 통제 정책 보기</summary><KeyValue items={[["Gateway 활성", status.policy.gateway_active ? "활성" : "비활성"], ["사용자별 캐시 분리", <span style={status.policy.cache_isolation.mode === "per_principal" && !status.policy.cache_isolation.ready ? { color: "var(--error)" } : undefined}>{status.policy.cache_isolation.mode === "off" ? "비활성 (사용자 간 prefix cache 공유)" : status.policy.cache_isolation.mode === "per_principal" ? status.policy.cache_isolation.ready ? "활성" : `준비 불가(${status.policy.cache_isolation.unavailable_reason_code ?? "unknown"})` : "확인 안 됨"}</span>]]} /></details>}
       <h2 className={ui.blockTitle}>최신 업데이트 검증</h2>
       <div className={ui.cardGrid}>
         <MetricCard title="최신 검증 결과" dot={verification ? "ok" : "none"} onClick={() => go("/update/results")} label="업데이트 검증 결과 보기">{verification ? <div className="stack">{AREAS.map((a) => <div key={a}>{AREA[a]} <VerdictBadge verdict={verification.summary.by_area[a]?.security ?? null} /></div>)}<OriginBadge origin={verification.data_origin} /></div> : <span className="muted">검증 결과가 없습니다. 검증 결과에서 새 보고서를 확인하세요.</span>}</MetricCard>

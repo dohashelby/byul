@@ -156,7 +156,7 @@ describe("통합 개요", () => {
     const chart = (await screen.findByRole("heading", { name: "요청 추이" })).closest("article")!;
     const eventChart = screen.getByRole("heading", { name: "시간별 관측 이벤트" }).closest("article")!;
     expect(screen.queryByRole("heading", { name: "시간대별 추이" })).toBeNull();
-    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56조회된 요청 · 선택한 기간");
+    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56");
     expect(eventChart.textContent).toContain("관측 이벤트 5건");
     expect(eventChart.textContent).toContain("기타(관측·허용 등)");
     const totalTab = within(chart).getByRole("tab", { name: "전체" });
@@ -177,9 +177,9 @@ describe("통합 개요", () => {
     expect(Array.from(left.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["요청 추이", "시간별 관측 이벤트"]);
     expect(eventChart.querySelector(".bigNumber")).toBeNull();
     const side = chartRow.children[1];
-    expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["요청 처리 결과", "거부·오류 사유"]);
+    expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["거부·오류 사유", "요청 처리 결과"]);
     expect(screen.getAllByRole("heading", { name: "요청 처리 결과" })).toHaveLength(1);
-    const donut = side.children[0].querySelector(".row")!;
+    const donut = side.children[1].querySelector(".row")!;
     expect(donut.className).not.toContain("donutCompact");
     expect((donut as HTMLElement).style.height).toBe("240px");
     expect(donut.children).toHaveLength(2);
@@ -199,8 +199,8 @@ describe("통합 개요", () => {
     expect(ranked.map((item) => item.querySelector("button > span:first-child")?.textContent)).toEqual(["1", "2", "3", "4", "5"]);
     expect(ranked[0].querySelector("button > span:first-child")?.className).toContain("reasonRankFirst");
     expect(ranked.slice(1).every((item) => !item.querySelector("button > span:first-child")?.className.includes("reasonRankFirst"))).toBe(true);
-    expect(ranked[0].querySelector("small")?.textContent).toBe("전달 전 거부");
-    expect(ranked[0].querySelector("button > span:nth-child(2)")?.textContent).toBe("정책 외 모델전달 전 거부");
+    expect(ranked[0].querySelector("button")?.getAttribute("title")).toBe("엔진에 전달하기 전에 거부된 요청");
+    expect(ranked[0].querySelector("button > span:nth-child(2)")?.textContent).toBe("정책 외 모델");
     expect(ranked.map((item) => item.querySelector("button > span:last-child strong")?.textContent)).toEqual(["5", "4", "3", "2", "1"]);
     expect(reasons.querySelector(".bigNumber")).toBeNull();
   });
@@ -217,7 +217,7 @@ describe("통합 개요", () => {
       <Route path="/runtime/overview" element={<DashboardPage />} />
       <Route path="/runtime/requests" element={<Destination />} />
     </Routes></MemoryRouter></QueryClientProvider>);
-    fireEvent.click(await screen.findByRole("button", { name: /정책 외 모델.*전달 전 거부.*1건/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /정책 외 모델.*1건/ }));
     expect(await screen.findByText("/runtime/requests?reason=MODEL_NOT_ALLOWED")).toBeTruthy();
   });
 });

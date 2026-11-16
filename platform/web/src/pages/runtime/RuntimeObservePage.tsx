@@ -1,3 +1,4 @@
+import { HubbleEvents } from "./HubbleEvents";
 // 통신·행위 관측. 삭제된 runtime 대시보드 renderCollectors()·collectorSummary()·renderObservations()를 옮겼다.
 import type { ReactNode } from "react";
 import { RouteAuditPanel } from "./RouteAuditPanel";
@@ -200,7 +201,7 @@ export function RuntimeObservePage() {
   return (
     <div className="page">
       <PageHead title={sub === "checks" ? "점검 범위" : sub === "hubble" ? "네트워크 이벤트 (Hubble)" : sub === "tetragon" ? "프로세스·파일 이벤트 (Tetragon)" : "수집 상태"}>
-        {item && (
+        {sub === "collectors" && item && (
           <span className="row small muted" style={{ gap: 12 }}>
             <span>{item.observations.counts_lower_bound ? "최근 조회 범위 · " : ""}네트워크 이벤트 {item.observations.by_source.hubble ?? 0}건 · 프로세스·파일 이벤트 {item.observations.by_source.tetragon ?? 0}건</span>
             <span>손상 줄 {item.observations.corrupt_lines}</span>
@@ -208,7 +209,7 @@ export function RuntimeObservePage() {
         )}
       </PageHead>
       {sub !== "checks" && sub !== "collectors" && <EventWindowNote data={events.data} />}
-      <p className="notice">관측 자료의 환경(예: kind lab)은 행마다 표시됩니다. 요청 화면의 엔진과 다른 환경일 수 있습니다.</p>
+      {sub !== "hubble" && <details className="small muted"><summary>관측 범위</summary><p>관측 자료의 환경은 행마다 표시됩니다. 요청 화면의 엔진과 다른 환경일 수 있습니다.</p></details>}
       <Subtabs
         tabs={[
           { to: "/runtime/observe/checks", label: "점검 범위", active: sub === "checks" },
@@ -254,33 +255,7 @@ export function RuntimeObservePage() {
         </Query>
       )}
       {sub === "collectors" && <RouteAuditPanel />}
-      {sub === "hubble" && (
-        <TableCard title="네트워크 이벤트 (Hubble)">
-          <table className={rt.statusTable}>
-            <thead>
-              <tr><th>시각</th><th>환경·실행</th><th>출발</th><th>도착</th><th>판정</th><th>출처</th></tr>
-            </thead>
-            <tbody>
-              {hubble.slice(pagination.start, pagination.end).map((e) => {
-                const o = e.observation!;
-                return (
-                  <tr key={e.event_id} className={o.verdict?.toLowerCase() === "dropped" ? rt.rowDropped : undefined}>
-                    <td>{formatTime(e.occurred_at)}</td>
-                    <td><ScopeBadges environment={e.scope.environment} runId={e.scope.run_id} /></td>
-                    <td>{pod(o.src_namespace, o.src_pod)}</td>
-                    <td className="mono">{`${pod(o.dst_namespace, o.dst_pod)} · ${o.dst_ip ?? "–"}:${o.dst_port ?? "–"}/${o.protocol ?? "–"}`}</td>
-                    <td title={o.reason ?? ""}>{o.verdict ?? "–"}</td>
-                    <td><ObservationOriginBadge origin={e.origin_detail} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <Pagination state={pagination} />
-          {hubble.length === 0 && <p className={rt.empty}>네트워크 이벤트 미수집. 수집 상태와 기간을 확인하세요.</p>}
-          <p className="notice" style={{ padding: "8px 16px 12px" }}>Hubble DROPPED는 관측이며, 출발·목적지·정책 귀속과 수신 대조 전에는 거부 확인이 아닙니다.</p>
-        </TableCard>
-      )}
+      {sub === "hubble" && <HubbleEvents />}
       {sub === "tetragon" && (
         <TableCard title="프로세스·파일 이벤트 (Tetragon)">
           <table className={rt.statusTable}>

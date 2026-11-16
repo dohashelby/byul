@@ -296,7 +296,7 @@ function useRuntimeStale(connection: Meta["runtime_connection"] | undefined): st
 export function Layout() {
   const auth = useAuth();
   const meta = useMeta();
-  const runtimeStale = useRuntimeStale();
+  const runtimeStale = useRuntimeStale(meta.data?.runtime_connection);
   const { pathname } = useLocation();
   const areaKey = useArea(pathname);
   const stale = areaKey === "runtime" ? runtimeStale : null;
@@ -322,7 +322,7 @@ export function Layout() {
         {unavailable.length > 0 && (
           <Banner kind="unofficial">관측 불가: 해당 구간 이벤트 누락 가능 ({unavailable.join(", ")})</Banner>
         )}
-        {meta.isError && !stale && <Banner kind="unofficial">자료 출처를 확인하지 못했습니다. 시스템 정보에서 연결 상태를 확인하세요.</Banner>}
+        {areaKey === "runtime" && meta.isError && !stale && <Banner kind="unofficial">자료 출처를 확인하지 못했습니다. 시스템 정보에서 연결 상태를 확인하세요.</Banner>}
         {stale && <Banner kind="unofficial">{stale} <Link to="/runtime/settings#system-info">연결 설정 보기</Link></Banner>}
         <main style={stale ? { opacity: 0.5, transition: "opacity 0.2s" } : undefined}>
           <Outlet />

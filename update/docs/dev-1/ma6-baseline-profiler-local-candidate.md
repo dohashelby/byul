@@ -39,3 +39,19 @@ with inert queue collaborators, default and repeated calls, unsupported
 method, async failure/cancellation, source tampering and false pairs. Tests
 were **not run locally** under the session's no-Python rule; PR CI must run
 them on the supported Linux CPython builds.
+
+The optional `LocalProfilerRouter` stages only module objects already present
+in `sys.modules`. It accepts the exact API two-module set or core three-module
+set, installs each segment once, and never imports missing engine modules.
+The default `enabled=False` path installs nothing. The caller injects a raw
+record sink, session, exact image, and a binding factory that obtains the
+current process-start context on every process. Inherited router hooks pass
+through without records until the router restores them, clears staging, and
+requires a fresh complete segment and binding. The router rechecks every
+staged module against `sys.modules` immediately before install, including
+modules staged by earlier calls. `observe_loaded(module)` returns true only for an install
+done by that call; `last_diagnostic` distinguishes disabled, partial,
+unsupported/unloaded/replaced module, source/binding failure, and installed
+states. Failed qualification never invokes the engine or imports the other
+process's segment. This remains a staging entry point: the production asset
+and common collector wiring are a separate follow-up.

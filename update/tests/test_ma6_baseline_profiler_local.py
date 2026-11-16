@@ -45,7 +45,7 @@ def _module(tmp_path, name):
     return module
 
 
-def world(tmp_path):
+def world(tmp_path, *, install=True):
     modules = {name: _module(tmp_path, name) for name in local.SPECS}
     # These are only inert collaborators. The observed function bodies are the
     # exact compiled source above, not replacements of the semantic calls.
@@ -75,7 +75,8 @@ def world(tmp_path):
     records = []
     observer = local.LocalProfilerObserver(records.append, session=SESSION,
         binding_factory=lambda: dict(BINDING))
-    observer.install(modules, image=local.IMAGE)
+    if install:
+        observer.install(modules, image=local.IMAGE)
     frontend = modules['vllm.v1.engine.async_llm'].AsyncLLM()
     frontend.engine_core = client.AsyncMPClient()
     frontend.engine_core.failure = None
@@ -213,6 +214,153 @@ def test_binding_requires_actual_private_session_and_bounded_consumer():
         local.project_local([], binding={**BINDING, 'pid': '1'})
     with pytest.raises(ValueError, match='BASELINE_PROFILER_LOCAL_RECORD_INVALID'):
         local.project_local([{}] * 1025, binding=BINDING)
+
+
+def _loaded(monkeypatch, modules):
+    for name, module in modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
+
+
+def test_router_default_off_then_exact_api_and_core_fragments(tmp_path, monkeypatch):
+    w = world(tmp_path, install=False)
+    _loaded(monkeypatch, w.modules)
+    before_modules = {name for name in sys.modules if name.startswith('vllm.')}
+    off = local.LocalProfilerRouter(w.records.append, session=SESSION,
+        binding_factory=lambda: dict(BINDING), image=local.IMAGE)
+    assert off.observe_loaded(w.modules['vllm.v1.engine.async_llm']) is False
+    assert off.last_diagnostic == 'DISABLED'
+    asyncio.run(w.frontend.start_profile())
+    assert w.records == [] and w.frontend.engine_core.sent == [('profile', True)]
+    router = local.LocalProfilerRouter(w.records.append, session=SESSION,
+        binding_factory=lambda: dict(BINDING), image=local.IMAGE, enabled=True)
+    assert router.observe_loaded(w.modules['vllm.v1.engine.async_llm']) is False
+    assert router.last_diagnostic == 'PARTIAL_SEGMENT'
+    assert router.observe_loaded(w.modules['vllm.v1.engine.core_client']) is True
+    assert router.last_diagnostic == 'INSTALLED'
+    asyncio.run(w.frontend.stop_profile())
+    assert local.project_local(w.records, binding=BINDING)['local_complete_calls'] == 2
+    api_name = 'vllm.v1.engine.async_llm'
+    monkeypatch.setitem(sys.modules, api_name, ModuleType(api_name))
+    assert router.observe_loaded(w.modules['vllm.v1.engine.core_client']) is False
+    assert router.last_diagnostic == 'MODULE_REPLACED'
+    assert router.observe_loaded(sys.modules[api_name]) is False
+    assert router.last_diagnostic == 'MODULE_REPLACED'
+    monkeypatch.setitem(sys.modules, api_name, w.modules[api_name])
+    assert router.observe_loaded(w.modules['vllm.v1.engine.core']) is False
+    assert router.observe_loaded(w.modules['vllm.v1.executor.abstract']) is False
+    assert router.observe_loaded(w.modules['vllm.v1.executor.multiproc_executor']) is True
+    w.core._handle_client_request(w.profile_type(True))
+    result = local.project_local(w.records, binding=BINDING)
+    assert result['local_complete_calls'] == 5 and result['local_parent_pairs'] == 3
+    assert result['cross_process_rpc_verified'] is False
+    assert {name for name in sys.modules if name.startswith('vllm.')} == before_modules
+    assert router.observe_loaded(w.modules['vllm.v1.engine.async_llm']) is False
+    assert router.last_diagnostic == 'ALREADY_INSTALLED'
+    assert router.close()['restored'] is True
+    assert off.close()['restored'] is True
+
+
+def test_router_partial_foreign_unloaded_source_failure_and_hook_owner(tmp_path, monkeypatch):
+    w = world(tmp_path, install=False)
+    _loaded(monkeypatch, w.modules)
+    router = local.LocalProfilerRouter(w.records.append, session=SESSION,
+        binding_factory=lambda: dict(BINDING), image=local.IMAGE, enabled=True)
+    assert router.observe_loaded(ModuleType('not.vllm')) is False
+    assert router.last_diagnostic == 'UNSUPPORTED_MODULE'
+    impostor = ModuleType('vllm.v1.engine.async_llm')
+    assert router.observe_loaded(impostor) is False
+    assert router.last_diagnostic == 'MODULE_NOT_LOADED'
+    assert router.observe_loaded(w.modules['vllm.v1.engine.async_llm']) is False
+    assert router.last_diagnostic == 'PARTIAL_SEGMENT'
+    assert w.records == []
+    path = Path(w.modules['vllm.v1.engine.core_client'].__file__)
+    path.write_bytes(path.read_bytes() + b'\n# source mutation\n')
+    assert router.observe_loaded(w.modules['vllm.v1.engine.core_client']) is False
+    assert router.last_diagnostic == 'SOURCE_UNAVAILABLE'
+    asyncio.run(w.frontend.start_profile())
+    assert w.records == [] and w.frontend.engine_core.sent == [('profile', True)]
+    assert router.close()['restored'] is True
+
+    other = world(tmp_path / 'owned', install=False)
+    _loaded(monkeypatch, other.modules)
+    api = {name: other.modules[name] for name in local.SEGMENTS['api']}
+    owner = local.LocalProfilerObserver(other.records.append, session=SESSION,
+        binding_factory=lambda: dict(BINDING))
+    owner.install(api, image=local.IMAGE)
+    wrapped = vars(other.modules['vllm.v1.engine.async_llm'].AsyncLLM)['start_profile']
+    router2 = local.LocalProfilerRouter(other.records.append, session=SESSION,
+        binding_factory=lambda: dict(BINDING), image=local.IMAGE, enabled=True)
+    assert router2.observe_loaded(other.modules['vllm.v1.engine.async_llm']) is False
+    assert router2.observe_loaded(other.modules['vllm.v1.engine.core_client']) is False
+    assert router2.last_diagnostic == 'SOURCE_UNAVAILABLE'
+    assert vars(other.modules['vllm.v1.engine.async_llm'].AsyncLLM)['start_profile'] is wrapped
+    assert router2.close()['restored'] is True
+    assert owner.close()['restored'] is True
+
+
+def test_router_rejects_member_replaced_between_stages(tmp_path, monkeypatch):
+    w = world(tmp_path, install=False)
+    _loaded(monkeypatch, w.modules)
+    router = local.LocalProfilerRouter(w.records.append, session=SESSION,
+        binding_factory=lambda: dict(BINDING), image=local.IMAGE, enabled=True)
+    api_name = 'vllm.v1.engine.async_llm'
+    assert router.observe_loaded(w.modules[api_name]) is False
+    monkeypatch.setitem(sys.modules, api_name, ModuleType(api_name))
+    assert router.observe_loaded(w.modules['vllm.v1.engine.core_client']) is False
+    assert router.last_diagnostic == 'MODULE_REPLACED'
+    asyncio.run(w.frontend.start_profile())
+    assert w.records == [] and w.frontend.engine_core.sent == [('profile', True)]
+    assert router.close()['restored'] is True
+
+
+def test_router_sink_failure_preserves_return_exception_and_cancellation(tmp_path, monkeypatch):
+    w = world(tmp_path, install=False)
+    _loaded(monkeypatch, w.modules)
+    def unavailable_sink(row):
+        raise RuntimeError('EXAMPLE sink unavailable')
+    router = local.LocalProfilerRouter(unavailable_sink, session=SESSION,
+        binding_factory=lambda: dict(BINDING), image=local.IMAGE, enabled=True)
+    assert router.observe_loaded(w.modules['vllm.v1.engine.async_llm']) is False
+    assert router.observe_loaded(w.modules['vllm.v1.engine.core_client']) is True
+    assert asyncio.run(w.frontend.start_profile()) is None
+    assert w.frontend.engine_core.sent == [('profile', True)]
+    w.frontend.engine_core.failure = ValueError('EXAMPLE native failure')
+    with pytest.raises(ValueError, match='EXAMPLE native failure'):
+        asyncio.run(w.frontend.start_profile())
+    w.frontend.engine_core.failure = asyncio.CancelledError()
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(w.frontend.stop_profile())
+    assert router.observers['api'].disabled is True
+    assert router.close()['restored'] is True
+
+
+def test_router_rebinds_after_fork_without_inherited_hook_reuse(tmp_path, monkeypatch):
+    w = world(tmp_path, install=False)
+    _loaded(monkeypatch, w.modules)
+    epoch = [1]
+    factory = lambda: direct.process_binding(SESSION,
+        {'pid': os.getpid(), 'start_epoch': epoch[0]})
+    router = local.LocalProfilerRouter(w.records.append, session=SESSION,
+        binding_factory=factory, image=local.IMAGE, enabled=True)
+    api = w.modules['vllm.v1.engine.async_llm']
+    client = w.modules['vllm.v1.engine.core_client']
+    assert router.observe_loaded(api) is False
+    assert router.observe_loaded(client) is True
+    prior = router.observers['api'].binding
+    real_pid = os.getpid()
+    epoch[0] = 2
+    monkeypatch.setattr(local.os, 'getpid', lambda: real_pid + 1)
+    asyncio.run(w.frontend.start_profile())
+    assert w.records == []  # inherited hooks are inert before router restaging
+    assert router.observe_loaded(api) is False
+    assert router.last_diagnostic == 'PARTIAL_SEGMENT'
+    assert router.observe_loaded(client) is True
+    fresh = router.observers['api'].binding
+    assert fresh['pid'] == real_pid + 1
+    assert fresh['process_start_sha256'] != prior['process_start_sha256']
+    asyncio.run(w.frontend.start_profile())
+    assert local.project_local(w.records, binding=fresh)['local_complete_calls'] == 2
+    assert router.close()['restored'] is True
 
 
 def test_consumer_rejects_false_parent_duplicate_and_reordered_pair(tmp_path):

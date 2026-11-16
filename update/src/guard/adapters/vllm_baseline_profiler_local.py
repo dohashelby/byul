@@ -207,6 +207,9 @@ class LocalProfilerObserver:
         def begin(args, kwargs):
             if observer.disabled:
                 return None
+            if (getattr(observer, 'require_fresh_install', False)
+                    and observer.pid != os.getpid()):
+                return None  # inherited hook is inert until the router reinstalls
             try:
                 name = POINTS[point][0]
                 _, size, digest, _ = SPECS[name]
@@ -299,6 +302,133 @@ class LocalProfilerObserver:
                 restored = False
         self.installed.clear()
         self.owners.clear()
+        return {'restored': restored, 'producer_authenticated': False}
+
+
+class LocalProfilerRouter:
+    """Stage only already-loaded modules, then install one exact local segment.
+
+    ``observe_loaded`` never imports engine modules. The caller owns the raw
+    record sink, session, process-start binding factory, image and opt-in flag.
+    The factory is called again in each process; a stale inherited binding is
+    rejected by LocalProfilerObserver before a new hook is installed.
+    """
+
+    def __init__(self, emit, *, session, binding_factory, image, enabled=False):
+        if (not callable(emit) or not callable(binding_factory) or type(session) is not str
+                or re.fullmatch('[0-9a-f]{32}', session) is None or type(image) is not str
+                or type(enabled) is not bool):
+            raise ValueError('BASELINE_PROFILER_LOCAL_ROUTER_INVALID')
+        self.emit, self.session, self.binding_factory = emit, session, binding_factory
+        self.image, self.enabled = image, enabled
+        self.pid = os.getpid()
+        self.pending = {name: {} for name in SEGMENTS}
+        self.observers = {}
+        self.installed_modules = {}
+        self.failed = set()
+        self.previous_start_sha256 = set()
+        self.last_diagnostic = 'DISABLED' if not enabled else 'WAITING_FOR_SEGMENT'
+
+    def _reset_after_fork(self):
+        if self.pid == os.getpid():
+            return
+        self.previous_start_sha256 = {
+            observer.binding['process_start_sha256'] for observer in self.observers.values()}
+        for observer in self.observers.values():
+            try:
+                if observer.close()['restored'] is not True:
+                    raise ValueError
+            except BaseException:
+                self.last_diagnostic = 'INHERITED_HOOK_RESTORE_FAILED'
+                self.enabled = False
+                return
+        self.pid = os.getpid()
+        self.pending = {name: {} for name in SEGMENTS}
+        self.observers = {}
+        self.installed_modules = {}
+        self.failed.clear()
+        self.last_diagnostic = 'WAITING_FOR_SEGMENT'
+
+    def observe_loaded(self, module):
+        """Return True only on a fresh complete installation in this call."""
+        self._reset_after_fork()
+        if not self.enabled:
+            if self.last_diagnostic != 'INHERITED_HOOK_RESTORE_FAILED':
+                self.last_diagnostic = 'DISABLED'
+            return False
+        if type(module) is not types.ModuleType:
+            self.last_diagnostic = 'UNSUPPORTED_MODULE'
+            return False
+        name = vars(module).get('__name__')
+        segment = next((part for part, names in SEGMENTS.items() if name in names), None)
+        if segment is None:
+            self.last_diagnostic = 'UNSUPPORTED_MODULE'
+            return False
+        if sys.modules.get(name) is not module:
+            self.last_diagnostic = 'MODULE_NOT_LOADED'
+            return False
+        if segment in self.observers:
+            self.last_diagnostic = ('ALREADY_INSTALLED'
+                if all(sys.modules.get(part) is candidate
+                    for part, candidate in self.installed_modules[segment].items())
+                else 'MODULE_REPLACED')
+            return False
+        if segment in self.failed:
+            self.last_diagnostic = 'SEGMENT_FAILED'
+            return False
+        staged = self.pending[segment]
+        if name in staged and staged[name] is not module:
+            self.failed.add(segment)
+            self.last_diagnostic = 'MODULE_REPLACED'
+            return False
+        staged[name] = module
+        if frozenset(staged) != SEGMENTS[segment]:
+            self.last_diagnostic = 'PARTIAL_SEGMENT'
+            return False
+        if any(sys.modules.get(part) is not candidate for part, candidate in staged.items()):
+            self.failed.add(segment)
+            self.last_diagnostic = 'MODULE_REPLACED'
+            return False
+        observer = None
+        try:
+            observer = LocalProfilerObserver(self.emit, session=self.session,
+                binding_factory=self.binding_factory)
+            if observer.binding['process_start_sha256'] in self.previous_start_sha256:
+                raise ValueError('BASELINE_PROFILER_LOCAL_BINDING_UNAVAILABLE')
+            observer.require_fresh_install = True
+            observer.install(dict(staged), image=self.image)
+        except BaseException as error:
+            if observer is not None:
+                try:
+                    if observer.close()['restored'] is not True:
+                        raise ValueError
+                except BaseException:
+                    self.enabled = False
+                    self.last_diagnostic = 'HOOK_RESTORE_FAILED'
+                    return False
+            self.failed.add(segment)
+            self.last_diagnostic = ('BINDING_UNAVAILABLE' if isinstance(error, ValueError)
+                and str(error) == 'BASELINE_PROFILER_LOCAL_BINDING_UNAVAILABLE'
+                else 'SOURCE_UNAVAILABLE')
+            return False
+        self.observers[segment] = observer
+        self.installed_modules[segment] = dict(staged)
+        self.pending[segment] = {}
+        self.last_diagnostic = 'INSTALLED'
+        return True
+
+    def close(self):
+        self.enabled = False
+        restored = True
+        for observer in self.observers.values():
+            try:
+                restored = observer.close()['restored'] and restored
+            except BaseException:
+                restored = False
+        self.pending = {name: {} for name in SEGMENTS}
+        self.observers = {}
+        self.installed_modules = {}
+        self.last_diagnostic = 'CLOSED' if restored else 'HOOK_RESTORE_FAILED'
         return {'restored': restored, 'producer_authenticated': False}
 
 

@@ -382,3 +382,73 @@ def test_consumer_rejects_false_parent_duplicate_and_reordered_pair(tmp_path):
     with pytest.raises(ValueError, match='BASELINE_PROFILER_LOCAL_RECORD_INVALID'):
         local.project_local(parent_first, binding=BINDING)
     assert w.observer.close()['restored'] is True
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_owned_callback_installer_stages_local_fragments_without_foreign_imports(tmp_path, monkeypatch, enabled):
+    from guard.adapters import vllm_engine_callback_sensor as sensor
+    from guard.collectors import engine_callbacks
+    w = world(tmp_path, install=False)
+    _loaded(monkeypatch, w.modules)
+    rows = []
+    expected_image = local.IMAGE if enabled else None
+    context = lambda: {'pid': os.getpid(), 'test': 'owned-profiler'}
+    callbacks = sensor.EngineCallbacks(SESSION, b'EXAMPLE-local-profiler-key-01', rows.append,
+        context_provider=context, baseline_profiler_local=enabled,
+        baseline_profiler_local_image=expected_image)
+    registry = {name for name in sys.modules if name.startswith('vllm.')}
+    for module in w.modules.values():
+        callbacks.instrument(module)
+    asyncio.run(w.frontend.start_profile())
+    w.core._handle_client_request(w.profile_type(True))
+    actual = [row for row in rows if row.get('schema') == local.SCHEMA]
+    if enabled:
+        assert set(callbacks.local_profiler.observers) == {'api', 'core'}
+        binding = direct.process_binding(SESSION, context())
+        result = local.project_local(actual, binding=binding)
+        assert result['local_complete_calls'] == 5 and result['local_parent_pairs'] == 3
+        assert result['whole_scope_complete'] is False and result['cross_process_rpc_verified'] is False
+        assert callbacks.local_profiler.close()['restored'] is True
+    else:
+        assert callbacks.local_profiler is None and actual == []
+    assert {name for name in sys.modules if name.startswith('vllm.')} == registry
+    prepared = engine_callbacks.prepare_assets(tmp_path / 'assets', baseline_profiler_local=enabled,
+        baseline_profiler_local_image=expected_image)
+    assert prepared['baseline_profiler_local'] is enabled and prepared['engine_started'] is False
+    assert prepared['baseline_profiler_local_image'] == expected_image
+    assert 'guard_engine_callbacks/vllm_baseline_profiler_local.py' in prepared['assets']
+    assert 'guard_engine_callbacks/vllm_rank_ipc_sources.py' in prepared['assets']
+    assert engine_callbacks.load_prepared(tmp_path / 'assets') == prepared
+
+
+def test_local_callback_preparation_requires_explicit_image_and_separate_mode(tmp_path):
+    from guard.collectors import engine_callbacks
+    with pytest.raises(ValueError, match='PROFILER_LOCAL_IMAGE_REQUIRED'):
+        engine_callbacks.prepare_assets(tmp_path / 'missing', baseline_profiler_local=True)
+    with pytest.raises(ValueError, match='PROFILER_LOCAL_FLAG_REQUIRED'):
+        engine_callbacks.prepare_assets(tmp_path / 'off', baseline_profiler_local_image=local.IMAGE)
+    with pytest.raises(ValueError, match='PROFILER_LOCAL_EXCLUSIVE'):
+        engine_callbacks.prepare_assets(tmp_path / 'mixed', baseline_profiler_local=True,
+            baseline_profiler_local_image=local.IMAGE, profiler_control=True)
+
+
+def test_inherited_callback_does_not_restage_profiler_into_parent_sink(tmp_path, monkeypatch):
+    from guard.adapters import vllm_engine_callback_sensor as sensor
+    w = world(tmp_path, install=False)
+    _loaded(monkeypatch, w.modules)
+    rows = []
+    callbacks = sensor.EngineCallbacks(SESSION, b'EXAMPLE-local-profiler-key-01', rows.append,
+        context_provider=lambda: {'pid': os.getpid(), 'test': 'owned-profiler'},
+        baseline_profiler_local=True, baseline_profiler_local_image=local.IMAGE)
+    for name in local.SEGMENTS['api']:
+        callbacks.instrument(w.modules[name])
+    asyncio.run(w.frontend.start_profile())
+    count = sum(row.get('schema') == local.SCHEMA for row in rows)
+    parent_pid = os.getpid()
+    with monkeypatch.context() as child:
+        child.setattr(local.os, 'getpid', lambda: parent_pid + 1)
+        callbacks.instrument(w.modules['vllm.v1.engine.async_llm'])
+        asyncio.run(w.frontend.stop_profile())
+        assert sum(row.get('schema') == local.SCHEMA for row in rows) == count
+        assert w.frontend.engine_core.sent == [('profile', True), ('profile', False)]
+    assert callbacks.local_profiler.close()['restored'] is True

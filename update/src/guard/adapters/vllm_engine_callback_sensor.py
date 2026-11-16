@@ -41,6 +41,7 @@ from . import vllm_scoped_consumption_callback as scoped_consumption
 from . import vllm_baseline_slot_sampling as slot_sampling
 from . import vllm_baseline_graph_callback as baseline_graph
 from . import vllm_baseline_attention_metadata as attention_metadata
+from . import vllm_baseline_profiler_local as profiler_local
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -97,6 +98,9 @@ OPTIONAL = (('link', execution_link.TARGETS), ('attempt', attempt.TARGETS), ('tr
             ('dispatch', transition_dispatch.TARGETS), ('slot_sampling', slot_sampling.TARGETS),
             ('baseline_graph', baseline_graph.TARGETS), ('attention_metadata', attention_metadata.TARGETS))
 OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
+# Local profiler segments stage only modules the engine actually loads.
+for _name in profiler_local.SPECS:
+    MODULES.setdefault(_name, ())
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -394,7 +398,16 @@ class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
                  request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
                  runner_consumption=False, worker_shards=False, transition_dispatches=False, execution_links=False,
-                 auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False, baseline_slot_sampling=False, baseline_piecewise_graph=False, baseline_attention_metadata=False):
+                 auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False, baseline_slot_sampling=False, baseline_piecewise_graph=False, baseline_attention_metadata=False,
+                 baseline_profiler_local=False, baseline_profiler_local_image=None):
+        if baseline_profiler_local is True:
+            if profiler_control:
+                raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_EXCLUSIVE')
+            if baseline_profiler_local_image not in {profiler_local.IMAGE, 'docker.io/' + profiler_local.IMAGE}:
+                raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_IMAGE_REQUIRED')
+        elif baseline_profiler_local_image is not None:
+            raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_FLAG_REQUIRED')
+        self.local_profiler = None
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -414,6 +427,15 @@ class EngineCallbacks:
         self.attention_metadata = AttentionMetadataObserver(session, **options) if baseline_attention_metadata is True else None
         if self.attention_metadata is not None:
             self.attention_metadata.secret = secret
+        if baseline_profiler_local is True:
+            def local_binding():
+                context = (context_provider or cache.base._context)()
+                if type(context) is not dict or type(context.get('pid')) is not int or context['pid'] != os.getpid():
+                    raise ValueError('BASELINE_PROFILER_LOCAL_BINDING_UNAVAILABLE')
+                return {'pid': context['pid'], 'session_id_sha256': hashlib.sha256(session.encode()).hexdigest(),
+                    'process_start_sha256': hashlib.sha256(json.dumps(context, sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
+            self.local_profiler = profiler_local.LocalProfilerRouter(sink, session=session,
+                binding_factory=local_binding, image=baseline_profiler_local_image, enabled=True)
         self.slot.slot_sampling_enabled = self.slot_sampling is not None
         if self.kernel is not None:
             self.kernel.secret = self.graph.secret = secret
@@ -448,6 +470,24 @@ class EngineCallbacks:
         self.auxiliary = auxiliary_link.AuxiliaryLinkObserver(auxiliary_roots, session=session, link=self.link, sink=sink) if self.link is not None and auxiliary_roots else None
 
     def instrument(self, module):
+        name = vars(module).get('__name__') if type(module) is type(sys) else None
+        installed = False
+        if self.local_profiler is not None and name in profiler_local.SPECS:
+            # An inherited EngineCallbacks owns the parent's static sink.
+            # Forked children require a fresh installer and owned sink.
+            if os.getpid() == self.cache.pid:
+                try:
+                    installed = self.local_profiler.observe_loaded(module)
+                    diagnostic = self.local_profiler.last_diagnostic
+                    if diagnostic not in {'INSTALLED', 'ALREADY_INSTALLED', 'PARTIAL_SEGMENT'}:
+                        self.gap('BASELINE_PROFILER_LOCAL_' + diagnostic, name)
+                except BaseException:
+                    self.gap('BASELINE_PROFILER_LOCAL_INSTALL_UNAVAILABLE', name)
+        if not MODULES.get(name) and name not in auxiliary_link.MODULES:
+            return installed
+        return self._instrument_existing(module) or installed
+
+    def _instrument_existing(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
         if name in auxiliary_link.MODULES:
@@ -622,6 +662,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             baseline_slot_sampling=settings.get('baseline_slot_sampling') is True,
             baseline_piecewise_graph=settings.get('baseline_piecewise_graph') is True,
             baseline_attention_metadata=settings.get('baseline_attention_metadata') is True,
+            baseline_profiler_local=settings.get('baseline_profiler_local') is True,
+            baseline_profiler_local_image=settings.get('baseline_profiler_local_image'),
             auxiliary_roots=settings.get('supply_roots'))
         sys.meta_path.insert(0, Finder(callbacks))
         if settings.get('supply_roots'):

@@ -1,3 +1,9 @@
+## 2026-11-16 — 프로파일러 local segment의 소유 callback 연결
+
+- 한 일: 검토된54de2366 router를 기존 callback 준비 경로의 기본 False 옵션으로 연결했다. 명시적 검토 image 선택을 요구하고 실제 로드된 API2/core3 module만 각 segment에 전달한다. engine 추가 import·원격 요청 연결·프로파일러 실행을 하지 않는다. raw source record는 기존 sink로 보내며 엄격한 local consumer의 실제 원 함수 경로 회귀를 추가했다.
+- 경계: 기존 profiler_control과의 같은 지점 소유를 분리한다. 부모의 sink를 상속한 callback은 fork 후 router를 재설치하지 않고 원 함수로 통과하며, 자식 소유 sink/새 installer 없음을 전체 관측으로 올리지 않는다. 기존 auxiliary 경로와 다른 callback 지점은 보존한다.
+- 검증/다음 단계: 생산 연결의 집중 정적 검토와 최종 source 목록 고정 후, 미공개 sampler·graph·attention·profiler 묶음의 #288 추가 공개 승인을 요청한다. 로컬 Python/pytest·기타 테스트 실행은 하지 않았다. GitHub Linux CI에서만 검증한다.
+
 ## 2026-11-16 — 기준 attention 메타데이터의 명시적 준비 연결
 
 - 한 일: 검토한1194698c의 실제 준비 반환→attention 입력/분기·반환 사실과000beb96의 프로세스별 profiler local call을 미공개 통합 분기에 보존했다. attention은 기존 callback 경로에 기본 False인 명시 옵션으로만 넣고 정확 source/공유 키·소유 sink·직접 consumer 회귀를 연결했다. source 지점 목록은 같은 runner의 sampling 지점을 덮지 않고 합친다.

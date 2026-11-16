@@ -55,3 +55,7 @@ unsupported/unloaded/replaced module, source/binding failure, and installed
 states. Failed qualification never invokes the engine or imports the other
 process's segment. This remains a staging entry point: the production asset
 and common collector wiring are a separate follow-up.
+
+기존 callback 준비 경로의 `baseline_profiler_local=True`는 검토된 immutable image 선택값을 `baseline_profiler_local_image`로 함께 받아야 한다. 이 값은 준비할 대상 선택이며 실제 이미지 실측·인증을 뜻하지 않는다. 기존 profiler_control 옵션과는 같은 지점의 소유권이 겹쳐 함께 켜지 않는다. root의 installer는 실제 로드된 module만 router에 전달하고 engine 모듈을 추가 import하지 않는다. 공유 runner/auxiliary 등 기존 경로는 별도로 보존한다.
+
+프로세스를 fork해 상속한 EngineCallbacks는 부모의 정적 sink를 소유하므로 local profiler를 restage하지 않는다. 상속된 local hook은 원 함수로 통과하고, 자식에서 이 관측을 하려면 자식 소유 sink를 가진 새 installer가 필요하다. 이것을 core/worker 관측 완료로 집계하지 않는다. /15·/31·/32·기본 실행 gate와 원격 RPC·auth·출력 완료의 false는 유지한다.

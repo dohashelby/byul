@@ -12,6 +12,8 @@ from types import SimpleNamespace
 import pytest
 
 from guard.adapters import vllm_baseline_graph_callback as graph
+from guard.adapters import vllm_engine_callback_sensor as sensor
+from guard.collectors import engine_callbacks
 
 
 FIXTURE = Path(__file__).parent / 'fixtures/vllm-070-graph/backends.py'
@@ -59,14 +61,15 @@ def exact_module(tmp_path):
     return module
 
 
-def world(tmp_path, *, raises=False):
+def world(tmp_path, *, raises=False, install=True):
     module = exact_module(tmp_path)
     rows = []
     observer = graph.BaselineGraphObserver('a' * 32, sink=rows.append,
         context_provider=lambda: {'fixture': True})
     original = module.PiecewiseBackend.__call__
-    assert graph.instrument(module, observer)
-    assert module.PiecewiseBackend.__call__ is not original
+    if install:
+        assert graph.instrument(module, observer)
+        assert module.PiecewiseBackend.__call__ is not original
     output, replay = Result(), Graph(raises=raises)
     entry = Entry()
     vars(entry).update(need_to_compile=False, compiled=True, use_cudagraph=True,
@@ -279,3 +282,36 @@ def test_object_capacity_gap_never_counts_replay(tmp_path, monkeypatch):
     report = item.observer.report()
     assert 'CACHE_CALLBACK_OBJECT_LIMIT' in report['missing']
     assert graph.project_piecewise(report)['replay_returns_cached_output'] == 0
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_prepared_callback_path_installs_only_explicit_graph_observation(tmp_path, enabled):
+    item = world(tmp_path, install=False)
+    rows = []
+    callbacks = sensor.EngineCallbacks('b' * 32, b'EXAMPLE-piecewise-shared-key-01', rows.append,
+        context_provider=lambda: {'pid': 1, 'start_ticks': 2}, baseline_piecewise_graph=enabled)
+    original = item.module.PiecewiseBackend.__call__
+    assert callbacks.instrument(item.module) is enabled
+    if not enabled:
+        assert item.module.PiecewiseBackend.__call__ is original
+        assert callbacks.baseline_graph is None
+        assert item.owner(4) is item.output and rows == []
+    else:
+        assert callbacks.baseline_graph.secret == b'EXAMPLE-piecewise-shared-key-01'
+        assert item.owner(4) is item.output
+        # The real in-pod path streams; do not manufacture event snapshots
+        # from the observer's deliberately empty in-memory report.
+        report = callbacks.baseline_graph.report()
+        assert report['events'] == [] and len(rows) == 2
+        result = graph.project_piecewise({**report, 'events': rows})
+        assert result['replay_returns_cached_output'] == 1
+        assert result['full_scope'] is False and result['producer_authenticated'] is False
+        callbacks.baseline_graph.gaps.add('EXAMPLE_GRAPH_GAP')
+        callbacks.flush_gaps()
+        assert any(row.get('code') == 'EXAMPLE_GRAPH_GAP' for row in rows)
+    prepared = engine_callbacks.prepare_assets(tmp_path / 'assets', baseline_piecewise_graph=enabled)
+    assert prepared['baseline_piecewise_graph'] is enabled and prepared['engine_started'] is False
+    settings = json.loads((tmp_path / 'assets/settings.json').read_bytes())
+    assert settings['baseline_piecewise_graph'] is enabled
+    assert 'guard_engine_callbacks/vllm_baseline_graph_callback.py' in prepared['assets']
+    assert engine_callbacks.load_prepared(tmp_path / 'assets') == prepared

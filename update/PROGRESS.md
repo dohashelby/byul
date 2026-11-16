@@ -1,3 +1,9 @@
+## 2026-11-16 — 기준 sampler·piecewise 관측의 다음 로컬 통합
+
+- 한 일: 고정599494ed·보완35771d72의 sampler 연결과 graph90963b4e를 별도 미공개 분기에 통합했다. sampler는 이동 전 기록의 잘못된 재연결·기본 restricted 의미 변경·단계별 안정성 누락·필수 child 관측 누락을 집중 검토 뒤 보완했다. graph는 고유 session/process/call/source/code/time pair와 비어 있지 않은 객체 세대를 요구한다.
+- 연결: graph를 기존 engine callback 준비 자산·import installer·소유 스트리밍 sink·gap 배출에 opt-in으로 넣었다. 기본값은 False이며 sampler·graph 직접 회귀를 CPython3.12.8 CI 목록에 추가했다. 이 분기는 공개 승인/CI 전이고 #288의 공개 snapshot과 구분한다.
+- 검증/다음 단계: 두 고정 소스의 정적 집중 검토는 blocker가 없다. 새 graph 생산 연결은 추가 검토하며 최종 source 목록은 후속 묶음 고정 뒤 갱신한다. 로컬 Python/pytest는 실행하지 않았다. REQ19의 bounded metadata/lineage와 기준 profiler local call 경로는 독립 개발을 계속한다.
+
 ## 2026-11-16 — #288 stream 회귀의 fixture 연결 보수
 
 - 결과: head31954efe에서 catalog import 차단이 해소돼 Docker stub·platform 계약 검사가 통과했다. CPython3.12.8은1 failed·179 passed·1 error(pytest11.10초·부모11.907초)다. 새 시험이 공용 case에 필요한 external/writer_factory fixture를 import하지 않았고, 다른 새 시험이 기록 envelope의 source_module을 payload 밖에서 찾았다.

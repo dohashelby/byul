@@ -9,3 +9,5 @@ The clean vLLM 0.7.0 source at commit `5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8`
 The wrapper's live source/code check and the projection's call-to-terminal code equality are separate checks. A pair of records is not independent producer attestation; `producer_authenticated` stays false. No absolute code digest or runtime catalog is inferred from the test fixture.
 
 This is partial REQ-20 input. It cannot prove copied graph inputs are fresh, sample or request output consumption, unchanged output values, GPU completion, or equality with an independent graph-off run. The existing V2 `project_graph_lifetime` contract and verdict are unchanged; no baseline engine-sensor default gate or producer registration opens. GPU lab completion remains UNKNOWN. M-B4's separate semantic work remains deferred.
+
+기존 engine callback 준비 경로는 `baseline_piecewise_graph=True`를 명시할 때만 이 module의 지점을 선택한다. 기본값은 False이며 설정/manifest에 별도로 남는다. 다른 관측과 같은 세션 키·소유 journal을 사용하되 이 관측기는 독립된 부분 기록과 gap을 내며 기존 V2/판정/기본 실행 gate를 열지 않는다. 실제 installer→source 원 함수→스트리밍 sink→엄격한 partial consumer 연결을 별도 회귀로 확인한다.

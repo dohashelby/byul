@@ -4,7 +4,8 @@ import { mockApi, renderAt } from "./helpers";
 import { FullReport, markText } from "../src/pages/ReportView";
 import type { ReportCheck, ReportView } from "../src/api/types";
 
-const side = (security: string) => ({ result_id: "RES-01M598RQXY78K2P5F8YDVJB902", result_revision: 1, security, functional: "PASS", performance: "UNKNOWN", verification_level: "EXAMPLE" });
+const side = (security: string) => ({ result_id: "RES-01M598RQXY78K2P5F8YDVJB902", result_revision: 1, security, functional: "PASS", performance: "UNKNOWN", verification_level: "EXAMPLE", reasons: [] as string[] });
+const SUP_REASON = "security: FAIL because code_selection_confirmed_violations nonempty (observed code_selection_confirmed_violations=[{'field': 'mm_processor_kwargs.code_revision'}])";
 
 const check = (id: string, over: Partial<ReportCheck>): ReportCheck => ({
   check_id: id,
@@ -51,7 +52,7 @@ const report: ReportView = {
   approval: null,
   inputs_manifest: [],
   checks: [
-    check("REQ-01", { headline: "FAIL", candidate: side("FAIL"), comparison: "REGRESSED", marks: [{ kind: "exception", status: "EXPIRED", reason: "임시", expires_at: "2026-10-01T00:00:00Z" }] }),
+    check("REQ-01", { headline: "FAIL", candidate: { ...side("FAIL"), reasons: [SUP_REASON] }, comparison: "REGRESSED", marks: [{ kind: "exception", status: "EXPIRED", reason: "임시", expires_at: "2026-10-01T00:00:00Z" }] }),
     check("REQ-02", { headline: "FAIL", baseline: side("FAIL"), candidate: side("FAIL"), comparison: "STILL_FAILING", marks: [{ kind: "manual_declared" }] }),
     check("REQ-03", { headline: "UNKNOWN", baseline: side("UNKNOWN"), candidate: side("UNKNOWN"), comparison: "UNKNOWN", evidence_source: null, marks: [{ kind: "gap", value: "NO_EXECUTOR" }, { kind: "tested_while_undetermined" }] }),
   ],
@@ -70,6 +71,13 @@ describe("검증 보고서 화면", () => {
     // 질문은 텍스트로만 들어간다
     expect(document.querySelector("b")).toBeNull();
     expect(screen.getAllByText("REQ-01 질문 <b>굵게</b>?").length).toBeGreaterThan(0);
+  });
+
+  it("미충족·미확인 쪽의 판정 이유를 RES 원문 그대로 보여준다", () => {
+    mockApi({});
+    renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
+    expect(screen.getByText(SUP_REASON)).toBeTruthy();
+    expect(screen.getAllByText("판정 이유(미충족·미확인 축)").length).toBe(1); // 이유가 없는 기준 쪽은 표시하지 않는다
   });
 
   it("미확인 점검을 충족처럼 보이게 하지 않는다", () => {

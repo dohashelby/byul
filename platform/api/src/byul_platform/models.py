@@ -211,6 +211,7 @@ class ReportSide(BaseModel):
     functional: str | None
     performance: str | None
     verification_level: str | None
+    reasons: list[str]
 
 
 class ReportMark(BaseModel):

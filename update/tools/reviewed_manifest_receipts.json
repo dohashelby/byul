@@ -445,6 +445,11 @@
       "manifest_sha256": "2c17f9a0f3e2b9a40e510d814c1b240170fbce37368ba89210127af1629edb0c",
       "reviewed_by": "Claude / PR288 main 통합·graph Fields·profiler EngineCoreProc 지점 보수 검토; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T05:53:37Z"
+    },
+    {
+      "manifest_sha256": "4e198d0072e495139f94b95585c4ae5ee4ca7c88d69d7cdb425d4e744ef174a6",
+      "reviewed_by": "Claude / PR291 보고서 판정 이유·main89c8569d 통합 review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T08:09:45Z"
     }
   ]
 }

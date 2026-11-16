@@ -94,3 +94,36 @@ def test_functional_scope_is_displayed(tmp_path):
     store2, pack2, plan2 = pipeline(tmp_path / "b", include=["SUP-01"])
     (sup,) = [r for r in build_report(store2, pack2, plan2, as_of=T0).by_check if r.check_id == "SUP-01"]
     assert sup.functional_scope is None
+
+
+def test_fail_and_unknown_reasons_are_copied_from_result(tmp_path):
+    """FAIL·UNKNOWN 축의 판정 이유는 RES.reasons 원문 그대로 보고서 행에 나온다(PASS 축 이유는 뺀다)."""
+    store, pack, plan = pipeline(tmp_path, scenario="direct_200", include=["REQ-01"])
+    rpt = build_report(store, pack, plan, as_of=T0)
+    row = rpt.by_check[0]
+    res = store.resolve(row.single.result)
+    assert row.single.security == Verdict.FAIL
+    passed = tuple(f"{axis}:" for axis in ("security", "functional", "performance")
+                   if getattr(res.verdicts, axis) not in (Verdict.FAIL, Verdict.UNKNOWN))
+    assert row.single.reasons == [r for r in res.reasons if not r.startswith(passed)]
+    assert any(r.startswith("security: FAIL because") for r in row.single.reasons)
+    assert json.loads(json.dumps(rpt.to_dict()))["by_check"][0]["single"]["reasons"] == row.single.reasons
+
+
+def test_reasons_omitted_when_every_axis_settled():
+    from types import SimpleNamespace
+
+    from guard.core.report import _verdict_reasons
+    from guard.models.objects import SideResult
+
+    settled = SimpleNamespace(verdicts=SimpleNamespace(security=Verdict.PASS, functional=Verdict.PASS,
+                                                       performance=Verdict.NOT_APPLICABLE),
+                              reasons=["security: all pass rules met: x eq True"])
+    assert _verdict_reasons(settled) is None
+    mixed = SimpleNamespace(verdicts=SimpleNamespace(security=Verdict.PASS, functional=Verdict.PASS,
+                                                     performance=Verdict.UNKNOWN),
+                            reasons=["security: all pass rules met: x eq True", "performance: no rule for this axis",
+                                     "execution ABORTED: target lost"])
+    assert _verdict_reasons(mixed) == ["performance: no rule for this axis", "execution ABORTED: target lost"]
+    # 이유가 없으면 직렬화에서 빠져 기존 RPT 해시가 그대로다
+    assert "reasons" not in SideResult(security=Verdict.PASS).model_dump(mode="json")

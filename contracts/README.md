@@ -140,6 +140,14 @@ Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 
 
 ## 변경 이력
 
+### 사용자 요청(2026-11-16) · 쪽별 판정 이유 `sides.<side>.reasons`
+
+보고서에서 FAIL·UNKNOWN의 이유를 보이기 위해 `verification-result` 0.2의 `sides.<side>`에 선택 필드 `reasons`(문자열 배열)를 더했다. 판본과 DRAFT 상태는 유지하고 기존 문서는 그대로 유효하다.
+
+- 값: 그 쪽의 보안·기능·성능 중 FAIL·UNKNOWN 축이 있을 때, 판정(RES)이 남긴 이유 원문(guard RPT `SideResult.reasons`). PASS·NOT_APPLICABLE 축 이름으로 시작하는 이유는 빼고 축 접두어가 없는 이유(실행 중단·정책 맥락)는 남긴다. 없으면 필드를 생략한다.
+- 이유 문장은 팩 규칙표와 수집된 관측값으로 만들어지며 엔진·판본별 원인 문구를 계약이나 화면에 두지 않는다.
+- 따라 할 일: platform은 화면 자료 `ReportSide.reasons`(빈 배열 가능)로 옮겨 점검 상세에 표시한다. runtime은 바꾸지 않는다.
+
 ### 사용자 승인(2026-11-09) · 엔진 식별·병렬 구성·판본 지원 공백
 
 update가 vLLM이나 특정 판본에 묶이지 않고 SGLang(반드시)·TensorRT-LLM(가능하면)으로 확장하도록, 엔진을 식별하는 값과 판본 지원 공백을 계약에 넣었다. 모든 변경은 선택 필드이거나 값을 더하는 것이라 기존 문서는 그대로 유효하다. 각 스키마의 판본(environment·framework-input 0.1, verification-result 0.2)과 DRAFT 상태는 유지한다.

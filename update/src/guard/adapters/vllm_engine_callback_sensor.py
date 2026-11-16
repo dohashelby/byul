@@ -40,6 +40,7 @@ from . import vllm_auxiliary_link_callback as auxiliary_link
 from . import vllm_scoped_consumption_callback as scoped_consumption
 from . import vllm_baseline_slot_sampling as slot_sampling
 from . import vllm_baseline_graph_callback as baseline_graph
+from . import vllm_baseline_attention_metadata as attention_metadata
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -78,8 +79,9 @@ for _name, _points in consumption.TARGETS.items():
 # 같은 설정의 V2 runner 경로: V2 runner 모듈이 불릴 때만 감싼다(lab kernel 대조 세션은 graph replay가 같은 지점을 쓴다).
 for _name, _points in consumption_v2.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
-for _name, _points in (slot_sampling.TARGETS | baseline_graph.TARGETS).items():
-    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+for _targets in (slot_sampling.TARGETS, baseline_graph.TARGETS, attention_metadata.TARGETS):
+    for _name, _points in _targets.items():
+        MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
 # SUP-06 worker shard(B 의존 반환 5): settings의 worker_shards가 참일 때만 감싼다. multiproc 모듈은 분산 관측과 같은 모듈이다.
 for _name, _points in worker_shard.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
@@ -93,7 +95,7 @@ for _name in auxiliary_link.MODULES:
 OPTIONAL = (('link', execution_link.TARGETS), ('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
             ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS), ('shard', worker_shard.TARGETS),
             ('dispatch', transition_dispatch.TARGETS), ('slot_sampling', slot_sampling.TARGETS),
-            ('baseline_graph', baseline_graph.TARGETS))
+            ('baseline_graph', baseline_graph.TARGETS), ('attention_metadata', attention_metadata.TARGETS))
 OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
@@ -121,6 +123,10 @@ class _Keyed:
 
 class CacheObserver(_Keyed, cache.CacheCallbackObserver):
     targets = CACHE_TARGETS
+
+
+class AttentionMetadataObserver(_Keyed, attention_metadata.AttentionMetadataObserver):
+    pass
 
 
 class BaselineGraphObserver(_Keyed, baseline_graph.BaselineGraphObserver):
@@ -388,7 +394,7 @@ class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
                  request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
                  runner_consumption=False, worker_shards=False, transition_dispatches=False, execution_links=False,
-                 auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False, baseline_slot_sampling=False, baseline_piecewise_graph=False):
+                 auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False, baseline_slot_sampling=False, baseline_piecewise_graph=False, baseline_attention_metadata=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -405,6 +411,9 @@ class EngineCallbacks:
         self.baseline_graph = BaselineGraphObserver(session, **options) if baseline_piecewise_graph is True else None
         if self.baseline_graph is not None:
             self.baseline_graph.secret = secret
+        self.attention_metadata = AttentionMetadataObserver(session, **options) if baseline_attention_metadata is True else None
+        if self.attention_metadata is not None:
+            self.attention_metadata.secret = secret
         self.slot.slot_sampling_enabled = self.slot_sampling is not None
         if self.kernel is not None:
             self.kernel.secret = self.graph.secret = secret
@@ -554,7 +563,7 @@ class EngineCallbacks:
                 try: verify()
                 except Exception: observer.gaps.add('OBSERVER_SOURCE_POSTCHECK_FAILED')
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'shard', None), getattr(self, 'dispatch', None), getattr(self, 'link', None), getattr(self, 'auxiliary', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None), self.baseline_graph) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'shard', None), getattr(self, 'dispatch', None), getattr(self, 'link', None), getattr(self, 'auxiliary', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None), self.baseline_graph, self.attention_metadata) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -612,6 +621,7 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             scoped_runner_consumption=settings.get('scoped_runner_consumption') is True,
             baseline_slot_sampling=settings.get('baseline_slot_sampling') is True,
             baseline_piecewise_graph=settings.get('baseline_piecewise_graph') is True,
+            baseline_attention_metadata=settings.get('baseline_attention_metadata') is True,
             auxiliary_roots=settings.get('supply_roots'))
         sys.meta_path.insert(0, Finder(callbacks))
         if settings.get('supply_roots'):

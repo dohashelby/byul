@@ -62,3 +62,5 @@ source/process/owner/time/field/metadata tampering, missing terminal records,
 substituted metadata and preserved backend exceptions. Local Python/pytest was
 not run; Linux CI must validate this new file, including on observer Python
 3.12.8. No new workflow edit is made here because root owns CI integration.
+
+기존 callback 준비 경로에 `baseline_attention_metadata=True`를 명시하면 이 두 source 지점만 opt-in으로 설치한다. 기본값은 False이며 설정·manifest·asset bytes에 남는다. 같은 GPUModelRunner 모듈의 sampler 지점은 module별 point 목록에 함께 보존하고, 원 sampler/graph/기존 V2 gate를 열지 않는다. 직접 회귀는 실제 원 함수→공유 소유 sink→typed partial consumer를 연결하며 native library/dispatch/범위/초기화/완료·전체 질문의 false를 유지한다.

@@ -166,6 +166,7 @@ jobs:
                   "tests/test_release_observation_variants.py", "tests/test_ma6_baseline_startup.py",
                   "tests/test_ma6_baseline_profiler.py", "tests/test_ma6_baseline_stream.py",
                   "tests/test_ma6_baseline_slot_sampling.py", "tests/test_ma6_baseline_graph.py",
+                  "tests/test_ma6_baseline_attention_metadata.py", "tests/test_ma6_baseline_profiler_local.py",
                   "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-observer-3128")])
           print(f"Observer 3.12.8 parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
           raise SystemExit(result.returncode)

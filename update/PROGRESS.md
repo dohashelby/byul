@@ -1,3 +1,9 @@
+## 2026-11-16 — 기준 attention 메타데이터의 명시적 준비 연결
+
+- 한 일: 검토한1194698c의 실제 준비 반환→attention 입력/분기·반환 사실과000beb96의 프로세스별 profiler local call을 미공개 통합 분기에 보존했다. attention은 기존 callback 경로에 기본 False인 명시 옵션으로만 넣고 정확 source/공유 키·소유 sink·직접 consumer 회귀를 연결했다. source 지점 목록은 같은 runner의 sampling 지점을 덮지 않고 합친다.
+- 경계: NumPy scalar interface·실제 native op/library·tensor 범위·초기화·GPU 완료는 검증하지 않았다. profiler local call은 API와 core 내부 segment만 관측하며 원격 causal/RPC 전체·auth·출력 완료는 미확인이다. /15·/31·/32·과거 private pins·기존 기본 실행기 gate를 유지한다.
+- 다음 단계: 생산 연결 집중 검토와 최종 source 목록 고정 후 같은 #288의 후속 범위 공개를 별도 요청한다. 공개된7145627e의 CI는 이 미공개 source의 검증으로 세지 않는다. 로컬 Python/pytest·GPU는 실행하지 않았다.
+
 ## 2026-11-16 — 기준 sampler·piecewise 관측의 다음 로컬 통합
 
 - 한 일: 고정599494ed·보완35771d72의 sampler 연결과 graph90963b4e를 별도 미공개 분기에 통합했다. sampler는 이동 전 기록의 잘못된 재연결·기본 restricted 의미 변경·단계별 안정성 누락·필수 child 관측 누락을 집중 검토 뒤 보완했다. graph는 고유 session/process/call/source/code/time pair와 비어 있지 않은 객체 세대를 요구한다.

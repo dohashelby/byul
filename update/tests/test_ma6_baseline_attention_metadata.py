@@ -72,7 +72,7 @@ def cumsum(values):
 def add(left, right, *, out):out[:] = left + right
 
 
-def setup(tmp_path):
+def setup(tmp_path, *, install=True):
     rows = []
     def sink(row):
         assert len(rows) < 256
@@ -92,10 +92,11 @@ def setup(tmp_path):
     backend_module.flash_attn_varlen_func = lambda **kwargs:selected.append('regular')
     backend_module.cascade_attention = lambda *args, **kwargs:selected.append('cascade')
     backend_module.FlashAttentionImpl.forward.__defaults__ = (None,)
-    for name, points in attention.TARGETS.items():
-        for point in points:
-            cls, method = point.split('.')
-            setattr(vars(modules[name])[cls], method, observer.wrap(modules[name], point))
+    if install:
+        for name, points in attention.TARGETS.items():
+            for point in points:
+                cls, method = point.split('.')
+                setattr(vars(modules[name])[cls], method, observer.wrap(modules[name], point))
     batch = Metadata(num_reqs=2, req_ids=['low-entropy-A', 'low-entropy-B'], req_id_to_index={'low-entropy-A':0, 'low-entropy-B':1},
         num_computed_tokens_cpu=Array([4, 4]), token_ids_cpu=NS(shape=(2, 16)), token_ids_cpu_tensor=Tensor())
     block_cpu = Tensor(Array([0, 1, 2, 3, 4, 5, 6, 7]));block_device = Tensor()
@@ -260,3 +261,36 @@ def test_explicit_wrapper_restoration_retains_original_source_behavior(tmp_path)
     provided, returned = forward(world, None)
     assert returned is provided
     assert project(world)['metadata_chains'][0]['profiling_returned_provided_output_observed'] is True
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_prepared_callback_path_keeps_attention_observation_explicit(tmp_path, enabled):
+    from guard.adapters import vllm_engine_callback_sensor as sensor
+    from guard.collectors import engine_callbacks
+    world = setup(tmp_path, install=False)
+    rows = []
+    callbacks = sensor.EngineCallbacks('a' * 32, b'EXAMPLE-attention-shared-key-01', rows.append,
+        context_provider=lambda: {'pid': 11, 'start_ticks': 22}, baseline_attention_metadata=enabled)
+    originals = {point: vars(vars(world.modules[name])[point.split('.')[0]])[point.split('.')[1]]
+        for name, points in attention.TARGETS.items() for point in points}
+    for module in world.modules.values():
+        assert callbacks.instrument(module) is enabled
+    metadata, _ = prepare(world)
+    forward(world, metadata)
+    if enabled:
+        assert callbacks.attention_metadata.secret == b'EXAMPLE-attention-shared-key-01'
+        assert callbacks.attention_metadata.report()['events'] == []
+        result = attention.project(rows, session_sha256=cache.base.sha('a'.encode() * 32),
+            process_sha256=callbacks.attention_metadata.process_sha256)
+        assert len(result['source_calls']) == 2 and len(result['metadata_chains']) == 1
+        assert result['whole_question_complete'] is False
+    else:
+        assert callbacks.attention_metadata is None and rows == []
+        for name, points in attention.TARGETS.items():
+            for point in points:
+                assert vars(vars(world.modules[name])[point.split('.')[0]])[point.split('.')[1]] is originals[point]
+    prepared = engine_callbacks.prepare_assets(tmp_path / 'assets', baseline_attention_metadata=enabled)
+    assert prepared['baseline_attention_metadata'] is enabled and prepared['engine_started'] is False
+    assert 'guard_engine_callbacks/vllm_baseline_attention_metadata.py' in prepared['assets']
+    assert json.loads((tmp_path / 'assets/settings.json').read_bytes())['baseline_attention_metadata'] is enabled
+    assert engine_callbacks.load_prepared(tmp_path / 'assets') == prepared

@@ -10,6 +10,11 @@
 - 연결: graph를 기존 engine callback 준비 자산·import installer·소유 스트리밍 sink·gap 배출에 opt-in으로 넣었다. 기본값은 False이며 sampler·graph 직접 회귀를 CPython3.12.8 CI 목록에 추가했다. 이 분기는 공개 승인/CI 전이고 #288의 공개 snapshot과 구분한다.
 - 검증/다음 단계: 두 고정 소스의 정적 집중 검토는 blocker가 없다. 새 graph 생산 연결은 추가 검토하며 최종 source 목록은 후속 묶음 고정 뒤 갱신한다. 로컬 Python/pytest는 실행하지 않았다. REQ19의 bounded metadata/lineage와 기준 profiler local call 경로는 독립 개발을 계속한다.
 
+## 2026-11-16 — #288 기존 fixture 증거 경로 보존
+
+- 결과: head7145627e CPython3.12.8은1 failed·180 passed(pytest10.81초·부모11.577초)였다. 공용 case가 이미 소유한 assets 디렉터리에 새 /33 자산을 만들려 해 기존 증거 덮어쓰기 거부가 올바르게 동작했다.
+- 보수: 새 stream 자산은 별도 baseline-stream/assets 아래에 준비하고 기존 case evidence를 보존한다. 덮어쓰기 거부·기존 assert·제품 source/관문은 바꾸지 않았다. 기본 suite 결과도 수집해 같은 PR의 시험 보수로 재검증한다. 로컬 Python/pytest는 실행하지 않았다.
+
 ## 2026-11-16 — #288 기준 전용 슬롯 대상과 후보 계약 분리
 
 - 원 결과: head31954efe 기본 suite는3 failed·13792 passed·기존34 skipped·10 warnings·1 error(pytest627.85초·부모628.717초)였다. stream 두 시험의 fixture/envelope 오류 외에 기준 전용 clear를 후보 판본 대상 목록에도 광고한 충돌과, 새 승인 대기 원인을 이전 원인 집합만 받던 시험의 불일치가 있었다. 원 로그 SHA d47fd0eb72157f5371e2bac4184225b10594a1c2ec2992670e1d21024874af90.

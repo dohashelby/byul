@@ -228,7 +228,8 @@ def test_exact_h11_producer_reaches_original_stream_projection_without_raw_id(tm
 
 
 def test_exact_stream_rows_parse_under_prepared_baseline_profile(case, monkeypatch):
-    prepared, world = composed_world(case.root, monkeypatch)
+    # The shared capture case owns root/assets already; preserve that evidence.
+    prepared, world = composed_world(case.root / 'baseline-stream', monkeypatch)
     asyncio.run(original.invoke(world, 'byul-lif04-' + 'c' * 32 + '-normal'))
     produced = [row for row in world.observer.recorded if row['event'] in {'MODULE', 'STREAM_BUFFER', 'ASGI'}]
     def insert(rows):

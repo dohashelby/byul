@@ -610,6 +610,11 @@
       "manifest_sha256": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
       "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-17T08:15:35.982363+00:00"
+    },
+    {
+      "manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+      "reviewed_by": "Codex / partial stall release scope; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T09:20:32.744111+00:00"
     }
   ]
 }

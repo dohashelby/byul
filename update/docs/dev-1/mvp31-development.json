@@ -611,5 +611,55 @@
       "test_or_deadline_relaxed": false,
       "scope": "Recorded duration values are preserved separately. The positive source-integrity and default-suite checks are not a whole-run clock stability qualification."
     }
+  },
+  "post_j02_remaining_implementation": {
+    "status": "IN_PROGRESS",
+    "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+    "strict_default_release_ack_required": true,
+    "explicit_stall_application_with_release_gap_supported": true,
+    "malformed_release_and_nonstall_scope_rejected": true,
+    "selected_declared_side_all69_offline_inventory": true,
+    "default_138_side_inventory_preserved": true,
+    "native_input_sdk_source_changed": false,
+    "native_input_registered_source_sha256": "5c9e6a5c956b8f2ec0873e71941776eb7027b16b4fd185c4606dd2125938b5d6",
+    "rank_producer_registered": false,
+    "new_gpu_executed": false,
+    "all69_actual_execution_complete": false,
+    "tests": {
+      "side-stall-release-gap-final": {
+        "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+        "exit_code": 0,
+        "parent_wall_seconds": 29.666,
+        "summary_lines": [
+          "........................................................................ [ 24%]",
+          "........................................................................ [ 49%]",
+          "........................................................................ [ 73%]",
+          "........................................................................ [ 98%]",
+          "....                                                                     [100%]",
+          "292 passed, 1 deselected in 28.63s"
+        ]
+      },
+      "side-stall-release-gap-negative": {
+        "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+        "exit_code": 0,
+        "parent_wall_seconds": 7.583,
+        "summary_lines": [
+          ".............................                                            [100%]",
+          "29 passed in 6.66s"
+        ]
+      },
+      "side-single-environment-b894": {
+        "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+        "exit_code": 0,
+        "parent_wall_seconds": 26.196,
+        "summary_lines": [
+          "........................................................................ [ 32%]",
+          "........................................................................ [ 65%]",
+          "........................................................................ [ 98%]",
+          "...                                                                      [100%]",
+          "219 passed, 1 deselected in 24.86s"
+        ]
+      }
+    }
   }
 }

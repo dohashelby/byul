@@ -7,6 +7,16 @@ uv run python -m tools.mvp_live_readiness --write-template /outside/input-source
 uv run python -m tools.mvp_live_readiness --index /outside/filled-sources.json --output /outside/readiness-next.json
 ```
 
+현재 작업지시서의 한 쪽만 독립 실행 준비할 때는 `--side baseline` 또는 `--side candidate`를 명시한다. 판본·이미지는 작업지시서의 해당 행에서 그대로 읽으며, 비교를 실행하거나 다른 쪽 결과를 이월하지 않는다. 한 쪽 모드는69개 행을 모두 남기고 색인의 다른 쪽 입력은 누락시키지 않고 거부한다. 기본 두 쪽138개 행 동작은 유지한다.
+
+```bash
+uv run python -m tools.mvp_live_readiness --write-template /outside/selected-sources.json --side candidate --output /outside/selected-readiness.json
+```
+
+파일 결합이 유효해도 실제 대상 검증·실행·결과 플래그는 계속 false/null이다. 실제 GPU의 새 ENV/target/prepared와 항목별 실행 입력이 필요하며, 종료한 세대의 원본은 새 실행 준비물로 바꾸지 않는다.
+
+통신 정체 원 기록에서 적용은 확인됐지만 해제 원 사건이 없을 때는 `tools.rank_rpc_fault_inputs --allow-missing-stall-release`를 명시한 별도 부분 수집을 사용할 수 있다. 기본 변환은 계속 엄격하게 거부한다. 이 모드도 적용의 원 source/HMAC/queue/제품 결합·해제 요청 bytes/nonce/기한·클라이언트 메타데이터를 대조한다. 잘못된 해제 원 사건을 미관측으로 바꾸지 않는다. 원 해제 사건이 없으면 `fault_released`를 만들지 않고 `RANK_RPC_RELEASE_UNOBSERVED`, 미등록·불완전·실행 미자격 상태를 유지한다. 다른 장애 종류로 이 모드를 확장하지 않는다.
+
 색인은 `guard-mvp-live-input-sources/1`이며 `pack_ref`와 `inputs`를 가진다. 각 입력은 `check_id`, `side`(baseline/candidate), `environment`, `policy`, `configuration`이다. 파일 세 개는 각각 `path`와 파일 bytes의 `sha256`을 요구한다. 중복·범위 밖 ID·오래된 팩·추가 필드는 거부한다. 빈 입력이어도 현행 팩의 69개/138쪽을 모두 남긴다.
 
 봉인된 ENV의 MVP 엔진/이미지·GPU 기본 사실, 정책 범위/필수 값/타입, 쪽·점검별 설정, real/kubernetes 구현의 판본별 가용성, target의 정확 ENV Ref, 기존 실행 결합을 확인한다. fake/common-input은 실제 능동 실행 입력으로 받지 않는다. EXAMPLE 파일의 형식이 맞아도 실제 자격으로 올리지 않는다. 파일 결합이 유효해도 `ready_for_execution`, `live_target_verified`, `input_preflight_passed`, `engine_executed`는 false이고 결과는 null이다. 실제 노드에서 기존 `guard prepare-update`가 필요하다.

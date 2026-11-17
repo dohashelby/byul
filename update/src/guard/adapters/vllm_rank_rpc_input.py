@@ -164,6 +164,20 @@ def http_delivery(rows,profile,header,client,applied):
 
 def project(prepared, capture, expected):
     """호출자가 독립적으로 공급한 예상 제품 범위와 대조하며 비밀/원문을 반환하지 않는다."""
+    return _project(prepared, capture, expected, tolerate_stall_release_gap=False)
+
+
+def project_stall_with_release_gap(prepared, capture, expected):
+    """Keep verified stall facts when a valid release request has no source ack.
+
+    This opt-in collection path never supplies a release, detection, delivery
+    or recovery event from an actor request alone. The strict entry point keeps
+    requiring the original release acknowledgment.
+    """
+    return _project(prepared, capture, expected, tolerate_stall_release_gap=True)
+
+
+def _project(prepared, capture, expected, *, tolerate_stall_release_gap):
     control.product_binding(expected, expected.get('session') if type(expected) is dict else None)
     prepared, capture = Path(prepared), Path(capture)
     files = _Files()
@@ -191,6 +205,8 @@ def project(prepared, capture, expected):
     physical = read_control('control-physical-action.json')
     _require(case['arm'] == arm and case['ready'] == ready and case['physical_action'] == physical)
     stall = arm.get('fault_kind')=='communication-stall'
+    if tolerate_stall_release_gap:
+        _require(stall, 'RANK_RPC_STALL_PARTIAL_SCOPE_REQUIRED')
     _require(set(arm) == control.ARM_FIELDS | {'product_binding'} | ({'reply_binding'} if stall else set())
         and arm['schema']==('guard-rank-rpc-arm/3' if stall else 'guard-rank-rpc-arm/2') and arm['fault_kind'] in FAULT_KINDS
         and arm['settings_sha256'] == sha256(files.raw[prepared / 'settings.json']).hexdigest()
@@ -344,11 +360,19 @@ def project(prepared, capture, expected):
             and resume['ready_sha256']==hashes['control-ready.json'])
         action=read_control('control-stall-release.json')
         _action(action,'release',arm,hashes,'control-physical-resume.json')
-        released=_selected(rows,event='CONTROL_RELEASE',call=ready['call_hmac_sha256'])
-        _phase(released,call,arm,hashes,hashes['control-stall-release.json'])
-        control.reply_binding(arm['reply_binding'],released)
-        _times(applied,resume['published_ns'],released['observation_ns'],arm['expires_ns'])
-        events.append({'event':'fault_released','at_ns':released['observation_ns'],'ack':True})
+        releases=[row for row in rows if row.get('event')=='CONTROL_RELEASE'
+            and row.get('call_hmac_sha256')==ready['call_hmac_sha256']]
+        _require(len(releases)<=1)
+        if releases:
+            released,=releases
+            _phase(released,call,arm,hashes,hashes['control-stall-release.json'])
+            control.reply_binding(arm['reply_binding'],released)
+            _times(applied,resume['published_ns'],released['observation_ns'],arm['expires_ns'])
+            events.append({'event':'fault_released','at_ns':released['observation_ns'],'ack':True})
+        else:
+            _require(tolerate_stall_release_gap)
+            _times(applied,resume['published_ns'],arm['expires_ns'])
+            codes.append('RANK_RPC_RELEASE_UNOBSERVED')
     else:
         _require(case['physical_resume'] is None)
         codes.append('RANK_RPC_RELEASE_UNOBSERVED')

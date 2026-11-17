@@ -3341,3 +3341,10 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 검토 중 새 trace callback의 BaseException 격리가 관측 도중 발생한 SystemExit/KeyboardInterrupt/GeneratorExit까지 삼킬 수 있음을 확인했다. 일반 관측 오류는 고정 gap으로 격리하되 종료·중단은 원 객체 그대로 전파한다. gap 기록 중 새 종료가 발생해도 무시하지 않으며, 부분 frame 상태는 정리한다. 기존 SDK bytes는 변경하지 않았다.
 - source4dc2e02e/628핀과 검토 기록 동결 뒤 Python3.12.3 원 객체/종료 전파·gap 기록 실패·원 응답/워커 연결·실제 종료 자식·기존 RPC/물리 장애/SDK 자격·아키텍처/불변식351통과·기존1deselected(pytest22.63초·부모23.368초). 모의 종료 예외와 실제 stdlib 프로세스 시험이며 GPU 실증은 아니다. 기존 기대값·정책·판정 기한·제외를 완화하지 않았다.
 - GPU 준비 점검: 과거 J02 controller는20달러/2시간을 고정 검사하며 오래된 source overlay를 설치하므로 실행하지 않는다. 새 실행에는 승인 범위의 credit-guarded runner와 현재 source/입력 묶음을 사용해야 한다. 신규 GPU·69개 실제 실행/원 RPT·새 관측기 실제 등록은 아직 수행하지 않았다.
+
+## 2026-11-18 — 선택 파일의 커널 읽기·PIDFD 귀속 후보
+
+- 한 일: 기존 등록 SDK를 바꾸지 않고 stdlib fanotify CLASS_NOTIF/REPORT_PIDFD 기반의 별도 선택 inode 관측과 source-pinned node 수집 경로를 추가했다. file content·경로 원문을 출력하지 않고, 읽기/열기/exec-open 사건을 구분한다. kernel이 준 PIDFD·실제 시작/namespace/UID·선택 파일의 전후 metadata를 대조하고 다른 Pod/관측기 자신의 접근은 배제한다. permission event·무제한 queue·target 신호/기동은 사용하지 않는다. retained inode와 현재 path가 모두 일치해야 안정된 선택으로 남긴다.
+- 자격 경계: opaque 기존 containerd task proof의 초기 신원과 프로그램/입력/원본 packet SHA·시간 구간을 연결한다. mmap/cache 소비·parser 수락·전체 공급물 inventory·관측 전후 root mount의 독립 대조·실제 GPU 자격/등록은 아직 주장하지 않는다. syscall 거부·오래된/종료 PID·변경 파일·큐 넘침·관측 한도는 공백이며 SUP03 판정 규칙을 결과에 맞춰 바꾸지 않는다.
+- 시험: sourcec7c24bb0/631핀·검토 기록 동결 뒤 Linux CPython3.12.3 새 FD/PIDFD·inode/세대/시계·기존 node/GPU source·불변식284통과·기존1deselected(pytest7.19초·부모7.751초). 같은 source의 node image·아키텍처/경계·기존 SDK 자격/소스 gate 통합155통과(10.74초·부모11.367초). 별도 실행이므로 합산하지 않는다. 실제 소유 stdlib 자식/FD와 모의 kernel packet 결과이며 실제 fanotify/GPU 자격으로 올리지 않는다. 기존 기대값·제외·정책 기한을 변경하지 않았다.
+- 비용/다음 단계: AWS CLI 인증 만료로 최신 크레딧/guard 재조회가 실패했다. 새 로그인 절차를 유지하며 새 GPU는 생성하지 않았다. 현재 head1be96bfc의20개 CI 검사 성공(두 기본 job 각각14722통과·기존34skip)을 이 새 source에 이월하지 않는다. GPU 자격·전체69개 실행/원 RPT는 계속 미완료다.

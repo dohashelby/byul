@@ -1176,3 +1176,5 @@ PLT04의 새 선언/worker 환경 이름 inventory는 기존 자격 producer를 
 
 - LIF08의 원 탐지 연결은 기존 등록 IPC/native SDK를 변경하지 않는 별도 passive source trace로 개발한다. 정확 이미지/CPython/파일·함수 고정값과 기존 deferred Future의 같은 요청 결합을 다시 확인한 프레임만 관측한다. 원래 reader의 공유 메모리 FD 지문과 예외 객체/직접 cause의 세션 HMAC, 명령 위치만 기록하며 응답 값·메시지·토큰·프롬프트는 읽지 않는다.
 - 반환 값이 None이라는 이유로 예외 전파를 추정하지 않는다. 원 함수의 RETURN 명령 위치와 예외 사건을 구분한다. 원본 예외를 Future에 저장한 뒤 정상 반환한 함수와 실제 unwind를 별도로 기록한다. 기존 debugger/profiler는 덮어쓰지 않는다. 새 관측은 후보이며 실제 GPU 자격·등록·장애 원인/상위 통지/회복/전체 자원 회수는 별도 증거가 필요하다.
+
+- 2026-11-18: SUP03/04 후속 선택 파일 귀속은 notification-only kernel PIDFD로 현재 소유 PID namespace와 실제 파일 metadata를 대조한다. OPEN만으로 read/parser 소비를 만들지 않고 mmap/cache/전체 공급물 범위와 GPU 등록은 별도 증거가 있을 때만 확장한다. 기존 등록 SDK는 변경하지 않는다.

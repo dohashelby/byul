@@ -297,15 +297,19 @@ class ResponseTrace:
                     if state['root'] == id(frame):
                         self.frames = {key: value for key, value in self.frames.items() if value['root'] != id(frame)}
             return self.callback
-        except BaseException:
-            # Never propagate an observer error into the engine or serialize it.
+        except BaseException as observation_error:
+            # Keep observer failures private, while preserving process stops.
             self.disabled, self.diagnostic = True, 'RANK_RESPONSE_OBSERVATION_INCOMPLETE'
             self.frames.clear()
             if self.on_gap is not None:
                 try:
                     self.on_gap(self.diagnostic)
-                except BaseException:
-                    pass
+                except BaseException as gap_error:
+                    if (isinstance(gap_error, (KeyboardInterrupt, SystemExit, GeneratorExit))
+                            and not isinstance(observation_error, (KeyboardInterrupt, SystemExit, GeneratorExit))):
+                        raise
+            if isinstance(observation_error, (KeyboardInterrupt, SystemExit, GeneratorExit)):
+                raise
             return None
 
     def install(self):

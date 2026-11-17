@@ -246,6 +246,39 @@ def test_existing_debugger_or_profiler_is_preserved(setup,kind):
     finally:setter(before)
 
 
+@pytest.mark.parametrize('stop',[SystemExit(77),KeyboardInterrupt('EXAMPLE-stop'),GeneratorExit('EXAMPLE-stop')])
+def test_process_stop_during_observation_is_not_suppressed_as_a_sensor_failure(setup,stop):
+    tracer,owner,scheduled=setup[2],setup[5],setup[6]
+    future=owner.execute(scheduled)
+    def stopping(row):raise stop
+    tracer.emit=stopping
+    tracer.install()
+    try:
+        with pytest.raises(type(stop))as raised:future.result()
+        assert raised.value is stop
+        assert tracer.disabled and tracer.diagnostic=='RANK_RESPONSE_OBSERVATION_INCOMPLETE'
+        assert tracer.frames=={}and sys.gettrace()is None
+    finally:tracer.close()
+
+
+@pytest.mark.parametrize('stop',[False,True])
+def test_secondary_gap_failure_preserves_stops_and_isolates_ordinary_observer_errors(setup,stop):
+    tracer,owner,scheduled=setup[2],setup[5],setup[6]
+    future=owner.execute(scheduled)
+    def broken(row):raise OSError('EXAMPLE observer failure')
+    def gap(code):
+        if stop:raise SystemExit(88)
+        raise BaseException('EXAMPLE gap failure')
+    tracer.emit=broken;tracer.on_gap=gap;tracer.install()
+    try:
+        if stop:
+            with pytest.raises(SystemExit)as raised:future.result()
+            assert raised.value.code==88
+        else:assert future.result()is owner.response.output
+        assert tracer.disabled and tracer.frames=={}
+    finally:tracer.close()
+
+
 def test_no_frame_future_or_exception_is_retained_by_observer(setup):
     module,observer,tracer,old_rows,rows,owner,scheduled,path,memory=setup
     future=owner.execute(scheduled);reference=weakref.ref(future)

@@ -710,6 +710,11 @@
       "manifest_sha256": "f5992c7dce698103e157aea3cc5c2d7326f6ef213251b93ff6d583fe1d7da266",
       "reviewed_by": "Codex / exact original rejection sites and separate GPU census qualification; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-17T17:52:38.601392+00:00"
+    },
+    {
+      "manifest_sha256": "4dc2e02ec897a7ddded9636c9de8b824f24182bbc3c37bcb1459de71b747d5f7",
+      "reviewed_by": "Codex / exact original rejection sites and separate GPU census qualification; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T18:15:31.119696+00:00"
     }
   ]
 }

@@ -3311,3 +3311,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 원 실패: cccc77e1의 두 Linux 기본 CI는 같은 Unix 소켓 경로 길이 오류로 각각14615통과·1실패·기존34skip였다(pytest619.03/706.78초, 부모619.944/708.463초). 실패 원본은 보존했다.
 - 보수: 소유자 전용 디렉터리를 O_DIRECTORY/O_NOFOLLOW로 열고 전후 inode·권한을 검증한 뒤 보유 FD의 짧은 /proc/self/fd 경로에 소켓을 만든다. 전역 cwd나 공개 임시 경로는 사용하지 않는다. 클라이언트도 같은 디렉터리 검증과 기존 HMAC/nonce 검사를 유지한다. 원 시험에 긴 경로 사례를 추가하고 디렉터리 교체·심볼릭 링크·공개 권한 거부를 확인했다.
 - 확인: source2b4c073e는 변경하지 않았다. Python3.12.3 감독 도구·불변식151통과·기존1deselected(pytest6.57초·부모7.092초). 전체 CI는 새 head에서 확인한다. 01:35 KST 추정 크레딧12.23달러, 보호 범위 활성 인스턴스/EBS/보안그룹0개·보호 예약 활성이다. GPU 자격과69개 실제 실행은 여전히 미완료다.
+
+## 2026-11-18 — 별도 원본 응답 대기 관측·닫힌 반출 검증 후보
+
+- 한 일: 등록된 IPC/native SDK를 수정하지 않고 별도 source trace·private namespace 확장·HMAC 파일 sink·준비/반출 검증 도구를 추가했다. 정확 CPython/이미지/파일·함수·명령 위치를 확인하고 같은 Future/요청의 원 reader FD·직접 cause·native error→Future 전파를 구분한다. 이전 Future를 먼저 drain하는 경우는 현재 요청으로 승격하지 않는다. 원 응답·예외 메시지는 읽지 않으며 출력 값은 반환 동작만 보존한다. debugger/profiler·관측 실패·변조·누락·다른 세대·부모 frame 혼입은 완전한 graph를 만들지 않는다.
+- 자격 경계: 별도 bootstrap은 원 sitecustomize를 먼저 실행하며 기존 private SDK 경로에 새 module 위치만 더한다. 준비 도구는 원 SDK bytes·키를 바꾸지 않는다. 새 서명 검증/원본4지점 graph는 파일과 소스 연결의 근거이며, GPU 장애 인과·HTTP 상위 전달·그룹 회복·자원 회수·생산자 등록을 선언하지 않는다. 실제 GPU 자격과 제품의 전체 인과 연결은 남아 있다.
+- 시험: source3dd6fc9b/627핀, Linux CPython3.12.3 서명/소스 graph·원 RPC/Future/IPC·아키텍처/불변식260통과·기존1deselected(pytest9.72초·부모10.255초). 이후 시험만 추가한 같은 source의 준비/원 SDK·native 수집/부트스트랩·불변식245통과·기존1deselected(pytest21.62초·부모22.215초). 합산하지 않는다. 초기 새 시험의 문법 오류와 존재하지 않는 selector로 끝난 무실행 로그도 보존했다. 기존 assert/기대값/기한·제외는 완화하지 않았다.
+- 전체 CI 이력: 부모4f43acae(source2b4c073e)의20개 검사 성공. 두 기본 job은 각각14618통과·기존34skip(pytest830.97/959.52초, 부모832.324/960.887초). 이 결과를 새3dd6 소스의 전체 성공으로 이월하지 않는다. 새 head의 CI를 별도로 확인한다.
+- 다음 단계: 새 실제 GPU 자격/등록·LIF08 상위 통지/그룹 회복·LIF11 전체 자원/새 정상 세대, SUP04/PLT01/PLT04 남은 범위와fresh69개 입력·실행·RPT. GPU는 새로 생성하지 않았으며$5준비금·최대$6/45분 제한을 유지한다.

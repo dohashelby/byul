@@ -661,5 +661,66 @@
         ]
       }
     }
+  },
+  "main_continuation_node_gpu_references": {
+    "status": "IMPLEMENTED_CPU_VERIFIED_GPU_UNQUALIFIED",
+    "source_manifest_sha256": "8dfa30ddc14cadb7aa455d9cfd74d96a905af2261c6520391ab394c72de5db7c",
+    "source_checkout": "pr-snapshots/mvp030-j02-checkpoint-20261117",
+    "linux_checkout": "/home/youngjo/.cache/byul-mvp030-main-remaining-20261117",
+    "kernel_node_task_anchor_required": true,
+    "node_gpu_processes_opt_in": true,
+    "all_host_pid_fd_scan_bounded": true,
+    "nvml_confirmed_before_after": true,
+    "previous_raw_facts_preserved_on_later_failure": true,
+    "native_evidence_report_export_restore_connected": true,
+    "native_input_sdk_source_changed": false,
+    "native_input_registered_source_sha256": "5c9e6a5c956b8f2ec0873e71941776eb7027b16b4fd185c4606dd2125938b5d6",
+    "gpu_source_qualified": false,
+    "gpu_producer_registered": false,
+    "whole_gpu_release_verified": false,
+    "whole_group_recovery_verified": false,
+    "actual_gpu_executed": false,
+    "new_aws_resources_created": false,
+    "all69_complete": false,
+    "tests": {
+      "main-node-gpu-product-7b37-rerun": {
+        "source_manifest_sha256": "7b37d06f8632158bef86eb05894368e71371a5adeb1f3ca7c8ff1c67bd6908ce",
+        "exit_code": 0,
+        "parent_wall_seconds": 116.317,
+        "summary_lines": [
+          "........................................................................ [ 18%]",
+          "........................................................................ [ 37%]",
+          "........................................................................ [ 55%]",
+          "........................................................................ [ 74%]",
+          "........................................................................ [ 93%]",
+          "..........................                                               [100%]",
+          "386 passed, 1 deselected in 115.53s (0:01:55)"
+        ]
+      },
+      "main-node-gpu-final-boundaries-7b37": {
+        "source_manifest_sha256": "7b37d06f8632158bef86eb05894368e71371a5adeb1f3ca7c8ff1c67bd6908ce",
+        "exit_code": 0,
+        "parent_wall_seconds": 15.142,
+        "summary_lines": [
+          "........................................................................ [ 78%]",
+          "....................                                                     [100%]",
+          "92 passed in 14.44s"
+        ]
+      }
+    },
+    "final_lf_verification": {
+      "source_manifest_sha256": "8dfa30ddc14cadb7aa455d9cfd74d96a905af2261c6520391ab394c72de5db7c",
+      "exit_code": 0,
+      "parent_wall_seconds": 21.577,
+      "summary_lines": [
+        "........................................................................ [ 24%]",
+        "........................................................................ [ 49%]",
+        "........................................................................ [ 74%]",
+        "........................................................................ [ 99%]",
+        ".                                                                        [100%]",
+        "289 passed, 1 deselected in 20.76s"
+      ]
+    },
+    "prior_7b37_tests_are_pre_lf_history": true
   }
 }

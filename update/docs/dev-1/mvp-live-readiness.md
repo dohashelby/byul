@@ -39,3 +39,19 @@ uv run python -m tools.mvp_live_readiness --write-template /outside/selected-sou
 6. 실행/실패/미수집/비적용·승인된 UNKNOWN을 분리해 플랫폼 원본 보고서와 촬영 기록에 연결한다. 실제 실행 전의 설명 영상·EXAMPLE/NOT_RUN 보고서는 촬영 근거에서 제외한다.
 
 새 GPU 시간·비용·대규모 다운로드와 이후 실제 등록은 별도 세션 범위에서 진행한다. 지난 $20/2시간 세션은 정리됐으므로 재사용 가능한 실행 승인이 아니다.
+
+## LIF-11 로컬 노드의 GPU 참조 관측
+
+기존 `[resource_recovery]`의 target·prepared·selection에 아래 옵션을 추가하면, 선택한 GPU worker의 커널 PID/시작 시각/UID/namespace를 호스트 PID와 연결하고 GPU UUID·장치 minor·NVML 사용 PID·장치 FD를 전후 수집한다. 기본 동작은 유지한다.
+
+```toml
+[resource_recovery]
+node_gpu_processes = true
+node_gpu_containerd_address = "/run/k3s/containerd/containerd.sock"
+```
+
+guard가 대상 Linux 노드에서 실행되어야 한다. 기존 live containerd 이미지·task·커널 루트 마운트 증거를 재사용하고, 그 task의 PID1/시작 시각/PID namespace 및 실제 노드·Pod·CID를 전후 대조한다. 다른 호스트나 임의 Unix socket의 자료를 대신 받지 않는다. 조회 명령과 입력은 고정하고, 출력·PID·FD·시간 범위를 제한한다. 사용자 입력이나 GPU 메모리 내용은 읽지 않는다.
+
+NVML 조회를 FD 수집 앞뒤에 반복하고 실제 host `/proc` 범위를 확인한다. PID 재사용·다른 GPU 작업·빈 조회 뒤 남은 FD·부분 수집·N/A/식별 불가·MIG 활성 상태·노드 교체·시계/바이너리 변경을 성공적인 부재로 바꾸지 않는다. 장치 식별과 상속 핸들 조건의 근거는 [NVIDIA nvidia-smi 명세](https://docs.nvidia.com/deploy/nvidia-smi/)다.
+
+원 packet과 비교는 LIF-11 EVD artifact의 `node_gpu_process_censuses`·`node_gpu_process_projection`에 남아 RPT·반출·복원으로 이어진다. 마지막 수집이 실패해도 앞서 확보한 관측을 지우지 않는다. 새 자료는 GPU 메모리 전체 해제, 접근 권한, 재기동·정상 추론이나 전체 그룹 회복을 증명하지 않는다. 새 수집기 GPU 자격·등록은 미완료이며, `gpu_release_verified`와 `whole_group_recovery_verified`는 계속 false다. 원 정책·판정 기준은 변경하지 않았다.

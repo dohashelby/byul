@@ -1,3 +1,12 @@
+## 2026-11-17 — 메인 세션 LIF11 호스트 GPU PID·장치 참조 수집과 원 증거 연결
+
+- 한 일: 기존 containerd 이미지/task/커널 루트 마운트 증거를 재사용해 host PID1 anchor와 worker PID/NSpid/시작 시각/UID/namespace를 연결했다. NVML의 UUID/minor/사용 PID와 모든 host PID의 장치 FD를 제한 범위에서 대조한다. pidfd 생존 검사, 전후 NVML 조회, 고정 바이너리 bytes/소유권/불변성, PID·FD·출력/시간·시계 검사를 포함했다. 빈 compute 조회의 상속 FD·다른 GPU 작업·PID 재사용·부분 관측을 구분한다. GPU/요청/비밀 내용은 읽지 않는다.
+- 제품 연결: LIF11의 node_gpu_processes opt-in으로 전후 원 packet/선택 GPU 비교가 EVD artifact→RES/RPT→반출/복원에 남는다. 소유자·노드 교체나 뒤늦은 수집 실패 시 이전 관측은 보존하고 완료/전체 회수로 올리지 않는다. 기존 동작·정책·judge·기한·제외는 유지했다. 새 실행기 종류나 의존성·runtime/contracts 변경은 없다.
+- 시험: Linux CPython3.12.3, source7b37 관련/불변식386 통과·기존1 deselected(pytest115.53초·부모116.317초), 최종 구성·변경 조회 거부와 기존 B GPU 부분 관측92 통과(14.44초·부모15.142초). 묶음은 중복되어 합산하지 않는다. 이전 sourceaf48 관련305 통과는 별도 이력이다. 기존 공개 head70c04864의 CI20개는 모두 성공했으나 이 새 소스 전체 통과로 이월하지 않는다.
+- 최종 배포 bytes: Git LF 정규화 전후 차이가 있던 새 runtime source 파일을 LF로 통일했다. 최종 source8dfa30dd의 관련·불변식289 통과·기존1 deselected(pytest20.76초·부모21.577초). source7b37의386/92는 정규화 전 이력이며 합산하지 않는다. 603개 핀은 Git staged bytes까지 대조한다.
+- 보존: 입력 SDK 생산자5c9e6a5c와 제한 범위 등록은 그대로이며, 새 GPU 수집기의 실제 GPU 자격/등록·전체 그룹/GPU 해제·다음 정상 세대는 미완료다. 원래 byul-ma9의 HEADa4c994f6·스테이징 DECISIONS/PROGRESS는 변경하지 않고 공개 PR 사본과 별도 Linux clone/env에서 작업했다. 새 AWS 자원/비용을 발생시키지 않았다.
+- 다음 작업/막힌 것: 새 수집기의 실제 GPU 자격, native rank 탐지·통지·회복과 SUP04·PLT01/04·REQ08/09 전체 관측, 항목별 fresh 입력과69개 원 실행/보고서가 남아 있다. PID/장치 참조 부재를 전체 메모리 회수나 보안 PASS로 표시하지 않는다.
+
 ## 2026-11-17 — 정체 해제 누락의 명시적 부분 수집·단일 판본69개 입력 점검
 
 - 한 일: 기존 엄격 RPC 투영은 그대로 유지하며, 통신 정체의 적용 원 사건·queue·HMAC·제품 결합·해제 요청/nonce/기한과 클라이언트가 검증되었지만 원 해제 사건만 없는 경우를 명시적으로 부분 수집할 수 있게 했다. 해제가 없으면 fault_released를 만들지 않는다. 변조·잘못된 해제·다른 장애 종류를 이 경로로 받지 않고, rank 생산자 미등록·원본 불완전·실행 미자격 상태를 유지한다. 새 GPU 실증이나 rank 등록 결과가 아니다.

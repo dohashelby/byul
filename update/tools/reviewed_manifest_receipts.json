@@ -615,6 +615,21 @@
       "manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
       "reviewed_by": "Codex / partial stall release scope; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-17T09:20:32.744111+00:00"
+    },
+    {
+      "manifest_sha256": "af48f68b58cf898c1471119e49afb7a135490b9d825fafddb37a0385af1efd0e",
+      "reviewed_by": "Codex main continuation / bounded node GPU PID, namespace and device references; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T10:12:11.756073+00:00"
+    },
+    {
+      "manifest_sha256": "7b37d06f8632158bef86eb05894368e71371a5adeb1f3ca7c8ff1c67bd6908ce",
+      "reviewed_by": "Codex main continuation / bounded node GPU PID, namespace and device references; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T10:20:50.907985+00:00"
+    },
+    {
+      "manifest_sha256": "8dfa30ddc14cadb7aa455d9cfd74d96a905af2261c6520391ab394c72de5db7c",
+      "reviewed_by": "Codex main continuation / bounded node GPU PID, namespace and device references; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T10:41:14.977973+00:00"
     }
   ]
 }

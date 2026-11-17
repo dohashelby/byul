@@ -1,7 +1,7 @@
-"""Selected reply-stall/source-timeout candidate, not a registered detector.
+"""Selected stall/worker-exception source candidates, not registered detectors.
 
 Both original capture readers run here. Public callers cannot supply a JSON
-success flag in place of either sealed capture. Other fault kinds and the
+success flag in place of either sealed capture. Delay/death detection and the
 frontend's causal error delivery/recovery remain outside this candidate scope.
 """
 from hashlib import sha256
@@ -42,7 +42,7 @@ def _link_verified(fault, response, case, rpc_rows, response_profile):
              and row.get('event') in {'CONTROL_RELEASE', 'CONTROL_CANCELLED', 'CONTROL_EXPIRED', 'RETURN', 'RAISE'}]
     if stops:
         end = min(end, *stops)
-    selected = [op for op in response['operations'] if op['binding']['request_hmac_sha256'] == request]
+    selected = [op for op in response['operations'] if op['source_role'] == 'deferred-result' and op['binding']['request_hmac_sha256'] == request]
     operation = _single(selected)
     _require(operation['source_four_point_graph_complete'] is True
              and operation['same_native_error_reached_future'] is True
@@ -78,10 +78,75 @@ def _link_verified(fault, response, case, rpc_rows, response_profile):
         'whole69_complete': False}
 
 
-def link(rank_prepared, rank_capture, response_prepared, response_capture, expected, *, expected_uid=None):
+def _link_exception_verified(fault, response, case, rpc_rows, response_profile):
+    """Exact worker handling/status plus the matching native failure branch."""
+    arm, ready = case['arm'], case['ready']
+    _require(arm['fault_kind'] == 'exception' and arm['schema'] == 'guard-rank-rpc-arm/2' and response['gaps'] == [])
+    call = _single([row for row in rpc_rows if row.get('event') == 'CALL'
+                    and row.get('call_hmac_sha256') == ready['call_hmac_sha256']])
+    request = call['request_hmac_sha256']
+    _require(len(request) == 1)
+    applied = _single([row for row in fault['events'] if row['event'] == 'fault_applied'])['at_ns']
+    worker = _single([op for op in response['operations'] if op['source_role'] == 'worker-response'
+        and op['binding']['request_hmac_sha256'] == request
+        and op['binding']['worker_rpc']['call_hmac_sha256'] == ready['parent_call_hmac_sha256']])
+    _require(worker['worker_three_point_graph_complete'] is True
+             and worker['worker_error_forwarded_as_failure_reply_observed'] is True
+             and worker['binding']['worker_rank'] == 0
+             and worker['process'] == arm['target_context']
+             and worker['binding']['worker_rpc']['object_hmac_sha256'] == arm['parent_object_hmac_sha256'])
+    future = _single([op for op in response['operations'] if op['source_role'] == 'deferred-result'
+        and op['binding']['request_hmac_sha256'] == request and op['same_native_error_reached_future'] is True])
+    _require(future['source_four_point_graph_complete'] is True
+             and all(future['process'][k] == worker['process'][k] for k in
+                     ('boot_sha256', 'time_namespace', 'time_offsets_sha256', 'pid_namespace', 'uid')))
+    def selected(op, kind, event):
+        return _single([row for row in response['rows'] if row['operation_hmac_sha256'] == op['operation_hmac_sha256']
+            and row['process'] == op['process'] and row['event'] == event
+            and response_profile['sources'][row['source_module']]['points'][row['point']]['kind'] == kind])
+    writer = selected(worker, 'worker-writer', 'RETURN')
+    sender_call = selected(worker, 'worker-writer', 'CALL')
+    handled = selected(worker, 'worker-output', 'CALL')
+    caught = _single([row for row in response['rows'] if row['operation_hmac_sha256'] == worker['operation_hmac_sha256']
+        and row['process'] == worker['process'] and row['event'] == 'EXCEPTION'
+        and row['exception']['kind'] == 'controlled-lab-fault'])
+    reader = selected(future, 'reader', 'RETURN')
+    native = selected(future, 'native-response', 'UNWIND')
+    root = selected(future, 'root', 'UNWIND')
+    _require(handled['handled_exception'] == caught['exception'] and writer['reply_status'] == 'failure'
+             and writer['writer_endpoint']['identity_hmac_sha256'] == reader['reader_endpoint']['identity_hmac_sha256']
+             and native['exception']['kind'] == root['exception']['kind'] == 'runtime-error'
+             and native['exception_site'] is not None and native['exception_site']['exception_kind'] == 'runtime-error'
+             and future['binding']['deferred_rpc']['origin_started_ns'] <= worker['binding']['worker_rpc']['operation_started_ns']
+             and applied <= caught['observed_ns'] <= handled['observed_ns'] <= sender_call['observed_ns'] <= reader['observed_ns']
+             and reader['observed_ns'] <= native['observed_ns'] <= root['observed_ns'] < arm['expires_ns']
+             and writer['observed_ns'] < arm['expires_ns'])
+    # A receiver can return while the publisher is still completing its return.
+    # Do not invent an ordering between those two cross-process return events.
+    deferred = _single([row for row in fault['native_deferred_results'] if row['event'] == 'original-result-raised'
+        and row['exception_kind'] == 'runtime-error' and row['context'] == future['process']
+        and row['deferred_rpc'] == future['binding']['deferred_rpc']])
+    _require(root['observed_ns'] <= deferred['at_ns'] < arm['expires_ns'])
+    return {'schema': 'guard-selected-worker-exception-source-link-candidate/1', 'fault_kind': 'exception',
+        'request_hmac_sha256': request[0], 'worker_operation_hmac_sha256': worker['operation_hmac_sha256'],
+        'future_operation_hmac_sha256': future['operation_hmac_sha256'],
+        'response_endpoint_hmac_sha256': writer['writer_endpoint']['identity_hmac_sha256'],
+        'fault_applied_ns': applied, 'worker_caught_error_ns': caught['observed_ns'],
+        'worker_reply_call_ns': sender_call['observed_ns'], 'worker_reply_return_ns': writer['observed_ns'],
+        'reader_return_ns': reader['observed_ns'], 'native_error_ns': native['observed_ns'],
+        'future_error_ns': root['observed_ns'], 'native_error_after_fault_ns': native['observed_ns'] - applied,
+        'selected_worker_exception_and_failure_status_link_observed': True,
+        'producer_registered': False, 'fault_causality_verified': False, 'native_detector_qualified': False,
+        'upper_delivery_verified': False, 'recovery_verified': False, 'whole_resources_released': False,
+        'whole69_complete': False}
+
+
+def link(rank_prepared, rank_capture, response_prepared, response_capture, expected, *, expected_uid=None, kind='communication-stall'):
     """Reverify original fault activation and closed response files end to end."""
     rank_prepared, rank_capture = Path(rank_prepared), Path(rank_capture)
-    before = faults.project_stall_with_release_gap(rank_prepared, rank_capture, expected)
+    _require(kind in {'communication-stall', 'exception'})
+    project = faults.project_stall_with_release_gap if kind == 'communication-stall' else faults.project
+    before = project(rank_prepared, rank_capture, expected)
     response = responses.verify_capture(response_prepared, response_capture, expected_uid=expected_uid)
     manifest, cfg, profile = responses.load_prepared(response_prepared, expected_uid=expected_uid)
     files = faults._Files()
@@ -93,9 +158,10 @@ def link(rank_prepared, rank_capture, response_prepared, response_capture, expec
              and hmac.compare_digest(cfg['key'], settings['key']))
     case = files.json(rank_capture / 'controls/control-case-result.json')['payload']
     rpc_review = faults.capture_code.verify_capture(rank_prepared, rank_capture / 'snapshots')
-    result = _link_verified(before, response, case, rpc_review['rows'], profile)
+    consume = _link_verified if kind == 'communication-stall' else _link_exception_verified
+    result = consume(before, response, case, rpc_review['rows'], profile)
     files.finish()
-    _require(faults.project_stall_with_release_gap(rank_prepared, rank_capture, expected) == before
+    _require(project(rank_prepared, rank_capture, expected) == before
              and responses.verify_capture(response_prepared, response_capture, expected_uid=expected_uid) == response)
     return {**result, 'rank_source_set_sha256': before['source_set_sha256'],
             'response_capture_set_sha256': sha256(responses.canonical(response['records'])).hexdigest(),

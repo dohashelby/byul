@@ -16,10 +16,11 @@ def main():
     verify.add_argument('--prepared', type=Path, required=True)
     verify.add_argument('--capture', type=Path, required=True)
     verify.add_argument('--expected-uid', type=int)
-    link = commands.add_parser('link-stall')
-    for name in ('rank-prepared', 'rank-capture', 'response-prepared', 'response-capture', 'binding'):
-        link.add_argument('--' + name, type=Path, required=True)
-    link.add_argument('--expected-uid', type=int)
+    for command in ('link-stall', 'link-exception'):
+        link = commands.add_parser(command)
+        for name in ('rank-prepared', 'rank-capture', 'response-prepared', 'response-capture', 'binding'):
+            link.add_argument('--' + name, type=Path, required=True)
+        link.add_argument('--expected-uid', type=int)
     args = parser.parse_args()
     if args.command == 'prepare':
         result = capture.prepare(args.output, rank_prepared=args.rank_prepared,
@@ -31,7 +32,8 @@ def main():
         from guard.adapters import vllm_rank_response_fault_link as linker
         binding = capture.document(capture.runtime.read(args.binding, 32768))
         result = linker.link(args.rank_prepared, args.rank_capture, args.response_prepared,
-                             args.response_capture, binding, expected_uid=args.expected_uid)
+                             args.response_capture, binding, expected_uid=args.expected_uid,
+                             kind='exception' if args.command == 'link-exception' else 'communication-stall')
     print(json.dumps(result, ensure_ascii=True))
 
 

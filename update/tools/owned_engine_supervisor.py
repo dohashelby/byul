@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import ctypes
 from dataclasses import dataclass
 import hashlib
 import hmac
@@ -89,6 +90,29 @@ def control_directory(directory):
         os.close(fd)
 
 
+@contextmanager
+def child_adoption():
+    """Adopt this standalone harness's descendants; restore its own prctl flag.
+
+    No process-wide setting outside this supervisor process is changed. The
+    class itself does not enable adoption in a caller such as a test runner.
+    """
+    library = ctypes.CDLL(None, use_errno=True)
+    prctl = library.prctl
+    prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+    prctl.restype = ctypes.c_int
+    previous = ctypes.c_int()
+    if prctl(37, ctypes.addressof(previous), 0, 0, 0) or previous.value not in (0, 1):
+        raise ValueError('SUPERVISOR_CHILD_ADOPTION_UNAVAILABLE')
+    if prctl(36, 1, 0, 0, 0):
+        raise ValueError('SUPERVISOR_CHILD_ADOPTION_UNAVAILABLE')
+    try:
+        yield
+    finally:
+        if prctl(36, previous.value, 0, 0, 0):
+            raise ValueError('SUPERVISOR_CHILD_ADOPTION_RESTORE_FAILED')
+
+
 def settings(value):
     required = {'schema', 'session', 'key', 'module', 'arguments', 'maximum_seconds', 'maximum_generations'}
     if (type(value) is not dict or set(value) != required or value['schema'] != SCHEMA
@@ -148,6 +172,41 @@ class Supervisor:
         self.deadline_ns = self.started_ns + config['maximum_seconds'] * 10**9
         self.generations = []
         self.nonces = set()
+        self.reaped = []
+        self.reaping_diagnostics = set()
+
+    def reap_exited_descendants(self):
+        """Reap only an adopted, exited child in a retained owned session.
+
+        Never signal it, wait on arbitrary PIDs, or reap the Popen-managed root.
+        A still-live descendant remains visible and continues to block restart.
+        """
+        for generation in self.generations:
+            try:
+                for before in group_members(generation.identity['group']):
+                    if before['pid'] == generation.identity['pid'] or before['parent_pid'] != os.getpid():
+                        continue
+                    if len(self.reaped) >= MAX_PROCESSES:
+                        raise ValueError('SUPERVISOR_REAP_RECORD_BOUND')
+                    fd = os.pidfd_open(before['pid'])
+                    try:
+                        if process(before['pid']) != before:
+                            raise ValueError('SUPERVISOR_REAP_IDENTITY_CHANGED')
+                        event = os.waitid(os.P_PIDFD, fd, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+                        if event is None:
+                            continue
+                        if event.si_pid != before['pid'] or process(before['pid']) != before:
+                            raise ValueError('SUPERVISOR_REAP_IDENTITY_CHANGED')
+                        reaped = os.waitid(os.P_PIDFD, fd, os.WEXITED | os.WNOHANG)
+                        if reaped is None or reaped.si_pid != before['pid']:
+                            raise ValueError('SUPERVISOR_REAP_IDENTITY_CHANGED')
+                        self.reaped.append({'generation': generation.number, 'pid': before['pid'],
+                            'start_ticks': before['start_ticks'], 'group': before['group'], 'session': before['session'],
+                            'exit_kind': reaped.si_code, 'exit_status': reaped.si_status, 'observed_ns': self.clock()})
+                    finally:
+                        os.close(fd)
+            except (OSError, ValueError, KeyError, TypeError):
+                self.reaping_diagnostics.add('SUPERVISOR_DESCENDANT_REAP_INCOMPLETE')
 
     def _latest(self):
         return self.generations[-1] if self.generations else None
@@ -167,6 +226,7 @@ class Supervisor:
         if previous is not None:
             if self._poll(previous) is None:
                 raise ValueError('SUPERVISOR_PREVIOUS_CHILD_RUNNING')
+            self.reap_exited_descendants()
             if group_members(previous.identity['group']):
                 raise ValueError('SUPERVISOR_PREVIOUS_GROUP_REMAINS')
         # No shell, inherited stdin, new credentials, environment override or GPU
@@ -204,6 +264,9 @@ class Supervisor:
                          'returncode': code, 'shutdown_requested': generation.shutdown_requested})
         return {'schema': SCHEMA, 'session': self.config['session'], 'supervisor': process(os.getpid()),
                 'observed_ns': self.clock(), 'deadline_ns': self.deadline_ns, 'generations': rows,
+                'reaped_descendants': self.reaped[-8:], 'reaped_descendant_count': len(self.reaped),
+                'reaped_descendants_sha256': hashlib.sha256(canonical(self.reaped)).hexdigest(),
+                'descendant_reaping_diagnostics': sorted(self.reaping_diagnostics),
                 'fault_causality_verified': False, 'whole_resources_released': False,
                 'new_normal_inference_verified': False}
 
@@ -245,6 +308,7 @@ class Supervisor:
                     signal.pidfd_send_signal(generation.pidfd, signal.SIGKILL)
                     generation.child.wait(timeout=3)
             os.close(generation.pidfd)
+        self.reap_exited_descendants()
 
 
 def serve(config_file, directory):
@@ -252,7 +316,7 @@ def serve(config_file, directory):
     directory.mkdir(mode=0o700, exist_ok=False)
     if directory.lstat().st_uid != os.geteuid():
         raise ValueError('SUPERVISOR_OWNER_UNVERIFIED')
-    with control_directory(directory) as path:
+    with control_directory(directory) as path, child_adoption():
         _serve(config, path)
 
 
@@ -273,6 +337,7 @@ def _serve(config, path):
         sock.settimeout(1)
         supervisor.launch()
         while not stopping and supervisor.clock() < supervisor.deadline_ns:
+            supervisor.reap_exited_descendants()
             try:
                 connection, _ = sock.accept()
             except TimeoutError:

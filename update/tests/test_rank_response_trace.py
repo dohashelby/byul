@@ -4,6 +4,7 @@ from concurrent.futures import Future, InvalidStateError
 from contextlib import suppress
 from copy import deepcopy
 import dis
+from enum import Enum
 import gc
 from hashlib import sha256
 import json
@@ -34,6 +35,24 @@ class Queue:
         if self.error is not None:
             raise self.error
         return self.output
+    def enqueue(self, obj):
+        self.last = obj
+class ReplyStatus(Enum):
+    SUCCESS = 1
+    FAILURE = 2
+class WorkerRPC:
+    def execute(self, scheduler_output):
+        try:
+            if self.error is not None:
+                raise self.error
+            self.enqueue_output(self.output)
+        except Exception as error:
+            self.enqueue_output(error)
+    def enqueue_output(self, output):
+        if type(output) in (NativeLabFault, TimeoutError, RuntimeError, ValueError, TypeError):
+            self.response.enqueue((ReplyStatus.FAILURE, None))
+        else:
+            self.response.enqueue((ReplyStatus.SUCCESS, output))
 class NativeFuture(Future):
     def __init__(self, queue, get_response):
         self.queue, self.get_response = queue, get_response
@@ -56,6 +75,14 @@ class Executor:
             except TimeoutError as error:
                 raise TimeoutError('PRIVATE_MESSAGE') from error
         return NativeFuture(deque(), get_response)
+class ResponseExecutor:
+    def execute(self, scheduler_output):
+        def get_response():
+            status, result = self.response.dequeue()
+            if status is ReplyStatus.FAILURE:
+                raise RuntimeError('PRIVATE_WORKER_ERROR')
+            return result
+        return NativeFuture(deque(), get_response)
 '''
 
 
@@ -63,14 +90,18 @@ class Executor:
 def setup(tmp_path,monkeypatch):
     name='EXAMPLE_response_trace';path=tmp_path/'fixture.py';path.write_bytes(RAW)
     module=types.ModuleType(name);module.__file__=str(path)
-    module.Future=Future;module.deque=deque
+    module.Future=Future;module.deque=deque;module.Enum=Enum;module.NativeLabFault=rpc.control_code.NativeLabFault
     exec(compile(RAW,str(path),'exec',dont_inherit=True,optimize=0),vars(module))
     monkeypatch.setitem(sys.modules,name,module)
     codes=sources._codes(compile(RAW,'fixture.py','exec',dont_inherit=True,optimize=0))
     common={'phase':'around-original','role':'EXAMPLE','source_modules':[name]}
     hooks={'Executor.execute':{**common,'kind':'rpc','requests':{'root':'scheduler_output','layout':'scheduled'},
         'deferred_result':{'class':'NativeFuture','point':'NativeFuture.result'}},
-        'NativeFuture.result':{**common,'kind':'deferred-result'}}
+        'NativeFuture.result':{**common,'kind':'deferred-result'},
+        'WorkerRPC.execute':{**common,'kind':'rpc','requests':{'root':'scheduler_output','layout':'scheduled'},
+            'scalars':{'rpc_rank':{'root':'self','path':['rpc_rank']}}},
+        'ResponseExecutor.execute':{**common,'kind':'rpc','requests':{'root':'scheduler_output','layout':'scheduled'},
+            'deferred_result':{'class':'NativeFuture','point':'NativeFuture.result'}}}
     source={'path':'fixture.py','bytes':len(RAW),'sha256':sha256(RAW).hexdigest(),
         'functions':list(hooks),'hooks':hooks,
         'body_code_sha256':{p:sources.code_digest(codes[p])for p in hooks}}
@@ -82,11 +113,23 @@ def setup(tmp_path,monkeypatch):
     monkeypatch.setattr(sources,'PROFILES',old_path)
     points={'NativeFuture.result':{'kind':'root'},'NativeFuture.wait':{'kind':'response-wait','parent_kind':'root','future_owner_argument':'self'},
         'Executor.execute.<locals>.get_response':{'kind':'native-response','parent_kind':'response-wait'},
-        'Queue.dequeue':{'kind':'reader','parent_kind':'native-response','queue_class':'Queue','buffer_class':'Buffer','timeout_argument':'timeout'}}
+        'Queue.dequeue':{'kind':'reader','parent_kind':'native-response','queue_class':'Queue','buffer_class':'Buffer','timeout_argument':'timeout'},
+        'WorkerRPC.execute':{'kind':'worker-root'},
+        'WorkerRPC.enqueue_output':{'kind':'worker-output','parent_kind':'worker-root','worker_owner_argument':'self','output_argument':'output'},
+        'ResponseExecutor.execute.<locals>.get_response':{'kind':'native-response','parent_kind':'response-wait'},
+        'Queue.enqueue':{'kind':'worker-writer','parent_kind':'worker-output','queue_class':'Queue','buffer_class':'Buffer',
+            'queue_role':'writer','status_tuple_argument':'obj','status_module':name,'status_type':['ReplyStatus'],
+            'success_member':'SUCCESS','failure_member':'FAILURE'}}
     new_source={k:source[k]for k in('path','bytes','sha256')}
     new_source.update(points=points,body_code_sha256={p:sources.code_digest(codes[p])for p in points},
         return_offsets={p:[i.offset for i in dis.get_instructions(codes[p])if i.opname in {'RETURN_VALUE','RETURN_CONST'}]for p in points},
         instruction_lines={p:{str(i.offset):i.positions.lineno for i in dis.get_instructions(codes[p],show_caches=True)}for p in points})
+    new_source['direct_raise_offsets']={p:[]for p in points}
+    raised='ResponseExecutor.execute.<locals>.get_response'
+    line,=[i for i,text in enumerate(RAW.splitlines(),1)if text.strip()==b"raise RuntimeError('PRIVATE_WORKER_ERROR')"]
+    new_source['direct_raise_offsets'][raised]=[{'instruction_offset':i.offset,'source_line':line,'exception_kind':'runtime-error'}
+        for i in dis.get_instructions(codes[raised])if i.opname=='RAISE_VARARGS'and i.positions.lineno==line]
+    assert len(new_source['direct_raise_offsets'][raised])==1
     new_path=tmp_path/'new.json';new_path.write_text(json.dumps({'schema':'guard-rank-response-trace-profiles/1','profiles':[
         {'id':'EXAMPLE-response-trace','image':'EXAMPLE-image','runtime':runtime,'sources':{name:new_source}}]}))
     monkeypatch.setattr(tracing,'PROFILES',new_path)
@@ -257,6 +300,66 @@ def test_new_thread_has_own_operation_and_no_foreign_trace_is_removed(setup):
     finally:sys.settrace(None)
 
 
+def worker(fixture):
+    module,observer,tracer,old_rows,rows,owner,scheduled,path,memory=fixture
+    current=module.WorkerRPC();current.error=None;current.output=object();current.rpc_rank=0
+    current.response=module.Queue();current.response._is_writer=True;current.response._is_local_reader=False
+    current.response.buffer=module.Buffer();current.response.buffer.shared_memory=memory
+    return current
+
+
+@pytest.mark.parametrize('fault',[False,True])
+def test_worker_original_exception_and_status_publication_have_separate_source_graph(sealed_capture,fault):
+    fixture,prepared,sink,cfg=sealed_capture
+    module,observer,tracer,old_rows,rows,owner,scheduled,path,memory=fixture
+    current=worker(fixture)
+    class Opaque:
+        def __repr__(self):raise AssertionError('model output repr forbidden')
+        @property
+        def __dict__(self):raise AssertionError('model output attrs forbidden')
+    current.output=Opaque()
+    if fault:current.error=rpc.control_code.NativeLabFault('PRIVATE_WORKER_ERROR')
+    tracer.install();assert current.execute(scheduled)is None;tracer.close()
+    assert tracer.diagnostic is None
+    result=capture.verify_capture(prepared,sink);operation,=result['operations']
+    assert operation['source_role']=='worker-response'and operation['worker_three_point_graph_complete']
+    assert operation['worker_error_forwarded_as_failure_reply_observed']is fault
+    assert not operation['source_four_point_graph_complete']and not operation['same_native_error_reached_future']
+    written,=[r for r in result['rows']if r['point']=='Queue.enqueue'and r['event']=='RETURN']
+    assert written['reader_endpoint']is None and written['writer_endpoint']['identity_hmac_sha256']==identity.shared_memory_endpoint(memory,key=b'K'*32)['identity_hmac_sha256']
+    assert written['reply_status']==('failure'if fault else'success')
+    assert current.response.last[0]is(module.ReplyStatus.FAILURE if fault else module.ReplyStatus.SUCCESS)
+    if not fault:assert current.response.last[1]is current.output
+    assert 'PRIVATE_WORKER_ERROR'not in json.dumps(result)and cfg['key']not in json.dumps(result)
+    assert all(operation[k]is False for k in capture.FLAGS)
+
+
+def test_worker_unbound_output_cannot_inherit_a_current_request(setup):
+    current=worker(setup);tracer=setup[2];rows=setup[4]
+    tracer.install();current.enqueue_output(current.output);tracer.close()
+    assert rows==[]and tracer.diagnostic is None
+
+
+@pytest.mark.parametrize('damage',['other-owner','reader-instead-of-writer','wrong-buffer','unknown-status'])
+def test_worker_response_gaps_do_not_change_original_model_handling(setup,damage,monkeypatch):
+    module,observer,tracer,old_rows,rows,owner,scheduled,path,memory=setup
+    current=worker(setup)
+    if damage=='other-owner':
+        other=worker(setup);current.enqueue_output=other.enqueue_output
+    elif damage=='reader-instead-of-writer':
+        current.response._is_writer=False;current.response._is_local_reader=True
+    elif damage=='wrong-buffer':current.response.buffer=object()
+    else:
+        class OtherStatus:SUCCESS=object();FAILURE=object()
+        # Only the status lookup is replaced in the observer's candidate data.
+        # The actual engine Enum and the original method remain unchanged.
+        monkeypatch.setitem(vars(module),'EXAMPLE_OtherStatus',OtherStatus)
+        tracer.profile['sources'][module.__name__]['points']['Queue.enqueue']['status_type']=['EXAMPLE_OtherStatus']
+    tracer.install();assert current.execute(scheduled)is None;tracer.close()
+    assert tracer.diagnostic=='RANK_RESPONSE_OBSERVATION_INCOMPLETE'
+    assert tracer.frames=={}and all(not row['fault_causality_verified']for row in rows)
+
+
 def test_official_candidate_pins_match_preserved_source_functions_and_return_instructions():
     root=__import__('pathlib').Path(__file__).parent/'fixtures/vllm-0.30.0'
     data=json.loads(tracing.PROFILES.read_bytes())
@@ -269,6 +372,11 @@ def test_official_candidate_pins_match_preserved_source_functions_and_return_ins
             assert sources.code_digest(sources.relative_code(codes[point],row['path']))==row['body_code_sha256'][point]
             assert [i.offset for i in dis.get_instructions(codes[point])if i.opname in {'RETURN_VALUE','RETURN_CONST'}]==row['return_offsets'][point]
             assert {str(i.offset):i.positions.lineno for i in dis.get_instructions(codes[point],show_caches=True)}==row['instruction_lines'][point]
+            instructions={i.offset:i for i in dis.get_instructions(codes[point])}
+            for site in row['direct_raise_offsets'][point]:
+                assert instructions[site['instruction_offset']].opname=='RAISE_VARARGS'
+                assert instructions[site['instruction_offset']].positions.lineno==site['source_line']
+                assert site['exception_kind']in {'timeout','runtime-error'}
 
 
 @pytest.fixture

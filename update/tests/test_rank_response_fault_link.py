@@ -5,7 +5,7 @@ import pytest
 
 from guard.adapters import vllm_rank_response_capture as capture
 from guard.adapters import vllm_rank_response_fault_link as linker
-from tests.test_rank_response_trace import setup, sealed_capture
+from tests.test_rank_response_trace import setup, sealed_capture, worker
 
 
 @pytest.fixture
@@ -78,3 +78,71 @@ def test_public_link_needs_original_fault_and_response_captures_not_json_flags(t
     with pytest.raises((OSError,ValueError)):
         linker.link(tmp_path/'absent-rank',tmp_path/'absent-fault',tmp_path/'absent-response-preparation',
                     tmp_path/'absent-response-files',{'fault_causality_verified':True})
+
+
+@pytest.fixture
+def exception_example(sealed_capture):
+    from guard.adapters import vllm_rank_rpc_input as faults
+    fixture,prepared,sink,cfg=sealed_capture
+    module,observer,tracer,old_rows,rows,owner,scheduled,path,memory=fixture
+    sender=worker(fixture);sender.error=module.NativeLabFault('PRIVATE_WORKER_ERROR')
+    receiver=module.ResponseExecutor();receiver.response=owner.response
+    future=receiver.execute(scheduled)
+    tracer.install();sender.execute(scheduled)
+    receiver.response.output=sender.response.last
+    with pytest.raises(RuntimeError):future.result()
+    tracer.close()
+    assert tracer.diagnostic is None
+    response=capture.verify_capture(prepared,sink)
+    worker_op,=[op for op in response['operations']if op['source_role']=='worker-response']
+    future_op,=[op for op in response['operations']if op['source_role']=='deferred-result']
+    caught,=[r for r in response['rows']if r['event']=='EXCEPTION'and r['exception']['kind']=='controlled-lab-fault']
+    applied=caught['observed_ns']-1
+    request=future_op['binding']['request_hmac_sha256'][0]
+    deferred=faults.deferred_results(old_rows,observer.profile,request,applied,worker_op['process'])
+    assert len(deferred)==1
+    expires=deferred[0]['at_ns']+1_000_000
+    fault={'events':[{'event':'fault_applied','at_ns':applied}],'native_deferred_results':deferred}
+    case={'arm':{'schema':'guard-rank-rpc-arm/2','fault_kind':'exception','expires_ns':expires,
+                 'target_context':worker_op['process'],
+                 'parent_object_hmac_sha256':worker_op['binding']['worker_rpc']['object_hmac_sha256']},
+          'ready':{'call_hmac_sha256':'b'*64,'parent_call_hmac_sha256':worker_op['binding']['worker_rpc']['call_hmac_sha256']}}
+    rpc=[{'event':'CALL','call_hmac_sha256':'b'*64,'request_hmac_sha256':[request]}]
+    return deepcopy(fault),response,deepcopy(case),rpc,tracer.profile
+
+
+def test_controlled_worker_error_reply_and_exact_native_failure_branch_are_linked(exception_example):
+    result=linker._link_exception_verified(*exception_example)
+    assert result['selected_worker_exception_and_failure_status_link_observed']
+    assert result['fault_applied_ns']<=result['worker_caught_error_ns']<=result['worker_reply_call_ns']<=result['reader_return_ns']<=result['native_error_ns']<=result['future_error_ns']
+    assert all(result[k]is False for k in('producer_registered','fault_causality_verified','native_detector_qualified',
+        'upper_delivery_verified','recovery_verified','whole_resources_released','whole69_complete'))
+
+
+@pytest.mark.parametrize('damage',['other-fault','other-parent','other-owner','wrong-worker-rank','wrong-channel','success-reply',
+    'no-worker-exception','no-forwarded-error','no-direct-raise','wrong-direct-raise','foreign-clock','late-future-origin',
+    'before-fault','expired','wrong-deferred','missing-worker'])
+def test_worker_error_link_refuses_other_rpc_opaque_error_or_unbound_native_exception(exception_example,damage):
+    fault,response,case,rpc,profile=deepcopy(exception_example)
+    worker_op=next(op for op in response['operations']if op['source_role']=='worker-response')
+    future_op=next(op for op in response['operations']if op['source_role']=='deferred-result')
+    writer=next(r for r in response['rows']if r['point']=='Queue.enqueue'and r['event']=='RETURN')
+    native=next(r for r in response['rows']if r['point']=='ResponseExecutor.execute.<locals>.get_response'and r['event']=='UNWIND')
+    if damage=='other-fault':case['arm']['fault_kind']='death'
+    elif damage=='other-parent':case['ready']['parent_call_hmac_sha256']='0'*64
+    elif damage=='other-owner':case['arm']['parent_object_hmac_sha256']='0'*64
+    elif damage=='wrong-worker-rank':worker_op['binding']['worker_rank']=1
+    elif damage=='wrong-channel':writer['writer_endpoint']['identity_hmac_sha256']='0'*64
+    elif damage=='success-reply':writer['reply_status']='success'
+    elif damage=='no-worker-exception':
+        response['rows']=[r for r in response['rows']if not(r['event']=='EXCEPTION'and r['exception']['kind']=='controlled-lab-fault')]
+    elif damage=='no-forwarded-error':worker_op['worker_error_forwarded_as_failure_reply_observed']=False
+    elif damage=='no-direct-raise':native['exception_site']=None
+    elif damage=='wrong-direct-raise':native['exception_site']['exception_kind']='timeout'
+    elif damage=='foreign-clock':case['arm']['target_context']['boot_sha256']='0'*64
+    elif damage=='late-future-origin':future_op['binding']['deferred_rpc']['origin_started_ns']=worker_op['binding']['worker_rpc']['operation_started_ns']+1
+    elif damage=='before-fault':fault['events'][0]['at_ns']=native['observed_ns']+1
+    elif damage=='expired':case['arm']['expires_ns']=native['observed_ns']-1
+    elif damage=='wrong-deferred':fault['native_deferred_results'][0]['deferred_rpc']['future_object_hmac_sha256']='0'*64
+    else:response['operations'].remove(worker_op)
+    with pytest.raises(ValueError):linker._link_exception_verified(fault,response,case,rpc,profile)

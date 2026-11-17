@@ -19,7 +19,8 @@ CONTEXT = {'pid', 'start_ticks', 'uid', 'boot_sha256', 'pid_namespace', 'time_na
 ROW = {'schema', 'profile', 'sequence', 'process', 'thread_hmac_sha256', 'operation_hmac_sha256', 'binding',
        'frame_call_hmac_sha256', 'parent_frame_call_hmac_sha256',
        'point', 'source_module', 'source_sha256', 'body_code_sha256', 'event', 'instruction_offset', 'line',
-       'started_ns', 'observed_ns', 'reader_endpoint', 'reader_timeout_ns', 'exception', *set(FLAGS) - {'observer_installed'}}
+       'started_ns', 'observed_ns', 'reader_endpoint', 'writer_endpoint', 'reader_timeout_ns', 'reply_status', 'handled_exception',
+       'exception', 'exception_site', *set(FLAGS) - {'observer_installed'}}
 
 
 def canonical(value):
@@ -59,6 +60,13 @@ def _context(value):
             and all(type(value[k]) is int and 0 <= value[k] < 2**63 for k in CONTEXT - {'boot_sha256', 'time_offsets_sha256'})
             and value['pid'] > 0 and value['start_ticks'] > 0
             and all(_sha(value[k]) for k in ('boot_sha256', 'time_offsets_sha256')))
+
+
+def _exception(value):
+    return (type(value) is dict and set(value) == {'object_hmac_sha256', 'cause_hmac_sha256', 'kind'}
+            and _sha(value['object_hmac_sha256'])
+            and (value['cause_hmac_sha256'] is None or _sha(value['cause_hmac_sha256']))
+            and value['kind'] in {'timeout', 'runtime-error', 'controlled-lab-fault', 'other'})
 
 
 def _files():
@@ -152,37 +160,59 @@ def _row(value, profile, context):
             or value['event'] == 'UNWIND' and value['instruction_offset'] in source['return_offsets'][value['point']]):
         raise ValueError('RANK_RESPONSE_ROW_SOURCE_INVALID')
     binding = value['binding']
-    if (type(binding) is not dict or set(binding) != {'context', 'request_hmac_sha256', 'deferred_rpc', 'deferred_call_hmac_sha256'}
-            or binding['context'] != context or not _sha(binding['deferred_call_hmac_sha256'])
+    future_keys = {'context', 'request_hmac_sha256', 'deferred_rpc', 'deferred_call_hmac_sha256'}
+    worker_keys = {'context', 'request_hmac_sha256', 'worker_rpc', 'worker_rank'}
+    if (type(binding) is not dict or set(binding) not in (future_keys, worker_keys)
+            or binding['context'] != context
             or type(binding['request_hmac_sha256']) is not list or len(binding['request_hmac_sha256']) != 1
             or not _sha(binding['request_hmac_sha256'][0])):
         raise ValueError('RANK_RESPONSE_ROW_BINDING_INVALID')
-    deferred = binding['deferred_rpc']
-    if (type(deferred) is not dict or set(deferred) != {'schema', 'source_module', 'point', 'origin_call_hmac_sha256',
+    original, = [row for row in json.loads(shared.sources.PROFILES.read_bytes())['profiles'] if row['image'] == profile['image']]
+    if ('worker_rpc' in binding) != point['kind'].startswith('worker-'):
+        raise ValueError('RANK_RESPONSE_BINDING_ROLE_INVALID')
+    if set(binding) == worker_keys:
+        rpc = binding['worker_rpc']
+        if (type(rpc) is not dict or set(rpc) != {'source_module', 'point', 'call_hmac_sha256', 'object_hmac_sha256', 'operation_started_ns'}
+                or type(binding['worker_rank']) is not int or not 0 <= binding['worker_rank'] <= 63
+                or not _sha(rpc['call_hmac_sha256']) or not _sha(rpc['object_hmac_sha256'])
+                or type(rpc['operation_started_ns']) is not int or not 0 <= rpc['operation_started_ns'] <= value['started_ns']
+                or profile['sources'][rpc['source_module']]['points'][rpc['point']]['kind'] != 'worker-root'
+                or original['rpc_sources'][rpc['source_module']]['hooks'][rpc['point']]['kind'] != 'rpc'):
+            raise ValueError('RANK_RESPONSE_WORKER_BINDING_INVALID')
+    else:
+        deferred = binding['deferred_rpc']
+        if (not _sha(binding['deferred_call_hmac_sha256']) or type(deferred) is not dict or set(deferred) != {'schema', 'source_module', 'point', 'origin_call_hmac_sha256',
             'origin_object_hmac_sha256', 'origin_started_ns', 'origin_returned_ns', 'future_object_hmac_sha256'}
             or deferred['schema'] != 'guard-rank-deferred-request-binding/1'
             or any(not _sha(deferred[k]) for k in ('origin_call_hmac_sha256', 'origin_object_hmac_sha256', 'future_object_hmac_sha256'))
             or any(type(deferred[k]) is not int or not 0 <= deferred[k] <= value['started_ns'] for k in ('origin_started_ns', 'origin_returned_ns'))
             or deferred['origin_started_ns'] > deferred['origin_returned_ns']):
-        raise ValueError('RANK_RESPONSE_DEFERRED_INVALID')
-    original, = [row for row in json.loads(shared.sources.PROFILES.read_bytes())['profiles'] if row['image'] == profile['image']]
-    origin = original['rpc_sources'][deferred['source_module']]['hooks'][deferred['point']]
-    target = origin.get('deferred_result', {}).get('point')
-    if (origin.get('kind') != 'rpc' or target is None
+            raise ValueError('RANK_RESPONSE_DEFERRED_INVALID')
+        origin = original['rpc_sources'][deferred['source_module']]['hooks'][deferred['point']]
+        target = origin.get('deferred_result', {}).get('point')
+        if (origin.get('kind') != 'rpc' or target is None
             or profile['sources'][deferred['source_module']]['points'].get(target, {}).get('kind') != 'root'):
-        raise ValueError('RANK_RESPONSE_DEFERRED_INVALID')
+            raise ValueError('RANK_RESPONSE_DEFERRED_INVALID')
     error = value['exception']
     if ((value['event'] in {'CALL', 'RETURN'}) != (error is None)
-            or error is not None and (type(error) is not dict or set(error) != {'object_hmac_sha256', 'cause_hmac_sha256', 'kind'}
-                or not _sha(error['object_hmac_sha256']) or error['cause_hmac_sha256'] is not None and not _sha(error['cause_hmac_sha256'])
-                or error['kind'] not in {'timeout', 'runtime-error', 'other'})):
+            or error is not None and not _exception(error)):
         raise ValueError('RANK_RESPONSE_EXCEPTION_INVALID')
-    endpoint = value['reader_endpoint']
+    site = value['exception_site']
+    expected_sites = source.get('direct_raise_offsets', {}).get(value['point'], [])
+    if site is not None and (error is None or type(site) is not dict or site not in expected_sites
+            or site != {'instruction_offset': value['instruction_offset'], 'source_line': value['line'], 'exception_kind': error['kind']}):
+        raise ValueError('RANK_RESPONSE_EXCEPTION_SITE_INVALID')
+    endpoint = value['reader_endpoint'] if point['kind'] == 'reader' else value['writer_endpoint']
     timeout = value['reader_timeout_ns']
     if timeout is not None and (point['kind'] != 'reader' or type(timeout) is not int or not 0 <= timeout <= (2**31) * 1_000_000_000):
         raise ValueError('RANK_RESPONSE_TIMEOUT_INVALID')
-    if (point['kind'] == 'reader') != (endpoint is not None):
+    if ((point['kind'] == 'reader') != (value['reader_endpoint'] is not None)
+            or (point['kind'] == 'worker-writer') != (value['writer_endpoint'] is not None)):
         raise ValueError('RANK_RESPONSE_READER_INVALID')
+    if ((point['kind'] == 'worker-writer' and value['reply_status'] not in {'success', 'failure'})
+            or point['kind'] != 'worker-writer' and value['reply_status'] is not None
+            or value['handled_exception'] is not None and (point['kind'] != 'worker-output' or not _exception(value['handled_exception']))):
+        raise ValueError('RANK_RESPONSE_WORKER_OUTPUT_INVALID')
     if endpoint is not None and (type(endpoint) is not dict or set(endpoint) != {'schema', 'kind', 'identity_hmac_sha256',
             'observation_started_ns', 'observation_finished_ns', 'source_authenticated', 'engine_group_verified'}
             or endpoint['schema'] != tracing.identity.SCHEMA or endpoint['kind'] != 'shared-memory'
@@ -212,7 +242,7 @@ def response_graphs(rows, profile):
         gaps = []
         for call, records in calls.items():
             first, last = records[0], records[-1]
-            fields = ('point', 'source_module', 'started_ns', 'reader_endpoint', 'reader_timeout_ns', 'parent_frame_call_hmac_sha256')
+            fields = ('point', 'source_module', 'started_ns', 'reader_endpoint', 'writer_endpoint', 'reader_timeout_ns', 'reply_status', 'handled_exception', 'parent_frame_call_hmac_sha256')
             if (first['event'] != 'CALL' or any(any(row[k] != first[k] for k in fields) for row in records)
                     or any(a['observed_ns'] > b['observed_ns'] for a, b in zip(records, records[1:]))
                     or any(row['event'] == 'CALL' for row in records[1:])
@@ -231,7 +261,7 @@ def response_graphs(rows, profile):
         for call, (first, last) in terminal.items():
             spec = profile['sources'][first['source_module']]['points'][first['point']]
             parent = first['parent_frame_call_hmac_sha256']
-            if spec['kind'] == 'root':
+            if spec['kind'] in {'root', 'worker-root'}:
                 if parent is not None:
                     raise ValueError('RANK_RESPONSE_PARENT_INVALID')
             elif parent not in terminal:
@@ -243,18 +273,30 @@ def response_graphs(rows, profile):
                         or not before['sequence'] < first['sequence'] < last['sequence'] < after['sequence']
                         or not before['observed_ns'] <= first['observed_ns'] <= last['observed_ns'] <= after['observed_ns']):
                     raise ValueError('RANK_RESPONSE_PARENT_INVALID')
-        complete = not gaps and set(kinds) == {'root', 'response-wait', 'native-response', 'reader'} and all(len(v) == 1 for v in kinds.values())
+        worker = 'worker_rpc' in binding
+        expected = {'worker-root', 'worker-output', 'worker-writer'} if worker else {'root', 'response-wait', 'native-response', 'reader'}
+        complete = not gaps and set(kinds) == expected and all(len(v) == 1 for v in kinds.values())
         if not complete:
-            gaps.append('RANK_RESPONSE_FOUR_POINT_GRAPH_MISSING_OR_AMBIGUOUS')
-        same_error = direct_cause = False
-        if complete:
+            gaps.append('RANK_RESPONSE_WORKER_GRAPH_MISSING_OR_AMBIGUOUS' if worker else 'RANK_RESPONSE_FOUR_POINT_GRAPH_MISSING_OR_AMBIGUOUS')
+        same_error = direct_cause = forwarded = False
+        if complete and worker:
+            root, output, writer = (kinds[k][0] for k in ('worker-root', 'worker-output', 'worker-writer'))
+            errors = [row['exception'] for row in calls[root[0]['frame_call_hmac_sha256']] if row['event'] == 'EXCEPTION']
+            forwarded = (root[1]['event'] == output[1]['event'] == writer[1]['event'] == 'RETURN'
+                         and writer[0]['reply_status'] == 'failure' and output[0]['handled_exception'] is not None
+                         and output[0]['handled_exception'] in errors)
+        elif complete:
             native, root, reader = (kinds[k][0][1] for k in ('native-response', 'root', 'reader'))
             same_error = (native['event'] == root['event'] == 'UNWIND'
                           and native['exception']['object_hmac_sha256'] == root['exception']['object_hmac_sha256'])
             direct_cause = (same_error and reader['event'] == 'UNWIND'
                             and native['exception']['cause_hmac_sha256'] == reader['exception']['object_hmac_sha256'])
         result.append({'operation_hmac_sha256': key[2], 'process': context, 'binding': binding,
-            'source_four_point_graph_complete': complete, 'same_native_error_reached_future': same_error,
+            'source_role': 'worker-response' if worker else 'deferred-result',
+            'source_four_point_graph_complete': complete and not worker,
+            'worker_three_point_graph_complete': complete and worker,
+            'worker_error_forwarded_as_failure_reply_observed': forwarded,
+            'same_native_error_reached_future': same_error,
             'reader_error_is_direct_native_cause': direct_cause, 'gaps': sorted(set(gaps)), **FLAGS})
     return result
 

@@ -168,3 +168,68 @@ def test_control_directory_pins_inode_and_refuses_public_or_linked_directories(t
     link=tmp_path/'linked';link.symlink_to(tmp_path/'moved',target_is_directory=True)
     with pytest.raises(OSError):
         with harness.control_directory(link):pass
+
+
+def test_standalone_adoption_reaps_only_exited_owned_descendants_and_restores_flag(tmp_path):
+    """Actual Linux subreaper in a disposable process, never the pytest parent."""
+    (tmp_path/'EXAMPLE_owned_orphans.py').write_text('''import os,sys,time
+from pathlib import Path
+if os.fork()==0:
+    deadline=time.monotonic()+5
+    while not Path(sys.argv[1]).exists()and time.monotonic()<deadline:time.sleep(.01)
+    os._exit(0)
+time.sleep(.1)
+os._exit(0)
+''')
+    program='''import ctypes,hashlib,json,os,subprocess,sys,time
+from pathlib import Path
+from tools import owned_engine_supervisor as h
+def adoption():
+    value=ctypes.c_int();library=ctypes.CDLL(None)
+    assert library.prctl(37,ctypes.byref(value),0,0,0)==0
+    return value.value
+before=adoption();release=Path(sys.argv[1])
+cfg={'schema':h.SCHEMA,'session':'a'*32,'key':'b'*64,'module':'EXAMPLE_owned_orphans',
+     'arguments':[str(release)],'maximum_seconds':30,'maximum_generations':3}
+supervisor=h.Supervisor(cfg)
+unrelated=subprocess.Popen([sys.executable,'-c','import time;time.sleep(10)'],start_new_session=True)
+try:
+    with h.child_adoption():
+        assert adoption()==1
+        supervisor.launch();first=supervisor.generations[0]
+        assert first.child.wait(timeout=3)==0
+        supervisor.reap_exited_descendants()
+        assert not supervisor.reaped and unrelated.poll()is None
+        try:supervisor.launch()
+        except ValueError as error:assert str(error)=='SUPERVISOR_PREVIOUS_GROUP_REMAINS'
+        else:raise AssertionError('live adopted child must block restart')
+        release.touch()
+        deadline=time.monotonic()+5
+        while len(supervisor.reaped)<1 and time.monotonic()<deadline:
+            supervisor.reap_exited_descendants();time.sleep(.01)
+        assert len(supervisor.reaped)==1
+        row=supervisor.reaped[0]
+        assert row['generation']==0 and row['group']==row['session']==first.identity['pid']
+        assert row['pid']!=first.identity['pid']and not Path('/proc',str(row['pid'])).exists()
+        supervisor.launch();second=supervisor.generations[1]
+        assert second.child.wait(timeout=3)==0
+        deadline=time.monotonic()+5
+        while len(supervisor.reaped)<2 and time.monotonic()<deadline:
+            supervisor.reap_exited_descendants();time.sleep(.01)
+        assert len(supervisor.reaped)==2 and unrelated.poll()is None
+        status=supervisor.status()
+        assert status['reaped_descendant_count']==2
+        assert status['reaped_descendants_sha256']==hashlib.sha256(h.canonical(status['reaped_descendants'])).hexdigest()
+        assert not status['whole_resources_released']and not status['new_normal_inference_verified']
+    assert adoption()==before
+    print(json.dumps({'adoption_restored':True,'owned_exited_descendants_reaped':2,'unrelated_child_alive':unrelated.poll()is None}))
+finally:
+    supervisor.close()
+    if unrelated.poll()is None:unrelated.terminate()
+    unrelated.wait(timeout=3)
+'''
+    environment={**os.environ,'PYTHONPATH':os.pathsep.join((str(tmp_path),str(Path(harness.__file__).resolve().parents[1])))}
+    result=subprocess.run([sys.executable,'-c',program,str(tmp_path/'release')],env=environment,
+                          cwd=tmp_path,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    assert json.loads(result.stdout)=={'adoption_restored':True,'owned_exited_descendants_reaped':2,'unrelated_child_alive':True}

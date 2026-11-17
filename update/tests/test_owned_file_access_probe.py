@@ -111,6 +111,8 @@ def test_selected_inode_actual_pidfd_and_request_window_do_not_become_supply_pas
                 os.fstat(closed)
         packet = reader.finish(capture_closed=True)
         assert packet['events'][0]['process'] == selected.context(owned_child.pid)
+        assert packet['events'][0]['namespace_pids'] == probe._namespace_pids(
+            selected.read_small('/proc/' + str(owned_child.pid) + '/status', 16384))
         assert packet['events'][0]['file_identity'] == selection['files'][0]['identity']
         assert packet['events'][0]['accessed'] is True and packet['events'][0]['opened'] is True
         assert packet['events'][0]['opened_for_exec'] is False
@@ -240,7 +242,7 @@ def test_path_replacement_after_mark_keeps_old_inode_distinct(tmp_path, fake_ker
 
 
 @pytest.mark.parametrize('damage', ['selected-file', 'process', 'clock', 'sequence', 'future', 'bool-size',
-    'bool-uid', 'claim', 'path-leak', 'not-event', 'unclosed'])
+    'bool-uid', 'claim', 'path-leak', 'not-event', 'unclosed', 'namespace-map', 'bool-namespace-pid'])
 def test_public_packet_is_closed_and_does_not_accept_added_authority(damage, tmp_path, owned_child, fake_kernel):
     path = tmp_path / 'known-file'; path.write_bytes(b'public')
     selection = scope(path); reader = probe.NotificationReader(selection).open()
@@ -261,6 +263,8 @@ def test_public_packet_is_closed_and_does_not_accept_added_authority(damage, tmp
     elif damage == 'path-leak': packet['files'][0]['path'] = str(path)
     elif damage == 'not-event': packet['events'][0]['accessed'] = False
     elif damage == 'unclosed': packet['capture_closed'] = 1
+    elif damage == 'namespace-map': packet['events'][0]['namespace_pids'][0] += 1
+    elif damage == 'bool-namespace-pid': packet['events'][0]['namespace_pids'][-1] = True
     with pytest.raises(ValueError, match='FILE_ACCESS_PACKET_INVALID'): probe.validate_packet(packet, selection)
 
 
@@ -287,5 +291,28 @@ def test_single_drain_is_bounded_and_empty_queue_does_not_block(tmp_path, fake_k
     try:
         reader.drain()
         assert reader.events == [] and reader.gaps == set()
+    finally:
+        reader.close()
+
+
+@pytest.mark.parametrize('raw', [b'', b'NSpid:\t1\nNSpid:\t1\n', b'NSpid:\t-1\n',
+    b'NSpid:\t0\n', b'NSpid:\t1 invalid\n', b'NSpid:\t' + b'1 ' * 33 + b'\n'])
+def test_missing_or_ambiguous_namespace_pid_chain_is_not_a_mapping(raw):
+    with pytest.raises(ValueError, match='FILE_ACCESS_PROCESS_NAMESPACE_UNAVAILABLE'): probe._namespace_pids(raw)
+
+
+def test_pidfd_namespace_pid_and_live_proc_must_agree(tmp_path, owned_child, fake_kernel, monkeypatch):
+    path = tmp_path / 'known-file'; path.write_bytes(b'public')
+    reader = probe.NotificationReader(scope(path)).open()
+    fd, pidfd = os.open(path, os.O_RDONLY), os.pidfd_open(owned_child.pid)
+    original = probe._pidfd_identity
+    def wrong_namespace(fd):
+        value = original(fd); value['namespace_pids'].append(9999); return value
+    monkeypatch.setattr(probe, '_pidfd_identity', wrong_namespace)
+    try:
+        os.write(fake_kernel[1], event(fd, owned_child.pid, pidfd)); reader.drain()
+        packet = reader.finish(capture_closed=True)
+        assert packet['events'] == []
+        assert packet['diagnostic_codes'] == ['FILE_ACCESS_PROCESS_OR_FILE_UNSTABLE']
     finally:
         reader.close()

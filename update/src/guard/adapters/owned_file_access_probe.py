@@ -42,6 +42,7 @@ DIAGNOSTICS = {
 LIMITATIONS = [
     'FILE_ACCESS_MMAP_AND_CACHE_CONSUMPTION_UNOBSERVED',
     'FILE_ACCESS_SELECTED_INODES_ONLY',
+    'FILE_ACCESS_ANCHOR_UID_ONLY',
     'FILE_ACCESS_PARSER_ACCEPTANCE_UNPROVEN',
     'FILE_ACCESS_ACTUAL_GPU_QUALIFICATION_PENDING',
 ]
@@ -130,12 +131,27 @@ def _alive(pidfd):
     return not poller.poll(0)
 
 
-def _pidfd_pid(pidfd):
+def _namespace_pids(raw):
+    rows = [r.split(b':', 1)[1].split() for r in raw.splitlines() if r.startswith(b'NSpid:')]
+    if (len(rows) != 1 or not 1 <= len(rows[0]) <= 32
+            or any(not v.isdigit() or not 0 < int(v) < 10**10 for v in rows[0])):
+        raise ValueError('FILE_ACCESS_PROCESS_NAMESPACE_UNAVAILABLE')
+    return [int(v) for v in rows[0]]
+
+
+def _pidfd_identity(pidfd):
     raw = selected.read_small('/proc/self/fdinfo/' + str(pidfd), 4096)
     rows = [r.split(b':', 1)[1].strip() for r in raw.splitlines() if r.startswith(b'Pid:')]
     if len(rows) != 1 or not rows[0].isdigit():
         raise ValueError('FILE_ACCESS_PROCESS_EXITED_OR_UNAVAILABLE')
-    return int(rows[0])
+    pid, namespace_pids = int(rows[0]), _namespace_pids(raw)
+    if namespace_pids[0] != pid:
+        raise ValueError('FILE_ACCESS_PROCESS_NAMESPACE_UNAVAILABLE')
+    return {'pid': pid, 'namespace_pids': namespace_pids}
+
+
+def _pidfd_pid(pidfd):
+    return _pidfd_identity(pidfd)['pid']
 
 
 class NotificationReader:
@@ -197,7 +213,10 @@ class NotificationReader:
         pidfd = row['pidfd']
         if pidfd < 0:
             self.gaps.add('FILE_ACCESS_PROCESS_EXITED_OR_UNAVAILABLE'); return
-        if not _alive(pidfd) or _pidfd_pid(pidfd) != row['pid']:
+        if not _alive(pidfd):
+            self.gaps.add('FILE_ACCESS_PROCESS_EXITED_OR_UNAVAILABLE'); return
+        kernel_process = _pidfd_identity(pidfd)
+        if kernel_process['pid'] != row['pid']:
             self.gaps.add('FILE_ACCESS_PROCESS_EXITED_OR_UNAVAILABLE'); return
         before = selected.context(row['pid'])
         anchor = self.selection['anchor']
@@ -212,13 +231,15 @@ class NotificationReader:
         if len(files) != 1:
             self.gaps.add('FILE_ACCESS_FILE_CHANGED'); return
         after = selected.context(row['pid'])
-        if (before != after or not _alive(pidfd) or _pidfd_pid(pidfd) != row['pid']
+        namespace_pids = _namespace_pids(selected.read_small('/proc/' + str(row['pid']) + '/status', 16384))
+        if (before != after or not _alive(pidfd) or _pidfd_identity(pidfd) != kernel_process
+                or namespace_pids != kernel_process['namespace_pids']
                 or identity != file_identity(os.fstat(row['fd']))):
             self.gaps.add('FILE_ACCESS_PROCESS_OR_FILE_UNSTABLE'); return
         if len(self.events) >= MAX_EVENTS:
             self.gaps.add('FILE_ACCESS_EVENT_BOUND'); return
         self.events.append({'seq': len(self.events), 'file_id': files[0]['id'], 'file_identity': identity,
-            'process': before, 'received_monotonic_ns': time.monotonic_ns(),
+            'process': before, 'namespace_pids': namespace_pids, 'received_monotonic_ns': time.monotonic_ns(),
             'opened': bool(row['mask'] & OPEN), 'accessed': bool(row['mask'] & ACCESS),
             'opened_for_exec': bool(row['mask'] & EXEC), 'kernel_pidfd_verified': True})
 
@@ -328,7 +349,7 @@ def validate_packet(value, selection):
         files = {r['id']: r['identity'] for r in selection['files']}
         previous = value['ready_monotonic_ns']
         for seq, row in enumerate(value['events']):
-            if (type(row) is not dict or set(row) != {'seq', 'file_id', 'file_identity', 'process',
+            if (type(row) is not dict or set(row) != {'seq', 'file_id', 'file_identity', 'process', 'namespace_pids',
                     'received_monotonic_ns', 'opened', 'accessed', 'opened_for_exec', 'kernel_pidfd_verified'}
                     or type(row['seq']) is not int or row['seq'] != seq or row['file_id'] not in files
                     or not _valid_identity(row['file_identity'])
@@ -340,7 +361,10 @@ def validate_packet(value, selection):
             selected.validate_context(row['process'])
             if (any(row['process'][k] != selection['anchor'][k] for k in selected.NAMESPACE_FIELDS)
                     or row['process']['uid'] != selection['anchor']['uid']
-                    or row['process']['pid'] == value['observer']['pid']):
+                    or row['process']['pid'] == value['observer']['pid']
+                    or type(row['namespace_pids']) is not list or not 1 <= len(row['namespace_pids']) <= 32
+                    or any(not selected.uint(p, 1, 10**10 - 1) for p in row['namespace_pids'])
+                    or row['namespace_pids'][0] != row['process']['pid']):
                 raise ValueError
             previous = row['received_monotonic_ns']
         if len(canonical(value)) > MAX_OUTPUT:

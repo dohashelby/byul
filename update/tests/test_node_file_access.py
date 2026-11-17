@@ -116,3 +116,56 @@ def test_each_standalone_dependency_is_pinned(monkeypatch, name):
 def test_new_file_access_path_leaves_registered_native_sdk_identity_unchanged():
     from guard.collectors.native_input import producer
     assert producer()['source_sha256'] == '5c9e6a5c956b8f2ec0873e71941776eb7027b16b4fd185c4606dd2125938b5d6'
+
+
+@pytest.mark.parametrize('mode', ['normal', 'owner-replaced', 'node-replaced', 'root-mount-replaced',
+    'task-replaced', 'missing-chain-proof', 'proof-error', 'capture-error', 'cleanup-error'])
+def test_live_reader_rechecks_both_mount_proofs_and_preserves_earlier_facts(tmp_path, monkeypatch, mode):
+    binding, first, anchor, files = example(tmp_path, monkeypatch)
+    for key in ('image_chain_verified', 'snapshot_chain_verified', 'live_root_mount_verified'):
+        first._receipt[key] = True
+    first._receipt['root_mount_identity_sha256'] = 'a' * 64
+    second = node_image_proof.NodeImageProof(binding['engine'], first.public_receipt(), _key=node_image_proof._PROOF_KEY)
+    second._receipt['observed_monotonic_ns'] += 100
+    second._receipt['reads'] = [{'operation': 'EXAMPLE-different-read-timing'}]
+    if mode == 'node-replaced': second._receipt['node']['node_uid'] = 'EXAMPLE-other-node'
+    elif mode == 'root-mount-replaced': second._receipt['root_mount_identity_sha256'] = 'c' * 64
+    elif mode == 'task-replaced': second._receipt['task']['start_ticks'] += 1
+    elif mode == 'missing-chain-proof': second._receipt['snapshot_chain_verified'] = False
+    class Reader:
+        lab = True; injected = True; deadline = time.monotonic() + 120
+        _parent_cleanup_failures = 0
+        def __init__(self): self.binding = binding; self.nodes = 0; self.owners = 0; self.runner = lambda *a, **k: None
+        def _remaining(self, deadline): return deadline - time.monotonic()
+        def _owner(self, timeout):
+            self.owners += 1
+            return {'owner': 'other' if mode == 'owner-replaced' and self.owners == 2 else 'EXAMPLE'}
+        def _request(self, argv, **kwargs):
+            assert argv == ['get', 'node', binding['engine']['node'], '-o', 'json']
+            self.nodes += 1
+            return b'{}'
+    reader = Reader(); proofs = [first, second]
+    def proof(*a, **kwargs):
+        value = proofs.pop(0)
+        if value is second and mode == 'proof-error': raise OSError('PRIVATE-ERROR')
+        return value
+    monkeypatch.setattr(node_image_proof, 'collect_local_node_image_proof', proof)
+    def capture(*a, **kwargs):
+        if mode == 'capture-error': raise OSError('PRIVATE-CAPTURE-ERROR')
+        if mode == 'cleanup-error': reader._parent_cleanup_failures += 1
+        selection = {'schema': probe.SELECTION_SCHEMA, 'anchor': anchor, 'files': files}
+        return collector.NodeFileAccessSnapshot(binding['engine'], packet(selection), {'data_origin': 'EXAMPLE'}, _key=collector._KEY)
+    monkeypatch.setattr(collector, 'collect', capture)
+    result = collector.collect_for_reader(reader, files, containerd_address='/run/k3s/containerd/containerd.sock')
+    assert result['collected'] is result['owner_binding_verified'] is result['clock_window_verified'] is result['root_mount_before_after_verified'] is (mode == 'normal')
+    assert (result['packet'] is not None) is (mode != 'capture-error')
+    assert b'PRIVATE' not in probe.canonical(result)
+    assert (result['task_proof_after'] is not None) is (mode not in {'proof-error', 'capture-error'})
+
+
+def test_live_reader_rejects_another_runtime_endpoint_before_any_io():
+    class Reader:
+        def _owner(self, *a): pytest.fail('No IO for unsupported endpoint')
+    result = collector.collect_for_reader(Reader(), [], containerd_address='/private/other.sock')
+    assert result['collected'] is False and result['packet'] is None
+    assert result['diagnostic_codes'] == ['FILE_ACCESS_OWNED_NODE_READ_UNVERIFIED']

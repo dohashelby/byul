@@ -77,3 +77,55 @@ def collect(binding, task_proof, files, *, runner=None, max_seconds=5):
         'whole_supply_scope_verified': False, 'parser_acceptance_verified': False,
         'engine_launched_by_collector': False}
     return NodeFileAccessSnapshot(binding['engine'], packet, public, _key=_KEY)
+
+
+def collect_for_reader(reader, files, *, max_seconds=5, containerd_address=None):
+    """Recheck the live API owner and containerd/root-mount proof on both sides.
+
+    These are two sampled mount proofs, not continuous mount surveillance.
+    Preserve an earlier packet when a later owner or proof check fails.
+    """
+    record = {'schema': 'guard-owned-node-file-access-read/1', 'collected': False,
+        'owner_binding_verified': False, 'clock_window_verified': False,
+        'root_mount_before_after_verified': False, 'packet': None, 'receipt': None,
+        'task_proof_before': None, 'task_proof_after': None, 'diagnostic_codes': []}
+    try:
+        if (containerd_address not in (None, '/run/k3s/containerd/containerd.sock')
+                or type(max_seconds) is not int or not 1 <= max_seconds <= 20):
+            raise ValueError
+        before = reader._owner(min(5, reader._remaining(reader.deadline)))
+        engine = reader.binding['engine']
+        cleanup = getattr(reader, '_parent_cleanup_failures', 0)
+
+        def proof():
+            node = strict_json(reader._request(['get', 'node', engine['node'], '-o', 'json'],
+                deadline=reader.deadline, cap=262144), limit=262144)
+            return node_image_proof.collect_local_node_image_proof(
+                {**reader.binding, 'lab': reader.lab}, node,
+                runner=reader.runner if reader.injected else None,
+                timeout=min(30, reader._remaining(reader.deadline)),
+                **({'containerd_address': containerd_address} if containerd_address is not None else {}))
+
+        first = proof()
+        record['task_proof_before'] = first.public_receipt()
+        if max_seconds + 5 >= reader._remaining(reader.deadline):
+            raise ValueError
+        snapshot = collect({**reader.binding, 'lab': reader.lab}, first, files,
+            runner=reader.runner if reader.injected else None, max_seconds=max_seconds)
+        record.update(packet=snapshot.packet(), receipt=snapshot.public_receipt())
+        second = proof()
+        record['task_proof_after'] = second.public_receipt()
+        identity = lambda r: {k: v for k, v in r.items() if k not in {'reads', 'observed_monotonic_ns', 'data_origin'}}
+        if (type(first) is not node_image_proof.NodeImageProof or type(second) is not node_image_proof.NodeImageProof
+                or not first.matches(engine) or not second.matches(engine)
+                or any(r.get(k) is not True for r in (record['task_proof_before'], record['task_proof_after'])
+                    for k in ('image_chain_verified', 'snapshot_chain_verified', 'live_root_mount_verified'))
+                or identity(record['task_proof_before']) != identity(record['task_proof_after'])
+                or reader._owner(min(5, reader._remaining(reader.deadline))) != before
+                or getattr(reader, '_parent_cleanup_failures', 0) != cleanup):
+            raise ValueError
+        record.update(collected=True, owner_binding_verified=True, clock_window_verified=True,
+            root_mount_before_after_verified=True)
+    except Exception:
+        record['diagnostic_codes'].append('FILE_ACCESS_OWNED_NODE_READ_UNVERIFIED')
+    return record

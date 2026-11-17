@@ -3348,3 +3348,13 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 자격 경계: opaque 기존 containerd task proof의 초기 신원과 프로그램/입력/원본 packet SHA·시간 구간을 연결한다. mmap/cache 소비·parser 수락·전체 공급물 inventory·관측 전후 root mount의 독립 대조·실제 GPU 자격/등록은 아직 주장하지 않는다. syscall 거부·오래된/종료 PID·변경 파일·큐 넘침·관측 한도는 공백이며 SUP03 판정 규칙을 결과에 맞춰 바꾸지 않는다.
 - 시험: sourcec7c24bb0/631핀·검토 기록 동결 뒤 Linux CPython3.12.3 새 FD/PIDFD·inode/세대/시계·기존 node/GPU source·불변식284통과·기존1deselected(pytest7.19초·부모7.751초). 같은 source의 node image·아키텍처/경계·기존 SDK 자격/소스 gate 통합155통과(10.74초·부모11.367초). 별도 실행이므로 합산하지 않는다. 실제 소유 stdlib 자식/FD와 모의 kernel packet 결과이며 실제 fanotify/GPU 자격으로 올리지 않는다. 기존 기대값·제외·정책 기한을 변경하지 않았다.
 - 비용/다음 단계: AWS CLI 인증 만료로 최신 크레딧/guard 재조회가 실패했다. 새 로그인 절차를 유지하며 새 GPU는 생성하지 않았다. 현재 head1be96bfc의20개 CI 검사 성공(두 기본 job 각각14722통과·기존34skip)을 이 새 source에 이월하지 않는다. GPU 자격·전체69개 실행/원 RPT는 계속 미완료다.
+
+## 2026-11-18 — 파일 읽기의 host/container PID 대조와 전후 root mount 연결
+
+- 한 일: kernel PIDFD fdinfo의 NSpid와 살아 있는 proc status의 namespace PID chain을 대조해 host PID와 container PID를 함께 보존한다. 원 worker/RPC 관측과 후속 연결할 때 pid 숫자만 바꾸는 방식으로 대체하지 않는다. anchor와 UID가 같은 namespace의 선택 inode만 현재 관측 범위이며 이 한계를 명시한다.
+- 제품 수집 연결: 기존 lifecycle reader의 정확 소유 API와 opaque containerd task/image/snapshot/root mount proof를 전후 다시 읽는다. sampling 두 지점의 동일 신원을 확인할 뿐 연속 mount 불변성을 주장하지 않는다. 후속 proof/owner 확인이 실패해도 먼저 수집한 packet과 receipt는 보존하며 complete로 올리지 않는다. 기존 등록 SDK와 판정 규칙은 변경하지 않았다.
+- 검증: sourcefb2fb32d/631핀·검토 기록 동결 뒤 Python3.12.3 관련·node/GPU 원 source·전후 image/root mount·아키텍처/불변식458통과·기존1deselected(pytest21.30초·부모22.159초). 앞선 sourcec7c24bb0의284통과 및 통합155통과는 별도 원본이며 합산/이월하지 않는다. WSL6.18.33.2의 새 private PID/mount namespace·임시 공개 fixture에서 실제 kernel ACCESS+PIDFD/NSpid, 다른 namespace 배제, 파일 변경, 종료 PID의4개 개발 사례를 확인하고 소유 자식을 회수했다. 엔진/GPU는 실행하지 않았고 자격/등록으로 올리지 않았다. 전체69 실행/RPT는 미완료다. 신규 GPU는 생성하지 않았다.
+
+- 커널 개발 시험 재현: 비특권 준비 도구는631핀/현재 검토 receipt·고정 canary body를 확인하고 새 private output만 생성한다. root 실행은 준비와 분리되며 생성 프로그램은 자기 임시 파일/namespace/자식만 사용한다. GPU/엔진/등록/전체69 완료는 항상 False다. 준비 도구 거부·무실행 경계와 원 커널 사례를 최종 확인했다.
+- 준비 도구 최초200통과(9.37초·부모10.056초) 뒤 파일 경로로 직접 실행할 때 tools namespace가 없어 실패한 CLI 원본을 확인했다. script/module의 표준 상대 import를 구분하고 두 실제 CLI 진입점을 추가해 최종 재검증한다. 실패 시 출력/자원은 생성되지 않았다.
+- 최종 준비/직접 script·module CLI·source gate·아키텍처/불변식202통과·기존1deselected(pytest10.87초·부모11.622초), sourcefb2fb32d는 유지했다. 공식 준비 도구가 만든 정확 프로그램4804ec17을 WSL root의 새 private namespace/공개 fixture에서 실행해4개 실제 kernel 사례를 다시 확인하고 새 자식2개 모두 회수했다. 원본은 docs/evidence/file-access-wsl-kernel-20261118.json에 보존했다. 부모9c30bd52/sourcec7c24bb0 CI20개 성공, 두 기본 job 각각14792통과/기존34skip(pytest628.67/896.27초·부모629.554/897.762초). 새 head 전체 CI는 별도로 확인한다. GPU 자격·등록·69개 실제 원 RPT는 여전히 미완료다.

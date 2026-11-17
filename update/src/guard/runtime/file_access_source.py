@@ -9,7 +9,7 @@ from guard.adapters import owned_file_access_probe as probe
 from guard.adapters import resource_recovery_probe as selected
 from . import bounded
 
-PINS = {'selected': '86f51b71a70b494562c04bb518afdab420a4f70d2577d6f7f205cec5a067240c', 'bounded': '25c81666a17e13651c0b5b3bd67c9f310c6feee8311fcac408404d895dc67290', 'probe': '44e79c99719933deda94118f82fc4b3c4ff81f44080aa52adc643a3a68d51534'}
+PINS = {'selected': '86f51b71a70b494562c04bb518afdab420a4f70d2577d6f7f205cec5a067240c', 'bounded': '25c81666a17e13651c0b5b3bd67c9f310c6feee8311fcac408404d895dc67290', 'probe': 'cf08d0c42c8657a0194012fd42821f7afadb42ea46a051b6cb399aeb2ee046a3'}
 SELECTED_IMPORT = 'from . import resource_recovery_probe as selected'
 
 

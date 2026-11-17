@@ -7,6 +7,7 @@ These rows alone do not establish fault causality, delivery, recovery or release
 from hashlib import sha256
 import hmac
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -133,6 +134,18 @@ class ResponseTrace:
         memory = descriptor.__get__(buffer, buffer_type).get('shared_memory')
         return identity.shared_memory_endpoint(memory, key=self.key)
 
+    @staticmethod
+    def _timeout(frame, spec):
+        argument = spec.get('timeout_argument')
+        if argument is None:
+            return None
+        value = frame.f_locals.get(argument)
+        if value is None:
+            return None
+        if type(value) not in (int, float) or not 0 <= value <= 2**31 or not math.isfinite(value):
+            raise ValueError('RANK_RESPONSE_TIMEOUT_UNAVAILABLE')
+        return int(value * 1_000_000_000)
+
     def _row(self, frame, state, event, error=None):
         if self.serial >= MAX_ROWS:
             raise ValueError('RANK_RESPONSE_ROW_BOUND')
@@ -147,6 +160,7 @@ class ResponseTrace:
                'event': event, 'instruction_offset': frame.f_lasti, 'line': frame.f_lineno,
                'started_ns': state['started_ns'], 'observed_ns': time.monotonic_ns(),
                'reader_endpoint': state['queue'], 'exception': None,
+               'reader_timeout_ns': state['timeout'],
                'producer_registered': False, 'fault_causality_verified': False,
                'upper_delivery_verified': False, 'recovery_verified': False, 'whole_resources_released': False}
         if error is not None:
@@ -198,6 +212,7 @@ class ResponseTrace:
                 state = {'module': module, 'point': point, 'kind': selected['kind'], 'binding': binding, 'root': root,
                          'operation': operation, 'started_ns': time.monotonic_ns(), 'pending': None,
                          'call': self._hash('frame-call', [operation, self.serial + 1]), 'parent': parent_call,
+                         'timeout': self._timeout(frame, selected) if selected['kind'] == 'reader' else None,
                          'queue': self._queue(frame, selected) if selected['kind'] == 'reader' else None}
                 self.frames[id(frame)] = state
                 frame.f_trace_lines = False

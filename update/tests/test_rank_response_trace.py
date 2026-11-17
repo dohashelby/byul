@@ -30,7 +30,7 @@ RAW=b'''class Scheduled:
 class Buffer:
     pass
 class Queue:
-    def dequeue(self):
+    def dequeue(self, timeout=0.1):
         if self.error is not None:
             raise self.error
         return self.output
@@ -82,7 +82,7 @@ def setup(tmp_path,monkeypatch):
     monkeypatch.setattr(sources,'PROFILES',old_path)
     points={'NativeFuture.result':{'kind':'root'},'NativeFuture.wait':{'kind':'response-wait','parent_kind':'root','future_owner_argument':'self'},
         'Executor.execute.<locals>.get_response':{'kind':'native-response','parent_kind':'response-wait'},
-        'Queue.dequeue':{'kind':'reader','parent_kind':'native-response','queue_class':'Queue','buffer_class':'Buffer'}}
+        'Queue.dequeue':{'kind':'reader','parent_kind':'native-response','queue_class':'Queue','buffer_class':'Buffer','timeout_argument':'timeout'}}
     new_source={k:source[k]for k in('path','bytes','sha256')}
     new_source.update(points=points,body_code_sha256={p:sources.code_digest(codes[p])for p in points},
         return_offsets={p:[i.offset for i in dis.get_instructions(codes[p])if i.opname in {'RETURN_VALUE','RETURN_CONST'}]for p in points},
@@ -209,6 +209,25 @@ def test_no_frame_future_or_exception_is_retained_by_observer(setup):
     tracer.install();future.result();tracer.close()
     del future;gc.collect()
     assert reference()is None and tracer.frames=={}
+
+
+@pytest.mark.parametrize('timeout',[None,0,0.1,300,3600])
+def test_actual_reader_budget_is_metadata_without_changing_engine_timeout(setup,timeout,monkeypatch):
+    module,observer,tracer,old_rows,rows,owner,scheduled,path,memory=setup
+    monkeypatch.setattr(module.Queue.dequeue,'__defaults__',(timeout,))
+    future=owner.execute(scheduled);tracer.install();assert future.result()is owner.response.output;tracer.close()
+    reader,= [row for row in rows if row['point']=='Queue.dequeue'and row['event']=='CALL']
+    assert reader['reader_timeout_ns']==(None if timeout is None else int(timeout*1_000_000_000))
+    assert tracer.diagnostic is None
+
+
+@pytest.mark.parametrize('timeout',[True,-1,float('nan'),float('inf'),2**31+1,object()])
+def test_unrepresentable_reader_budget_is_a_gap_and_never_changes_original_result(setup,timeout,monkeypatch):
+    module,observer,tracer,old_rows,rows,owner,scheduled,path,memory=setup
+    monkeypatch.setattr(module.Queue.dequeue,'__defaults__',(timeout,))
+    future=owner.execute(scheduled);tracer.install();assert future.result()is owner.response.output;tracer.close()
+    assert tracer.diagnostic=='RANK_RESPONSE_OBSERVATION_INCOMPLETE'
+    assert not any(row['point']=='Queue.dequeue'for row in rows)
 
 
 def test_older_future_drained_by_current_result_cannot_inherit_current_request(setup):

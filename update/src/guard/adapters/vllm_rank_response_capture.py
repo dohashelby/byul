@@ -19,7 +19,7 @@ CONTEXT = {'pid', 'start_ticks', 'uid', 'boot_sha256', 'pid_namespace', 'time_na
 ROW = {'schema', 'profile', 'sequence', 'process', 'thread_hmac_sha256', 'operation_hmac_sha256', 'binding',
        'frame_call_hmac_sha256', 'parent_frame_call_hmac_sha256',
        'point', 'source_module', 'source_sha256', 'body_code_sha256', 'event', 'instruction_offset', 'line',
-       'started_ns', 'observed_ns', 'reader_endpoint', 'exception', *set(FLAGS) - {'observer_installed'}}
+       'started_ns', 'observed_ns', 'reader_endpoint', 'reader_timeout_ns', 'exception', *set(FLAGS) - {'observer_installed'}}
 
 
 def canonical(value):
@@ -178,6 +178,9 @@ def _row(value, profile, context):
                 or error['kind'] not in {'timeout', 'runtime-error', 'other'})):
         raise ValueError('RANK_RESPONSE_EXCEPTION_INVALID')
     endpoint = value['reader_endpoint']
+    timeout = value['reader_timeout_ns']
+    if timeout is not None and (point['kind'] != 'reader' or type(timeout) is not int or not 0 <= timeout <= (2**31) * 1_000_000_000):
+        raise ValueError('RANK_RESPONSE_TIMEOUT_INVALID')
     if (point['kind'] == 'reader') != (endpoint is not None):
         raise ValueError('RANK_RESPONSE_READER_INVALID')
     if endpoint is not None and (type(endpoint) is not dict or set(endpoint) != {'schema', 'kind', 'identity_hmac_sha256',
@@ -209,7 +212,7 @@ def response_graphs(rows, profile):
         gaps = []
         for call, records in calls.items():
             first, last = records[0], records[-1]
-            fields = ('point', 'source_module', 'started_ns', 'reader_endpoint', 'parent_frame_call_hmac_sha256')
+            fields = ('point', 'source_module', 'started_ns', 'reader_endpoint', 'reader_timeout_ns', 'parent_frame_call_hmac_sha256')
             if (first['event'] != 'CALL' or any(any(row[k] != first[k] for k in fields) for row in records)
                     or any(a['observed_ns'] > b['observed_ns'] for a, b in zip(records, records[1:]))
                     or any(row['event'] == 'CALL' for row in records[1:])

@@ -508,7 +508,8 @@
               "kind": "reader",
               "parent_kind": "native-response",
               "queue_class": "MessageQueue",
-              "buffer_class": "ShmRingBuffer"
+              "buffer_class": "ShmRingBuffer",
+              "timeout_argument": "timeout"
             }
           },
           "body_code_sha256": {

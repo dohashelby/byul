@@ -3319,3 +3319,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 시험: source3dd6fc9b/627핀, Linux CPython3.12.3 서명/소스 graph·원 RPC/Future/IPC·아키텍처/불변식260통과·기존1deselected(pytest9.72초·부모10.255초). 이후 시험만 추가한 같은 source의 준비/원 SDK·native 수집/부트스트랩·불변식245통과·기존1deselected(pytest21.62초·부모22.215초). 합산하지 않는다. 초기 새 시험의 문법 오류와 존재하지 않는 selector로 끝난 무실행 로그도 보존했다. 기존 assert/기대값/기한·제외는 완화하지 않았다.
 - 전체 CI 이력: 부모4f43acae(source2b4c073e)의20개 검사 성공. 두 기본 job은 각각14618통과·기존34skip(pytest830.97/959.52초, 부모832.324/960.887초). 이 결과를 새3dd6 소스의 전체 성공으로 이월하지 않는다. 새 head의 CI를 별도로 확인한다.
 - 다음 단계: 새 실제 GPU 자격/등록·LIF08 상위 통지/그룹 회복·LIF11 전체 자원/새 정상 세대, SUP04/PLT01/PLT04 남은 범위와fresh69개 입력·실행·RPT. GPU는 새로 생성하지 않았으며$5준비금·최대$6/45분 제한을 유지한다.
+
+## 2026-11-18 — 선택 응답 정지와 reader timeout의 원본 연결 후보
+
+- 한 일: 두 원본 검증기를 직접 호출하는 별도 link-stall 도구를 추가했다. 같은 private session·이미지·키/준비 SHA·현재 요청/Future·실제 reader/sender 공유 메모리 FD가 맞고 정지 적용 뒤 원 예외/cause가 Future까지 전달되며 해제·만료·취소 전일 때만 제한된 연결 사실을 남긴다. HTTP500이나 JSON 성공 표시만으로 만들지 않는다. reader의 실제 timeout scalar만 정수 ns로 투영하며 엔진의 시간 설정은 변경하지 않는다. 다른 fault 종류·상위 HTTP 인과·그룹 회복·등록은 여전히 False다.
+- 시험: source95c4b603/628핀, Python3.12.3 서명·source graph/link·기존 stall/physical fault·기존 SDK 자격·아키텍처/불변식295통과·기존1deselected(pytest20.74초·부모21.543초). EXAMPLE 메타데이터와 실제 stdlib Future/서명 파일의 단위 검증이며 실제 GPU 자격이나 판정 완료로 올리지 않는다. 다른 채널·요청·Future/시계·누락·해제/만료·관측 gap·0/미상 timeout을 거부한다. 원 함수/예외와 기존 보안 기대값·기한/제외를 유지한다.
+- 이전 head CI: d798b5ee/source3dd6fc9b의20개 검사 성공. 두 기본 job 각각14661통과·기존34skip(pytest653.31/656.66초·부모654.302/657.586초). source95c4의 전체 성공으로 이월하지 않는다.
+- 입력 점검: 현재 팩39의69개에는176개 확정 정책 값과5개 실행 시 실자료로 채울 규칙이 있다(정책 항목이 있는 점검49개). enterprise 미확정 키는 없지만 sealed ENV/target/per-check 실행 파일은 아직 연결 전이다. SUP03은 security pass/fail 규칙이 비어 있는 추가 미완료 경로임을 확인했다. 실행 횟수만으로69개 판정 완료를 만들지 않는다.
+- 비용: 02:15 KST 추정 크레딧12.23달러, 보호 범위 활성 EC2/EBS/SG0개·예약 활성. 새 GPU는 만들지 않았다. 신규 관측 GPU 자격·등록·69개 실제 실행/원 RPT는 계속 미완료다.

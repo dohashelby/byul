@@ -3282,3 +3282,10 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 실패 원인과 보수: (1) profiler 15건 — 0.7.0 `_handle_client_request`는 `EngineCoreProc`에 정의돼 있는데 관측 지점을 `EngineCore.`로 적어 정확 소스에서 함수를 찾지 못했다. 지점 이름을 `EngineCoreProc._handle_client_request`로 고쳤다(시험 도우미·설계 문서 포함). (2) graph 7건 — `base.attrs()`가 dict가 아닌 `Fields`(`.get`만 제공)를 반환하는데 snapshot이 `state['…']`로 읽어 예외가 났고 CALL·종결 필드가 비었다. `.get()`으로 바꿨다. 시험·단언·기대값은 바꾸지 않았다.
 - 테스트 결과: 로컬 Python/pytest는 실행하지 않았다. 소스 목록은 셸 SHA·jq로 다시 만들었고(같은 방법으로 main 목록을 바이트 단위로 재현함) Linux CI 결과를 기다린다.
 - 다음 단계: 새 head의 update-default·observer 3.12.8 job 확인.
+## 2026-11-17 — 크레딧 사전 중단 배포·실제 자동 종료, PLT04 공급 설정/worker 이름 연결
+
+- 한 일: 사용자 요청에 따라 전용 실행 역할·IAM 만료 기한·1분 예약 Lambda 감시를 실제 배포했다. AWS API 잔액 $12.23, $5 준비금, 세션 최대 $6/45분, 관측 실패/설정 불일치 시 래치 차단, 활성 예약액·경과 비용·세션 기한 확인을 적용한다. 감시 자체는 24시간 이하 기한 뒤 차단·소유 자원 정리 후 꺼진다. root·다른 역할·계정 전체의 과금 차단을 주장하지 않는다.
+- 실제 확인: 전용 제한 역할의 저비용 t3.micro 1대가 2분 기한 뒤 예약 감시에 의해 종료됐다. 12:30:13 UTC 원 SSM 상태에 종료 이유, 12:31:12 UTC에 보안그룹 삭제가 남았고 EC2 종료·소유 EBS/보안그룹 0개를 재조회했다. 별도 노드 4분 종료 예약보다 먼저 동작했다. IAM 미래 시각 시뮬레이션에서 생성/시작/디스크/스냅샷/명령 5종 명시적 Deny를 확인했다. 시험용 Lambda도 삭제했다. 크레딧 소진 분기는 모의 시험이며 실제 잔액을 소진한 시험이 아니다. 새 GPU는 만들지 않았다.
+- 관측 구현: PLT04 provider_inventory opt-in으로 정확 소유 Pod의 전후 env/valueFrom/envFrom·마운트/Secret/ConfigMap/projected token/CSI 선언을 제한 투영한다. 비밀 값·command·volumeAttributes·Secret/ConfigMap 내용·IMDS/SDK 요청은 읽지 않는다. 기존 등록 worker 소스/target/prepared/current PID/namespace를 대조해 환경 이름의 양성 존재를 연결한다. 뒤늦은 소유자/선언 변경은 첫 관측을 보존하되 전체 범위로 올리지 않는다. 이름 일치는 값 동일성·상속 원인·provider 사용/권한의 증명이 아니다.
+- 시험: 최종 source34cd2fbb/605핀, Linux CPython3.12.3 관련/제품/worker/불변식275 통과·기존1 deselected(pytest18.14초·부모18.513초). 최초 두 시험 묶음의 새 CLI 시험 인자 오류(run의 pack, report/export 옵션)는 원 실패 로그를 보존하고 수정했다. 최종 시험은 EVD→RES→RPT→반출/복원과 기존 UNKNOWN/EXAMPLE 유지, 비밀 값 미수집·변경/누락 거부를 포함한다. 기존 assert/기대값/정책/judge·제외는 완화하지 않았다. 새 정확 head 전체 suite는 PR Linux CI에서 별도로 확인한다.
+- 경계/다음 작업: 기존 worker/input 생산자 bytes·제한 등록을 유지했다. 새 공급 설정 inventory와 호스트 GPU 수집기의 실제 GPU 자격·전체 provider/상속 범위, SUP04·PLT01·LIF08/11·REQ08/09 남은 범위, fresh69개 입력·전체 실제 실행/보고서는 미완료다. 모의 시험과 CPU canary를 GPU 완료로 세지 않는다. runtime/contracts·원 dirty checkout은 변경하지 않았다.

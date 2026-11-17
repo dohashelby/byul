@@ -630,6 +630,11 @@
       "manifest_sha256": "8dfa30ddc14cadb7aa455d9cfd74d96a905af2261c6520391ab394c72de5db7c",
       "reviewed_by": "Codex main continuation / bounded node GPU PID, namespace and device references; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-17T10:41:14.977973+00:00"
+    },
+    {
+      "manifest_sha256": "34cd2fbb56fef66b2603fba31bfb112808da7f40341b66a7a1b626279e70a044",
+      "reviewed_by": "Codex main continuation / safe provider declarations and source-bound worker name association; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T12:30:46.921440+00:00"
     }
   ]
 }

@@ -1161,3 +1161,8 @@ WORK_ORDER 1.2의 부분 snapshot 범위에서 `/33`은 source qualified `run_as
 ## 2026-11-16 M-A6 기준 V1 REQ-20 graph 부분 관측
 
 0.7.0 `PiecewiseBackend.__call__`의 정확 소스·선택 함수 코드로 shape별 graph replay 분기와 `entry.output` 객체 반환을 부분 관측한다. `copy_and_call` closure, tensor 원값, property, CUDA 완료는 관측 범위 밖이다. 기존 V2 `ModelCudaGraphManager.run_fullgraph`/`GPUModelRunner.sample` 소비와 의미가 다르므로 판정이나 수락 기준을 바꾸지 않고 별도 adapter projection을 둔다. 이는 default `engine_sensor` gate나 GPU 등록을 열지 않으며 REQ-20 전체 결과는 UNKNOWN이다. 근거와 공백은 `docs/dev-1/ma6-baseline-graph-candidate.md`에 기록한다.
+## 2026-11-17 — 잔액 준비금과 BYUL 전용 역할의 크레딧 중단
+
+사용자는 크레딧 소진 전 자동 중단과 추가 과금 방지, 남은0.30.0 관측/69개 실행 준비 및 PR 공개를 지시했다. AWS의 지연된 잔액만으로 계정 전체의 결제를 보장하지 않고 $5 준비금·최대$6/45분의 세션 상한·1분 소유 자원 감시와 3분 이내 IAM 만료 기한을 함께 쓴다. 잔액/자원 관측 실패는 차단하고 자동 해제하지 않는다. root에는 IAM 제한을 적용할 수 없어 실제 실증은 별도 전용 역할로 실행한다. 다른 역할·기존 사용자 자원·다른 서비스는 이 제어의 대상이 아니다. 감시 자체도 최대24시간 기한 뒤 차단·소유 자원 정리 후 중지한다. 새 비용 승인을 이월하거나 추가 계정/조직·결제 수단을 변경하지 않는다.
+
+PLT04의 새 선언/worker 환경 이름 inventory는 기존 자격 producer를 바꾸지 않는 선택 보조 증거다. 비밀 값·공급자 토큰·Secret/ConfigMap 내용은 수집하지 않으며 이름의 존재를 값 동일성·상속 원인·공급자 사용/권한·전체 자격으로 승격하지 않는다. 새 범위의 GPU 자격과 등록은 실제 증거가 있을 때만 한다.

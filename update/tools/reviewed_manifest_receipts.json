@@ -450,6 +450,166 @@
       "manifest_sha256": "4e198d0072e495139f94b95585c4ae5ee4ca7c88d69d7cdb425d4e744ef174a6",
       "reviewed_by": "Claude / PR291 보고서 판정 이유·main89c8569d 통합 review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T08:09:45Z"
+    },
+    {
+      "manifest_sha256": "93e95b5dde5e95e17a522018dc871b626fd0f20e7233e94c3a94016f0e3b6d0e",
+      "reviewed_by": "Codex / SUP04 node and PLT04 mount source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T05:30:58.886961+00:00"
+    },
+    {
+      "manifest_sha256": "d9f78d5e034ad15918073582802a2b27799d755eb8c447494d7c9b6c871a9e17",
+      "reviewed_by": "Codex / SUP04 node and PLT04 mount source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T05:51:41.059653+00:00"
+    },
+    {
+      "manifest_sha256": "cdaadb68add1d5c25944fb83cb81d1c64cd47a4292e735275f44bc9f838e24a1",
+      "reviewed_by": "Codex / SUP04 node and PLT04 mount source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T06:16:56.816481+00:00"
+    },
+    {
+      "manifest_sha256": "67008619cc35da1e339026f18a32d902262468d2f24f9e5e072a04c0c395efc4",
+      "reviewed_by": "Codex / SUP04 node and PLT04 mount source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T06:22:17.331015+00:00"
+    },
+    {
+      "manifest_sha256": "bb7111cdd500a49a0715be57a33b97a18f586df9d4c804b49b0893147b0d4930",
+      "reviewed_by": "Codex / SUP04 node and PLT04 mount source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T06:51:11.748391+00:00"
+    },
+    {
+      "manifest_sha256": "4f25e2417bddf4db6d9c61e8d6ba8743313d4412cad6118e3b3c2dd77bcab00a",
+      "reviewed_by": "Codex / SUP04 node and PLT04 mount source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T07:14:54.465138+00:00"
+    },
+    {
+      "manifest_sha256": "a15bfb8e111b53e3991f9087c74a1f2563884270d8407893178c61f90fd1c102",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T08:02:38.322640+00:00"
+    },
+    {
+      "manifest_sha256": "248bbe680ac3170b83004b4972c7ebe29e94fbc023489623cc4e1134afff1244",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T08:26:45.669708+00:00"
+    },
+    {
+      "manifest_sha256": "747831be00039c5855e8c651341a754dba1a7c712a436218896d4879ded81df7",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T09:26:59.024445+00:00"
+    },
+    {
+      "manifest_sha256": "bb8f21253c0878c03b113d2c415f2d9c06d48b4be98bc730c3841a421e16e422",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T09:29:33.641451+00:00"
+    },
+    {
+      "manifest_sha256": "18fc4c5521c2c765b3af9914a68305e4e41c5428c85d085eb186174622ee266a",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T10:06:48.624005+00:00"
+    },
+    {
+      "manifest_sha256": "8aa0aec5981ab53d8b5eb9aab19485c18ae0466388b6d6ed2172303cbb495e56",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T10:36:35.940237+00:00"
+    },
+    {
+      "manifest_sha256": "ce78fa6326a4bcf2cd5d384afe6bfd15de18e321f64ba9e017f10bda34582f10",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T11:28:25.782412+00:00"
+    },
+    {
+      "manifest_sha256": "f43fcf14dbee66b1a512b10c4647c63e537b1c5e3eababb8590168abed709cd4",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T11:48:40.801348+00:00"
+    },
+    {
+      "manifest_sha256": "36b1d7548b7c20a358b67edbc7aa489f08b5116366a76e679cb563fd009d8115",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T12:08:13.574389+00:00"
+    },
+    {
+      "manifest_sha256": "b107d1cb18af131ac84ec037d083cd13d2a57fb8d3180677febc93e3937a2774",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T12:52:33.526533+00:00"
+    },
+    {
+      "manifest_sha256": "bdf54f088d2d41e0ac22b6d7b80d4f1e8bed9fed3b9acf76b0134b8f36a355c3",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T12:55:52.366049+00:00"
+    },
+    {
+      "manifest_sha256": "e1814859fdbf05bb6087a1cdc1cb3b2a6bf55cdd7b8537a0a5f6ab23b2b3565f",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T12:57:30.223602+00:00"
+    },
+    {
+      "manifest_sha256": "92e43beb9081f0e42bb22f5f9e142d503534f1142d5ef29cd9df208f4b6e6caf",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T13:08:34.420222+00:00"
+    },
+    {
+      "manifest_sha256": "a56172511968630936d429b26deac7a622014a8066f0ec0bd47fa4f6445b9b19",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T13:08:59.105762+00:00"
+    },
+    {
+      "manifest_sha256": "5de2037821d7016eae31daa105019fca24136ecbc8fb0a1e3ebd86b4df4988ec",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T13:40:48.715044+00:00"
+    },
+    {
+      "manifest_sha256": "590126b33e311f6bb336b2d2f2090b9c2b9dd3dcde0a35acd53bcfc0c964e54e",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T14:55:08.054106+00:00"
+    },
+    {
+      "manifest_sha256": "2b3f203298f13b83f86f7dfecde26ddf34c4a406c6571592271289ab18648289",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T06:07:16.941345+00:00"
+    },
+    {
+      "manifest_sha256": "7a18370a8731bb207711f3d362066540c7846b7c351395f8ffdc68ee247b354b",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T06:14:01.430107+00:00"
+    },
+    {
+      "manifest_sha256": "298f217b5c7a54b13a61a60c1fc11b824910690d5d345b960cf159d33358c540",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T06:18:54.604172+00:00"
+    },
+    {
+      "manifest_sha256": "f34902445c22ccae7c69cc5de27bf8d26f98b65c70fd6ecbb898b70991a31269",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T06:20:25.148712+00:00"
+    },
+    {
+      "manifest_sha256": "d02d5485b8a9884d2903c9f5dab85949538088cd0c2bcc5b628d9c07440cf67b",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T07:08:22.290332+00:00"
+    },
+    {
+      "manifest_sha256": "3d529af9494593bf709de616dacdaae7883ce48e4726877185fa64635696e04b",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T07:53:41.277927+00:00"
+    },
+    {
+      "manifest_sha256": "2024e84df8c1a63bb65628f2e0e5727c4f2135f096d282b3089035b81b87b3d9",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T07:56:09.227373+00:00"
+    },
+    {
+      "manifest_sha256": "8a26c31975cc816a7241f941d1638149e99819e3ed59cdfe08339c73e6c287b2",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T08:03:01.229929+00:00"
+    },
+    {
+      "manifest_sha256": "e61ccf04be2b192883b1795dbeebcf3a4978830b5cf5b0474870902083fe10ab",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T08:07:56.489528+00:00"
+    },
+    {
+      "manifest_sha256": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+      "reviewed_by": "Codex / 0.30 input, rank, worker access and owned-signal cleanup source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-17T08:15:35.982363+00:00"
     }
   ]
 }

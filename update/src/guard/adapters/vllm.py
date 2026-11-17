@@ -146,6 +146,17 @@ PINNED_SAFE_PROBES: dict[tuple[str, str, str, str], ProbeRequest] = {
 # These are rejection proofs only; neither a 2xx nor a generation-shaped body
 # establishes that the submitted invalid input was consumed or caused damage.
 _INPUT_REJECTION_REVIEWS = {
+    "0.30.0": {
+        # Installed Python files exported from the pinned GPU image during J00.
+        # This exact HTTP rejection contract does not qualify native observers.
+        "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+        "length_format": "input-output",
+        "token": [("vllm/v1/engine/input_processor.py", "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813", "340,487-559")],
+        "length": [("vllm/renderers/params.py", "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5", "494-556"),
+                   ("vllm/renderers/online_renderer.py", "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e", "538-573,600-645")],
+        "error": ("vllm/entrypoints/serve/exception_handling/error_response.py", "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e", "38-48,89-96"),
+        "exception": ("vllm/exceptions.py", "06c77c8129ac024455ace7c89168cd8e2284d70e5d96b326782b5f110ff73e7a", "28-58"),
+    },
     "0.31.0": {
         "image": SAFE_PROBE_REVIEWED_IMAGES["0.31.0"], "length_format": "input-output",
         "token": [("vllm/v1/engine/input_processor.py", "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b", "397-400,598-626")],

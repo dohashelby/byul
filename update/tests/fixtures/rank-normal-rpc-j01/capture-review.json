@@ -1,0 +1,1397 @@
+{
+  "engine_group_verified": false,
+  "gaps": [],
+  "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+  "producer_registered": false,
+  "rows": [
+    {
+      "body_code_sha256": "037b8bdbb11aef969ef30cc42e0f49566790af02b93f4a7a22d12b5ab56664be",
+      "call_hmac_sha256": "7a95b41bac9ec9064726b931647f5c00ce93781c30575a28dd7601850924c18e",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 1,
+        "pid_namespace": 4026534839,
+        "start_ticks": 461238,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "RETURN",
+      "external_request_hmac_sha256": "f7b927e7518b870898c1e06a5cef837d9153d0e7a865ce0af805b7db7b74ad4e",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": null,
+      "observation_ns": 4703232872729,
+      "operation_started_ns": 4703231840492,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "BaseServing._base_request_id",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "http-request-id",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {},
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.entrypoints.openai.completion.serving": "75d05ddddf303734a078a3e42fcb173fef58ea56da09bc0b5c7525cb9bbbf527",
+        "vllm.entrypoints.serve.engine.serving": "70143311acc2230b925e7f3603b8b9314f029ff5e98d5af990b3bdca691331f1"
+      },
+      "source_module": "vllm.entrypoints.serve.engine.serving",
+      "source_sha256": "70143311acc2230b925e7f3603b8b9314f029ff5e98d5af990b3bdca691331f1"
+    },
+    {
+      "assignment": {
+        "external_hmac_sha256": "2b0c1d51cfc66d940046eafcdc44a50be2fa85c3466b22341320adce0a55fb46",
+        "internal_hmac_sha256": "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb",
+        "producer_registered": false,
+        "rpc_active_verified": false,
+        "schema": "guard-rank-request-assignment-candidate/1",
+        "source_authenticated": false
+      },
+      "body_code_sha256": "3a32ac83f2dfc1f1d6f9a59b8cb8f8bfb2ff264cfcea683bdc60174291b33a3f",
+      "call_hmac_sha256": "65f8829bea39f90b757be89b7a6644d575ebfc61efec56d8a85d323356d46505",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 1,
+        "pid_namespace": 4026534839,
+        "start_ticks": 461238,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "RETURN",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": null,
+      "observation_ns": 4703254208940,
+      "operation_started_ns": 4703253763999,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "InputProcessor.assign_request_id",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "internal-request-id-assignment",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {},
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.engine": "4e59828787634123026a6b424f48c21d691913dd338b59dd13f25fa260f2284b",
+        "vllm.v1.engine.input_processor": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813"
+      },
+      "source_module": "vllm.v1.engine.input_processor",
+      "source_sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813"
+    },
+    {
+      "body_code_sha256": "93a599d21ac171a0d49abba4f5b8b1e50e4c2ac706e6fe9dbd55a140d674fcf6",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 329,
+        "pid_namespace": 4026534839,
+        "start_ticks": 465072,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {
+        "broadcast": {
+          "engine_group_verified": false,
+          "identity_hmac_sha256": "78139e0caeb688ce2c0995e3caa4562d83055149ffc0fc21ccf038eac19c39c3",
+          "kind": "shared-memory",
+          "observation_finished_ns": 4690224751602,
+          "observation_started_ns": 4690224631999,
+          "schema": "guard-rank-ipc-identity/1",
+          "source_authenticated": false
+        }
+      },
+      "engine_group_verified": false,
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "members": [
+        {
+          "endpoints": {
+            "response": {
+              "engine_group_verified": false,
+              "identity_hmac_sha256": "c3dbbf92b11e039e1268b5462d41c6eac5526fbb618fecec213b86d6db24154b",
+              "kind": "shared-memory",
+              "observation_finished_ns": 4690224960927,
+              "observation_started_ns": 4690224858635,
+              "schema": "guard-rank-ipc-identity/1",
+              "source_authenticated": false
+            }
+          },
+          "object_hmac_sha256": "849570d5dc7e5cc4c22c100ffc8b58c6b38819925822f93c09e01516a80f90a9",
+          "processes": {
+            "worker": {
+              "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+              "pid": 468,
+              "pid_namespace": 4026534839,
+              "start_ticks": 466682,
+              "time_namespace": 4026531834,
+              "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+              "uid": 0
+            }
+          },
+          "scalars": {
+            "rank": 0,
+            "worker_pid": 468
+          }
+        },
+        {
+          "endpoints": {
+            "response": {
+              "engine_group_verified": false,
+              "identity_hmac_sha256": "1884d2396f484c7d63717bb262d96fbeeed6d82a14001e19f632bd6e24f02edd",
+              "kind": "shared-memory",
+              "observation_finished_ns": 4690225668326,
+              "observation_started_ns": 4690225571453,
+              "schema": "guard-rank-ipc-identity/1",
+              "source_authenticated": false
+            }
+          },
+          "object_hmac_sha256": "baf2ff5fb99af91ca23842d95af06224d1ba3fda45c075d83c6c9db1a060d4a0",
+          "processes": {
+            "worker": {
+              "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+              "pid": 469,
+              "pid_namespace": 4026534839,
+              "start_ticks": 466682,
+              "time_namespace": 4026531834,
+              "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+              "uid": 0
+            }
+          },
+          "scalars": {
+            "rank": 1,
+            "worker_pid": 469
+          }
+        }
+      ],
+      "object_hmac_sha256": "cb943b1c91512ed32ed7149bfe5c892362d62d339f0f2213ee543fe4d64d2b86",
+      "observation_finished_ns": 4690226197919,
+      "observation_started_ns": 4690223782307,
+      "phase": "after-original",
+      "point": "MultiprocExecutor._init_executor",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "role": "parent-executor",
+      "scalars": {
+        "configured_tp_size": 2
+      },
+      "schema": "guard-rank-ipc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.distributed.device_communicators.shm_broadcast": "f3e7a3f3ff713fccbd535e0d41650ee05bdf8677e83d4b90519910645022c30b",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "2b506b6b07838c851f1819da973c1ea5de2761c0be23e5a3c8b2f7e59573c18d",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {
+        "broadcast": {
+          "engine_group_verified": false,
+          "identity_hmac_sha256": "78139e0caeb688ce2c0995e3caa4562d83055149ffc0fc21ccf038eac19c39c3",
+          "kind": "shared-memory",
+          "observation_finished_ns": 4690205306639,
+          "observation_started_ns": 4690205201626,
+          "schema": "guard-rank-ipc-identity/1",
+          "source_authenticated": false
+        },
+        "response": {
+          "engine_group_verified": false,
+          "identity_hmac_sha256": "c3dbbf92b11e039e1268b5462d41c6eac5526fbb618fecec213b86d6db24154b",
+          "kind": "shared-memory",
+          "observation_finished_ns": 4690205409542,
+          "observation_started_ns": 4690205331990,
+          "schema": "guard-rank-ipc-identity/1",
+          "source_authenticated": false
+        }
+      },
+      "engine_group_verified": false,
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "observation_finished_ns": 4690205415102,
+      "observation_started_ns": 4690204453067,
+      "phase": "after-original",
+      "point": "WorkerProc._init_message_queues",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "role": "worker-initialization",
+      "scalars": {
+        "configured_tp_size": 2,
+        "rank": 0,
+        "reader_rank": 0
+      },
+      "schema": "guard-rank-ipc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.distributed.device_communicators.shm_broadcast": "f3e7a3f3ff713fccbd535e0d41650ee05bdf8677e83d4b90519910645022c30b",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "31b3b3dd5520fcbaea92b0199d60ed968ff3eb38d00bf11d5b80440435523dd1",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "observation_ns": 4703316584273,
+      "operation_started_ns": 4703315749662,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "82aa146ae9aada904bb57b30b531d270703bc00585d80b519446a8ba13a166dc",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "c4a2b686478d4593dafdb2183f13ea4bf13c1782a1b9846fbc628fa344d0dbe7",
+      "observation_ns": 4703321847359,
+      "operation_started_ns": 4703321075139,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "746b5b84d5c02402f7eb465bfebe064cda685ad4627798cc908ebc1e738db910",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "CALL",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "observation_ns": 4703261563771,
+      "operation_started_ns": 4703260531034,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "49a10ea95fb3f8c47cd549a168d2ff6ef110616863c459b026daaad3f85056a3",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "CALL",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "c4a2b686478d4593dafdb2183f13ea4bf13c1782a1b9846fbc628fa344d0dbe7",
+      "observation_ns": 4703266299123,
+      "operation_started_ns": 4703265325908,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": "746b5b84d5c02402f7eb465bfebe064cda685ad4627798cc908ebc1e738db910",
+      "rpc_parent_frame_verified": true,
+      "rpc_parent_object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "rpc_parent_worker_verified": true,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "49a10ea95fb3f8c47cd549a168d2ff6ef110616863c459b026daaad3f85056a3",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "RETURN",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "c4a2b686478d4593dafdb2183f13ea4bf13c1782a1b9846fbc628fa344d0dbe7",
+      "observation_ns": 4703283417336,
+      "operation_started_ns": 4703265325908,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": "746b5b84d5c02402f7eb465bfebe064cda685ad4627798cc908ebc1e738db910",
+      "rpc_parent_frame_verified": true,
+      "rpc_parent_object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "rpc_parent_worker_verified": true,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "746b5b84d5c02402f7eb465bfebe064cda685ad4627798cc908ebc1e738db910",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "RETURN",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "observation_ns": 4703289843802,
+      "operation_started_ns": 4703260531034,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "174b5e13b1e63cee30dbf4eb9835486448cc0a358227ab9ecee2c4dc05b491bf",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "observation_ns": 4703295454507,
+      "operation_started_ns": 4703294406290,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "ed681b164de48b833b94f475b44fe1b88a66148b887d2ce5dc39f94a051f82d3",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "c4a2b686478d4593dafdb2183f13ea4bf13c1782a1b9846fbc628fa344d0dbe7",
+      "observation_ns": 4703299840270,
+      "operation_started_ns": 4703299071400,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "ed681b164de48b833b94f475b44fe1b88a66148b887d2ce5dc39f94a051f82d3",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_RETURN",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "c4a2b686478d4593dafdb2183f13ea4bf13c1782a1b9846fbc628fa344d0dbe7",
+      "observation_ns": 4703304048409,
+      "operation_started_ns": 4703299071400,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "174b5e13b1e63cee30dbf4eb9835486448cc0a358227ab9ecee2c4dc05b491bf",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 468,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_RETURN",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "cf6d9588125433efddb01c34f845344fc1e8369a99f64666e72f32d2d56f2168",
+      "observation_ns": 4703310887976,
+      "operation_started_ns": 4703294406290,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 0
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "2b506b6b07838c851f1819da973c1ea5de2761c0be23e5a3c8b2f7e59573c18d",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {
+        "broadcast": {
+          "engine_group_verified": false,
+          "identity_hmac_sha256": "78139e0caeb688ce2c0995e3caa4562d83055149ffc0fc21ccf038eac19c39c3",
+          "kind": "shared-memory",
+          "observation_finished_ns": 4690158284973,
+          "observation_started_ns": 4690158192181,
+          "schema": "guard-rank-ipc-identity/1",
+          "source_authenticated": false
+        },
+        "response": {
+          "engine_group_verified": false,
+          "identity_hmac_sha256": "1884d2396f484c7d63717bb262d96fbeeed6d82a14001e19f632bd6e24f02edd",
+          "kind": "shared-memory",
+          "observation_finished_ns": 4690158386266,
+          "observation_started_ns": 4690158311094,
+          "schema": "guard-rank-ipc-identity/1",
+          "source_authenticated": false
+        }
+      },
+      "engine_group_verified": false,
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "observation_finished_ns": 4690158391676,
+      "observation_started_ns": 4690157601266,
+      "phase": "after-original",
+      "point": "WorkerProc._init_message_queues",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "role": "worker-initialization",
+      "scalars": {
+        "configured_tp_size": 2,
+        "rank": 1,
+        "reader_rank": 1
+      },
+      "schema": "guard-rank-ipc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.distributed.device_communicators.shm_broadcast": "f3e7a3f3ff713fccbd535e0d41650ee05bdf8677e83d4b90519910645022c30b",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "6dda34a7d131d3ed124498495bbe82892d3b66d17ecc7956eddd40aa91f3dbd3",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "observation_ns": 4703312847056,
+      "operation_started_ns": 4703312206550,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "fc55a1b7176d9c1d9acf4e0ec158848556d3a776df3da228e35d8954f0109a34",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "74ef1c954542e4a4a5550820b5c4668472a01454b9cf5bf7b8c3659312dc86e5",
+      "observation_ns": 4703317241010,
+      "operation_started_ns": 4703316593984,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "fc55a1b7176d9c1d9acf4e0ec158848556d3a776df3da228e35d8954f0109a34",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_RETURN",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "74ef1c954542e4a4a5550820b5c4668472a01454b9cf5bf7b8c3659312dc86e5",
+      "observation_ns": 4703322750403,
+      "operation_started_ns": 4703316593984,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "3049bc4e50a05a6e5bf13d5b2be23a4faf87b7ead3aef020cabd0b5bb608eb66",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "CALL",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "observation_ns": 4703261693344,
+      "operation_started_ns": 4703260642347,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "e42d6827ea7fd054de4a74e3fc0c58526f13216fc9b544e84aae1335c2e21c14",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "CALL",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "74ef1c954542e4a4a5550820b5c4668472a01454b9cf5bf7b8c3659312dc86e5",
+      "observation_ns": 4703266064097,
+      "operation_started_ns": 4703265278157,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": "3049bc4e50a05a6e5bf13d5b2be23a4faf87b7ead3aef020cabd0b5bb608eb66",
+      "rpc_parent_frame_verified": true,
+      "rpc_parent_object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "rpc_parent_worker_verified": true,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "e42d6827ea7fd054de4a74e3fc0c58526f13216fc9b544e84aae1335c2e21c14",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "RETURN",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "74ef1c954542e4a4a5550820b5c4668472a01454b9cf5bf7b8c3659312dc86e5",
+      "observation_ns": 4703282297017,
+      "operation_started_ns": 4703265278157,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": "3049bc4e50a05a6e5bf13d5b2be23a4faf87b7ead3aef020cabd0b5bb608eb66",
+      "rpc_parent_frame_verified": true,
+      "rpc_parent_object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "rpc_parent_worker_verified": true,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "3049bc4e50a05a6e5bf13d5b2be23a4faf87b7ead3aef020cabd0b5bb608eb66",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "RETURN",
+      "gaps": [],
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "observation_ns": 4703286752802,
+      "operation_started_ns": 4703260642347,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [
+        "6ab1cce757728241847c0c233e50345ac3c768f1380c3bcce5ddd8ae292f6dfb"
+      ],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "de2809fdf766cd97edd2ee88585bab950bda510b28d6f1a1c1262ca61210db1f",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "observation_ns": 4703292623964,
+      "operation_started_ns": 4703291930296,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "e0ae96f302079a047626d06d09da0f5d9938681d21874c92b3209748fa69e0c7",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_CALL",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "74ef1c954542e4a4a5550820b5c4668472a01454b9cf5bf7b8c3659312dc86e5",
+      "observation_ns": 4703296791312,
+      "operation_started_ns": 4703296032962,
+      "original_invoked": false,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7",
+      "call_hmac_sha256": "e0ae96f302079a047626d06d09da0f5d9938681d21874c92b3209748fa69e0c7",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_RETURN",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "74ef1c954542e4a4a5550820b5c4668472a01454b9cf5bf7b8c3659312dc86e5",
+      "observation_ns": 4703301857912,
+      "operation_started_ns": 4703296032962,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerWrapperBase.execute_model",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-wrapper",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "configured_tp_size": 2,
+        "gpu_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.worker.worker_base",
+      "source_sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+    },
+    {
+      "body_code_sha256": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+      "call_hmac_sha256": "de2809fdf766cd97edd2ee88585bab950bda510b28d6f1a1c1262ca61210db1f",
+      "context": {
+        "boot_sha256": "0a44a7195e3c6933095c3b6f762d470a60d7bfc0bed5e8f2bb550c32ba6aac86",
+        "pid": 469,
+        "pid_namespace": 4026534839,
+        "start_ticks": 466682,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 0
+      },
+      "endpoints": {},
+      "engine_group_verified": false,
+      "event": "IDLE_RETURN",
+      "gaps": [],
+      "idle_basis": {
+        "empty_scheduled_requests": true,
+        "fault_eligible": false,
+        "request_bound": false,
+        "total_scheduled_tokens": 0
+      },
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "object_hmac_sha256": "43fecb723d6cee90e18bb4ccb14dc782f705acd4093bbb831505eed55ef5ec5a",
+      "observation_ns": 4703307810146,
+      "operation_started_ns": 4703291930296,
+      "original_invoked": true,
+      "phase": "around-original",
+      "point": "WorkerProc._execute_worker_rpc",
+      "processes": {},
+      "producer_registered": false,
+      "profile": "v1-shm-broadcast",
+      "request_hmac_sha256": [],
+      "role": "gpu-worker-rpc",
+      "rpc_parent_call_hmac_sha256": null,
+      "rpc_parent_frame_verified": false,
+      "rpc_parent_object_hmac_sha256": null,
+      "rpc_parent_worker_verified": false,
+      "scalars": {
+        "rpc_rank": 1
+      },
+      "schema": "guard-rank-rpc-hook-candidate/1",
+      "source_authenticated": false,
+      "source_graph": {
+        "vllm.v1.core.sched.output": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+        "vllm.v1.executor.multiproc_executor": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+        "vllm.v1.worker.gpu_worker": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+        "vllm.v1.worker.worker_base": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c"
+      },
+      "source_module": "vllm.v1.executor.multiproc_executor",
+      "source_sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    }
+  ],
+  "schema": "guard-rank-ipc-capture-review/1",
+  "session": "cbd82c082e6649c8704282f08015ff27",
+  "snapshots": 26,
+  "source_authenticated": false,
+  "source_rows_verified": 26
+}

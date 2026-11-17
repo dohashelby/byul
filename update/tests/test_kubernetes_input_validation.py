@@ -4,9 +4,10 @@ import json
 import pytest
 
 from guard.collectors.file import load_environment
-from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor, _WithBody
+from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor, _WithBody, _contract
 from guard.executors.stream_probe import _prepare
 from guard.executors.registry import EXECUTORS
+from guard.models import load_pack
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP
 from tests.builders import baseline_pack
 from tests.test_gpu_a_run_inputs import UPDATE, build
@@ -64,6 +65,20 @@ def test_field_contract_accepts_only_the_declared_fixture(tmp_path):
             {**CHAT, 'messages': [{'role': 'user', 'content': 'other'}]}):
         with pytest.raises(KubernetesBindingError):
             t._input_validation_request(request(body, rid=chat))
+
+
+def test_nested_reused_token_field_reaches_only_its_declared_transport_fixture(tmp_path):
+    check=load_pack(UPDATE/'packs/PACK-BASELINE').checks['REQ-08']
+    contract=_contract(check,{'reused_token_field':'kv_transfer_params.prompt_token_ids'},
+        {'reused_token_ids':[5,7]},'test-model')
+    assert contract['fields']=={'kv_transfer_params':{'prompt_token_ids':[5,7]}}
+    t=transport(tmp_path);t.declare_input_contract(contract)
+    rid='func|POST_/v1/chat/completions'
+    body={**contract['control'],**contract['fields']}
+    t._input_validation_request(request(body,rid=rid))
+    for extra in ({'prompt_token_ids':[5,8]}, {'prompt_token_ids':[5,7],'other':'unreviewed'}):
+        with pytest.raises(KubernetesBindingError):
+            t._input_validation_request(request({**body,'kv_transfer_params':extra},rid=rid))
 
 
 @pytest.mark.parametrize('contract', [

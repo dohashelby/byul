@@ -259,7 +259,9 @@ def collect(ctx, cfg):
 
     def send(request, label):
         from .req_runner_capture import case_call
-        result = case_call(ctx, label, request, lambda: bounded_probe(ctx, ctx.trusted_net, request))
+        from .native_input_link import case_call as native_case_call
+        result = case_call(ctx, label, request, lambda: native_case_call(ctx, label, request,
+            lambda transmitted: bounded_probe(ctx, ctx.trusted_net, transmitted)))
         record_content(ctx, "trusted", "request-field", label, {key: result.get(key) for key in ("outcome", "body_bytes", "body_sha256")})
         return result
 

@@ -3,6 +3,7 @@ from copy import deepcopy
 from hashlib import sha256
 import hmac
 import json
+import os
 import socket
 import subprocess
 
@@ -75,6 +76,43 @@ def test_file_binding_is_signed_before_arm_and_never_claims_execution(files, tmp
     assert (output / 'control-product-binding.json').stat().st_mode & 0o777 == 0o600
     with pytest.raises(FileExistsError):
         tool.prepare(*files, output)
+
+
+def test_host_binding_explicitly_matches_target_owner_and_never_uses_ambient_root(files,tmp_path,monkeypatch):
+    uid=(files[0]/'settings.json').stat().st_uid
+    monkeypatch.setattr(tool.os,'geteuid',lambda:uid+1)
+    with pytest.raises(ValueError,match='RANK_RPC_BINDING_PRIVATE_SETTINGS'):
+        tool.prepare(*files,tmp_path/'wrong-default')
+    result=tool.prepare(*files,tmp_path/'explicit-owner',expected_uid=uid)
+    assert result['engine_executed']is result['scope_complete']is result['producer_registered']is False
+    assert result['binding']['schema']=='guard-rank-rpc-product-binding/1'
+    with pytest.raises(ValueError,match='RANK_RPC_BINDING_PRIVATE_SETTINGS'):
+        tool.prepare(*files,tmp_path/'wrong-owner',expected_uid=uid+1)
+
+
+@pytest.mark.parametrize('uid',[True,-1,2**31,'1000'])
+def test_invalid_target_owner_cannot_prepare_product_binding(files,tmp_path,uid):
+    with pytest.raises(ValueError,match='RANK_RPC_BINDING_PRIVATE_SETTINGS'):
+        tool.prepare(*files,tmp_path/'invalid-owner',expected_uid=uid)
+
+
+def test_fault_input_conversion_requires_the_explicit_original_target_owner(files,tmp_path,monkeypatch):
+    from tools import rank_rpc_fault_inputs as inputs
+    uid=(files[0]/'settings.json').stat().st_uid
+    monkeypatch.setattr(tool.os,'geteuid',lambda:uid+1)
+    reached=[]
+    def source_required(*args,**kwargs):
+        reached.append(kwargs)
+        raise ValueError('EXAMPLE_ORIGINAL_CAPTURE_STILL_REQUIRED')
+    monkeypatch.setattr(inputs.producer,'record',source_required)
+    for owner in (None,uid+1,True,-1,2**31):
+        with pytest.raises(ValueError,match='RANK_RPC_BINDING_PRIVATE_SETTINGS'):
+            inputs.prepare(files[0],tmp_path/'absent-capture',*files[1:],tmp_path/'denied',expected_uid=owner)
+        assert not reached and not (tmp_path/'denied').exists()
+    with pytest.raises(ValueError,match='EXAMPLE_ORIGINAL_CAPTURE_STILL_REQUIRED'):
+        inputs.prepare(files[0],tmp_path/'absent-capture',*files[1:],tmp_path/'selected',expected_uid=uid)
+    assert len(reached)==1 and not (tmp_path/'selected').exists()
+    assert reached[0]['pod']['pod_uid']==json.loads(files[2].read_bytes())['kubernetes']['engine']['pod_uid']
 
 
 @pytest.mark.parametrize('damage', ['env_hash', 'tp1', 'gpu1', 'dp2', 'pp2', 'env_image', 'target_ref',

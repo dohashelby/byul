@@ -1,4 +1,4 @@
-"""Candidate /29 and /30 compose reviewed 0.30.0 rows without changing /12 or /15."""
+"""Exact 0.30.0 variants compose unchanged observation dependencies."""
 import hashlib
 import hmac
 import asyncio
@@ -19,6 +19,8 @@ from guard.adapters import vllm_lifecycle_sensor as base
 from guard.adapters import vllm_profiler_sensor as profiler
 from guard.adapters import vllm_profiler_metadata as profiler_metadata
 from guard.adapters import vllm_stream_buffer_sensor as stream
+from guard.adapters import vllm_rank_failure_sensor as rank
+from guard.adapters import vllm_rank_failure_metadata as rank_metadata
 from guard.adapters import vllm_release_observation_sensor as variant
 from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture_module
@@ -35,6 +37,7 @@ REPO = Path(__file__).resolve().parents[2]
 @pytest.mark.parametrize('kind,profile,extension,sha,added', [
     ('stream', variant.STREAM_PROFILE, stream, variant.STREAM_SHA256, stream.SOURCE_ADDITIONS),
     ('profiler', variant.PROFILER_PROFILE, profiler, variant.PROFILER_SHA256, variant.PROFILER_ROWS),
+    ('rank', variant.RANK_PROFILE, rank, variant.RANK_SHA256, variant.RANK_ROWS),
 ])
 def test_candidate_variant_prepares_exact_private_dependencies_and_rejects_changes(
         external, kind, profile, extension, sha, added):
@@ -51,7 +54,7 @@ def test_candidate_variant_prepares_exact_private_dependencies_and_rejects_chang
     assert (external / 'assets/guard_lifecycle_sensor.py').read_bytes() == variant.render_source(kind,
         request_key_sha256=prepared['assets']['request-binding-key.json']['sha256'])
     assert profiles.point_sources(profile) == profiles.point_sources(release.PROFILE)
-    assert resolve_executor('stream_buffer' if kind == 'stream' else 'profiler_observation',
+    assert resolve_executor({'stream':'stream_buffer','profiler':'profiler_observation','rank':'rank_failure'}[kind],
         'kubernetes', engine='vllm', version='0.30.0') is not None
     changed = external / 'assets/guard_lifecycle_extension.py'
     changed.write_bytes(changed.read_bytes() + b'# modified\n')
@@ -71,6 +74,7 @@ def test_profiler_candidate_sources_and_generation_are_separate_from_old_profile
 @pytest.mark.parametrize('kind,profile,extension', [
     ('stream', variant.STREAM_PROFILE, stream),
     ('profiler', variant.PROFILER_PROFILE, profiler),
+    ('rank', variant.RANK_PROFILE, rank),
 ])
 def test_private_composition_selects_candidate_profile_and_exact_rows(
         external, monkeypatch, kind, profile, extension):
@@ -86,7 +90,8 @@ def test_private_composition_selects_candidate_profile_and_exact_rows(
         return raw
     monkeypatch.setattr(module, '_read', exact_dependency)
     monkeypatch.setattr(module, '_request_key', lambda binding: (prepared['session'], b'k' * 32))
-    if (runtime not in extension.RUNTIME_CODE_CONTRACTS or
+    contracts=variant.RANK_RUNTIME_CODE_CONTRACTS if kind=='rank' else extension.RUNTIME_CODE_CONTRACTS
+    if (runtime not in contracts or
             runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix'
                 or os.uname().machine != 'x86_64')):
         with pytest.raises(ValueError):
@@ -113,6 +118,10 @@ def test_private_composition_selects_candidate_profile_and_exact_rows(
     assert native['metadata']['selected_scheduled_sha256'] == [native['requests'][0]['request_sha256']]
     assert native['metadata']['asgi_request_sha256'] == 'a' * 64
     assert native['metadata']['configured_model_sha256'] == raw
+    if kind=='rank':
+        observer.emit('RANK_FAILURE',{'native_request_sha256':[raw],'owner_sha256':raw})
+        assert captured[-1][1]['native_request_sha256']==[native['requests'][0]['request_sha256']]
+        assert captured[-1][1]['owner_sha256']==raw
     observer.emit('ASGI', {'request_sha256': raw, 'phase': 'APP_RETURN', 'more_body': None})
     assert captured[-1][1]['request_sha256'] == 'a' * 64
     observer.emit('SELECTION', {'requests': [], 'metadata': {'request_selection': {

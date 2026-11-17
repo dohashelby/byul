@@ -7,7 +7,7 @@ from .kubernetes_container_config import KubernetesContainerConfigExecutor
 
 class KubernetesCredentialExposureExecutor(KubernetesContainerConfigExecutor):
     name = "credential_exposure"
-    version = "0.1.1"
+    version = "0.2.0"
 
     def validate_policy(self, check, values):
         if (check.id != "PLT-04" or not any(obs.key == "forbidden_mount_violations"

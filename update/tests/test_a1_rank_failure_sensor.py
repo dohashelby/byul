@@ -29,9 +29,10 @@ def codes(root):
 def cell(value):return (lambda:value).__closure__[0]
 
 
-def reference_module(name):
-    path=REFERENCES/('multiproc_executor.py' if name==sensor.MP else 'core.py');raw=path.read_bytes()
-    assert hashlib.sha256(raw).hexdigest()==sensor.SOURCES[name]
+def reference_module(name,*,source_paths=None,source_rows=None):
+    path=(REFERENCES/('multiproc_executor.py' if name==sensor.MP else 'core.py')) if source_paths is None else source_paths[name]
+    raw=path.read_bytes()
+    assert hashlib.sha256(raw).hexdigest()==(sensor.SOURCES if source_rows is None else source_rows)[name]
     compiled=codes(compile(raw,str(path),'exec',dont_inherit=True,optimize=0));module=types.ModuleType(name);module.__file__=str(path)
     class EngineCoreRequestType(Enum):
         WAKEUP=auto();ADD=auto();ABORT=auto();UTILITY=auto();EXECUTOR_FAILED=auto()
@@ -80,18 +81,20 @@ class BroadcastMQ:
     def shutdown(self):self.closed=True
 
 
-def make_world(session='a'*32):
-    base=types.ModuleType('_rank_private_base');base.__file__=base8.__file__
-    exec(compile(Path(base8.__file__).read_bytes(),base8.__file__,'exec',dont_inherit=True,optimize=0),base.__dict__)
-    sensor.configure(base)
+def make_world(session='a'*32,*,private_base=None,module_factory=reference_module):
+    base=private_base
+    if base is None:
+        base=types.ModuleType('_rank_private_base');base.__file__=base8.__file__
+        exec(compile(Path(base8.__file__).read_bytes(),base8.__file__,'exec',dont_inherit=True,optimize=0),base.__dict__)
+        sensor.configure(base)
     class Observer(base.Observer):
         def __init__(self):super().__init__({'session':session},'b'*64);self.recorded=[]
         def _writer(self):return SimpleNamespace(context={**CONTEXT,'pid':os.getpid()})
         def emit(self,event,payload):self.recorded.append({'event':event,'payload':copy.deepcopy(payload),'monotonic_ns':time.monotonic_ns()})
     observer=Observer();base._OBSERVER=observer;modules={}
     for name in sensor.TARGETS:
-        module=reference_module(name);observer.instrument(module);modules[name]=module
-        observer.modules[name]={'source_sha256':sensor.SOURCES[name],'code_sha256':'c'*64}
+        module=module_factory(name);observer.instrument(module);modules[name]=module
+        observer.modules[name]={'source_sha256':hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest(),'code_sha256':'c'*64}
         observer.emit('MODULE',{'module':name,'verified':True,**observer.modules[name]})
     mp=modules[sensor.MP];executor=object.__new__(mp.MultiprocExecutor)
     executor.__dict__.update(world_size=2,output_rank=1,is_failed=False,failure_callback=None,futures_queue=deque(),workers=[],

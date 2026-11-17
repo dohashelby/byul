@@ -319,25 +319,6 @@
           "checks": [],
           "basis": "ma6-version-applicability.md 19.2",
           "next": "M-B4"
-        },
-        "rank_failure": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_rank_failure_sensor",
-            "vllm_fault_sensor"
-          ],
-          "checks": [],
-          "basis": "ma6-version-applicability.md 19.2",
-          "next": "M-B4"
-        },
-        "resource_recovery": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor"
-          ],
-          "checks": [],
-          "basis": "ma6-version-applicability.md 19.2",
-          "next": "M-B4"
         }
       }
     }

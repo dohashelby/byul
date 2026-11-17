@@ -62,12 +62,15 @@ class InputValidationExecutor(HttpCheckExecutor):
 
     def _finish(self, ctx):
         from .req_runner_capture import begin, finish
+        from . import native_input_link
+        native_input_link.begin(ctx, self.cfg)
         begin(ctx, self.cfg)
         draft = super()._finish(ctx)
         if response_contract_state(ctx.check) == "current":
             draft = append_artifact(draft, ctx, "input_response_samples.json", f"{self.name}/{self.version}")
         from .common_consumption import attach
-        return attach(draft, ctx, finish(ctx, draft, self.cfg), kind="runner-consumption")
+        draft = attach(draft, ctx, finish(ctx, draft, self.cfg), kind="runner-consumption")
+        return native_input_link.finish(ctx, draft)
 
     def collect(self, ctx):
         if request_field_probe.supported(ctx.check):
@@ -83,7 +86,9 @@ class InputValidationExecutor(HttpCheckExecutor):
                  "length": [0] * (ctx.policy_values["max_input_tokens"] + 1)}
         def send(req, label):
             from .req_runner_capture import case_call
-            r = case_call(ctx, label, req, lambda: bounded_probe(ctx, ctx.trusted_net, req))
+            from .native_input_link import case_call as native_case_call
+            r = case_call(ctx, label, req, lambda: native_case_call(ctx, label, req,
+                lambda transmitted: bounded_probe(ctx, ctx.trusted_net, transmitted)))
             record_content(ctx, "trusted", "input-validation", label, _log_projection(r))
             if semantic:
                 # Native rejection and length-cause review need full transient

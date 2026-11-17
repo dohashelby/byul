@@ -66,6 +66,22 @@ def clock(value):
     return {k: value[k] for k in ('boot_sha256', 'time_namespace', 'time_offsets_sha256')}
 
 
+def reply_binding(value, proof=None):
+    """Bind the selected queue object and live shared-memory identity, not its payload."""
+    if (type(value) is not dict or set(value) != {'object_hmac_sha256','response_hmac_sha256'}
+            or not all(fingerprint(item) for item in value.values())):
+        raise ValueError('RANK_RPC_REPLY_BINDING_INVALID')
+    if proof is not None:
+        endpoint = proof.get('endpoints',{}).get('response',{})
+        if (proof.get('object_hmac_sha256') != value['object_hmac_sha256']
+                or endpoint.get('schema') != 'guard-rank-ipc-identity/1'
+                or endpoint.get('kind') != 'shared-memory'
+                or endpoint.get('source_authenticated') is not False or endpoint.get('engine_group_verified') is not False
+                or endpoint.get('identity_hmac_sha256') != value['response_hmac_sha256']):
+            raise ValueError('RANK_RPC_REPLY_BINDING_MISMATCH')
+    return value
+
+
 def product_binding(value, session):
     """사전 결합의 닫힌 형식만 검사한다. 현재 클러스터나 생산자 인증을 주장하지 않는다."""
     if (type(value) is not dict or set(value) != PRODUCT_FIELDS
@@ -153,15 +169,29 @@ class Control:
         if len(raw) > 32768:
             raise ValueError('RANK_RPC_CONTROL_FILE')
         directory = self._directory()
-        fd = None
+        fd, backing, backing_owned, published = None, None, False, False
         try:
-            fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+            backing = '.sealed-control-' + os.urandom(16).hex() + '.bin'
+            fd = os.open(backing, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+            backing_owned = True
             if os.write(fd, raw) != len(raw):
                 raise OSError('RANK_RPC_CONTROL_PARTIAL')
+            os.fsync(fd)
+            os.close(fd); fd = None
+            # A final name is visible only after its complete bytes are closed
+            # to writes. link is atomic and refuses any existing final name.
+            os.link(backing, name, src_dir_fd=directory, dst_dir_fd=directory, follow_symlinks=False)
+            published = True
+            # Keep the immutable backing link until this private session is
+            # removed: unlinking it here could race read_raw's ctime binding.
         finally:
             if fd is not None:
                 os.close(fd)
-            os.close(directory)
+            try:
+                if backing_owned and not published:
+                    os.unlink(backing, dir_fd=directory)
+            finally:
+                os.close(directory)
         return sha256(raw).hexdigest()
 
     def _snapshot(self, name, include_ipc=False):
@@ -223,7 +253,13 @@ class Control:
     def _arm(self, arm, proof, now):
         if type(arm) is not dict:
             raise ValueError('RANK_RPC_CONTROL_ARM')
-        if arm.get('schema') == 'guard-rank-rpc-arm/2':
+        if arm.get('schema') == 'guard-rank-rpc-arm/3':
+            product_binding(arm.get('product_binding'), self.settings['session'])
+            if (set(arm) != ARM_FIELDS | {'product_binding','reply_binding'}
+                    or arm['product_binding'] != self.product_binding() or arm.get('fault_kind') != 'communication-stall'):
+                raise ValueError('RANK_RPC_PRODUCT_BINDING_MISMATCH')
+            reply_binding(arm.get('reply_binding'),proof)
+        elif arm.get('schema') == 'guard-rank-rpc-arm/2':
             product_binding(arm.get('product_binding'), self.settings['session'])
             if set(arm) != ARM_FIELDS | {'product_binding'} or arm['product_binding'] != self.product_binding():
                 raise ValueError('RANK_RPC_PRODUCT_BINDING_MISMATCH')
@@ -233,7 +269,7 @@ class Control:
                 or arm['settings_sha256'] != self.settings_sha256
                 or arm['assets_sha256'] != digest(self.settings['assets'])
                 or type(arm['nonce']) is not str or re.fullmatch('[0-9a-f]{32}', arm['nonce']) is None
-                or arm['fault_kind'] not in {'delay', 'death', 'exception'}
+                or arm['fault_kind'] not in {'delay', 'death', 'exception', 'communication-stall'}
                 or not all(fingerprint(arm[k]) for k in ('target_sha256', 'initial_capture_sha256',
                     'parent_object_hmac_sha256', 'source_sha256', 'body_code_sha256',
                     'header_hmac_sha256', 'external_hmac_sha256'))
@@ -259,7 +295,11 @@ class Control:
                 or not fingerprint(proof['request_hmac_sha256'][0])):
             return False
         expected = self.profile['rpc_sources'][proof['source_module']]['hooks'][proof['point']]
-        if expected.get('fault_eligible') is not True:
+        if (expected.get('fault_eligible') is not True
+                or arm['fault_kind'] not in expected.get('fault_kinds', ['delay', 'death', 'exception'])
+                or arm['fault_kind'] == 'communication-stall' and expected.get('kind') != 'rpc-reply'):
+            return False
+        if arm['fault_kind'] == 'communication-stall' and arm.get('schema') != 'guard-rank-rpc-arm/3':
             return False
         if (clock(arm['header_context']) != clock(proof['context'])
                 or arm['header_context']['pid_namespace'] != proof['context']['pid_namespace']
@@ -360,9 +400,10 @@ class Control:
                 'ready_ns': time.monotonic_ns(), 'expires_ns': arm['expires_ns'], 'rpc_active': True}
             ready_sha = self.write('control-ready.json', ready)
             self._phase(proof, 'CONTROL_READY', arm, arm_sha, ready_sha)
+            stalled = False
             while time.monotonic_ns() < arm['expires_ns']:
                 try:
-                    action, action_sha = self.read('control-action.json')
+                    action, action_sha = self.read('control-stall-release.json' if stalled else 'control-action.json')
                 except FileNotFoundError:
                     time.sleep(0.01)
                     continue
@@ -376,6 +417,15 @@ class Control:
                     self._phase(proof, 'CONTROL_EXCEPTION', arm, arm_sha, ready_sha, action_sha)
                     raise NativeLabFault('BYUL_RANK_LAB_FAULT')
                 if action['action'] == 'release' and arm['fault_kind'] == 'delay':
+                    self._phase(proof, 'CONTROL_RELEASE', arm, arm_sha, ready_sha, action_sha)
+                    return
+                if action['action'] == 'stall' and arm['fault_kind'] == 'communication-stall' and not stalled:
+                    # READY alone is not an injected communication fault.
+                    # A distinct closed action enables the selected reply hold.
+                    self._phase(proof, 'CONTROL_STALL', arm, arm_sha, ready_sha, action_sha)
+                    stalled = True
+                    continue
+                if action['action'] == 'release' and arm['fault_kind'] == 'communication-stall' and stalled:
                     self._phase(proof, 'CONTROL_RELEASE', arm, arm_sha, ready_sha, action_sha)
                     return
                 if action['action'] == 'cancel':

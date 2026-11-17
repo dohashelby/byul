@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import threading
 
 import pytest
 
@@ -126,6 +127,42 @@ def test_private_writer_never_overwrites_an_existing_snapshot(tmp_path):
     with pytest.raises(FileExistsError):
         runtime.SnapshotWriter(settings, manifest['settings_sha256'])(payload)
     assert path.read_bytes() == original
+
+
+def test_snapshot_is_not_visible_while_its_bytes_are_being_written(tmp_path,monkeypatch):
+    root,settings,manifest=_prepared(tmp_path)
+    capture=root/'data'/settings['session']
+    entered,release=threading.Event(),threading.Event();errors=[]
+    write=runtime.os.write
+    def paused(fd,raw):
+        entered.set();assert release.wait(3)
+        return write(fd,raw)
+    def writer():
+        try:runtime.SnapshotWriter(settings,manifest['settings_sha256'])({'gaps':['EXAMPLE']})
+        except BaseException as error:errors.append(error)
+    monkeypatch.setattr(runtime.os,'write',paused)
+    thread=threading.Thread(target=writer);thread.start()
+    try:
+        assert entered.wait(3)
+        assert not list(capture.glob('pid-*.json'))
+    finally:release.set();thread.join(3)
+    assert not thread.is_alive() and not errors
+    path,=capture.glob('pid-*.json')
+    value=json.loads(path.read_bytes())
+    assert value['snapshot']['payload']=={'gaps':['EXAMPLE']}
+    assert path.stat().st_mode&0o777==0o600
+    assert hmac.compare_digest(value['hmac_sha256'],hmac.new(bytes.fromhex(settings['key']),
+        tool.canonical(value['snapshot']),sha256).hexdigest())
+
+
+def test_partial_snapshot_is_never_published_and_backing_is_removed(tmp_path,monkeypatch):
+    root,settings,manifest=_prepared(tmp_path)
+    capture=root/'data'/settings['session'];write=runtime.os.write
+    monkeypatch.setattr(runtime.os,'write',lambda fd,raw:write(fd,raw[:len(raw)//2]))
+    with pytest.raises(OSError,match='RANK_IPC_PARTIAL_SNAPSHOT'):
+        runtime.SnapshotWriter(settings,manifest['settings_sha256'])({'gaps':['EXAMPLE']})
+    assert not list(capture.glob('pid-*.json'))
+    assert not list(capture.glob('.sealed-snapshot-*.bin'))
 
 
 def test_settings_permissions_and_duplicate_keys_are_rejected(tmp_path, monkeypatch):

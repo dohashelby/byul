@@ -111,7 +111,7 @@ def verify_capture(prepared, capture):
         if rpc:
             fingerprint = lambda v: type(v) is str and re.fullmatch('[0-9a-f]{64}', v) is not None
             ids = payload.get('request_hmac_sha256')
-            phases = {'CONTROL_READY', 'CONTROL_RELEASE', 'CONTROL_EXPIRED', 'CONTROL_EXCEPTION', 'CONTROL_CANCELLED'}
+            phases = {'CONTROL_READY', 'CONTROL_RELEASE', 'CONTROL_EXPIRED', 'CONTROL_EXCEPTION', 'CONTROL_CANCELLED', 'CONTROL_STALL'}
             idle_events = {'IDLE_CALL', 'IDLE_RETURN', 'IDLE_RAISE'}
             idle = payload.get('event') in idle_events
             if (payload.get('event') not in {'CALL', 'RETURN', 'RAISE', 'CONTROL_RAISE', *phases, *idle_events}
@@ -145,7 +145,7 @@ def verify_capture(prepared, capture):
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
             if hook.get('parent') and not idle and not payload['rpc_parent_frame_verified']:
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
-            if hook['kind'] == 'rpc' and not idle and not ids:
+            if hook['kind'] in {'rpc', 'rpc-reply'} and not idle and not ids:
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
             if payload['original_invoked'] != (payload['event'] in {'RETURN', 'RAISE', 'IDLE_RETURN', 'IDLE_RAISE'}):
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
@@ -157,11 +157,15 @@ def verify_capture(prepared, capture):
                 if (type(control) is not dict or set(control) != {'nonce', 'fault_kind', 'arm_sha256',
                         'ready_sha256', 'action_sha256', 'target_sha256', 'control_code_sha256', 'barrier_only'}
                         or type(control['nonce']) is not str or re.fullmatch('[0-9a-f]{32}', control['nonce']) is None
-                        or control['fault_kind'] not in {'delay', 'death', 'exception'}
+                        or control['fault_kind'] not in {'delay', 'death', 'exception', 'communication-stall'}
                         or not all(fingerprint(control[k]) for k in ('arm_sha256', 'ready_sha256', 'target_sha256', 'control_code_sha256'))
                         or control['control_code_sha256'] != manifest['assets']['guard/adapters/vllm_rank_rpc_control.py']['sha256']
-                        or control['barrier_only'] is not (payload['event'] != 'CONTROL_EXCEPTION')
+                        or control['barrier_only'] is not (payload['event'] not in {'CONTROL_EXCEPTION', 'CONTROL_STALL'})
                         or (control['action_sha256'] is not None and not fingerprint(control['action_sha256']))):
+                    raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+                if (control['fault_kind'] not in hook.get('fault_kinds', ['delay', 'death', 'exception'])
+                        or payload['event'] == 'CONTROL_STALL' and (control['fault_kind'] != 'communication-stall'
+                            or hook['kind'] != 'rpc-reply' or control['action_sha256'] is None)):
                     raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
             if any(type(payload.get(k)) is not int or not 0 <= payload[k] < 2**63
                    for k in ('operation_started_ns', 'observation_ns')) or payload['operation_started_ns'] > payload['observation_ns']:
@@ -176,6 +180,40 @@ def verify_capture(prepared, capture):
                         or any(assignment.get(k) is not False for k in
                                ('source_authenticated', 'rpc_active_verified', 'producer_registered'))):
                     raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if hook['kind']=='deferred-result':
+                deferred=payload.get('deferred_rpc');exception_kind=payload.get('exception_kind')
+                fields={'schema','source_module','point','origin_call_hmac_sha256','origin_object_hmac_sha256',
+                    'origin_started_ns','origin_returned_ns','future_object_hmac_sha256'}
+                if (type(deferred)is not dict or set(deferred)!=fields
+                        or deferred['schema']!='guard-rank-deferred-request-binding/1'
+                        or deferred['source_module']!=payload['source_module']
+                        or type(deferred['point'])is not str
+                        or expected['hooks'].get(deferred['point'],{}).get('deferred_result')!=
+                            {'class':payload['point'].split('.')[0],'point':payload['point']}
+                        or not ids or any(not fingerprint(deferred[k])for k in
+                            ('origin_call_hmac_sha256','origin_object_hmac_sha256','future_object_hmac_sha256'))
+                        or deferred['future_object_hmac_sha256']!=payload.get('object_hmac_sha256')
+                        or deferred['origin_call_hmac_sha256']==payload['call_hmac_sha256']
+                        or any(type(deferred[k])is not int or not 0<=deferred[k]<2**63 for k in('origin_started_ns','origin_returned_ns'))
+                        or not deferred['origin_started_ns']<=deferred['origin_returned_ns']<=payload['operation_started_ns']
+                        or payload['event']not in{'CALL','RETURN','RAISE'}or 'exception_kind'not in payload
+                        or ((type(exception_kind)is not str or exception_kind not in{'timeout','runtime-error','other'})
+                            if payload['event']=='RAISE'else exception_kind is not None)):
+                    raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            elif 'deferred_rpc'in payload or 'exception_kind'in payload:raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if hook['kind']=='asgi-send':
+                sent=payload.get('http_send')
+                if (type(sent)is not dict or set(sent)!={'schema','type','method','path','status','more_body','external_request_hmac_sha256'}
+                        or sent['schema']!='guard-rank-native-http-send/1'or sent['method']!='POST'
+                        or type(sent['path'])is not str or sent['path']not in hook['paths']
+                        or type(sent['type'])is not str or sent['type']not in{'http.response.start','http.response.body'}
+                        or not fingerprint(sent['external_request_hmac_sha256'])or ids!=[sent['external_request_hmac_sha256']]
+                        or payload['event']not in{'CALL','RETURN','RAISE'}):raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+                if sent['type']=='http.response.start':
+                    if type(sent['status'])is not int or not 100<=sent['status']<=599 or sent['more_body']is not None:
+                        raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+                elif sent['status']is not None or type(sent['more_body'])is not bool:raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            elif 'http_send'in payload:raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
         rows.append(payload)
     return {'schema': 'guard-rank-ipc-capture-review/1', 'session': manifest['session'],
             'image': manifest['image'], 'snapshots': len(paths), 'source_rows_verified': len(rows),

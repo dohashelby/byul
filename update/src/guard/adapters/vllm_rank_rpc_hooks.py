@@ -7,12 +7,14 @@ from contextvars import ContextVar
 import functools
 from hashlib import sha256
 import hmac
+import inspect
 import json
 import os
 import sys
 import threading
 import time
 import types
+import weakref
 
 from . import vllm_rank_ipc_hooks as ipc
 from . import vllm_rank_ipc_sources as sources
@@ -30,16 +32,67 @@ class RPCObserver:
         self.control = None
         self.current = ContextVar('guard_rank_rpc_candidate', default=None)
         self.pid, self.serial, self.lock = os.getpid(), 0, threading.RLock()
+        self.deferred = {}
 
     def _call(self, context):
         if self.pid != os.getpid():
             self.pid, self.serial, self.lock = os.getpid(), 0, threading.RLock()
+            self.deferred = {}
         with self.lock:
             self.serial += 1
             if self.serial > 4096:
                 raise ValueError('RANK_RPC_CALL_BOUND')
             raw = json.dumps(['rpc-call', context, self.serial], sort_keys=True, separators=(',', ':')).encode()
             return hmac.new(self.key, raw, sha256).hexdigest()
+
+    @staticmethod
+    def _class_cell(original,module,point):
+        if original.__code__.co_freevars:
+            cells=original.__closure__
+            if (original.__code__.co_freevars!=('__class__',)or cells is None or len(cells)!=1
+                    or cells[0].cell_contents is not vars(module)[point.split('.')[0]]):
+                raise ValueError('RANK_RPC_CLASS_CELL_UNVERIFIED')
+        elif original.__closure__ is not None:raise ValueError('RANK_RPC_CLASS_CELL_UNVERIFIED')
+
+    def _defer(self,module_name,point,spec,owner,result,returned):
+        target=spec.get('deferred_result')
+        if target is None:return
+        module=self.modules[module_name];future_type=vars(module).get(target['class'])
+        if type(future_type)is not type or type(result)is not future_type:return
+        self._fresh(spec['source_modules'])
+        with self.lock:
+            stale=[key for key,row in self.deferred.items()if row[0]()is None or row[1]()is None]
+            for key in stale:del self.deferred[key]
+            if len(self.deferred)>=256:raise ValueError('RANK_RPC_DEFERRED_BOUND')
+            key=id(result)
+            if key in self.deferred and self.deferred[key][0]()is result:
+                raise ValueError('RANK_RPC_DEFERRED_DUPLICATE_ORIGIN')
+            context=returned['context']
+            binding={'schema':'guard-rank-deferred-request-binding/1','source_module':module_name,'point':point,
+                'origin_call_hmac_sha256':returned['call_hmac_sha256'],
+                'origin_object_hmac_sha256':returned['object_hmac_sha256'],
+                'origin_started_ns':returned['operation_started_ns'],'origin_returned_ns':returned['observation_ns'],
+                'future_object_hmac_sha256':self.identity_observer._name(result,context)}
+            self.deferred[key]=(weakref.ref(result),weakref.ref(owner),binding,context,list(returned['request_hmac_sha256']))
+
+    def _deferred(self,module_name,point,owner,context):
+        if self.pid!=os.getpid():
+            self.pid,self.serial,self.lock,self.deferred=os.getpid(),0,threading.RLock(),{}
+            return None
+        with self.lock:
+            row=self.deferred.get(id(owner))
+            if row is None or row[0]()is not owner:return None
+            origin_owner=row[1]()
+            if origin_owner is None or row[3]!=context:raise ValueError('RANK_RPC_DEFERRED_ORIGIN_UNAVAILABLE')
+            binding=row[2];origin_spec=self.sources[module_name]['hooks'][binding['point']]
+            target=origin_spec.get('deferred_result')
+            if (binding['source_module']!=module_name or target!={'class':point.split('.')[0],'point':point}
+                    or type(owner)is not vars(self.modules[module_name])[target['class']]
+                    or self.identity_observer._name(owner,context)!=binding['future_object_hmac_sha256']
+                    or self.identity_observer._name(origin_owner,context)!=binding['origin_object_hmac_sha256']):
+                raise ValueError('RANK_RPC_DEFERRED_ORIGIN_UNVERIFIED')
+            self._fresh(origin_spec['source_modules'])
+            return dict(binding),list(row[4])
 
     def _fresh(self, required):
         if not set(required) <= set(self.modules):
@@ -48,6 +101,7 @@ class RPCObserver:
             module, expected = self.modules[name], self.sources[name]
             sources._bytes(vars(module)['__file__'], expected)
             for point, original in self.functions[name].items():
+                self._class_cell(original,module,point)
                 if (original.__globals__ is not vars(module)
                         or original.__qualname__ != point
                         or sources.code_digest(sources.relative_code(original.__code__, expected['path']))
@@ -107,7 +161,8 @@ class RPCObserver:
             frame = None
 
     def _metadata(self, module_name, point, spec, context, owner, ids, call, event, started,
-                  *, parent=None, result=ipc.MISSING, original_invoked=False, idle=False):
+                  *, parent=None, result=ipc.MISSING, original_invoked=False, idle=False,
+                  deferred=None,exception_kind=None,http_send=None):
         self._fresh(spec['source_modules'])
         expected = self.sources[module_name]
         value = {'schema': 'guard-rank-rpc-hook-candidate/1', 'image': self.image,
@@ -138,8 +193,15 @@ class RPCObserver:
                              rpc_parent_frame_verified=True, rpc_parent_worker_verified=True)
             else:
                 value['gaps'].append('RANK_RPC_ACTIVE_PARENT_UNVERIFIED')
-        fields = self.identity_observer._fields(spec, {'self': owner}, context, value['gaps'])
+        fields = self.identity_observer._fields(spec, {'self': owner,
+            'rpc_parent': parent['owner'] if value['rpc_parent_frame_verified'] else ipc.MISSING}, context, value['gaps'])
         value.update(fields)
+        if spec['kind']=='deferred-result':
+            if deferred is None:raise ValueError('RANK_RPC_DEFERRED_ORIGIN_UNAVAILABLE')
+            value.update(deferred_rpc=dict(deferred),exception_kind=exception_kind)
+        if spec['kind']=='asgi-send':
+            if http_send is None:raise ValueError('RANK_HTTP_SEND_UNAVAILABLE')
+            value['http_send']=dict(http_send)
         if spec.get('kind') == 'assignment' and event == 'RETURN':
             value['assignment'] = request_identity.assignment(
                 result, expected_type=self.profile['assignment_type'], key=self.key)
@@ -164,15 +226,111 @@ class RPCObserver:
         except BaseException:
             pass
 
+    def _http_send(self,original,args,kwargs,spec):
+        owner=ipc.IPCObserver._argument(original,args,kwargs,'self')
+        scope=ipc._path(owner,['scope'])
+        if type(scope)is not dict:raise ValueError('RANK_HTTP_SCOPE_UNAVAILABLE')
+        if any(type(scope.get(k))is not str for k in('type','method','path')):raise ValueError('RANK_HTTP_SCOPE_UNAVAILABLE')
+        if (scope.get('type')!='http'or scope.get('method')!='POST'
+                or scope.get('path')not in spec['paths']):return None
+        headers=scope.get('headers')
+        if type(headers)not in(list,tuple)or len(headers)>64:raise ValueError('RANK_HTTP_HEADER_UNAVAILABLE')
+        ids=[]
+        for pair in headers:
+            if (type(pair)not in(list,tuple)or len(pair)!=2 or type(pair[0])is not bytes or len(pair[0])>256):
+                raise ValueError('RANK_HTTP_HEADER_UNAVAILABLE')
+            if pair[0].lower()==b'x-request-id':ids.append(pair[1])
+        if not ids:return None
+        if len(ids)!=1 or type(ids[0])is not bytes or not 1<=len(ids[0])<=512:raise ValueError('RANK_HTTP_HEADER_UNAVAILABLE')
+        try:request=request_identity._fingerprints([ids[0].decode('ascii')],self.key)[0]
+        except UnicodeError:raise ValueError('RANK_HTTP_HEADER_UNAVAILABLE')from None
+        message=ipc.IPCObserver._argument(original,args,kwargs,'message')
+        if type(message)is not dict:raise ValueError('RANK_HTTP_MESSAGE_UNAVAILABLE')
+        kind=message.get('type')
+        if type(kind)is not str:raise ValueError('RANK_HTTP_MESSAGE_UNAVAILABLE')
+        if kind not in('http.response.start','http.response.body'):return None
+        status=message.get('status')if kind=='http.response.start'else None
+        more=message.get('more_body',False)if kind=='http.response.body'else None
+        if (kind=='http.response.start'and(type(status)is not int or not 100<=status<=599)
+                or kind=='http.response.body'and type(more)is not bool):raise ValueError('RANK_HTTP_MESSAGE_UNAVAILABLE')
+        return owner,request,{'schema':'guard-rank-native-http-send/1','type':kind,
+            'method':'POST','path':scope['path'],'status':status,'more_body':more,'external_request_hmac_sha256':request}
+
+    def _wrap_http(self,module_name,point,original,spec):
+        @functools.wraps(original)
+        async def observed(*args,**kwargs):
+            bound=None;context=None;call=None;started=time.monotonic_ns()
+            try:
+                candidate=ipc.IPCObserver._argument(original,args,kwargs,'self')
+                if type(candidate)is not vars(self.modules[module_name])[point.split('.')[0]]:
+                    raise ValueError('RANK_HTTP_OWNER_UNAVAILABLE')
+                bound=self._http_send(original,args,kwargs,spec)
+                if bound is not None:
+                    owner,request,metadata=bound;context=ipc.base._context();call=self._call(context)
+                    self._metadata(module_name,point,spec,context,owner,[request],call,'CALL',started,http_send=metadata)
+            except BaseException as error:
+                bound=None;self._gap(point,error,'before-original')
+            try:
+                result=await original(*args,**kwargs)
+            except BaseException:
+                if bound is not None:
+                    try:self._metadata(module_name,point,spec,context,owner,[request],call,'RAISE',started,
+                        original_invoked=True,http_send=metadata)
+                    except BaseException as error:self._gap(point,error,'after-exception')
+                raise
+            else:
+                if bound is not None:
+                    try:
+                        after=self._http_send(original,args,kwargs,spec)
+                        if after is None or after[0]is not owner or after[1:]!=bound[1:]:
+                            raise ValueError('RANK_HTTP_MESSAGE_CHANGED')
+                        self._metadata(module_name,point,spec,context,owner,[request],call,'RETURN',started,
+                            original_invoked=True,http_send=metadata)
+                    except BaseException as error:self._gap(point,error,'after-return')
+                return result
+        return observed
+
     def _wrap(self, module_name, point, original, spec):
+        if spec['kind']=='asgi-send':return self._wrap_http(module_name,point,original,spec)
         @functools.wraps(original)
         def observed(*args, **kwargs):
             owner = ipc.IPCObserver._argument(original, args, kwargs, 'self')
             context, call, ids, token, parent, started = None, None, [], None, None, time.monotonic_ns()
             armed, proof, original_invoked, idle = False, None, False, False
+            deferred=None
             try:
                 context = ipc.base._context()
-                if spec['kind'] == 'rpc':
+                if spec['kind']=='deferred-result':
+                    bound=self._deferred(module_name,point,owner,context)
+                    if bound is not None:
+                        deferred,ids=bound;call=self._call(context)
+                        proof=self._metadata(module_name,point,spec,context,owner,ids,call,'CALL',started,deferred=deferred)
+                        armed=True
+                elif spec['kind'] == 'rpc-reply':
+                    # Response publication receives a model output. Never inspect
+                    # that argument: inherit only the parent's already computed
+                    # request fingerprints inside the same original RPC frame.
+                    parent = self.current.get()
+                    # The same queue carries unrelated startup/RPC traffic.
+                    # Fall through to the one original invocation below.
+                    if type(parent) is dict and parent['point'] == spec['parent']['point']:
+                        if (parent['context'] != context
+                                or ipc._path(parent['owner'],spec['parent']['worker_path']) is not owner
+                                or not self._parent_frame(parent)):
+                            raise ValueError('RANK_RPC_REPLY_PARENT_UNVERIFIED')
+                        sync_owner = owner if spec.get('synchronous_false_root','self') == 'self' else parent['owner']
+                        if ipc._path(sync_owner, spec['synchronous_false_path']) is not False:
+                            raise ValueError('RANK_RPC_REPLY_ASYNC_UNSUPPORTED')
+                        ids = list(parent['ids'])
+                        if not ids:
+                            raise ValueError('RANK_RPC_REPLY_REQUEST_UNAVAILABLE')
+                        call = self._call(context)
+                        proof = self._metadata(module_name, point, spec, context, owner, ids, call,
+                            'CALL', started, parent=parent)
+                        token = self.current.set({'point': point, 'original': original, 'owner': owner,
+                            'context': context, 'ids': ids, 'call': call, 'source_modules': spec['source_modules']})
+                        armed = True
+                elif spec['kind'] == 'rpc':
                     ids = self._requests(original, args, kwargs, spec)
                     if ids is ipc.MISSING:
                         ids, idle, call = [], True, self._call(context)
@@ -204,7 +362,9 @@ class RPCObserver:
                     try:
                         event = 'IDLE_RAISE' if idle else 'CONTROL_RAISE' if not original_invoked and type(error) is control_code.NativeLabFault else 'RAISE'
                         self._metadata(module_name, point, spec, context, owner, ids, call, event, started,
-                                       parent=parent, original_invoked=original_invoked, idle=idle)
+                                       parent=parent, original_invoked=original_invoked, idle=idle,deferred=deferred,
+                                       exception_kind=('timeout'if type(error)is TimeoutError else'runtime-error'if type(error)is RuntimeError else'other')
+                                           if spec['kind']=='deferred-result'else None)
                     except BaseException as observation_error:
                         self._gap(point, observation_error, 'after-exception')
                 raise
@@ -214,8 +374,9 @@ class RPCObserver:
                         selected = result
                         if spec['kind'] == 'assignment':
                             selected = self._root(original, args, kwargs, spec['assignment'])
-                        self._metadata(module_name, point, spec, context, owner, ids, call, 'IDLE_RETURN' if idle else 'RETURN', started,
-                                       parent=parent, result=selected, original_invoked=True, idle=idle)
+                        returned=self._metadata(module_name, point, spec, context, owner, ids, call, 'IDLE_RETURN' if idle else 'RETURN', started,
+                                       parent=parent, result=selected, original_invoked=True, idle=idle,deferred=deferred)
+                        if armed:self._defer(module_name,point,spec,owner,result,returned)
                     except BaseException as error:
                         self._gap(point, error, 'after-return')
                 return result
@@ -229,9 +390,31 @@ class RPCObserver:
         name = vars(module)['__name__']
         expected, changes = self.sources[name], []
         for point, spec in expected.get('hooks', {}).items():
-            if spec['kind'] not in {'rpc', 'assignment', 'external-id'} or spec['phase'] != 'around-original':
+            if spec['kind'] not in {'rpc', 'rpc-reply', 'assignment', 'external-id','deferred-result','asgi-send'} or spec['phase'] != 'around-original':
+                raise ValueError('RANK_RPC_HOOK_SETTINGS_INVALID')
+            if spec['kind']=='asgi-send'and(type(spec.get('paths'))is not list or not 1<=len(spec['paths'])<=8
+                    or any(type(p)is not str or not p.startswith('/v1/')or len(p)>128 for p in spec['paths'])or len(set(spec['paths']))!=len(spec['paths'])
+                    or 'requests'in spec or 'parent'in spec or spec.get('fault_eligible')is True):raise ValueError('RANK_RPC_HOOK_SETTINGS_INVALID')
+            if 'deferred_result'in spec:
+                target=spec['deferred_result']
+                if (spec['kind']!='rpc'or type(target)is not dict or set(target)!={'class','point'}
+                        or type(target['class'])is not str or not target['class']or target['point']!=target['class']+'.result'
+                        or expected['hooks'].get(target['point'],{}).get('kind')!='deferred-result'):
+                    raise ValueError('RANK_RPC_HOOK_SETTINGS_INVALID')
+            if spec['kind']=='deferred-result'and('requests'in spec or 'parent'in spec or spec.get('fault_eligible')is True):
+                raise ValueError('RANK_RPC_HOOK_SETTINGS_INVALID')
+            if spec['kind'] == 'rpc-reply' and (type(spec.get('parent', {}).get('worker_path')) is not list
+                    or len(spec['parent']['worker_path'])>8
+                    or any(type(part) is not str or not part for part in spec['parent']['worker_path'])
+                    or type(spec.get('synchronous_false_path')) is not list or not spec['synchronous_false_path']
+                    or any(type(part) is not str or not part for part in spec['synchronous_false_path'])
+                    or spec.get('synchronous_false_root','self') not in {'self','rpc_parent'}
+                    or 'requests' in spec or 'rpc_envelope' in spec):
                 raise ValueError('RANK_RPC_HOOK_SETTINGS_INVALID')
             original = qualified['functions'][point]
+            if inspect.iscoroutinefunction(original)!=(spec['kind']=='asgi-send')or inspect.isasyncgenfunction(original):
+                raise ValueError('RANK_RPC_HOOK_SETTINGS_INVALID')
+            self._class_cell(original,module,point)
             parts = point.split('.')
             owner = module if len(parts) == 1 else vars(module)[parts[0]]
             member = vars(owner)[parts[-1]]

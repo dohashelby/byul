@@ -2,7 +2,9 @@
 from pathlib import Path
 import uuid
 from guard.adapters import vllm_initialization_sensor as initialization,vllm_rank_failure_sensor as rank
+from guard.adapters import vllm_initialization_release_sensor as initialization_release,vllm_release_observation_sensor as release_observation
 from guard.adapters import resource_recovery_probe as resource_probe
+from guard.adapters import resource_group_probe as group_probe
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_recovery_http import KubernetesRecoveryHTTP,PROFILE as HTTP_PROFILE,SLOTS
@@ -29,15 +31,17 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check,policy_values)
         try:
-            if set(self.cfg)-{'target','prepared','selection','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
+            if set(self.cfg)-{'target','prepared','selection','kubectl_binary','max_duration_seconds','namespace_resources'} or adapter is None:raise ValueError
+            if type(self.cfg.get('namespace_resources',False))is not bool:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end,deadline=normalize_policy(policy_values)
             with Path(self.cfg['selection']).open('rb') as stream:selection=strict_json(stream.read(resource_probe.MAX_INPUT+1),limit=resource_probe.MAX_INPUT)
             validate_selected_policy(selection,policy_values)
-            expected_profile=rank.PROFILE if policy_values['recovery_branch']=='runtime-failure' else initialization.PROFILE
+            expected_profiles=({rank.PROFILE,release_observation.RANK_PROFILE} if policy_values['recovery_branch']=='runtime-failure'
+                else {initialization.PROFILE,initialization_release.PROFILE})
             if (target_hash!=policy_values['recovery_target_sha256'] or env.ref().sha256!=policy_values['recovery_environment_sha256']
-                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile']!=expected_profile or sha256_hex(canonical_json(selection))!=policy_values['recovery_selection_sha256']
+                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile'] not in expected_profiles or sha256_hex(canonical_json(selection))!=policy_values['recovery_selection_sha256']
                     or sha256_hex(canonical_json(prepared))!=policy_values['recovery_prepared_sha256'] or not start<=utcnow()<=end or type(env.model.inventory_sha256) is not str or len(env.model.inventory_sha256)!=64):raise ValueError
         except (KeyError,ValueError,TypeError,RuntimeError,OSError):raise ValueError('RESOURCE_RECOVERY_CONFIGURATION_INVALID') from None
         transport=KubernetesRecoveryHTTP(target,env,runner=self.runner,duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))
@@ -46,13 +50,22 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         ctx._recovery_prepared=prepared;ctx._recovery_selection=selection;return self._finish(ctx)
 
     def collect(self,ctx):
-        start,end,deadline=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[];censuses=[]
+        start,end,deadline=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[];censuses=[];groups=[]
+        group_selection={'schema':group_probe.SELECTION_SCHEMA,
+            'owners':[{'id':row['id'],'context':row['context']}for row in ctx._recovery_selection['owners']]}
+        def collect_group():
+            if self.cfg.get('namespace_resources',False):
+                row=reader.group_resource_census(group_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']);groups.append(row)
+                if (not row.get('collected')or not row.get('owner_binding_verified')or not row.get('clock_window_verified')
+                        or (row.get('packet')or{}).get('namespace_scan_complete')is not True):
+                    diagnostics.append('RESOURCE_RECOVERY_NAMESPACE_CENSUS_INCOMPLETE')
         native_target={'schema':'guard-kubernetes-lifecycle-target/1','lab':ctx.target['lab'],'run_id':ctx.cprobe.binding['run_id'],
             'environment_ref':ctx.env.ref().model_dump(mode='json'),'kubernetes':{'context':ctx.cprobe.binding['context'],'engine':ctx.cprobe.binding['engine']}}
         try:
             reader=KubernetesResourceRecoveryReader(native_target,ctx.env,ctx._recovery_prepared,runner=self.runner,
                 binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120));reader.snapshot()
             censuses.append(reader.resource_census(ctx._recovery_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']))
+            collect_group()
             for slot in SLOTS:
                 row={'case_id':'lif11-'+slot,'request_id_sha256':sha256_hex(('byul-lif11-'+token+'-'+slot).encode()),
                     'attempted':False,'started_at':None,'finished_at':None,'policy_window_verified':False,
@@ -73,6 +86,8 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             if reader is not None:
                 try:censuses.append(reader.resource_census(ctx._recovery_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']))
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_CENSUS_UNAVAILABLE')
+                try:collect_group()
+                except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_NAMESPACE_CENSUS_UNAVAILABLE')
                 try:sealed=reader.seal_session().get('sealed') is True
                 except Exception:pass
                 if not sealed:diagnostics.append('RESOURCE_RECOVERY_SESSION_SEAL_UNAVAILABLE')
@@ -82,6 +97,12 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
                     if not packet.get('recorded_files_covered'):diagnostics.append('RESOURCE_RECOVERY_NATIVE_COVERAGE_UNAVAILABLE')
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_CAPTURE_UNAVAILABLE')
         projection=project(censuses,ctx._recovery_selection,ctx.policy_values)
+        group_projection=None
+        if self.cfg.get('namespace_resources',False):
+            try:
+                if len(groups)!=2 or any(not r['collected']or not r['owner_binding_verified']or not r['clock_window_verified']for r in groups):raise ValueError
+                group_projection=group_probe.compare(groups[0]['packet'],groups[1]['packet'],group_selection)
+            except Exception:diagnostics.append('RESOURCE_RECOVERY_NAMESPACE_COMPARISON_UNAVAILABLE')
         try:http=ctx.cprobe.report()
         except Exception:
             diagnostics.append('RESOURCE_RECOVERY_HTTP_REPORT_UNAVAILABLE')
@@ -102,6 +123,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             'declared_scenario_sha256':ctx.policy_values['recovery_scenario_sha256'],'trials':trials,'censuses':censuses,'native':packet,
             'projection':projection,'transport':http,'reader':read_report,'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,
             'fixture':{'profile':PROFILE},'failure_control_implemented':False,'restart_control_implemented':False,'whole_scope_complete':False}
+        if self.cfg.get('namespace_resources',False):summary.update(namespace_resource_censuses=groups,namespace_resource_projection=group_projection)
         observations={'recovery_trials':trials,'recovery_resource_censuses':censuses,'recovery_selected_resource_status':projection['rows'],
             'recovery_missing':projection['missing'],'recovery_absolute_deadline_violated':projection['absolute_deadline_violated'],
             'recovery_selected_absence_observed':projection['selected_absence_observed'],'recovery_global_resources_released':False,

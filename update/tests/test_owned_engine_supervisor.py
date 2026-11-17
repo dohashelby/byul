@@ -127,9 +127,14 @@ def test_expired_lease_refuses_new_launch_but_status_and_shutdown_remain(child_c
     finally:supervisor.close()
 
 
-def test_owner_socket_roundtrip_returns_authenticated_current_status_and_cleans_child(child_config,tmp_path):
+@pytest.mark.parametrize('long_path', [False, True])
+def test_owner_socket_roundtrip_returns_authenticated_current_status_and_cleans_child(child_config,tmp_path,long_path):
     path=tmp_path/'settings.json';path.write_bytes(harness.canonical(child_config));path.chmod(0o600)
-    directory=tmp_path/'new-supervisor'
+    parent=tmp_path
+    if long_path:
+        parent=tmp_path/('long-parent-'+'a'*100)/('nested-'+'b'*100)
+        parent.mkdir(parents=True)
+    directory=parent/'new-supervisor'
     command=[sys.executable,str(Path(harness.__file__).resolve()),'--config',str(path),'--new-directory',str(directory)]
     server=subprocess.Popen(command,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
     try:
@@ -146,3 +151,20 @@ def test_owner_socket_roundtrip_returns_authenticated_current_status_and_cleans_
     finally:
         if server.poll()is None:server.terminate();server.wait(timeout=5)
         server.stderr.close()
+
+
+def test_control_directory_pins_inode_and_refuses_public_or_linked_directories(tmp_path):
+    directory=tmp_path/'private';directory.mkdir(mode=0o700)
+    with harness.control_directory(directory)as path:
+        held=path.parent.stat()
+        assert (held.st_dev,held.st_ino)==(directory.stat().st_dev,directory.stat().st_ino)
+        directory.rename(tmp_path/'moved')
+        directory.mkdir(mode=0o700)
+        assert path.parent.stat().st_ino==held.st_ino!=directory.stat().st_ino
+        assert len(os.fsencode(path))<108
+    directory.chmod(0o755)
+    with pytest.raises(ValueError,match='OWNER_UNVERIFIED'):
+        with harness.control_directory(directory):pass
+    link=tmp_path/'linked';link.symlink_to(tmp_path/'moved',target_is_directory=True)
+    with pytest.raises(OSError):
+        with harness.control_directory(link):pass

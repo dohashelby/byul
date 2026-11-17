@@ -8,6 +8,7 @@ and the credit guard still own whole-container/node cleanup.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 import hmac
@@ -65,6 +66,27 @@ def private_file(path):
     if len(raw) != before.st_size or len({identity(s) for s in (before, opened, after, path.lstat())}) != 1:
         raise ValueError('SUPERVISOR_PRIVATE_FILE_CHANGED')
     return document(raw)
+
+
+@contextmanager
+def control_directory(directory):
+    """Pin the private directory and keep AF_UNIX names below its path bound.
+
+    Linux resolves the proc FD alias to the held inode. No process-wide chdir,
+    public temporary socket, or symlink supplied by a caller is needed.
+    """
+    before = directory.lstat()
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(fd)
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_uid, s.st_mode)
+        if (not stat.S_ISDIR(opened.st_mode) or opened.st_uid != os.geteuid()
+                or opened.st_mode & 0o077
+                or len({identity(s) for s in (before, opened, directory.lstat())}) != 1):
+            raise ValueError('SUPERVISOR_OWNER_UNVERIFIED')
+        yield Path('/proc/self/fd', str(fd), 'control.sock')
+    finally:
+        os.close(fd)
 
 
 def settings(value):
@@ -230,9 +252,13 @@ def serve(config_file, directory):
     directory.mkdir(mode=0o700, exist_ok=False)
     if directory.lstat().st_uid != os.geteuid():
         raise ValueError('SUPERVISOR_OWNER_UNVERIFIED')
-    supervisor = Supervisor(config)
-    path = directory / 'control.sock'
+    with control_directory(directory) as path:
+        _serve(config, path)
+
+
+def _serve(config, path):
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    supervisor = Supervisor(config)
     socket_identity = None
     stopping = False
     def stop(_signal, _frame):
@@ -288,15 +314,17 @@ def serve(config_file, directory):
 
 def client(config_file, directory, action):
     config = settings(private_file(config_file))
-    identity = directory.lstat()
-    if not stat.S_ISDIR(identity.st_mode) or identity.st_uid != os.geteuid() or identity.st_mode & 0o077:
-        raise ValueError('SUPERVISOR_OWNER_UNVERIFIED')
+    with control_directory(directory) as path:
+        return _client(config, path, action)
+
+
+def _client(config, path, action):
     value = {'session': config['session'], 'action': action, 'nonce': secrets.token_hex(16), 'issued_ns': time.monotonic_ns()}
     envelope = {'request': value, 'hmac_sha256': hmac.new(bytes.fromhex(config['key']),
         b'guard-owned-engine-supervisor-request/1\0' + canonical(value), hashlib.sha256).hexdigest()}
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.settimeout(3)
-        sock.connect(str(directory / 'control.sock'))
+        sock.connect(str(path))
         sock.sendall(canonical(envelope))
         sock.shutdown(socket.SHUT_WR)
         raw = bytearray()

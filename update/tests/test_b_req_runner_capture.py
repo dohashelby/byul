@@ -22,7 +22,8 @@ from tools import b_req_runner_capture as driver
 
 CAPTURE_PROFILE = VllmAdapter().runner_capture_profile("0.31.0")
 
-PACK_DIR = Path(__file__).parents[1] / "packs/PACK-BASELINE"
+from tests.published_pack38 import original as published_pack38
+PACK_DIR = published_pack38().path
 
 
 def baseline_pack():

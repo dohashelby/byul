@@ -12,7 +12,7 @@
     "previous_031_changes_and_original_evidence_preserved": true,
     "cost_authority": "Subsequent explicit user approval: fresh $20 / maximum two hours for 0.30.0 only",
     "historical_new_cost_approval_used_for_j01": true,
-    "new_gpu_session_currently_authorized": true
+    "new_gpu_session_currently_authorized": false
   },
   "version_pair": {
     "baseline": {
@@ -419,7 +419,7 @@
   },
   "j02_actual_qualification": {
     "schema": "byul-j02-scoped-qualification-stage/1",
-    "checked_at": "2026-11-17T08:21:28.716447+00:00",
+    "checked_at": "2026-11-17T08:51:02.955328+00:00",
     "status": "IN_PROGRESS",
     "goal": "vLLM 0.30.0 actual all69 EVD/RES/RPT",
     "video_in_current_scope": false,
@@ -460,7 +460,7 @@
       "private_settings_or_key_files_included": false,
       "all69_complete": false
     },
-    "cleanup_confirmed": false,
+    "cleanup_confirmed": true,
     "new_resources_only": true,
     "total_budget_cap_usd": 20,
     "max_session_hours": 2,
@@ -500,8 +500,63 @@
       "gpu_executed": false
     },
     "whole_regression": {
-      "state": "RUNNING",
-      "source_manifest_sha256": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011"
+      "source_manifest_sha256": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+      "source_manifest_unchanged": true,
+      "all_pinned_source_bytes_unchanged": true,
+      "test_and_dependency_sources_unchanged": true,
+      "base_commit": "a4c994f6f127e2f9593a1d41244d1535fa9b7126",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "started_at": "2026-11-17T08:16:37.934710+00:00",
+      "finished_at": "2026-11-17T08:48:09.519595+00:00",
+      "parent_wall_seconds": 1925.084,
+      "exit_code": 0,
+      "summary_lines": [
+        "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:136: DeprecationWarning: This process (pid=13709) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+        "    expected=identity.process_context(child.pid);read_fd,write_fd=os.pipe();worker=os.fork()",
+        "",
+        "tests/test_rank_rpc_actor.py::test_actor_exit_without_finally_still_resumes_target",
+        "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:159: DeprecationWarning: This process (pid=13709) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+        "    worker = os.fork()",
+        "",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-delay]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-death]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-exception]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-delay]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-death]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-exception]",
+        "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:214: DeprecationWarning: This process (pid=13709) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+        "    worker = os.fork()",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "14265 passed, 34 skipped, 14 warnings in 1921.76s (0:32:01)"
+      ],
+      "gpu_executed": false,
+      "timeout_used": false,
+      "new_test_exclusions": false,
+      "source_gate": {
+        "reviewed_common_commit": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+        "B_source_commit": "57a7537968c0c09a7aab8f741965d64a7eb0f0d5",
+        "fixed_B_helper_sha256": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+        "pinned_paths": [
+          "update/src/guard",
+          "update/packs",
+          "update/uv.lock",
+          "update/pyproject.toml",
+          "update/reference/framework"
+        ],
+        "files_verified": 600,
+        "verified_manifest_sha256": "170ea3d987fb0652cb759f90bb3577c14b3eb954f8637e4eeacc948f4327316c",
+        "pack_ref": {
+          "id": "PACK-BASELINE",
+          "kind": "PACK",
+          "revision": 38,
+          "sha256": "22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80"
+        },
+        "paths_excluded": [],
+        "runtime_hash_approval": false,
+        "original_B_default_pin_changed": false,
+        "actual_CPU_execution": false
+      }
     },
     "all69_executed": false,
     "native_all69_report_created": false,
@@ -514,6 +569,47 @@
       "LIF-11 full kernel/GPU resource recovery and subsequent normal generation before operator cleanup",
       "REQ-08 native consumption/nested token reuse and REQ-09 full text/chat/token and applicable embedding/mask/offset scope",
       "Remaining exact qualifications, registrations, fresh per-check inputs, all69 actual EVD/RES/RPT and verified export"
-    ]
+    ],
+    "implementation_inventory": {
+      "engine": {
+        "role": "후보 판본",
+        "engine": "vllm",
+        "version": "0.30.0",
+        "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
+      },
+      "active_checks": 69,
+      "checks_with_implementation": 69,
+      "checks_without_pass_rules": [
+        "SUP-03",
+        "SUP-04",
+        "SUP-13",
+        "PLT-02",
+        "PLT-07",
+        "PLT-08"
+      ],
+      "actual_execution_performed_by_this_inventory": false,
+      "all69_full_scope_inputs_confirmed": false
+    },
+    "implementation_inventory_file": "j02-final-implementation-inventory-actual030.json",
+    "clocksource_readback": {
+      "checked_at": "2026-11-17T08:44:41.288911+00:00",
+      "clocksource": "tsc",
+      "kernel_clock_setting_changed_by_agent_for_this_run": false,
+      "observation_scope": "Final portion of the ongoing full suite; no assertion of external changes throughout the run"
+    },
+    "timing_review": {
+      "schema": "byul-full-regression-two-timing-review/1",
+      "source_manifest": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+      "pytest_reported_seconds": 1921.76,
+      "parent_monotonic_seconds": 1925.084,
+      "utc_label_difference_seconds": 1891.584885,
+      "parent_monotonic_minus_utc_seconds": 33.499115,
+      "cause_confirmed": false,
+      "whole_run_clock_stability_claimed": false,
+      "kernel_clocksource_modified_for_this_run": false,
+      "original_log_junit_summary_retained": true,
+      "test_or_deadline_relaxed": false,
+      "scope": "Recorded duration values are preserved separately. The positive source-integrity and default-suite checks are not a whole-run clock stability qualification."
+    }
   }
 }

@@ -38,6 +38,7 @@ def execution_policy(cfg,infra):
         {'Effect':'Allow','Action':['ssm:SendCommand','ssm:StartSession'],'Resource':[
           f'arn:aws:ssm:{region}::document/AWS-RunShellScript',f'arn:aws:ssm:{region}::document/AWS-StartPortForwardingSession']},
         {'Effect':'Allow','Action':'ssm:GetParameter','Resource':f'arn:aws:ssm:{region}:{account}:parameter'+cfg['state_parameter']},
+        {'Effect':'Allow','Action':'ssm:PutParameter','Resource':f'arn:aws:ssm:{region}:{account}:parameter'+cfg['state_parameter'].removesuffix('/state')+'/launch-lock'},
         {'Effect':'Allow','Action':'iam:PassRole','Resource':infra['instance_role_arn'],
          'Condition':{'StringEquals':{'iam:PassedToService':'ec2.amazonaws.com'}}},
         {'Effect':'Allow','Action':'iam:GetInstanceProfile','Resource':infra['instance_profile_arn']},

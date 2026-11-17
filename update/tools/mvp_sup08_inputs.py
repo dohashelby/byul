@@ -19,6 +19,10 @@ from tools.prepare_sup08_phi3v_fixture import SOURCE_MODEL, SOURCE_REVISION
 ROOT = Path(__file__).resolve().parents[1]
 POC = ROOT / 'docs/evidence/sup08-code-selection-20261111.json'
 FIXTURE_CONTRACT = ROOT / 'docs/dev-1/ma8-poc-fixture-contract.json'
+SUPPORTED_PACKS = {
+    (38, '22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80'),
+    (39, 'f0b5e643361e6a0ba21fa09ecdd0f385c9b430a342882e480d4b69c1a23e97dd'),
+}
 
 
 def validate_fixture(fixture_file):
@@ -46,7 +50,8 @@ def prepare(fixture_file, environments, targets, output, *, control_image, pack=
     fixture_raw, fixture, historical, inventory_hash = validate_fixture(fixture_file)
     code = fixture['code_revisions']
     baseline = load_pack(pack); check = baseline.checks['SUP-08']
-    if baseline.manifest.revision != 38 or check.revision != 5:
+    if (baseline.ref().id != 'PACK-BASELINE'
+            or (baseline.ref().revision, baseline.ref().sha256) not in SUPPORTED_PACKS or check.revision != 5):
         raise ValueError('정본 팩과 SUP-08 정의가 준비되지 않았습니다.')
     pair = versions(); results = {}; files = {}; conditions = []
     same_pair = all(pair[side]['image'] == historical[side]['image_digest'] for side in pair)

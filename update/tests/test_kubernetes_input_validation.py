@@ -69,6 +69,8 @@ def test_field_contract_accepts_only_the_declared_fixture(tmp_path):
 
 def test_nested_reused_token_field_reaches_only_its_declared_transport_fixture(tmp_path):
     check=load_pack(UPDATE/'packs/PACK-BASELINE').checks['REQ-08']
+    # The matrix delegates each selected field to this unchanged child protocol.
+    check=check.model_copy(update={'collection_profile':'reused-token-input-v1'})
     contract=_contract(check,{'reused_token_field':'kv_transfer_params.prompt_token_ids'},
         {'reused_token_ids':[5,7]},'test-model')
     assert contract['fields']=={'kv_transfer_params':{'prompt_token_ids':[5,7]}}

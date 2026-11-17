@@ -377,6 +377,18 @@ class VllmAdapter:
     def input_rejection_proof(self, **kwargs) -> dict:
         return _input_rejection_proof(**kwargs)
 
+    def native_input_rejection_facts(self, *, engine,version,image,review):
+        from . import vllm_native_input_rejection as native
+        return native.project(review,native.profile(engine,version,image))
+
+    def input_matrix_fixtures(self,**kwargs):
+        from .vllm_input_matrix import fixtures
+        return fixtures(**kwargs)
+
+    def native_reused_field_facts(self,**kwargs):
+        from .vllm_reused_input import project
+        return project(**kwargs)
+
     def http_profile(self, version, image):
         from .vllm_release_profiles import http_profile
         return http_profile(version, image)

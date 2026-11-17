@@ -85,10 +85,18 @@ def _inspect(source, check, pack, issued_at):
         if target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
         target_state = (target, raw_target, identity)
-    binding, _ = run_binding.effective_values(check, cfg, env, values,
+    binding, effective = run_binding.effective_values(check, cfg, env, values,
         side=source['side'], attempt_id='mvp-offline-readiness', issued_at=issued_at,
         valid_from=policy.valid_from, valid_until=policy.valid_until,
         run_cfg=run_binding.run_config(config, check.id), policy_ref=policy.ref())
+    # Use the same factory, per-check config and effective run values as run.
+    # This invokes only its admission checks, never run/collect or a target.
+    try:
+        executor = registry.build_executor(check.executor, implementation, config,
+            engine=env.engine.name, version=env.engine.version)
+        executor.validate_policy(check, effective)
+    except (ValueError, TypeError, KeyError):
+        raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
     for role, identity in identities.items():
         after, current = _read(source[role]['path'])
         if current != identity or after != files[role]:
@@ -100,7 +108,7 @@ def _inspect(source, check, pack, issued_at):
     blockers = ['LIVE_EXECUTOR_PREFLIGHT_REQUIRED']
     if env.data_origin.value == 'EXAMPLE':
         blockers.append('EXAMPLE_ENV_NOT_ACTUAL')
-    return {'file_binding_valid': True, 'environment_ref': env.ref().model_dump(mode='json'),
+    return {'file_binding_valid': True, 'executor_policy_valid': True, 'environment_ref': env.ref().model_dump(mode='json'),
             'environment_origin': env.data_origin.value, 'implementation': implementation,
             'binding_schema': binding['schema'] if binding else None,
             'files': {role: source[role] for role in files}, 'blocking_codes': blockers}
@@ -143,7 +151,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
                    'security_rules_present': security_rules, 'available_implementations': implementations,
                    'expected_engine': expected, 'required_policy_keys': [p.key for p in check.policy_params if p.required],
                    'required_observations': [o.key for o in check.required_observations],
-                   'file_binding_valid': False, 'live_target_verified': False,
+                   'file_binding_valid': False, 'executor_policy_valid': False, 'live_target_verified': False,
                    'input_preflight_passed': False, 'ready_for_execution': False,
                    'engine_executed': False, 'actual_results': None}
             if (cid, selected_side) not in sources:

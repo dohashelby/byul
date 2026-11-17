@@ -84,3 +84,51 @@ def test_fake_executor_cannot_be_an_active_execution_input(tmp_path, sources):  
     row = next(r for r in report['rows'] if (r['check_id'], r['side']) == ('SUP-08', 'baseline'))
     assert row['file_binding_valid'] is False
     assert row['blocking_codes'] == ['MVP_ACTIVE_EXECUTOR_REQUIRED']
+
+
+def test_typed_but_unsupported_policy_is_refused_by_the_actual_executor_before_network(tmp_path,sources,monkeypatch):
+    import yaml
+    def forbidden(*args,**kwargs):raise AssertionError('offline admission must not execute or contact a target')
+    monkeypatch.setattr(socket,'socket',forbidden);monkeypatch.setattr(subprocess,'Popen',forbidden)
+    value=blank();value['inputs']=sources['inputs'][:1]
+    entry=value['inputs'][0];path=Path(entry['policy']['path']);policy=yaml.safe_load(path.read_bytes())
+    policy['values']['SUP-08']['code_selection_fields']=['invalid..field']
+    path.write_text(yaml.safe_dump(policy));entry['policy']['sha256']=sha256(path.read_bytes()).hexdigest()
+    report=run(tmp_path,value)
+    row=next(r for r in report['rows']if(r['check_id'],r['side'])==('SUP-08','baseline'))
+    assert row['file_binding_valid']is False and row['blocking_codes']==['MVP_EXECUTOR_POLICY_INVALID']
+    assert len(report['rows'])==138 and report['blocking_counts']['ACTUAL_INPUT_FILES_MISSING']==137
+    assert not report['engine_executed']and not report['ready_for_execution']
+
+
+@pytest.mark.parametrize('capture_present',[False,True])
+def test_current_matrix_admission_checks_effective_check_config_without_live_success(tmp_path,monkeypatch,capture_present):
+    import yaml
+    from guard.models import canonical_json
+    from tests.builders import policy
+    from tests.test_input_matrix import values
+    from tests.test_model_preparation_integration import full_inputs
+    def forbidden(*args,**kwargs):raise AssertionError('no target or engine during file admission')
+    monkeypatch.setattr(socket,'socket',forbidden);monkeypatch.setattr(subprocess,'Popen',forbidden)
+    pack=load_pack(tool.ROOT/'packs/PACK-BASELINE');expected=tool.versions()['candidate'];env,target=full_inputs()
+    env=env.model_copy(update={'engine':env.engine.model_copy(update={'name':expected['engine'],'version':expected['version'],'image_digest':expected['image']}),
+        'runtime':env.runtime.model_copy(update={'gpu_count':2,'gpu_model':'EXAMPLE-GPU','driver':'EXAMPLE-driver'})}).seal()
+    target['environment_ref']=env.ref().model_dump(mode='json')
+    pol=policy(pack.ref(),scope={'include':['REQ-09']},values={'REQ-09':values()})
+    files={}
+    for role,obj in [('environment',env.to_dict()),('policy',pol.to_dict()),('target',target)]:
+        file=tmp_path/(role+'.json');file.write_bytes(canonical_json(obj));files[role]=file
+    cfg=tmp_path/'guard.toml'
+    text='[executors]\ninput_validation="kubernetes"\n[adapter]\nname="vllm"\n[input_validation]\ntarget='+json.dumps(str(files['target']))+'\nvocab_size=100\nvocab_source="EXAMPLE"\n'
+    if capture_present:text+='[check_config.REQ-09.native_input_capture]\nprepared_dir="EXAMPLE-not-installed"\nprepared_sha256="'+'a'*64+'"\n'
+    cfg.write_text(text);files['configuration']=cfg
+    entry={'check_id':'REQ-09','side':'candidate',**{role:{'path':str(files[role]),'sha256':sha256(files[role].read_bytes()).hexdigest()}
+        for role in('environment','policy','configuration')}}
+    index=tmp_path/'index.json';index.write_text(json.dumps({**blank(),'inputs':[entry]}))
+    result=tool.audit(index,side='candidate');row=next(r for r in result['rows']if r['check_id']=='REQ-09')
+    assert row['file_binding_valid']is capture_present and len(result['rows'])==69
+    if capture_present:
+        assert row['executor_policy_valid']is True and 'EXAMPLE_ENV_NOT_ACTUAL'in row['blocking_codes']
+        assert 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'in row['blocking_codes']
+    else:assert row['blocking_codes']==['MVP_EXECUTOR_POLICY_INVALID']
+    assert not row['ready_for_execution']and not row['engine_executed']and row['actual_results']is None

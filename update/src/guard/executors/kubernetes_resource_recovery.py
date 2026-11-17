@@ -162,7 +162,12 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             'projection':projection,'transport':http,'reader':read_report,'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,
             'fixture':{'profile':PROFILE},'failure_control_implemented':False,'restart_control_implemented':False,'whole_scope_complete':False}
         if self.cfg.get('namespace_resources',False):summary.update(namespace_resource_censuses=groups,namespace_resource_projection=group_projection)
-        if self.cfg.get('node_gpu_processes',False):summary.update(node_gpu_process_censuses=gpus,node_gpu_process_projection=gpu_projection)
+        if self.cfg.get('node_gpu_processes',False):
+            from guard.collectors import gpu_process_qualification
+            try:qualification=gpu_process_qualification.status(ctx.env.engine.name,ctx.env.engine.version,ctx.env.engine.image_digest)
+            except Exception:qualification={'registered':False,'diagnostic_codes':['GPU_PROCESS_QUALIFICATION_DATA_INVALID']}
+            summary.update(node_gpu_process_censuses=gpus,node_gpu_process_projection=gpu_projection,
+                node_gpu_process_qualification=qualification)
         observations={'recovery_trials':trials,'recovery_resource_censuses':censuses,'recovery_selected_resource_status':projection['rows'],
             'recovery_missing':projection['missing'],'recovery_absolute_deadline_violated':projection['absolute_deadline_violated'],
             'recovery_selected_absence_observed':projection['selected_absence_observed'],'recovery_global_resources_released':False,

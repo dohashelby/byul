@@ -26,6 +26,7 @@ from guard.collectors.file import load_environment
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+from guard.runtime.kubernetes_binding import verify_owned_pod
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader, validate_target
 from .lifecycle_session import capture_session, request_index
@@ -318,6 +319,51 @@ class LifecycleTransitionExecutor:
                 return
             self.wait(min(remaining, 0.2))
 
+    def _observe_retirement(self, generation, samples):
+        """Read back retirement only for a generation previously verified live."""
+        try:
+            expected = generation.target['kubernetes']['engine']
+            prior = next((s['native']['before'] for s in reversed(samples)
+                if s['phase'] in ('preflight', 'before') and s['generation'] == generation.key
+                and s.get('native') and s['native'].get('session') == generation.prepared['session']
+                and s['native'].get('before') and s['native']['before'].get('owner_stable') is True
+                and _sha(s['native']['before'].get('capture_sha256'))
+                and all(s['native']['before']['owner'].get(key) == expected[key]
+                        for key in ('namespace_uid', 'pod_uid', 'container_id', 'restart_count'))), None)
+            if prior is None:
+                return None
+            transport = KubernetesHTTP(generation.target, generation.env, duration=5,
+                binary=self.cfg.get('kubectl_binary', 'kubectl'), runner=self.runner, profile=REQUEST_BINDING_PROFILE)
+            def namespace():
+                value = transport._call(['get', 'namespace', expected['namespace'], '-o', 'json'])
+                meta = value['metadata']
+                if (value.get('kind') != 'Namespace' or meta.get('name') != expected['namespace']
+                        or meta.get('uid') != expected['namespace_uid'] or meta.get('deletionTimestamp')):
+                    raise ValueError
+                return meta
+            started = self.clock()
+            before = namespace()
+            pod = transport._call([f"--namespace={expected['namespace']}", 'get', 'pod', expected['pod'],
+                '--ignore-not-found', '-o', 'json'], allow_empty=True)
+            finished_at = None
+            state = 'selected_pod_absent'
+            if pod is not None:
+                if pod.get('kind') != 'Pod':
+                    raise ValueError
+                verify_owned_pod(pod, before, expected, transport.binding['run_id'], require_ready=False, terminated=True)
+                selected, = (row for row in pod['status']['containerStatuses'] if row['name'] == expected['container'])
+                finished_at = stamp(selected['state']['terminated']['finishedAt']).isoformat()
+                state = 'selected_container_terminated'
+            namespace()
+            if transport.cleanup_errors:
+                return None
+            return {'generation': generation.key, 'state': state, 'target_sha256': transport.target_sha256,
+                    'prior_live_inventory_sha256': prior['capture_sha256'],
+                    'observed_from': started.isoformat(), 'observed_until': self.clock().isoformat(),
+                    'reported_container_finished_at': finished_at, 'native_terminal_tail_collected': False}
+        except (KeyError, TypeError, ValueError, AttributeError, OSError, RuntimeError):
+            return None
+
     def run(self, check, env, policy_values, adapter, workdir):
         policy_values = normalize_policy_values(policy_values)
         self.validate_policy(check, policy_values)
@@ -356,8 +402,10 @@ class LifecycleTransitionExecutor:
                 row['finished_at'] = self.clock().isoformat()
             return row
 
-        def sample(phase):
+        def sample(phase, *, retired_generation=None):
             for generation in generations.values():
+                if generation.key == retired_generation:
+                    continue
                 row = {'phase': phase, 'generation': generation.key, 'sample_started_at': self.clock().isoformat(), 'native': None}
                 try:
                     if generation.reader is None:
@@ -380,22 +428,28 @@ class LifecycleTransitionExecutor:
                 sample(phase)
                 trials.append(trial(phase))
             trials.append(inflight.result())
-        # Seal only selected prepared sessions after all transition/recovery probes.
+        # A verified API retirement cannot supply a terminal journal from the old Pod.
+        retirement = None
+        if check.id == 'LIF-05':
+            previous = generations[policy_values['transition_phase_generation']['before']]
+            retirement = self._observe_retirement(previous, samples)
+        retired_generation = retirement['generation'] if retirement else None
         for generation in generations.values():
             if generation.reader is None:
                 continue
-            try:
-                if generation.reader.seal_session().get('sealed') is not True:
+            if generation.key != retired_generation:
+                try:
+                    if generation.reader.seal_session().get('sealed') is not True:
+                        cleanup.append('TRANSITION_SESSION_SEAL_UNAVAILABLE:' + generation.key)
+                except Exception:
                     cleanup.append('TRANSITION_SESSION_SEAL_UNAVAILABLE:' + generation.key)
-            except Exception:
-                cleanup.append('TRANSITION_SESSION_SEAL_UNAVAILABLE:' + generation.key)
             try:
                 report = generation.reader.report()
                 if report.get('parent_cleanup_unverified'):
                     cleanup.append('TRANSITION_PARENT_CLEANUP_UNVERIFIED:' + generation.key)
             except Exception:
                 cleanup.append('TRANSITION_READER_REPORT_UNAVAILABLE:' + generation.key)
-        sample('sealed')
+        sample('sealed', retired_generation=retired_generation)
         projection = project(samples, trials)
         before = next(t for t in trials if t['case_id'] == 'before')
         inflight_row = next(t for t in trials if t['case_id'] == 'inflight')
@@ -411,6 +465,8 @@ class LifecycleTransitionExecutor:
             'actual_transition_activation_unverified', 'actual_weights_cache_consumption_unverified',
             'inflight_actual_request_overlap_unverified',
             'drain_and_external_admission_gate_unverified']
+        if retirement is not None:
+            missing.append('retired_generation_native_terminal_tail_unobserved')
         if check.id == 'LIF-06':
             missing.extend(['selected_feature_activation_unverified', 'partial_failure_activation_unverified'])
         if check.id == 'LIF-16':
@@ -438,6 +494,7 @@ class LifecycleTransitionExecutor:
                     'request_generation_bindings': projection['request_generation_bindings'],
                     'request_configuration_facts': projection['request_configuration_facts'],
                     'request_configuration_conflict_candidates': projection['request_configuration_conflicts'],
+                    'old_api_retirement': retirement,
                     'transition_activation_verified': False,
                     'actual_consumption_verified': False,
                 }],
@@ -454,7 +511,7 @@ class LifecycleTransitionExecutor:
             artifacts.append(DraftArtifact(name=path.name, path=path, collector=self.name + '/' + self.version))
         except OSError:
             cleanup.append('TRANSITION_ARTIFACT_UNAVAILABLE')
-        draft = EvidenceDraft(status=ExecStatus.ABORTED if cleanup or diagnostics or projection['missing'] else ExecStatus.COMPLETED,
+        draft = EvidenceDraft(status=ExecStatus.ABORTED if cleanup or diagnostics or projection['missing'] or retirement is not None else ExecStatus.COMPLETED,
             data_origin=DataOrigin.EXAMPLE if self.runner is not None or any(g.target.get('lab') for g in generations.values()) else DataOrigin.DECLARED,
             normal_control={'attempted': before['attempted'], 'succeeded': all(t['normal_shape_verified'] for t in trials if t['case_id'] in PHASES),
                 'detail': 'Scheduled normal HTTP shapes; native generation, consumption and admission guarantees are separate observations.'},

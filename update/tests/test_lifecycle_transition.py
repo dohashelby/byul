@@ -229,6 +229,65 @@ def test_lif05_normalization_keeps_observed_request_facts_and_transition_gaps(mo
     assert observed['activation_scope_complete']['value'] is False
 
 
+@pytest.mark.parametrize('case', ['terminated', 'absent', 'replaced', 'running', 'changed-namespace', 'unseen-old', 'read-error'])
+def test_lif05_retirement_preserves_only_exact_api_outcomes(case):
+    from tests.test_kubernetes_transition import Pair
+
+    pair = Pair(stop=case != 'running', replace=case == 'replaced')
+    old = pair.worlds[0].target
+    engine = old['kubernetes']['engine']
+    session = 'a' * 32
+    generation = subject.Generation('old', pair.envs[0], old, {}, {'session': session})
+    reads = []
+
+    def runner(argv, **kwargs):
+        reads.append(argv)
+        if 'namespace' in argv:
+            uid = 'unmatched-uid' if case == 'changed-namespace' and len(reads) == 3 else engine['namespace_uid']
+            raw = canonical_json({'kind': 'Namespace', 'metadata': {'name': engine['namespace'], 'uid': uid}})
+            return {'returncode': 0, 'stdout_bytes': raw, 'stderr_bytes': b'', 'capture': {'complete': True}}
+        if case == 'read-error':
+            raise OSError('EXAMPLE private raw transport error')
+        if case == 'absent':
+            return {'returncode': 0, 'stdout_bytes': b'', 'stderr_bytes': b'', 'capture': {'complete': True}}
+        result = pair.runner(argv, **kwargs)
+        pod = json.loads(result['stdout_bytes'])
+        result['stdout_bytes'] = canonical_json({'kind': 'Pod', **pod})
+        return result
+
+    executor = subject.LifecycleTransitionExecutor({}, runner=runner, clock=lambda: T0)
+    before = {'capture_sha256': 'e' * 64, 'owner_stable': case != 'unseen-old',
+              'owner': {key: engine[key] for key in ('namespace_uid', 'pod_uid', 'container_id', 'restart_count')}}
+    samples = [sample({'session': session, 'before': before}, phase='before')]
+    result = executor._observe_retirement(generation, samples)
+    if case in ('terminated', 'absent'):
+        assert result['state'] == ('selected_container_terminated' if case == 'terminated' else 'selected_pod_absent')
+        assert result['prior_live_inventory_sha256'] == 'e' * 64
+        assert result['target_sha256'] == sha256_hex(canonical_json(old))
+        assert bool(result['reported_container_finished_at']) == (case == 'terminated')
+        assert result['native_terminal_tail_collected'] is False
+    else:
+        assert result is None
+    if case == 'unseen-old':
+        assert not reads
+    assert all('get' in call and 'exec' not in call and 'delete' not in call for call in reads)
+
+
+def test_lif05_does_not_seal_a_verified_retired_generation(tmp_path, monkeypatch):
+    executor, env, log = harness(monkeypatch)
+    retirement = {'generation': 'old', 'state': 'selected_pod_absent', 'native_terminal_tail_collected': False}
+    monkeypatch.setattr(executor, '_observe_retirement', lambda *_: retirement)
+    draft = executor.run(check(), env, policy(), None, tmp_path)
+    steps, = draft.observations['activation_steps'].value
+    assert steps['old_api_retirement'] == retirement
+    assert 'retired_generation_native_terminal_tail_unobserved' in draft.observations['activation_missing'].value
+    assert 'drain_and_external_admission_gate_unverified' in draft.observations['activation_missing'].value
+    assert ('seal', 'old') not in log and ('seal', 'new') in log
+    assert ('capture', 'old') not in log[log.index(('seal', 'new')):]
+    assert not draft.observations['activation_scope_complete'].value
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+
+
 @pytest.mark.parametrize('failure', ['cleanup', 'recovery', 'replacement'])
 def test_later_error_keeps_independent_facts_and_other_generation(monkeypatch, tmp_path, failure):
     executor, env, log = harness(monkeypatch, failure=failure)

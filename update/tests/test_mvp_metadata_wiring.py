@@ -94,11 +94,12 @@ def test_offline_cli_emits_product_config_and_all_138_rows(tmp_path, monkeypatch
         assert not ({'lab_activation', 'record_attestation', '_runtime_environ'} & set(merged))
     readiness = json.loads((output / 'readiness.json').read_bytes())
     assert readiness['sides'] == 138 and readiness['active_checks'] == 69
-    assert readiness['file_binding_valid_sides'] == (6 if missing_template else 8)
+    assert readiness['file_binding_valid_sides'] == (6 if missing_template else 10)
     assert readiness['ready_for_execution'] is False and readiness['actual_results'] is None
     assert all(not row['engine_executed'] and row['actual_results'] is None for row in readiness['rows'])
     assert readiness['metadata_wiring']['SUP-03']['sides']['candidate'] == (
         'CONFIGURED_TEMPLATE_TARGET_REQUIRED' if missing_template else None)
+    assert config['check_config'].get('REQ-07') == (None if missing_template else {'req07_normal_only': True})
 
 
 def test_a_target_from_the_other_release_cannot_be_reused(tmp_path, sources):
@@ -123,10 +124,10 @@ def test_shared_template_siblings_stop_before_any_target_or_transport_access(tmp
         with monkeypatch.context() as guard:
             guard.setattr(template_executor.Path, 'open', forbidden)
             guard.setattr(template_executor, 'KubernetesHTTP', forbidden)
+            decision = checks['SUP-03']['shared_executor_checks']['SUP-13'][side]
+            assert decision == {'expected_if_invoked': 'ABORTED', 'reason': 'EXECUTOR_FAILURE',
+                                'transport_dispatched': False}
             for check_id in ('REQ-07', 'SUP-13'):
-                decision = checks['SUP-03']['shared_executor_checks'][check_id][side]
-                assert decision == {'expected_if_invoked': 'ABORTED', 'reason': 'EXECUTOR_FAILURE',
-                                    'transport_dispatched': False}
                 with pytest.raises(ValueError, match='KUBERNETES_TEMPLATE_PROFILE_UNSUPPORTED'):
                     executor.run(pack.checks[check_id], env, {}, object(), tmp_path / 'unused')
 
@@ -173,7 +174,8 @@ def test_staged_configuration_requires_a_fresh_candidate_before_hash_binding(tmp
 def test_template_wiring_requires_the_configured_hash_in_approved_policy(tmp_path, sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())
-    values = {**original.values, 'SUP-03': {'allowed_template_sha256': []}}
+    values = {**original.values, 'SUP-03': {'allowed_template_sha256': []},
+              'REQ-07': {**original.values['REQ-07'], 'allowed_template_sha256': ['f' * 64]}}
     _write(policy_path, original.model_copy(update={'values': values}).seal().to_dict())
     config, _, checks = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
     assert 'template_validation' not in config['executors']

@@ -50,7 +50,7 @@ _COMMON_LIMIT = (
 )
 
 
-def _policy_shape(check, values):
+def _policy_shape(check, values, *, kubernetes_template=False):
     """Existing declared types and pure shape rules, without collector limits."""
     for param in check.policy_params:
         if param.required and param.key not in values:
@@ -60,7 +60,7 @@ def _policy_shape(check, values):
     if check.executor == "template_validation":
         if getattr(check, "collection_profile", None) == TEMPLATE_SUPPLY_PROFILE:
             validate_template_supply_policy(check, values, {})
-        else:
+        elif check.id != "SUP-13" or not kubernetes_template:
             validate_template_policy(values)
     elif check.executor == "unix_ipc":
         from guard.executors.unix_ipc import policy_shape
@@ -118,23 +118,25 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("no automatic executor; manual evidence import remains a separate path")
             continue
+        implementation = cfg.get("executors", {}).get(executor)
+        kube = implementation == "kubernetes" and not managed
+        kube_template = kube and executor == "template_validation"
         values = policy.values.get(check_id, {})
         try:
-            _policy_shape(check, values)
+            _policy_shape(check, values, kubernetes_template=kube_template)
         except (ValueError, TypeError):
             row["policy_valid"] = False
             row["reasons"].append("required policy values are missing or malformed; support cannot be determined")
             continue
         row["policy_valid"] = True
-        implementation = cfg.get("executors", {}).get(executor)
-        kube = implementation == "kubernetes" and not managed
-        if (implementation != "real" and not kube) or registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version) is None:
+        selected_factory = (registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
+                            if implementation == "real" or kube else None)
+        if selected_factory is None:
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
         row['code_available'] = True
         if executor == 'engine_sensor':
-            selected_factory = registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
             from guard.configuration import for_check
             selected_executor = selected_factory(for_check(cfg, executor, check.id))
             describe = getattr(selected_executor, 'support', None)
@@ -162,6 +164,21 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             if policy_scope:
                 row["policy_supported"] = False
             row["reasons"].append(reason)
+
+        if kube_template:
+            from guard.configuration import for_check
+            try:
+                selected_factory(for_check(cfg, executor, check_id)).validate_policy(check, values)
+            except (TypeError, ValueError):
+                unsupported("the check or policy is outside the configured Kubernetes template collector's scope",
+                            policy_scope=True)
+            else:
+                row["status"] = "UNKNOWN"
+                row["reasons"].append("owned Pod identity and selected readonly template bytes require runtime verification")
+                if check_id == "REQ-07":
+                    row["scope"] = "owned fixed-template normal input projection within the declared token limit"
+                    row["limitations"].append("limit enforcement, request template overrides and worker consumption require separate evidence")
+            continue
 
         if executor == "unix_ipc":
             from guard.executors.unix_ipc import UnixIPCExecutor

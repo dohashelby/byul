@@ -24,7 +24,7 @@ from tools.j02_run_config import write_config
 from tools.mvp_a_input_preflight import _pairs, _read
 from tools.mvp_versions import versions
 
-CHECKS = ('SUP-04', 'PLT-01', 'PLT-04', 'SUP-03', 'OBS-03')
+CHECKS = ('SUP-04', 'PLT-01', 'PLT-04', 'SUP-03', 'REQ-07', 'OBS-03')
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset({'container_config', 'credential_exposure', 'template_validation', 'log_analysis'})
 
@@ -105,7 +105,7 @@ def _check_reason(check, env, target, transport, values, *, policy):
     if any(key.required and key.key not in values for key in check.policy_params):
         return 'MVP_POLICY_VALUE_MISSING'
     try:
-        config = {check.executor: {}}
+        config = {check.executor: {'req07_normal_only': True} if check.id == 'REQ-07' else {}}
         executor = registry.build_executor(check.executor, 'kubernetes', config,
                                            engine=env.engine.name, version=env.engine.version)
         executor.validate_policy(check, values)
@@ -113,7 +113,7 @@ def _check_reason(check, env, target, transport, values, *, policy):
         return 'METADATA_EXECUTOR_OR_POLICY_UNAVAILABLE'
     if check.id == 'OBS-03' and type(executor) is not KubernetesLogAnalysisExecutor:
         return 'NORMAL_LOG_EXECUTOR_UNAVAILABLE'
-    if check.id == 'SUP-03':
+    if check.id in ('SUP-03', 'REQ-07'):
         if type(executor) is not KubernetesTemplateSupplyExecutor:
             return 'CONFIGURED_TEMPLATE_EXECUTOR_UNAVAILABLE'
         factory = registry.adapter_factory(env.engine.name)
@@ -185,12 +185,14 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             bindings.append({'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer})
         if check_id == 'SUP-04' and node_image_verification is not None:
             config.setdefault('check_config', {})[check_id] = {'node_image_verification': node_image_verification}
-    if candidates['SUP-03']['configuration_enabled']:
+        if check_id == 'REQ-07':
+            config.setdefault('check_config', {})[check_id] = {'req07_normal_only': True}
+    if 'template_validation' in config['executors']:
         plan = select(pack, [base, candidate], policy, mode='update')
         run = RunConfig(executors=config['executors'])
         siblings = {}
         for check in pack.active_checks():
-            if check.id == 'SUP-03' or check.executor != pack.checks['SUP-03'].executor:
+            if check.executor != 'template_validation' or candidates.get(check.id, {}).get('configuration_enabled'):
                 continue
             row = plan.item(check.id)
             siblings[check.id] = {}

@@ -760,6 +760,11 @@
       "manifest_sha256": "6c15c874d4f6fe2665c36a5a3deee59ddf5fdb3e62260588616819af6ef89c25",
       "reviewed_by": "Codex / bounded owned Pod normal log observation; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T13:41:49+00:00"
+    },
+    {
+      "manifest_sha256": "fcfc0bde9008912f8fbfe7558fed24fa814b9b3b824216fc4f0f96e4128bbaa4",
+      "reviewed_by": "Codex / paired normal log and template observations; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T13:52:28+00:00"
     }
   ]
 }

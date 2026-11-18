@@ -17,7 +17,7 @@ from guard.cli import app
 from guard.executors import registry
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from guard.executors.reuse import preview_inputs
-from guard.models import DataOrigin, canonical_json, sha256_hex
+from guard.models import DataOrigin, canonical_json, load_pack, sha256_hex
 from guard.store import Store
 from tests.builders import baseline_pack, policy, T0
 from tests.test_model_preparation_integration import full_inputs, FullWorld
@@ -155,6 +155,38 @@ def test_paired_template_fixture_matches_conditions_and_keeps_exact_per_side_map
     assert baseline.comparability.fixture_sha256 == candidate.comparability.fixture_sha256
     assert baseline.comparability.config_sha256 == candidate.comparability.config_sha256
     assert summary(baseline)["model_mapping_sha256"] != summary(candidate)["model_mapping_sha256"]
+
+
+@pytest.mark.parametrize("mode,limit,approved,requests,reason", [
+    (None, 127, SHA, 2, None),
+    (None, 1, SHA, 1, "TEMPLATE_NORMAL_INPUT_BUDGET_EXCEEDED"),
+    ("file-change", 127, SHA, 1, "TEMPLATE_NORMAL_IDENTITY_CHANGED_BEFORE_INFERENCE"),
+    (None, 127, "f" * 64, 0, "TEMPLATE_NORMAL_APPROVAL_UNVERIFIED"),
+])
+def test_req07_normal_limit_checked_before_one_fixed_inference(tmp_path, mode, limit, approved, requests, reason):
+    env, _, world, cfg = inputs(tmp_path, mode)
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    check = pack.checks["REQ-07"]
+    values = {"allowed_template_sha256": [approved], "max_rendered_input_tokens": limit,
+              "request_template_override_allowed": False}
+    executor = KubernetesTemplateSupplyExecutor({**cfg, "req07_normal_only": True}, runner=world.runner)
+    draft = executor.run(check, env, values, VllmAdapter(), tmp_path / "work")
+    assert len(world.packets) == requests
+    assert draft.data_origin.value == "EXAMPLE"
+    assert draft.observations["collection_complete"].value is False
+    for key in ("max_consumed_prompt_tokens", "tested_rendered_input_limit", "enforcement_observed", "request_override_rejected"):
+        assert not draft.observations[key].collected and draft.observations[key].value is None
+    detail = summary(draft)
+    if reason is None:
+        assert draft.observations["rendered_prompt_tokens_exact_match"].value is True
+        counts = draft.observations["rendered_input_token_counts"].value
+        assert 0 < counts["normal"] <= limit
+        assert all("chat_template" not in request["body"] for packet in world.packets for request in packet)
+    else:
+        assert reason in detail["collection_errors"]
+        assert not draft.observations["rendered_prompt_tokens_exact_match"].collected
+    assert detail["fixture"]["declared_normal_input_limit"] == limit
+    assert not any(challenge.attempted for challenge in draft.challenges)
 
 
 @pytest.mark.parametrize("mode", ["tokens", "wrong-model", "wrong-id", "http-error", "http-exception", "cleanup"])

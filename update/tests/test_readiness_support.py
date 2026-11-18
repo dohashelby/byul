@@ -90,6 +90,28 @@ def test_supply_template_support_uses_its_own_policy_and_names_observation_scope
     assert missing["status"] == "UNKNOWN" and missing["policy_valid"] is False
 
 
+@pytest.mark.parametrize("version", ("0.30.0", "0.31.0"))
+def test_kubernetes_template_guidance_uses_the_scoped_collector(pack, monkeypatch, version):
+    from guard import readiness_support
+
+    def unrelated_contract(*_args):
+        pytest.fail("Kubernetes template readiness should use the declared template collector")
+
+    monkeypatch.setattr(readiness_support, "evidence_contract", unrelated_contract)
+    env, pol, _ = declared_inputs(pack)
+    env.engine = env.engine.model_copy(update={"version": version})
+    pol.values["REQ-07"]["max_rendered_input_tokens"] = 4096
+    pol.values["SUP-03"] = {"allowed_template_sha256": [CHAT_TEMPLATE_SHA256]}
+    pol.values["SUP-13"] = {"forbidden_template_attributes": ["fixture_attribute"]}
+    cfg = {"adapter": {"name": "vllm"}, "executors": {"template_validation": "kubernetes"},
+           "check_config": {"REQ-07": {"req07_normal_only": True}}}
+    rows = assess_check_support(pack, env, pol, cfg, selected_check_ids=["REQ-07", "SUP-03", "SUP-13"], managed=False)
+    assert [row["status"] for row in rows] == ["UNKNOWN", "UNKNOWN", "UNSUPPORTED"]
+    assert [row["policy_supported"] for row in rows] == [True, True, False]
+    assert all(row["policy_valid"] and not row["runtime_qualified"] for row in rows)
+    assert "normal input projection" in rows[0]["scope"]
+
+
 @pytest.mark.parametrize("change", ["other-digest", "other-version"])
 def test_pinned_source_contracts_do_not_trust_version_alone(pack, change):
     def mutate(env, pol, cfg):

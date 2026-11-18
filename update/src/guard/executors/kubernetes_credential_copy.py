@@ -50,9 +50,19 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
             business={key:values[key] for key in ('copy_max_record_delay_ms',contract.DECISION_KEY) if key in values}
             if not business.get(contract.DECISION_KEY) or sha256_hex(canonical_json(business))!=values['copy_policy_sha256']:
                 raise ValueError('COPY_RECORD_SNAPSHOT_POLICY_UNVERIFIED')
+            return self._bound_inventory(values)
+
+    def _bound_inventory(self, values):
+        try:
+            inventory = load_inventory(self.cfg['copy_inventory'], values['copy_inventory_sha256'], values['copy_policy_sha256'])
+            if contract.DECISION_KEY in values and contract.treatments(inventory) != values[contract.DECISION_KEY]:
+                raise ValueError
+        except (KeyError, TypeError, ValueError, OSError):
+            raise ValueError('COPY_CONFIGURATION_INVALID') from None
+        return inventory
 
     def run(self,check,env,policy_values,adapter,workdir):
-        self.validate_policy(check,policy_values)
+        inventory = self.validate_policy(check,policy_values)
         snapshot_only=self.cfg.get(SNAPSHOT_OPTION) is True
         try:
             if set(self.cfg)-{'target','copy_inventory','kubectl_binary','max_duration_seconds',SNAPSHOT_OPTION} or adapter is None:raise ValueError
@@ -64,9 +74,8 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
             if (target.get('lab') is not expected_lab or target_hash!=policy_values['copy_target_sha256']
                     or snapshot_only and self.expected_target is None
                     or self.expected_target is not None and target_hash!=self.expected_target):raise ValueError
-            inventory=load_inventory(self.cfg['copy_inventory'],policy_values['copy_inventory_sha256'],policy_values['copy_policy_sha256'])
-            # @38 (RB3-Q4): treatments are decided in policy; the run's inventory must carry exactly them.
-            if contract.DECISION_KEY in policy_values and contract.treatments(inventory)!=policy_values[contract.DECISION_KEY]:raise ValueError
+            if inventory is None:
+                inventory = self._bound_inventory(policy_values)
         except (KeyError,TypeError,ValueError,OSError,RuntimeError):raise ValueError('COPY_CONFIGURATION_INVALID') from None
         profile=REQUEST_BINDING_PROFILE if snapshot_only else REQUIRED_EVENT_PROFILE
         transport=KubernetesHTTP(target,env,duration=self.cfg.get('max_duration_seconds',120),

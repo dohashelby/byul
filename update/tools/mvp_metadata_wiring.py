@@ -9,7 +9,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from guard.adapters.engine_profiles import supports
-from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, update_allowed_checks
+from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, RECORD_SNAPSHOT_OPTIONS, merge_config,
+                                 record_snapshot_scopes, update_allowed_checks)
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
@@ -31,13 +32,12 @@ from tools.mvp_versions import versions
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
                    'SUP-03': 'template_validation', 'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
                    'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc',
-                   'OBS-01': 'required_event_record', 'PLT-02': 'unix_ipc',
+                   'OBS-01': 'required_event_record', 'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
-CHECKS = tuple(cid for cid in CHECK_EXECUTORS if cid not in {'OBS-01', 'PLT-02', passive_api_hop.CHECK})
+CHECKS = tuple(cid for cid in CHECK_EXECUTORS if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'PLT-02', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
-OBSERVATION_RUN_BINDING_KEYS = {'record_session', 'record_producer', 'test_actors'}
 
 
 def _source(path):
@@ -60,17 +60,23 @@ def _transport(target, env):
     return transport
 
 
-def _observation_bindings(value):
+def _paired_record_inputs(value, check_id):
     if type(value) is not dict or set(value) != set(readiness.SIDES):
         raise ValueError('OBSERVATION_PAIRED_RUN_BINDINGS_REQUIRED')
+    is_copy = check_id == 'PLT-12'
+    fields = {'record_session', 'record_producer', 'copy_inventory' if is_copy else 'test_actors'}
+    file_fields = ('record_producer', 'copy_inventory') if is_copy else ('record_producer',)
     bindings = {}
     for side, entry in value.items():
-        path = entry.get('record_producer') if type(entry) is dict else None
-        if type(path) is not str or not path or set(entry) != OBSERVATION_RUN_BINDING_KEYS:
+        if type(entry) is not dict or set(entry) != fields:
             raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
-        source = Path(path).absolute()
-        _read(source)
-        bindings[side] = {**entry, 'record_producer': str(source)}
+        bindings[side] = dict(entry)
+        for field in file_fields:
+            if type(entry[field]) is not str or not entry[field]:
+                raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
+            source = Path(entry[field]).absolute()
+            _read(source)
+            bindings[side][field] = str(source)
     return bindings
 
 
@@ -95,18 +101,30 @@ def revalidate_candidate(config, env, preliminary_ref):
     executors = config.get('executors', {})
     candidate = config.get('sides', {}).get('candidate', {})
     allowed = config.get('update', {}).get('allowed_checks')
-    has_observation = type(allowed) is list and 'OBS-01' in allowed
-    technical = {'run_binding'} if has_observation else set()
+    record_checks = {cid for cid in RECORD_SNAPSHOT_OPTIONS if cid in allowed} if type(allowed) is list else set()
+    technical = {'run_binding'} if record_checks else set()
+    if 'PLT-12' in record_checks:
+        technical.add('check_config')
     if (config.get('update', {}).get('kubernetes_candidate_binding') != 'after_baseline' or not executors
             or set(executors) - METADATA_EXECUTORS or set(candidate) != set(executors) | technical
             or any(impl != 'kubernetes' for impl in executors.values())
             or any(type(candidate[name]) is not dict or set(candidate[name]) != {'target'} for name in executors)):
         raise ValueError('METADATA_STAGED_CONFIGURATION_INVALID')
-    if has_observation:
-        technical_by_side = {side: config['sides'].get(side, {}).get('run_binding') for side in readiness.SIDES}
-        if any(type(entry) is not dict or set(entry) != {'OBS-01'} for entry in technical_by_side.values()):
-            raise ValueError('METADATA_STAGED_CONFIGURATION_INVALID')
-        _observation_bindings({side: entry['OBS-01'] for side, entry in technical_by_side.items()})
+    if record_checks:
+        settings_by_side = {side: config['sides'].get(side, {}) for side in readiness.SIDES}
+        for settings in settings_by_side.values():
+            bindings = settings.get('run_binding')
+            if type(bindings) is not dict or set(bindings) != record_checks or any(type(row) is not dict for row in bindings.values()):
+                raise ValueError('METADATA_STAGED_CONFIGURATION_INVALID')
+            if 'PLT-12' in record_checks:
+                overlay = settings.get('check_config')
+                if (type(overlay) is not dict or set(overlay) != {'PLT-12'} or type(overlay['PLT-12']) is not dict
+                        or set(overlay['PLT-12']) != {'copy_inventory'}):
+                    raise ValueError('METADATA_STAGED_CONFIGURATION_INVALID')
+        for check_id in record_checks:
+            _paired_record_inputs({side: {**settings['run_binding'][check_id],
+                **(settings['check_config'][check_id] if check_id == 'PLT-12' else {})}
+                for side, settings in settings_by_side.items()}, check_id)
     restricted_executors = {CHECK_EXECUTORS[cid] for cid in KUBERNETES_BOUND_CHECK_OPTIONS}
     if allowed is None:
         if restricted_executors.intersection(executors):
@@ -142,7 +160,7 @@ def revalidate_candidate(config, env, preliminary_ref):
     return dict.fromkeys(executors, new.target_sha256)
 
 
-def _check_reason(check, env, target, transport, values, *, policy, side, target_path, observation_binding):
+def _check_reason(check, env, target, transport, values, *, policy, side, target_path, record_inputs):
     if not _in_scope(check.id, policy):
         return 'MVP_POLICY_SCOPE_MISMATCH'
     if any(key.required and key.key not in values for key in check.policy_params):
@@ -157,11 +175,14 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
-        if check.id == 'OBS-01':
+        if check.id in RECORD_SNAPSHOT_OPTIONS:
             config[check.executor]['target'] = target_path
+            run_cfg = dict(record_inputs)
+            if check.id == 'PLT-12':
+                config[check.executor]['copy_inventory'] = run_cfg.pop('copy_inventory')
             _, values = run_binding.effective_values(check, config[check.executor], env, values, side=side,
                 attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
-                run_cfg=observation_binding, policy_ref=policy.ref())
+                run_cfg=run_cfg, policy_ref=policy.ref())
         executor = registry.build_executor(check.executor, 'kubernetes', config,
                                            engine=env.engine.name, version=env.engine.version)
         executor.validate_policy(check, values)
@@ -169,7 +190,7 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return 'METADATA_EXECUTOR_OR_POLICY_UNAVAILABLE'
     if check.id == 'OBS-03' and type(executor) is not KubernetesLogAnalysisExecutor:
         return 'NORMAL_LOG_EXECUTOR_UNAVAILABLE'
-    if check.id == 'OBS-01' and type(executor) is not KubernetesRequiredEventExecutor:
+    if check.id in RECORD_SNAPSHOT_OPTIONS and type(executor) is not KubernetesRequiredEventExecutor:
         return 'OBSERVATION_RECORD_SNAPSHOT_EXECUTOR_UNAVAILABLE'
     if check.id == 'OBS-04' and registry.resolve_executor(check.executor, 'kubernetes', engine=env.engine.name,
             version=env.engine.version) is not registry.EXECUTORS.get('boundary_egress:kubernetes'):
@@ -194,7 +215,7 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
 
 
 def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None, passive_plt08=False,
-             protected_ipc_metadata=False, observation_run_bindings=None):
+             protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -226,14 +247,15 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config = {'store': str(Path(store).absolute()), 'adapter': {'name': base.engine.name},
               'update': {'mode': 'external'}, 'executors': {}, 'sides': {side: {} for side in sides}}
     candidates = {}
-    observation = {} if observation_run_bindings is None else _observation_bindings(observation_run_bindings)
-    optional = {passive_api_hop.CHECK: passive_plt08, 'PLT-02': protected_ipc_metadata, 'OBS-01': bool(observation)}
+    records = {check_id: _paired_record_inputs(value, check_id) for check_id, value in
+               (('OBS-01', observation_run_bindings), ('PLT-12', copy_record_inputs)) if value is not None}
+    optional = {passive_api_hop.CHECK: passive_plt08, 'PLT-02': protected_ipc_metadata, **dict.fromkeys(records, True)}
     check_ids = (*CHECKS, *(cid for cid, requested in optional.items() if requested))
     for check_id in check_ids:
         check = pack.checks[check_id]
         values = policy.values.get(check_id) or {}
         reasons = {side: _check_reason(check, env, target, transport, values, policy=policy, side=side,
-                                       target_path=target_pointer['path'], observation_binding=observation.get(side))
+                                       target_path=target_pointer['path'], record_inputs=records.get(check_id, {}).get(side))
                    for side, (env, target, transport, _, target_pointer) in sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
     container_checks = ('SUP-04', 'PLT-01')
@@ -255,9 +277,13 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         check = pack.checks[check_id]
         config['executors'][check.executor] = 'kubernetes'
         for side, (_, _, _, env_pointer, target_pointer) in sides.items():
-            config['sides'][side][check.executor] = {'target': target_pointer['path']}
-            if check_id == 'OBS-01':
-                config['sides'][side]['run_binding'] = {'OBS-01': observation[side]}
+            settings = config['sides'][side]
+            settings[check.executor] = {'target': target_pointer['path']}
+            if check_id in records:
+                run_cfg = dict(records[check_id][side])
+                if check_id == 'PLT-12':
+                    settings.setdefault('check_config', {})[check_id] = {'copy_inventory': run_cfg.pop('copy_inventory')}
+                settings.setdefault('run_binding', {})[check_id] = run_cfg
             bindings.append({'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer})
         if check_id == 'SUP-04' and node_image_verification is not None:
             config.setdefault('check_config', {})[check_id] = {'node_image_verification': node_image_verification}
@@ -265,7 +291,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             config.setdefault('check_config', {})[check_id] = {CHECK_OPTIONS[check_id]: True}
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
-    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06', 'OBS-01', passive_api_hop.CHECK)
+    record_snapshot_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
+    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06', *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
         plan = select(pack, [base, candidate], policy, mode='update')
@@ -302,6 +329,8 @@ def main():
                         help='Read only the approved PLT-02 path metadata')
     parser.add_argument('--observation-run-bindings', type=Path,
                         help='Paired existing OBS-01 RunBinding inputs for read-only record collection')
+    parser.add_argument('--copy-record-inputs', type=Path,
+                        help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
                         help='Unpublished target path for the operator-managed second phase')
     args = parser.parse_args()
@@ -309,9 +338,11 @@ def main():
               for side in readiness.SIDES}
     pack = load_pack(readiness.ROOT / 'packs/PACK-BASELINE')
     observation = _source(args.observation_run_bindings)[0] if args.observation_run_bindings else None
+    copies = _source(args.copy_record_inputs)[0] if args.copy_record_inputs else None
     config, bindings, checks = assemble(inputs, args.policy, pack=pack, store=args.store,
                                         node_image_verification=args.node_image_verification, passive_plt08=args.passive_plt08,
-                                        protected_ipc_metadata=args.protected_ipc_metadata, observation_run_bindings=observation)
+                                        protected_ipc_metadata=args.protected_ipc_metadata, observation_run_bindings=observation,
+                                        copy_record_inputs=copies)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]
@@ -319,6 +350,9 @@ def main():
         protected.append(args.candidate_target_after_baseline)
     if observation is not None:
         protected.extend([args.observation_run_bindings, *(row['record_producer'] for row in observation.values())])
+    if copies is not None:
+        protected.extend([args.copy_record_inputs, *(row[key] for row in copies.values()
+                         for key in ('record_producer', 'copy_inventory'))])
     output = reserve_output(args.output, protected=protected)
     config_path = output / ('preliminary-guard.toml' if staged is not None else 'guard.toml')
     write_config(config, config_path)

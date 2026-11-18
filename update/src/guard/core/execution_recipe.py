@@ -26,9 +26,13 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None):
         if not isinstance(value, dict): return
         for key, item in value.items():
             if key.startswith('_'): continue
-            if key == 'record_producer' and location[-2:] == ('run_binding', 'OBS-01') and isinstance(item, (str, Path)):
+            record_source = key == 'record_producer' and location[-2:] in {
+                ('run_binding', 'OBS-01'), ('run_binding', 'PLT-12')}
+            copy_inventory = key == 'copy_inventory' and (
+                location[-1:] == ('required_event_record',) or location[-2:] == ('check_config', 'PLT-12'))
+            if (record_source or copy_inventory) and isinstance(item, (str, Path)):
                 # The audit record names the source bytes, so commit them with
-                # the exact side's requested record session and actor hashes.
+                # the exact side's requested record session and inventory.
                 from guard.executors.run_binding import producer_sha256
                 path = str(item)
                 try: inputs[path] = producer_sha256(path)

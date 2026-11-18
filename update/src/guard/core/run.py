@@ -14,7 +14,7 @@ from typing import Any
 from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
 from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, UPDATE_CHECK_OUTSIDE_SCOPE, merge_config,
-                                 observation_snapshot_scope, update_allowed_checks)
+                                 record_snapshot_scopes, update_allowed_checks)
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -129,12 +129,12 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
     if plan.mode == Mode.update:
         allowed_checks = update_allowed_checks(requested, pack)
         validate_update_run_config(cfg)
-        for side in (Side.baseline, Side.candidate):
-            actual = observation_snapshot_scope(cfg.side_configs.get(side.value, cfg).raw, allowed_checks)
-            expected = observation_snapshot_scope(merge_config(requested, requested.get("sides", {}).get(side.value, {})),
-                                                  allowed_checks)
-            if actual != expected:
-                raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")
+        sides = ("baseline", "candidate")
+        actual = record_snapshot_scopes((cfg.side_configs.get(side, cfg).raw for side in sides), pack, allowed_checks)
+        expected = record_snapshot_scopes(
+            (merge_config(requested, requested.get("sides", {}).get(side, {})) for side in sides), pack, allowed_checks)
+        if actual != expected:
+            raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")
     passive_hop = passive_api_hop.validate_run_scope(pack, plan, cfg, allowed_checks)
 
     plan_ref = plan.ref()

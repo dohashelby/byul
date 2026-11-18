@@ -13,7 +13,7 @@ import re
 
 from guard.automation_policy import (string_list, validate_log_integrity_policy,
                                      validate_request_binding_policy, validate_template_policy)
-from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, for_check
+from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, UPDATE_CHECK_OUTSIDE_SCOPE, for_check
 from guard.core.select import check_policy_value
 from guard.executors import ipc_trust_scope, log_collection_gap, passive_api_hop, registry, request_field_probe, run_binding
 from guard.executors.request_binding import SUPPORTED_POLICY as BINDING_POLICY
@@ -176,13 +176,16 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
         row['code_available'] = True
-        if kube and check_id in {'OBS-01', 'PLT-02'}:
+        if kube and check_id in {'OBS-01', 'PLT-02', 'PLT-12'}:
             effective = for_check(cfg, executor, check_id).get(executor, {})
-            setting = 'record_snapshot_only' if check_id == 'OBS-01' else 'protected_path_metadata_only'
+            setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
             if type(effective) is dict and effective.get(setting) is True:
                 if check_id == 'OBS-01':
                     row["scope"] = "owned audit record snapshot for the selected producer, actor hashes and session"
                     row["limitations"].append("independent event triggering, record delivery and timing remain unverified")
+                elif check_id == 'PLT-12':
+                    row["scope"] = "owned copy-inventory record snapshot bound to the selected policy and producer"
+                    row["limitations"].append("copy membership, treatment, reuse and issuer state require independent evidence")
                 else:
                     row["scope"] = "approved IPC path presence and mode in the owned Pod mount namespace"
                     row["limitations"].append("no IPC connections, process-to-socket attribution or whole-access verdict")

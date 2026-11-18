@@ -11,7 +11,7 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, for_check, observation_snapshot_scope, update_allowed_checks
+from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, for_check, record_snapshot_scopes, update_allowed_checks
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
@@ -196,8 +196,7 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
     validate_policy_time(policy)
     mode, side_cfgs, managed = prepared
     allowed_checks = update_allowed_checks(cfg, pack)
-    for settings in side_cfgs.values():
-        observation_snapshot_scope(settings, allowed_checks)
+    record_snapshot_scopes(side_cfgs.values(), pack, allowed_checks)
     change_input = read_change(change, pack, store)
     previous = resolve_plan(store, previous_plan)
     if change_input is not None or previous is not None:
@@ -515,8 +514,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             prepared = ("managed", {"single": effective}, {"single": managed})
         else:
             prepared = update_inputs(envs, execution_config)
-            for settings in prepared[1].values():
-                observation_snapshot_scope(settings, allowed_checks)
+            record_snapshot_scopes(prepared[1].values(), pack, allowed_checks)
         option_group = "validation" if single else "update"
         if any(c.get(option_group, {}).get("credential_canary", False) for c in prepared[1].values()) and policy.status.value != "DRAFT":
             raise ValueError("credential_canary is only available with a DRAFT sandbox policy")

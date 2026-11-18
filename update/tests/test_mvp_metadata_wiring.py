@@ -20,7 +20,9 @@ from guard.store import Store
 from tests.builders import T0, policy
 from tests.test_model_preparation_integration import full_inputs
 from tests.test_template_supply_approval import SHA
+from tools import mvp_credential_copy_inputs as copy_inputs
 from tools import mvp_metadata_wiring as tool
+from tools.mvp_runtime_policy import AMENDMENT
 
 
 def _write(path, obj):
@@ -392,6 +394,103 @@ def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path,
     recipe = configuration_sha256(staged, envs)
     Path(obs_bindings['candidate']['record_producer']).write_text('# changed producer bytes\n')
     assert configuration_sha256(staged, envs) != recipe
+
+
+def test_copy_and_observation_share_executor_with_separate_pinned_record_inputs(tmp_path, sources):
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    env_by_side = {side: tool.Environment.model_validate_json(settings['environment'].read_bytes())
+                   for side, settings in sides.items()}
+    base = original.model_copy(update={
+        'values': {'OBS-01': {'observation_required_events': ['ACCESS_ALLOWED', 'ACCESS_DENIED'],
+                             'observation_required_fields': ['actor_sha256', 'target_sha256', 'run_sha256', 'policy_sha256'],
+                             'observation_max_delay_ms': 5000}, 'PLT-12': {'copy_max_record_delay_ms': 5000}},
+        'source_document_sha256': sha256_hex(AMENDMENT.read_bytes()),
+        'scope': original.scope.model_copy(update={'include': ['OBS-01', 'PLT-12']}),
+    }).seal()
+    policy, inventory = copy_inputs.materialize(base, pack, env_by_side, {
+        'schema': copy_inputs.SELECTION_SCHEMA, 'base_policy_ref': base.ref().model_dump(mode='json'),
+        'environments': {side: env.ref().model_dump(mode='json') for side, env in env_by_side.items()},
+        'started_at': '2026-11-19T03:00:00.125+09:00', 'credential_family_id': '1' * 32,
+        'copies': [{'copy_id': '2' * 32, 'generation': 1, 'location_id': '3' * 32,
+                    'location_kind': 'FILE', 'recipient_id': '4' * 32}],
+    })
+    _write(policy_path, policy.to_dict())
+    observation, copies = {}, {}
+    for number, side in enumerate(sides, 1):
+        obs_source = tmp_path / f'{side}-observation.py'
+        obs_source.write_text('# observation fixture\n')
+        copy_source = tmp_path / f'{side}-copy.py'
+        copy_source.write_text('# copy fixture\n')
+        observation[side] = {'record_session': f'{number:032x}', 'record_producer': str(obs_source),
+                             'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64}}
+        copies[side] = {'record_session': f'{number + 10:032x}', 'record_producer': str(copy_source),
+                        'copy_inventory': str(_write(tmp_path / f'{side}-copy-inventory.json', inventory))}
+    cfg, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
+                                      observation_run_bindings=observation, copy_record_inputs=copies)
+    assert cfg['update']['allowed_checks'] == ['OBS-01', 'PLT-12']
+    assert cfg['executors'] == {'required_event_record': 'kubernetes'}
+    assert all(decisions[cid]['configuration_enabled'] for cid in ('OBS-01', 'PLT-12'))
+    for side in sides:
+        settings = merge_config(cfg, cfg['sides'][side])
+        copy_cfg = for_check(settings, 'required_event_record', 'PLT-12')['required_event_record']
+        audit_cfg = for_check(settings, 'required_event_record', 'OBS-01')['required_event_record']
+        assert copy_cfg == {'target': str(sides[side]['target']), 'copy_record_snapshot_only': True,
+                            'copy_inventory': copies[side]['copy_inventory']}
+        assert audit_cfg == {'target': str(sides[side]['target']), 'record_snapshot_only': True}
+        assert settings['run_binding']['OBS-01'] == observation[side]
+        assert settings['run_binding']['PLT-12'] == {key: copies[side][key] for key in ('record_session', 'record_producer')}
+    envs = list(env_by_side.values())
+    ready = application.update_readiness(pack, envs, policy, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+
+    overlap = deepcopy(cfg)
+    row = overlap['sides']['candidate']['run_binding']
+    row['PLT-12']['record_session'] = row['OBS-01']['record_session']
+    blocked = application.update_readiness(pack, envs, policy, overlap)
+    assert next(row for row in blocked['checks'] if row['check'] == 'inputs')['detail'] == (
+        'OBSERVATION_RECORD_SNAPSHOT_SESSIONS_MUST_DIFFER')
+
+    fresh = tmp_path / 'fresh-dual-record-target.json'
+    staged = tool.staged_config(cfg, fresh)
+    assert staged['sides']['candidate']['run_binding'] == cfg['sides']['candidate']['run_binding']
+    assert staged['sides']['candidate']['check_config'] == cfg['sides']['candidate']['check_config']
+    _, pointer = tool._source(sides['candidate']['target'])
+    target = json.loads(sides['candidate']['target'].read_bytes())
+    for number, role in enumerate(('engine', 'probe'), 100):
+        target['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        target['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, target)
+    assert tool.revalidate_candidate(staged, envs[1], pointer) == {
+        'required_event_record': sha256_hex(canonical_json(target))}
+
+    recipe = configuration_sha256(staged, envs)
+    _write(Path(copies['candidate']['copy_inventory']), {**inventory, 'policy_sha256': '0' * 64})
+    assert configuration_sha256(staged, envs) != recipe
+    invalid = application.update_readiness(pack, envs, policy, cfg)
+    assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == 'COPY_CONFIGURATION_INVALID'
+
+
+def test_obs11_canonical_prepare_uses_exact_side_sessions_without_default_activation(sources):
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    approved = json.loads((tool.readiness.ROOT / 'docs/dev-1/mvp-enterprise-policy-20261116.json').read_bytes())
+    values = {row['key']: row['value'] for row in approved['decisions'] if row['check_id'] == 'OBS-11'}
+    policy = original.model_copy(update={'values': {'OBS-11': values},
+        'scope': original.scope.model_copy(update={'include': ['OBS-11']})}).seal()
+    cfg = {'update': {'mode': 'external', 'allowed_checks': ['OBS-11']},
+           'adapter': {'name': 'vllm'}, 'executors': {'log_integrity': 'kubernetes'},
+           'sides': {side: {'log_integrity': {'target': str(entry['target'])},
+                            'run_binding': {'OBS-11': {'record_session': f'{number:032x}'}}}
+                     for number, (side, entry) in enumerate(sides.items(), 1)}}
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    assert tool.run_binding.config_keys(pack.checks['OBS-11']) == {'record_session'}
+    readiness = application.update_readiness(pack, envs, policy, cfg)
+    assert next(row for row in readiness['checks'] if row['check'] == 'inputs')['ok'], readiness
+    assert not any(row['runtime_qualified'] for row in readiness['check_support'])
+    cfg['sides']['candidate']['run_binding'] = {}
+    blocked = application.update_readiness(pack, envs, policy, cfg)
+    assert next(row for row in blocked['checks'] if row['check'] == 'inputs')['detail'] == 'RUN_BINDING_CONFIG_INVALID'
 
 
 def test_shared_ipc_checks_keep_distinct_recipe_pinned_targets(tmp_path, monkeypatch, sources):

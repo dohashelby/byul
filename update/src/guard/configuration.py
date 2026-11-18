@@ -11,8 +11,12 @@ def merge_config(base, override):
 
 CHECK_CONFIG = "check_config"
 UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
-KUBERNETES_BOUND_CHECK_OPTIONS = {
+RECORD_SNAPSHOT_OPTIONS = {
     "OBS-01": "record_snapshot_only",
+    "PLT-12": "copy_record_snapshot_only",
+}
+KUBERNETES_BOUND_CHECK_OPTIONS = {
+    **RECORD_SNAPSHOT_OPTIONS,
     "OBS-04": "local_observation_only",
     "PLT-02": "protected_path_metadata_only",
     "PLT-06": "worker_trust_metadata_only",
@@ -70,20 +74,33 @@ def for_check(raw, executor, check_id):
     return out
 
 
-def observation_snapshot_scope(raw, allowed_checks):
-    """Return the scoped OBS-01 settings and technical binding when requested."""
-    name, check_id = "required_event_record", "OBS-01"
-    option = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
-    overlays = raw.get(CHECK_CONFIG)
-    overlay = overlays.get(check_id) if type(overlays) is dict else None
-    if not any(type(settings) is dict and option in settings for settings in (raw.get(name), overlay)):
-        return None
-    settings = for_check(raw, name, check_id).get(name, {})
-    if (allowed_checks is None or check_id not in allowed_checks or "PLT-12" in allowed_checks
-            or raw.get("update", {}).get("mode", "external") != "external"
-            or raw.get("executors", {}).get(name) != "kubernetes"
-            or raw.get("record_attestation") or raw.get("lab_activation")
-            or settings.get(option) is not True):
-        raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")
-    bindings = raw.get("run_binding")
-    return settings, bindings.get(check_id) if type(bindings) is dict else None
+def record_snapshot_scopes(configurations, pack, allowed_checks):
+    """Keep the two snapshot children isolated within the shared record executor."""
+    name = "required_event_record"
+    error = "OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID"
+    scopes = []
+    for raw in configurations:
+        scoped = {}
+        overlays = raw.get(CHECK_CONFIG)
+        bindings = raw.get("run_binding")
+        for check_id, option in RECORD_SNAPSHOT_OPTIONS.items():
+            overlay = overlays.get(check_id) if type(overlays) is dict else None
+            if not any(type(settings) is dict and option in settings for settings in (raw.get(name), overlay)):
+                continue
+            settings = for_check(raw, name, check_id).get(name, {})
+            if settings.get(option) is not True:
+                raise ValueError(error)
+            scoped[check_id] = (settings, bindings.get(check_id) if type(bindings) is dict else None)
+        if scoped:
+            if (allowed_checks is None or set(scoped) != {cid for cid in allowed_checks if pack.checks[cid].executor == name}
+                    or raw.get("update", {}).get("mode", "external") != "external"
+                    or raw.get("executors", {}).get(name) != "kubernetes"
+                    or raw.get("record_attestation") or raw.get("lab_activation")):
+                raise ValueError(error)
+            sessions = [binding.get("record_session") for _, binding in scoped.values() if type(binding) is dict]
+            if len(sessions) == 2 and sessions[0] == sessions[1]:
+                raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SESSIONS_MUST_DIFFER")
+        scopes.append(scoped)
+    if any(scopes) and (len(scopes) != 2 or set(scopes[0]) != set(scopes[1])):
+        raise ValueError(error)
+    return scopes

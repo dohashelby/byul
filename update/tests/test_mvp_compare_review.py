@@ -61,9 +61,37 @@ def test_resealed_incomplete_or_duplicate_report_is_refused(damage):
 
     damaged = patch_case(case, 'RPT', mutate)
     result = tool.review([damaged], pack=case[2], expected=_expected(case))
-    assert result['reports'] == [{'verified': False, 'reason': 'EVIDENCE_CONTRACT_INVALID'}]
-    assert result['rows']['REQ-01']['status'] == 'ORIGINAL_ROW_MISSING'
+    row = result['rows']['REQ-01']
+    if damage == 'duplicate-row':
+        assert result['reports'] == [{'verified': False, 'reason': 'ORIGINAL_CHECK_ROWS_MISMATCH'}]
+        assert row['status'] == 'ORIGINAL_ROW_MISSING'
+    else:
+        assert result['reports'][0]['verified']
+        assert row['status'] == 'ORIGINAL_ROW_UNRESOLVED'
+        assert row['baseline']['blocking_codes'] == ['ORIGINAL_RPT_SIDE_MISSING']
+        assert row['candidate']['verdicts']['security'] == 'PASS'
     assert not result['unknown_security_limit_met']
+
+
+def test_executor_specific_record_artifact_survives_export_restore_and_rejudgment(tmp_path):
+    def record_only(cid, side, raw):
+        if cid == 'PLT-04':
+            raw['artifacts'][0]['name'] = 'worker-security-record.json'
+
+    case = builders.build_update_case(tmp_path, mutate_evidence=record_only)
+    report, _, pack = case
+    rpt_path = tmp_path / 'report.json'
+    rpt_path.write_text(json.dumps(report), encoding='utf-8')
+    bundle, restored = tmp_path / 'evidence.zip', tmp_path / 'restored'
+    export_bundle(tmp_path / 'store', bundle)
+    restore_bundle(bundle, restored)
+    runs = list(tool._read_runs([(restored, rpt_path)]))
+    result = tool.review(runs, pack=pack, expected=_expected(case))
+    assert not assess_update(*runs[0], profile='plan-scope/2')['evidence_contract_valid']
+    assert result['reports'][0]['verified']
+    row = result['rows']['PLT-04']
+    assert row['status'] == 'MEASURED_ROWS_VERIFIED'
+    assert all(row[side]['verdicts']['security'] == 'PASS' for side in tool.SIDES)
 
 
 def test_config_difference_keeps_real_verdict_and_exact_blocker():
@@ -75,6 +103,24 @@ def test_config_difference_keeps_real_verdict_and_exact_blocker():
     assert row['comparison_reasons'] == ['config_sha256']
     assert row['blocking_codes'] == ['COMPARISON_UNRESOLVED']
     assert 'REQ-01' in result['unresolved_check_ids']
+
+
+@pytest.mark.parametrize('status', ['NOT_RUN', 'ABORTED'])
+def test_unfinished_execution_retains_exact_refs_as_an_unresolved_side(status):
+    def unfinished(cid, side, raw):
+        if (cid, side) == ('REQ-01', 'baseline'):
+            raw['execution']['status'] = status
+            raw['data_origin'] = 'DECLARED'
+
+    case = builders.build_pure_update_case(mutate_evidence=unfinished)
+    result = tool.review([case], pack=case[2], expected=_expected(case))
+    row = result['rows']['REQ-01']
+    assert row['status'] == 'ORIGINAL_ROW_UNRESOLVED'
+    assert row['baseline']['evidence']['kind'] == 'EVD'
+    assert row['baseline']['result']['kind'] == 'RES'
+    assert 'EXECUTION_' + status in row['baseline']['blocking_codes']
+    assert row['baseline']['verdicts'] is None
+    assert row['candidate']['verdicts']['security'] == 'PASS'
 
 
 def test_repeated_original_rows_never_choose_a_result_implicitly():

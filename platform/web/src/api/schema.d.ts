@@ -1487,13 +1487,13 @@ export interface components {
         ReportFinding: {
             /**
              * Code
-             * @constant
+             * @enum {string}
              */
-            code: "forbidden_code_revision_imported";
+            code: "forbidden_code_revision_imported" | "forbidden_ipc_connection" | "forbidden_egress_succeeded" | "forbidden_plaintext_succeeded" | "forbidden_template_reference" | "unapproved_running_image" | "untrusted_input_changed_log" | "normal_probes_passed" | "normal_probe_failed";
             /** Field */
-            field: string;
+            field?: string | null;
             /** Revision */
-            revision: string;
+            revision?: string | null;
         };
         /** ReportFocus */
         ReportFocus: {

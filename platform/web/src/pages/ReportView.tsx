@@ -165,7 +165,70 @@ function comparisonText(check: ReportCheck) {
   return "기록된 판정에 변화가 없습니다.";
 }
 
+const FINDING_TEXT = {
+  forbidden_code_revision_imported: {
+    title: "요청에 지정한 코드가 실제로 로드됨",
+    body: "정책은 요청으로 서버에서 사용할 코드 버전을 지정하는 것을 금지합니다. 시험 요청에 지정된 버전의 코드가 실제로 로드됐습니다.",
+    proof: "요청 직후 생긴 로드 기록과 저장된 모듈의 해시가 일치했습니다.",
+  },
+  forbidden_ipc_connection: {
+    title: "허용되지 않은 프로세스가 내부 통신 접점에 연결됨",
+    body: "정책이 허용한 사용자만 보호된 내부 통신 접점에 연결할 수 있어야 합니다. 시험에서 허용 목록 밖 사용자로 연결이 성공한 기록이 확인됐습니다.",
+  },
+  forbidden_egress_succeeded: {
+    title: "정책으로 금지한 외부 송신이 성공함",
+    body: "정책은 지정된 외부 송신을 차단하도록 요구합니다. 시험에서 금지된 송신이 성공한 기록이 확인됐습니다.",
+  },
+  forbidden_plaintext_succeeded: {
+    title: "평문 연결이 금지된 구간에서 API 요청이 성공함",
+    body: "정책은 대상 API 구간에서 암호화되지 않은 통신을 금지합니다. 시험에서 해당 구간에 평문 HTTP 요청을 보냈고, API가 정상 응답했습니다.",
+  },
+  forbidden_template_reference: {
+    title: "템플릿이 금지된 속성을 참조함",
+    body: "정책은 지정된 속성 참조를 금지합니다. 시험에서 공급 템플릿을 렌더링했을 때, 해당 참조가 실행됐음을 보여주는 결과가 관측됐습니다.",
+  },
+  unapproved_running_image: {
+    title: "승인 목록에 없는 실행 이미지가 확인됨",
+    body: "정책은 승인된 이미지만 실행하도록 요구합니다. 실제 실행 중인 이미지의 식별값을 승인 목록과 대조한 결과, 일치하는 항목이 없었습니다.",
+  },
+  untrusted_input_changed_log: {
+    title: "요청 입력으로 신뢰해야 할 로그 기록이 바뀜",
+    body: "사용자가 보낸 값이 시스템이 남기는 신뢰 기록에 영향을 주면 안 됩니다. 시험에서 입력값이 로그의 신뢰 필드를 바꾸거나 별도 사건으로 기록된 결과가 확인됐습니다.",
+  },
+  normal_probes_passed: {
+    title: "계획된 정상 동작 시험이 모두 성공함",
+    body: "계획 목록에 있는 모든 정상 동작 시험에서 성공 결과가 기록됐습니다. 이 근거는 시험한 요청의 범위에 해당합니다.",
+  },
+  normal_probe_failed: {
+    title: "정상 동작 시험에서 실패가 기록됨",
+    body: "계획된 정상 동작 시험 중 하나 이상에서 실패가 기록됐습니다.",
+  },
+} satisfies Record<NonNullable<ReportSide["finding"]>["code"], { title: string; body: string; proof?: string }>;
+
+function isFunctionalFinding(finding: ReportSide["finding"]) {
+  return finding?.code === "normal_probes_passed" || finding?.code === "normal_probe_failed";
+}
+
+function needsEvidenceNote(side: ReportSide) {
+  return !side.finding || (isFunctionalFinding(side.finding) && !!side.security && side.security !== "NOT_APPLICABLE");
+}
+
 const OBSERVATION_NAMES: Record<string, string> = {
+  running_image_unapproved: "실행 이미지의 승인 목록 일치 여부",
+  supply_execution_scope_complete: "실행 코드와 의존성 전체의 승인 여부",
+  log_security_violations: "요청 입력이 신뢰 로그에 미치는 영향",
+  unix_ipc_violations: "허용되지 않은 내부 통신 연결의 성공 여부",
+  unix_ipc_trials: "내부 통신 연결 시험 결과",
+  ipc_scope_complete: "대상 내부 통신 접점 전체의 관측",
+  forbidden_egress_successes: "금지된 외부 송신의 성공 여부",
+  egress_trials: "외부 송신 시험 결과",
+  egress_scope_complete: "대상 송신 경로 전체의 관측",
+  forbidden_plaintext_successes: "금지된 평문 API 요청의 성공 여부",
+  api_transport_trials: "API 전송 시험 결과",
+  api_transport_scope_complete: "대상 API 전송 구간 전체의 관측",
+  template_render_witness_verified: "템플릿을 실제 렌더링한 결과",
+  forbidden_template_type_reference_verified: "금지된 속성 참조의 실행 여부",
+  template_sandbox_scope_complete: "템플릿 실행 제한 전체의 관측",
   selected_template_sha256: "선택된 템플릿의 해시",
   template_identity_verified: "선택된 템플릿의 식별 확인",
   selected_template_approved: "선택된 템플릿의 승인 여부",
@@ -186,9 +249,10 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
   const update = report.mode === "update";
   const sides: SideKey[] = update ? ["baseline", "candidate"] : ["single"];
   const present = sides.filter((key) => c[key]);
-  const candidateImport = update && c.candidate?.finding?.code === "forbidden_code_revision_imported";
+  const candidateSecurityFinding = update && c.candidate?.security === "FAIL"
+    && !!c.candidate.finding && !isFunctionalFinding(c.candidate.finding);
   const baselinePass = c.baseline?.security === "PASS";
-  const summarizesComparison = candidateImport && baselinePass && c.comparison === "REGRESSED"
+  const summarizesComparison = candidateSecurityFinding && baselinePass && c.comparison === "REGRESSED"
     && c.baseline?.functional === c.candidate?.functional
     && c.baseline?.performance === c.candidate?.performance;
   return (
@@ -217,25 +281,29 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
               </section>
               {present.some((key) => c[key]?.finding) && (
                 <section>
-                  <h4>{summarizesComparison ? "기준은 보안 충족, 후보에서는 요청에 지정한 코드가 로드됨" : "요청에 지정한 코드가 실제로 로드됨"}</h4>
                   {present.map((key) => {
                     const finding = c[key]?.finding;
-                    return finding?.code === "forbidden_code_revision_imported" && (
+                    if (!finding) return null;
+                    const narrative = FINDING_TEXT[finding.code];
+                    const combined = summarizesComparison && key === "candidate";
+                    const event = finding.code === "forbidden_code_revision_imported"
+                      ? "요청에 지정한 코드가 로드됨"
+                      : narrative.title;
+                    const title = combined
+                      ? `기준은 보안 충족, 후보에서는 ${event}`
+                      : narrative.title;
+                    const target = report.targets?.[key] ? `${SIDE_LABEL[key]} ${targetLabel(report, key)}` : SIDE_LABEL[key];
+                    return (
                       <div key={key}>
-                        <p>
-                          정책은 요청을 보낸 사람이 서버에서 사용할 코드 버전을 지정하는 것을 금지합니다.
-                          {SIDE_LABEL[key]} {`${report.targets?.[key] ? targetLabel(report, key) : "서버"}에서`}
-                          시험 요청에 지정된 버전의 코드가 실제로 로드됐습니다.
-                        </p>
-                        <p>
-                          요청 직후 생긴 로드 기록을 해당 코드 파일과 대조했습니다. 로드 기록과 저장된 모듈의 해시가 일치했습니다.
-                        </p>
+                        <h4>{update && !combined ? `${target} · ${title}` : title}</h4>
+                        <p>{narrative.body}</p>
+                        {"proof" in narrative && <p>{narrative.proof}</p>}
                       </div>
                     );
                   })}
                 </section>
               )}
-              {present.some((key) => !c[key]?.finding || c[key]?.missing_observations?.length || c[key]?.unverified_observations?.length) && (
+              {present.some((key) => needsEvidenceNote(c[key]!) || c[key]?.missing_observations?.length || c[key]?.unverified_observations?.length) && (
                 <section>
                   <h4>미확인 범위</h4>
                   {present.map((key) => {
@@ -251,10 +319,10 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                         </div>
                       );
                     }
-                    if (key === "baseline" && candidateImport && baselinePass && !side.finding) {
+                    if (key === "baseline" && candidateSecurityFinding && baselinePass && !side.finding) {
                       return <p key={key}>기준 {report.targets?.baseline ? `${targetLabel(report, "baseline")}은` : "판본은"} 보안 충족으로 기록됐습니다. 이 보고서에는 그 판정의 세부 관측 기록이 없습니다.</p>;
                     }
-                    if (!side.finding) return <p key={key}>{SIDE_LABEL[key]}의 세부 판정 근거를 설명할 수 있는 관측 기록이 없습니다.</p>;
+                    if (needsEvidenceNote(side)) return <p key={key}>{SIDE_LABEL[key]}의 {side.finding ? "보안 " : ""}세부 판정 근거를 설명할 수 있는 관측 기록이 없습니다.</p>;
                     return null;
                   })}
                 </section>

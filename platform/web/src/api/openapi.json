@@ -4117,23 +4117,45 @@
         "properties": {
           "code": {
             "type": "string",
-            "const": "forbidden_code_revision_imported",
+            "enum": [
+              "forbidden_code_revision_imported",
+              "forbidden_ipc_connection",
+              "forbidden_egress_succeeded",
+              "forbidden_plaintext_succeeded",
+              "forbidden_template_reference",
+              "unapproved_running_image",
+              "untrusted_input_changed_log",
+              "normal_probes_passed",
+              "normal_probe_failed"
+            ],
             "title": "Code"
           },
           "field": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Field"
           },
           "revision": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Revision"
           }
         },
         "type": "object",
         "required": [
-          "code",
-          "field",
-          "revision"
+          "code"
         ],
         "title": "ReportFinding"
       },

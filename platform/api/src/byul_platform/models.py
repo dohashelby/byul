@@ -205,9 +205,19 @@ class VerificationList(BaseModel):
 
 
 class ReportFinding(BaseModel):
-    code: Literal["forbidden_code_revision_imported"]
-    field: str
-    revision: str
+    code: Literal[
+        "forbidden_code_revision_imported",
+        "forbidden_ipc_connection",
+        "forbidden_egress_succeeded",
+        "forbidden_plaintext_succeeded",
+        "forbidden_template_reference",
+        "unapproved_running_image",
+        "untrusted_input_changed_log",
+        "normal_probes_passed",
+        "normal_probe_failed",
+    ]
+    field: str | None = None
+    revision: str | None = None
 
 
 class ReportSide(BaseModel):

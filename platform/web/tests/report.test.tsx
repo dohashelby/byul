@@ -104,7 +104,7 @@ describe("검증 보고서 화면", () => {
     expect(within(drawer.getByText("후보 · vLLM 0.30.0").parentElement!).getByText("보안 미충족")).toBeTruthy();
     const heading = comparison === "REGRESSED"
       ? "기준은 보안 충족, 후보에서는 요청에 지정한 코드가 로드됨"
-      : "요청에 지정한 코드가 실제로 로드됨";
+      : "후보 vLLM 0.30.0 · 요청에 지정한 코드가 실제로 로드됨";
     expect(drawer.getByRole("heading", { name: heading })).toBeTruthy();
     if (comparison === "NOT_COMPARABLE") expect(drawer.getByText(/비교 조건을 충족하지 못했으며/)).toBeTruthy();
     const details = drawer.getByText("상세 근거").closest("details")!;
@@ -128,6 +128,21 @@ describe("검증 보고서 화면", () => {
     expect(drawer.getByText("보안 미확인")).toBeTruthy();
     expect(drawer.getByText(/선택된 템플릿의 해시 관측이 누락/)).toBeTruthy();
     expect(drawer.getByText(/템플릿의 실제 소비 확인입니다/)).toBeTruthy();
+  });
+
+  it("평문 API 요청의 관측과 미확인 범위를 함께 표시한다", () => {
+    mockApi({});
+    const row = check("PLT-08", {
+      headline: "FAIL", baseline: null, candidate: null,
+      single: { ...side("FAIL"), finding: { code: "forbidden_plaintext_succeeded" },
+        unverified_observations: ["api_transport_scope_complete"] },
+    });
+    const audit = { ...report, mode: "audit", checks: [row] };
+    renderAt("/update/results", "/update/results", <FullReport report={audit} rawChecks={null} selected="PLT-08" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(drawer.getByRole("heading", { name: "평문 연결이 금지된 구간에서 API 요청이 성공함" })).toBeTruthy();
+    expect(drawer.getByText(/평문 HTTP 요청을 보냈고, API가 정상 응답했습니다/)).toBeTruthy();
+    expect(drawer.getByText(/대상 API 전송 구간 전체의 관측입니다/)).toBeTruthy();
   });
 
   it("미확인 점검을 충족처럼 보이게 하지 않는다", () => {

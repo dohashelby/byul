@@ -60,6 +60,64 @@ def _import_violation(evd):
     return None
 
 
+# These observations correspond to explicit failure rules in the check definitions.
+_SECURITY_FINDINGS = {
+    "PLT-02": ("unix_ipc_violations", "forbidden_ipc_connection"),
+    "PLT-07": ("forbidden_egress_successes", "forbidden_egress_succeeded"),
+    "PLT-08": ("forbidden_plaintext_successes", "forbidden_plaintext_succeeded"),
+    "SUP-13": ("forbidden_template_type_reference_verified", "forbidden_template_reference"),
+    "SUP-04": ("running_image_unapproved", "unapproved_running_image"),
+    "OBS-09": ("log_security_violations", "untrusted_input_changed_log"),
+}
+
+_SCOPE_OBSERVATIONS = {
+    "SUP-03": ("template_consumer_verified", "supply_scope_complete"),
+    "SUP-04": ("supply_execution_scope_complete",),
+    "SUP-13": ("template_render_witness_verified", "template_sandbox_scope_complete"),
+    "PLT-02": ("ipc_scope_complete",),
+    "PLT-07": ("egress_scope_complete",),
+    "PLT-08": ("api_transport_scope_complete",),
+}
+
+
+def _observed(evd, key):
+    obs = evd.get("observations", {}).get(key, {})
+    return obs.get("value") if obs.get("collected") is True else None
+
+
+def _finding(check_id, view, result, evd):
+    if evd.get("execution", {}).get("status") != "COMPLETED" or evd.get("execution", {}).get("operator") is not None:
+        return None
+    verdicts = result.get("verdicts", {})
+    if view["security"] == verdicts.get("security") == "FAIL":
+        if check_id == "SUP-08":
+            return _import_violation(evd)
+        if rule := _SECURITY_FINDINGS.get(check_id):
+            observation, code = rule
+            value = _observed(evd, observation)
+            if check_id in {"SUP-04", "SUP-13"}:
+                if value is True:
+                    return {"code": code}
+            elif isinstance(value, list) and value and all(isinstance(v, str) and v for v in value):
+                return {"code": code}
+
+    # The functional finding describes the recorded normal probes, within their measured scope.
+    planned = _observed(evd, "functional_probes_planned")
+    outcomes = _observed(evd, "functional_probe_results")
+    if not isinstance(planned, list) or not planned or not isinstance(outcomes, dict):
+        return None
+    if not all(isinstance(key, str) for key in planned):
+        return None
+    functional = view["functional"]
+    if functional != verdicts.get("functional"):
+        return None
+    if functional == "PASS" and all(outcomes.get(key) == "pass" for key in planned):
+        return {"code": "normal_probes_passed"}
+    if functional == "FAIL" and any(outcomes.get(key) == "fail" for key in planned):
+        return {"code": "normal_probe_failed"}
+    return None
+
+
 def enrich_report(report, vr, store: Path | None):
     if store is None or not store.is_file():
         return
@@ -98,12 +156,8 @@ def _enrich(conn, report, vr):
             if evd.get("check_id") != check["check_id"] or evd.get("side") != side:
                 continue
             view["evidence_ref"] = evd_ref
-            if check["check_id"] == "SUP-03":
-                observations = evd.get("observations", {})
-                view["unverified_observations"] = [
-                    key for key in ("template_consumer_verified", "supply_scope_complete")
-                    if observations.get(key, {}).get("collected") is True
-                    and observations[key].get("value") is False
-                ]
-            if check["check_id"] == "SUP-08" and view["security"] == "FAIL":
-                view["finding"] = _import_violation(evd)
+            view["unverified_observations"] = [
+                key for key in _SCOPE_OBSERVATIONS.get(check["check_id"], ())
+                if _observed(evd, key) is False
+            ]
+            view["finding"] = _finding(check["check_id"], view, result, evd)

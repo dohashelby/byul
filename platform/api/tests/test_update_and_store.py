@@ -15,7 +15,7 @@ from byul_platform.contracts import canonical_sha256
 from byul_platform.diff import json_diff
 from byul_platform.inputs import MVP_PACK
 from byul_platform.main import create_app
-from byul_platform.sources.report_evidence import _import_violation
+from byul_platform.sources.report_evidence import _finding, _import_violation
 from byul_platform.sources.update import rpt_to_verification_result
 from byul_platform.store import FileDocumentStore, RevisionExists
 from conftest import EXAMPLES, FIXTURES, load_json
@@ -90,6 +90,43 @@ def test_reports_dir_source(tmp_path):
         assert detail["report"]["targets"] == {}
         assert detail["report"]["checks"][0]["single"]["finding"] is None
         assert len(detail["item"]["checks"]) == 77
+
+
+@pytest.mark.parametrize(("check_id", "observation", "value", "code"), [
+    ("PLT-02", "unix_ipc_violations", ["ipc"], "forbidden_ipc_connection"),
+    ("PLT-07", "forbidden_egress_successes", ["egress"], "forbidden_egress_succeeded"),
+    ("PLT-08", "forbidden_plaintext_successes", ["http"], "forbidden_plaintext_succeeded"),
+    ("SUP-13", "forbidden_template_type_reference_verified", True, "forbidden_template_reference"),
+    ("SUP-04", "running_image_unapproved", True, "unapproved_running_image"),
+    ("OBS-09", "log_security_violations", ["log"], "untrusted_input_changed_log"),
+])
+def test_report_security_finding_requires_matching_collected_evidence(check_id, observation, value, code):
+    view = {"security": "FAIL", "functional": None}
+    result = {"verdicts": view}
+    observed = {"collected": True, "value": value}
+    evidence = {"execution": {"status": "COMPLETED"}, "observations": {observation: observed}}
+    assert _finding(check_id, view, result, evidence) == {"code": code}
+    assert _finding(check_id, {**view, "security": "UNKNOWN"}, result, evidence) is None
+    observed["collected"] = False
+    assert _finding(check_id, view, result, evidence) is None
+    observed.update(collected=True, value=False if value is True else [])
+    assert _finding(check_id, view, result, evidence) is None
+
+
+def test_report_functional_finding_checks_planned_probe_outcomes():
+    view = {"security": "UNKNOWN", "functional": "PASS"}
+    result = {"verdicts": view}
+    outcomes = {"first": "pass", "second": "pass"}
+    evidence = {"execution": {"status": "COMPLETED"}, "observations": {
+        "functional_probes_planned": {"collected": True, "value": ["first", "second"]},
+        "functional_probe_results": {"collected": True, "value": outcomes},
+    }}
+    assert _finding("REQ-01", view, result, evidence) == {"code": "normal_probes_passed"}
+    outcomes.pop("second")
+    assert _finding("REQ-01", view, result, evidence) is None
+    view["functional"] = "FAIL"
+    outcomes["second"] = "fail"
+    assert _finding("REQ-01", view, result, evidence) == {"code": "normal_probe_failed"}
 
 
 def test_sup08_display_requires_a_measured_module_import():

@@ -177,7 +177,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
         row['code_available'] = True
-        if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-12', 'LIF-04', 'REQ-09', 'REQ-10'}:
+        if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-12', 'LIF-03', 'LIF-04', 'REQ-09', 'REQ-10'}:
             effective = for_check(cfg, executor, check_id).get(executor, {})
             setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
             if type(effective) is dict and effective.get(setting) is True:
@@ -195,6 +195,9 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 elif check_id == 'PLT-02':
                     row["scope"] = "approved IPC path presence and mode in the owned Pod mount namespace"
                     row["limitations"].append("no IPC connections, process-to-socket attribution or whole-access verdict")
+                elif check_id == 'LIF-03':
+                    row["scope"] = "owned client timing for one ordinary completion"
+                    row["limitations"].append("server budgets, contention and fairness require separate observations")
                 elif check_id == 'LIF-04':
                     row["scope"] = "ordinary stream framing and fixed owned container memory observations"
                     row["limitations"].append("bounded normal stream only; backpressure, debug behavior and release stay unverified")

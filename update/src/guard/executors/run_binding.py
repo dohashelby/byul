@@ -42,12 +42,17 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from guard.configuration import NORMAL_SERVING_READINESS_OPTION, NORMAL_STREAM_OPTION
+from guard.configuration import (NORMAL_REQUEST_LATENCY_OPTION, NORMAL_SERVING_READINESS_OPTION,
+                                 NORMAL_STREAM_OPTION)
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
 SCHEMA_2 = 'guard-run-binding/2'
 SCHEMAS = (SCHEMA, SCHEMA_2)
+_TARGET_ONLY_NORMAL_MODES = {
+    'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
+    'OBS-02': ('observation_state', NORMAL_SERVING_READINESS_OPTION, 'observation_state_target_sha256'),
+}
 
 # @34 policy keys moved to the run binding (RB-Q1, 2026-11-14 user approval).
 # PLT-10, PLT-11 and LIF-11 keep their validity window in policy: their policy
@@ -480,17 +485,20 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     `policy_row` is this check's values as written in the POL (stage 4).
     """
     stages = stages_for(check)
-    if check.id == 'OBS-02' and type(executor_cfg) is dict and NORMAL_SERVING_READINESS_OPTION in executor_cfg:
-        if (check.executor != 'observation_state' or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK['OBS-02']
-                or executor_cfg[NORMAL_SERVING_READINESS_OPTION] is not True or run_cfg is not None):
-            raise RunBindingUnavailable('RUN_BINDING_OBS02_NORMAL_SCOPE_INVALID')
-        key = 'observation_state_target_sha256'
+    normal = _TARGET_ONLY_NORMAL_MODES.get(check.id)
+    if normal is not None and type(executor_cfg) is dict and normal[1] in executor_cfg:
+        executor, marker, key = normal
+        error_prefix = f"RUN_BINDING_{check.id.replace('-', '')}_NORMAL"
+        if (check.executor != executor or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK[check.id]
+                or executor_cfg[marker] is not True or run_cfg is not None
+                or (check.id == 'LIF-03' and NORMAL_STREAM_OPTION in executor_cfg)):
+            raise RunBindingUnavailable(f'{error_prefix}_SCOPE_INVALID')
         try:
             target = file_hash(check.id, key, executor_cfg)
         except (KeyError, OSError, TypeError, ValueError):
-            raise RunBindingUnavailable('RUN_BINDING_OBS02_NORMAL_TARGET_UNAVAILABLE') from None
+            raise RunBindingUnavailable(f'{error_prefix}_TARGET_UNAVAILABLE') from None
         if expected_target_sha256 is not None and target != expected_target_sha256:
-            raise RunBindingUnavailable('RUN_BINDING_OBS02_NORMAL_TARGET_CHANGED')
+            raise RunBindingUnavailable(f'{error_prefix}_TARGET_CHANGED')
         document = {'schema': SCHEMA, 'check_id': check.id, 'side': side, 'attempt_id': attempt_id,
                     'environment_sha256': env.ref().sha256, 'files': {key: target}, 'validity': None,
                     'issued_at': _stamp(issued_at)}

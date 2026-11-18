@@ -15,9 +15,12 @@ GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
 NORMAL_STREAM_OPTION = "normal_stream_only"
 NORMAL_SAMPLING_OPTION = "normal_sampling_only"
 NORMAL_TOKEN_INPUT_OPTION = "normal_token_input_only"
+NORMAL_REQUEST_LATENCY_OPTION = "normal_request_latency_only"
+NORMAL_REQUEST_LATENCY_SCOPE_ERROR = "NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID"
 NORMAL_SERVING_READINESS_OPTION = "normal_serving_readiness_only"
 NORMAL_SERVING_READINESS_SCOPE_ERROR = "NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID"
 _NORMAL_ONLY_CASES = {
+    "LIF-03": ("stream_buffer", NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR),
     "LIF-04": ("stream_buffer", NORMAL_STREAM_OPTION, "NORMAL_STREAM_EXECUTION_SCOPE_INVALID"),
     "OBS-02": ("observation_state", NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR),
     "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
@@ -94,22 +97,34 @@ def normal_token_input_requested(raw):
     return any(type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section for section in settings)
 
 
-def _serving_readiness_markers(value, path=()):
+def _option_occurrences(value, option, path=()):
     if type(value) is dict:
         for key, child in value.items():
             location = (*path, key)
-            if key == NORMAL_SERVING_READINESS_OPTION:
+            if key == option:
                 yield location, child
             else:
-                yield from _serving_readiness_markers(child, location)
+                yield from _option_occurrences(child, option, location)
     elif type(value) is list:
         for index, child in enumerate(value):
-            yield from _serving_readiness_markers(child, (*path, index))
+            yield from _option_occurrences(child, option, (*path, index))
+
+
+def _validate_normal_option_placement(raw, option, paths, error):
+    for path, value in _option_occurrences(raw, option):
+        if path[:2] in {("sides", "baseline"), ("sides", "candidate")}:
+            path = path[2:]
+        if value is not True or path not in paths:
+            raise ValueError(error)
+
+
+def normal_request_latency_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_REQUEST_LATENCY_OPTION), None) is not None
 
 
 def normal_serving_readiness_requested(raw):
     """Detect a serving-readiness opt-in before validating its placement or value."""
-    return next(_serving_readiness_markers(raw), None) is not None
+    return next(_option_occurrences(raw, NORMAL_SERVING_READINESS_OPTION), None) is not None
 
 
 def bounded_metadata_scopes(configurations, pack, allowed_checks):
@@ -122,14 +137,13 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         scoped = {}
         overlays = raw.get(CHECK_CONFIG)
         bindings = raw.get("run_binding")
-        for path, value in _serving_readiness_markers(raw):
-            if path[:2] in {("sides", "baseline"), ("sides", "candidate")}:
-                path = path[2:]
-            if value is not True or path not in {
-                ("observation_state", NORMAL_SERVING_READINESS_OPTION),
-                (CHECK_CONFIG, "OBS-02", NORMAL_SERVING_READINESS_OPTION),
-            }:
-                raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_SERVING_READINESS_OPTION, {
+            ("observation_state", NORMAL_SERVING_READINESS_OPTION),
+            (CHECK_CONFIG, "OBS-02", NORMAL_SERVING_READINESS_OPTION),
+        }, NORMAL_SERVING_READINESS_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_REQUEST_LATENCY_OPTION, {
+            (CHECK_CONFIG, "LIF-03", NORMAL_REQUEST_LATENCY_OPTION),
+        }, NORMAL_REQUEST_LATENCY_SCOPE_ERROR)
         if type(overlays) is dict and any(
                 check_id != "REQ-09" and type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section
                 for check_id, section in overlays.items()):
@@ -156,21 +170,41 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
             sessions = [binding.get("record_session") for _, binding in scoped.values() if type(binding) is dict]
             if len(sessions) == 2 and sessions[0] == sessions[1]:
                 raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SESSIONS_MUST_DIFFER")
+        stream_cases = {}
         for check_id, (executor, option, scope_error) in _NORMAL_ONLY_CASES.items():
             overlay = overlays.get(check_id) if type(overlays) is dict else None
             if not any(type(settings) is dict and option in settings for settings in (raw.get(executor), overlay)):
                 continue
             settings = for_check(raw, executor, check_id).get(executor, {})
             if (settings[option] is not True or allowed_checks is None
-                    or {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {check_id}
+                    or (executor != "stream_buffer"
+                        and {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {check_id})
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
-                    or (check_id in {"OBS-02", "REQ-09", "REQ-10"} and raw.get("record_attestation"))
-                    or (check_id == "OBS-02" and "run_binding" in raw
+                    or (check_id in {"LIF-03", "OBS-02", "REQ-09", "REQ-10"} and raw.get("record_attestation"))
+                    or (check_id in {"LIF-03", "OBS-02"} and "run_binding" in raw
                         and (type(bindings) is not dict or check_id in bindings))):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
+            if executor == "stream_buffer":
+                stream_cases[check_id] = settings
+        if stream_cases:
+            stream_error = (NORMAL_REQUEST_LATENCY_SCOPE_ERROR if "LIF-03" in stream_cases
+                            else _NORMAL_ONLY_CASES["LIF-04"][2])
+            if set(stream_cases) != {cid for cid in allowed_checks if pack.checks[cid].executor == "stream_buffer"}:
+                raise ValueError(stream_error)
+            if "LIF-03" in stream_cases:
+                _validate_normal_option_placement(raw, NORMAL_STREAM_OPTION, {
+                    (CHECK_CONFIG, "LIF-04", NORMAL_STREAM_OPTION),
+                }, stream_error)
+                base = raw.get("stream_buffer", {})
+                target = base.get("target")
+                if (type(target) is not str or not target
+                        or any(settings.get("target") != target or {"prepared", "common_inputs"} & settings.keys()
+                               for settings in stream_cases.values())
+                        or ("run_binding" in raw and (type(bindings) is not dict or set(stream_cases) & bindings.keys()))):
+                    raise ValueError(stream_error)
         scopes.append(scoped)
         gateway_modes.append(scoped.get("OBS-01", ({}, None))[0].get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
     for check_id, (_, _, scope_error) in _NORMAL_ONLY_CASES.items():

@@ -12,8 +12,9 @@ import secrets
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
 from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
-                                 NORMAL_SERVING_READINESS_SCOPE_ERROR, bounded_metadata_scopes,
-                                 for_check, normal_serving_readiness_requested,
+                                 NORMAL_REQUEST_LATENCY_SCOPE_ERROR, NORMAL_SERVING_READINESS_SCOPE_ERROR,
+                                 bounded_metadata_scopes, for_check, normal_request_latency_requested,
+                                 normal_serving_readiness_requested,
                                  normal_token_input_requested, update_allowed_checks)
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
@@ -148,7 +149,8 @@ def _update_config_for_execution(pack, cfg, allowed_checks):
 
 def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
     sides = cfg.get("sides", {})
-    if (normal_serving_readiness_requested(cfg) or normal_token_input_requested(cfg)
+    if (normal_request_latency_requested(cfg) or normal_serving_readiness_requested(cfg)
+            or normal_token_input_requested(cfg)
             or any(normal_token_input_requested(raw) for raw in sides.values())):
         bounded_metadata_scopes((merge_config(cfg, sides.get(side, {})) for side in ("baseline", "candidate")),
                                 pack, allowed_checks)
@@ -196,7 +198,10 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=
             if gateway_snapshot:
                 from guard.executors.kubernetes_gateway_observation import snapshot_owner
                 snapshot_owner(target, binding)
-            if scoped_check == "OBS-02":
+            if scoped_check == "LIF-03":
+                from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
+                normal_request_latency_transport(target, env, duration=1)
+            elif scoped_check == "OBS-02":
                 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
                 normal_serving_readiness_transport(target, env, duration=1)
             elif scoped_check == "REQ-09":
@@ -409,6 +414,8 @@ def _validation_inputs(env, cfg: dict):
     """One managed engine, using the same launch contract as update."""
     if passive_api_hop.requested(cfg):
         raise ValueError("PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID")
+    if normal_request_latency_requested(cfg):
+        raise ValueError(NORMAL_REQUEST_LATENCY_SCOPE_ERROR)
     if normal_serving_readiness_requested(cfg):
         raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
     if normal_token_input_requested(cfg):
@@ -595,7 +602,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 settings = c.get(item.executor, {})
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
-                explicit_observer = (item.check_id in {"OBS-02", "REQ-09"} and type(settings) is dict
+                explicit_observer = (item.check_id in {"LIF-03", "OBS-02", "REQ-09"} and type(settings) is dict
                                      and option in settings)
                 if kube and option and type(settings) is dict and settings.get(option) is True:
                     path = Path(settings["target"])

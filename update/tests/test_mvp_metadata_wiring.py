@@ -727,6 +727,119 @@ def test_lif04_normal_preparation_binds_actual_target_without_enabling_stream_si
         'NORMAL_STREAM_EXECUTION_SCOPE_INVALID')
 
 
+def test_paired_lif03_and_lif04_keep_independent_executors_on_the_same_owned_target(tmp_path, sources, monkeypatch):
+    from guard.executors import run_binding
+    from guard.executors.kubernetes_normal_request_latency import KubernetesNormalRequestLatencyExecutor
+    from guard.executors.kubernetes_stream_buffer import KubernetesStreamBufferExecutor
+    from tests.test_lif04_normal_stream import configuration
+
+    pack, sides, policy_path = sources
+    _, _, _, full = configuration(tmp_path)
+    expected_options = {'LIF-03': {'normal_request_latency_only': True}, 'LIF-04': {'normal_stream_only': True}}
+    values = {cid: {row.key: full[row.key] for row in pack.checks[cid].policy_params} for cid in expected_options}
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    policy = original.model_copy(update={'values': values,
+        'scope': original.scope.model_copy(update={'include': list(expected_options)})}).seal()
+    _write(policy_path, policy.to_dict())
+    store_path = tmp_path / 'store'
+    cfg, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=store_path,
+        normal_request_latency=True, normal_stream_buffer=True)
+    assert cfg['update']['allowed_checks'] == ['LIF-03', 'LIF-04'], decisions
+    assert cfg['check_config'] == expected_options
+    assert cfg['executors'] == {'stream_buffer': 'kubernetes'}
+    assert all(side == {'stream_buffer': {'target': str(sides[name]['target'])}}
+               for name, side in cfg['sides'].items())
+    envs = [tool.Environment.model_validate_json(side['environment'].read_bytes()) for side in sides.values()]
+    ready = application.update_readiness(pack, envs, policy, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    pinned = {env.id: sha256_hex(canonical_json(json.loads(side['target'].read_bytes())))
+              for env, side in zip(envs, sides.values())}
+    seen = set()
+
+    def draft(check, env):
+        seen.add((check.id, env.id))
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
+
+    def fixture_latency(self, check, env, policy_values, *_args):
+        assert check.id == 'LIF-03' and self._expected_target_sha256 == pinned[env.id]
+        assert set(self.cfg) == {'target', 'normal_request_latency_only'} and policy_values == values[check.id]
+        return draft(check, env)
+
+    def fixture_stream(self, check, env, policy_values, *_args):
+        assert check.id == 'LIF-04' and self.normal_only and self.expected_target == pinned[env.id]
+        assert set(self.cfg) == {'target', 'normal_stream_only'} and 'buffer_prepared_sha256' not in policy_values
+        assert policy_values['buffer_target_sha256'] == pinned[env.id]
+        assert policy_values['buffer_environment_sha256'] == env.ref().sha256
+        return draft(check, env)
+
+    default = registry.build_executor('stream_buffer', 'kubernetes', {'stream_buffer': {}},
+        engine=envs[0].engine.name, version=envs[0].engine.version)
+    assert type(default) is KubernetesStreamBufferExecutor and not default.normal_only
+    monkeypatch.setattr(KubernetesNormalRequestLatencyExecutor, 'run', fixture_latency)
+    monkeypatch.setattr(KubernetesStreamBufferExecutor, 'run', fixture_stream)
+    store = Store(store_path)
+    report, _ = application.execute_update(store, pack, envs, policy, cfg, tmp_path / 'paired', utcnow())
+    assert seen == {(cid, env.id) for cid in values for env in envs}
+    for row in report.by_check:
+        if row.check_id not in values:
+            continue
+        for side in (row.baseline, row.candidate):
+            evidence = store.resolve(store.resolve(side.result).evidence)
+            binding = evidence.execution.run_binding
+            assert evidence.execution.status == ExecStatus.COMPLETED and not run_binding.verify(binding, evidence)
+            assert binding['files'] == {'buffer_target_sha256': pinned[evidence.environment.id]}
+            assert (binding['validity'] is None) == (row.check_id == 'LIF-03')
+
+    fresh = tmp_path / 'fresh-stream-target.json'
+    staged = tool.staged_config(cfg, fresh)
+    current, pointer = tool._source(sides['candidate']['target'])
+    for number, role in enumerate(('engine', 'probe'), 200):
+        current['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        current['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, current)
+    assert tool.revalidate_candidate(staged, envs[1], pointer) == {
+        'stream_buffer': sha256_hex(canonical_json(current))}
+    changed = deepcopy(staged)
+    changed['check_config'].pop('LIF-03')
+    with pytest.raises(ValueError, match='METADATA_STAGED_EXECUTION_SCOPE_INVALID'):
+        tool.revalidate_candidate(changed, envs[1], pointer)
+
+
+def test_lif03_scope_rejects_combined_or_incomplete_flags_before_preparation(tmp_path, sources, monkeypatch):
+    from guard.core.run import run_plan
+
+    pack, sides, policy_path = sources
+    policy = tool.Policy.model_validate_json(policy_path.read_bytes())
+    envs = [tool.Environment.model_validate_json(side['environment'].read_bytes()) for side in sides.values()]
+    marker = 'normal_request_latency_only'
+    cfg = {'executors': {'stream_buffer': 'kubernetes'}, 'update': {'allowed_checks': ['LIF-03', 'LIF-04']},
+           'sides': {side: {'stream_buffer': {'target': str(paths['target'])}} for side, paths in sides.items()},
+           'check_config': {'LIF-03': {marker: True}, 'LIF-04': {'normal_stream_only': True}}}
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError('Invalid stream scope reached target preparation')
+
+    monkeypatch.setattr(application, 'update_inputs', forbidden)
+    single_marker, false_marker, combined, shared_marker, override_target, prepared = (
+        deepcopy(cfg) for _ in range(6))
+    single_marker['check_config'].pop('LIF-04')
+    false_marker['sides']['candidate']['check_config'] = {'LIF-03': {marker: False}}
+    combined['check_config']['LIF-03']['normal_stream_only'] = True
+    shared_marker['sides']['baseline']['stream_buffer'][marker] = True
+    override_target['check_config']['LIF-03']['target'] = str(tmp_path / 'other.json')
+    prepared['sides']['candidate']['stream_buffer']['prepared'] = '/fixture/unsupported'
+    mixed_binding = {**cfg, 'run_binding': {'LIF-04': {}}}
+    wrapped = {**cfg, 'record_attestation': {'mode': 'example'}}
+    store = Store(tmp_path / 'store')
+    for invalid in (single_marker, false_marker, combined, shared_marker, override_target, prepared, mixed_binding, wrapped):
+        with pytest.raises(ValueError, match='NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID'):
+            application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
+    with pytest.raises(ValueError, match='NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
+    assert not (tmp_path / 'run').exists()
+
+
 def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_requests(tmp_path, sources, monkeypatch):
     from tools import mvp_gateway_preparation as preparation
 

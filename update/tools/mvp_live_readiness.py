@@ -19,11 +19,14 @@ from guard.adapters import vllm_native_input_profiles, vllm_native_input_rejecti
 from guard.collectors import native_input, native_input_qualification
 from guard.collectors import native_input_rejection_qualification, reused_input_qualification
 from guard.collectors.file import load_environment, load_policy
-from guard.configuration import (NORMAL_SERVING_READINESS_OPTION, NORMAL_TOKEN_INPUT_OPTION,
+from guard.configuration import (NORMAL_REQUEST_LATENCY_OPTION, NORMAL_SERVING_READINESS_OPTION,
+                                 NORMAL_TOKEN_INPUT_OPTION,
                                  bounded_metadata_scopes, for_check, merge_config,
-                                 normal_serving_readiness_requested, normal_token_input_requested)
+                                 normal_request_latency_requested, normal_serving_readiness_requested,
+                                 normal_token_input_requested)
 from guard.core.select import _in_scope, check_policy_value
 from guard.executors import passive_api_hop, registry, run_binding
+from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
@@ -131,7 +134,8 @@ def _inspect(source, check, pack, issued_at):
     if allowed is not None and check.id not in allowed:
         raise ValueError(UPDATE_CHECK_OUTSIDE_SCOPE)
     side_configs = {side: merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES}
-    if any(normal_serving_readiness_requested(raw) or normal_token_input_requested(raw) for raw in side_configs.values()):
+    if any(normal_request_latency_requested(raw) or normal_serving_readiness_requested(raw)
+           or normal_token_input_requested(raw) for raw in side_configs.values()):
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
     passive_hop = check.id == passive_api_hop.CHECK and passive_api_hop.validate_scope(
         pack, side_configs.values(), allowed, explicitly_requested=passive_api_hop.requested(config))
@@ -148,6 +152,7 @@ def _inspect(source, check, pack, issued_at):
                                  version=env.engine.version) is None:
         raise ValueError('MVP_EXECUTOR_UNAVAILABLE')
     cfg = config.get(check.executor, {})
+    normal_request_latency = check.id == 'LIF-03' and cfg.get(NORMAL_REQUEST_LATENCY_OPTION) is True
     normal_serving_readiness = check.id == 'OBS-02' and cfg.get(NORMAL_SERVING_READINESS_OPTION) is True
     normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
     target = cfg.get('target')
@@ -160,6 +165,11 @@ def _inspect(source, check, pack, issued_at):
         if target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
         target_state = (target, raw_target, identity)
+    if normal_request_latency:
+        try:
+            normal_request_latency_transport(target_data, env, duration=1)
+        except (KubernetesBindingError, ValueError):
+            raise ValueError('NORMAL_REQUEST_LATENCY_TARGET_UNAVAILABLE') from None
     if normal_serving_readiness:
         try:
             normal_serving_readiness_transport(target_data, env, duration=1)
@@ -205,6 +215,7 @@ def _inspect(source, check, pack, issued_at):
             'environment_origin': env.data_origin.value, 'implementation': implementation,
             'binding_schema': binding['schema'] if binding else None,
             'files': {role: source[role] for role in files}, 'blocking_codes': blockers,
+            **({NORMAL_REQUEST_LATENCY_OPTION: True} if normal_request_latency else {}),
             **({NORMAL_SERVING_READINESS_OPTION: True} if normal_serving_readiness else {}),
             **({NORMAL_TOKEN_INPUT_OPTION: True} if normal_token_input else {})}
 

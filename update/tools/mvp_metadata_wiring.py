@@ -18,6 +18,7 @@ from guard.executors import passive_api_hop, registry, run_binding, template_sup
 from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snapshot_owner
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
+from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
@@ -37,10 +38,12 @@ CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', '
                    'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc',
                    'OBS-01': 'required_event_record', 'OBS-02': 'observation_state',
                    'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
-                   'LIF-04': 'stream_buffer', 'REQ-09': 'input_validation', 'REQ-10': 'sampling_validation',
+                   'LIF-03': 'stream_buffer', 'LIF-04': 'stream_buffer',
+                   'REQ-09': 'input_validation', 'REQ-10': 'sampling_validation',
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
-               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-04', 'REQ-09', 'REQ-10', passive_api_hop.CHECK})
+               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-03', 'LIF-04',
+                              'REQ-09', 'REQ-10', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
@@ -179,6 +182,11 @@ def revalidate_candidate(config, env, preliminary_ref):
         raise ValueError('METADATA_PRELIMINARY_TARGET_CHANGED')
     current, _ = _source(current_path)
     old, new = _transport(preliminary, env), _transport(current, env)
+    if 'LIF-03' in (allowed or ()):
+        try:
+            normal_request_latency_transport(current, env, duration=1, runner=_detached_runner)
+        except (KubernetesBindingError, ValueError):
+            raise ValueError('NORMAL_REQUEST_LATENCY_TARGET_UNAVAILABLE') from None
     if 'observation_state' in executors:
         try:
             normal_serving_readiness_transport(current, env, duration=1, runner=_detached_runner)
@@ -220,6 +228,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
+        if check.id == 'LIF-03':
+            config[check.executor]['target'] = target_path
+            try:
+                normal_request_latency_transport(target, env, duration=1, runner=_detached_runner)
+            except (KubernetesBindingError, ValueError):
+                return 'NORMAL_REQUEST_LATENCY_TARGET_UNAVAILABLE'
         if check.id == 'OBS-02':
             config[check.executor]['target'] = target_path
             try:
@@ -290,7 +304,7 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
 def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None, passive_plt08=False,
              protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None,
              gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
-             normal_serving_readiness=False):
+             normal_serving_readiness=False, normal_request_latency=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -329,7 +343,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             raise ValueError('GATEWAY_RECORD_INPUT_MODE_CONFLICT')
         records['OBS-01'] = _gateway_record_inputs(gateway_record_inputs)
     optional = {passive_api_hop.CHECK: passive_plt08, 'PLT-02': protected_ipc_metadata,
-                'LIF-04': normal_stream_buffer, 'REQ-10': normal_sampling, 'REQ-09': normal_token_input,
+                'LIF-03': normal_request_latency, 'LIF-04': normal_stream_buffer,
+                'REQ-10': normal_sampling, 'REQ-09': normal_token_input,
                 'OBS-02': normal_serving_readiness,
                 **dict.fromkeys(records, True)}
     check_ids = (*CHECKS, *(cid for cid, requested in optional.items() if requested))
@@ -378,7 +393,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
     bounded_metadata_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
-    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06', 'LIF-04', 'REQ-09', *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
+    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06', 'LIF-03', 'LIF-04', 'REQ-09',
+                     *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
         plan = select(pack, [base, candidate], policy, mode='update')
@@ -419,6 +435,8 @@ def main():
                         help='Paired prebound OBS-01 inputs for one selected, already recorded normal Gateway request')
     parser.add_argument('--normal-stream-buffer', action='store_true',
                         help='Observe only ordinary SSE framing and fixed owned container memory for LIF-04')
+    parser.add_argument('--normal-request-latency', action='store_true',
+                        help='Observe client timing for one ordinary owned LIF-03 completion')
     parser.add_argument('--normal-sampling', action='store_true',
                         help='Observe one ordinary completion using the approved REQ-10 sampling options')
     parser.add_argument('--normal-token-input', action='store_true',
@@ -442,7 +460,8 @@ def main():
                                         copy_record_inputs=copies, gateway_record_inputs=gateway,
                                         normal_stream_buffer=args.normal_stream_buffer, normal_sampling=args.normal_sampling,
                                         normal_token_input=args.normal_token_input,
-                                        normal_serving_readiness=args.normal_serving_readiness)
+                                        normal_serving_readiness=args.normal_serving_readiness,
+                                        normal_request_latency=args.normal_request_latency)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

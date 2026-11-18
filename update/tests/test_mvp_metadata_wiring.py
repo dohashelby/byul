@@ -9,7 +9,8 @@ import tomllib
 import pytest
 
 from guard.configuration import for_check, merge_config
-from guard.models import DataOrigin, canonical_json, load_pack
+from guard.executors import kubernetes_template_supply as template_executor, registry
+from guard.models import DataOrigin, canonical_json, load_pack, sha256_hex
 from tests.builders import T0, policy
 from tests.test_model_preparation_integration import full_inputs
 from tests.test_template_supply_approval import SHA
@@ -52,6 +53,9 @@ def sources(tmp_path):
             'PLT-04': {'forbidden_env_names': ['FIXTURE_NAME'], 'forbidden_mount_paths': ['/fixture'],
                        'credential_candidate_paths': ['/fixture/candidate']},
             'SUP-03': {'allowed_template_sha256': [SHA]},
+            'REQ-07': {'allowed_template_sha256': [SHA], 'max_rendered_input_tokens': 128,
+                       'request_template_override_allowed': False},
+            'SUP-13': {'forbidden_template_attributes': []},
         })
     return pack, sides, _write(tmp_path / 'policy.json', confirmed.to_dict())
 
@@ -102,6 +106,58 @@ def test_a_target_from_the_other_release_cannot_be_reused(tmp_path, sources):
     sides['candidate']['target'] = sides['baseline']['target']
     with pytest.raises(ValueError, match='METADATA_TARGET_BINDING_INVALID'):
         tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+
+
+def test_shared_template_siblings_stop_before_any_target_or_transport_access(tmp_path, monkeypatch, sources):
+    pack, sides, policy_path = sources
+    config, _, checks = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+    assert config['executors']['template_validation'] == 'kubernetes'
+    assert checks['SUP-03']['configuration_enabled']
+    for side, paths in sides.items():
+        env = tool.Environment.model_validate_json(paths['environment'].read_bytes())
+        executor = registry.build_executor('template_validation', 'kubernetes',
+            merge_config(config, config['sides'][side]), engine=env.engine.name, version=env.engine.version)
+        assert type(executor) is template_executor.KubernetesTemplateSupplyExecutor
+        def forbidden(*args, **kwargs):
+            raise AssertionError('unsupported siblings may never access or dispatch to a target')
+        with monkeypatch.context() as guard:
+            guard.setattr(template_executor.Path, 'open', forbidden)
+            guard.setattr(template_executor, 'KubernetesHTTP', forbidden)
+            for check_id in ('REQ-07', 'SUP-13'):
+                decision = checks['SUP-03']['shared_executor_checks'][check_id][side]
+                assert decision == {'expected_if_invoked': 'ABORTED', 'reason': 'EXECUTOR_FAILURE',
+                                    'transport_dispatched': False}
+                with pytest.raises(ValueError, match='KUBERNETES_TEMPLATE_PROFILE_UNSUPPORTED'):
+                    executor.run(pack.checks[check_id], env, {}, object(), tmp_path / 'unused')
+
+
+def test_staged_configuration_requires_a_fresh_candidate_before_hash_binding(tmp_path, sources):
+    pack, sides, policy_path = sources
+    config, _, _ = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+    path = sides['candidate']['target']
+    preliminary, pointer = tool._source(path)
+    env = tool.Environment.model_validate_json(sides['candidate']['environment'].read_bytes())
+    with pytest.raises(ValueError, match='METADATA_FRESH_CANDIDATE_PATH_REQUIRED'):
+        tool.staged_config(config, path)
+    fresh = tmp_path / 'fresh-candidate.json'
+    staged = tool.staged_config(config, fresh)
+    assert staged['update']['kubernetes_candidate_binding'] == 'after_baseline'
+    assert config['sides']['candidate']['credential_exposure']['target'] == str(path)
+    assert staged['sides']['candidate']['credential_exposure']['target'] == str(fresh)
+    _write(fresh, preliminary)
+    with pytest.raises(ValueError, match='METADATA_CANDIDATE_GENERATION_NOT_FRESH'):
+        tool.revalidate_candidate(staged, env, pointer)
+    current = deepcopy(preliminary)
+    for number, role in enumerate(('engine', 'probe'), 100):
+        current['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+    _write(fresh, current)
+    assert tool.revalidate_candidate(staged, env, pointer) == dict.fromkeys(
+        config['executors'], sha256_hex(canonical_json(current)))
+    assert json.loads(path.read_bytes()) == preliminary
+    current['comparison_config']['launch']['max_model_len'] += 1
+    _write(fresh, current)
+    with pytest.raises(ValueError, match='METADATA_CANDIDATE_CONDITIONS_CHANGED'):
+        tool.revalidate_candidate(staged, env, pointer)
 
 
 def test_missing_shared_policy_blocks_both_container_checks_without_filling_values(tmp_path, sources):

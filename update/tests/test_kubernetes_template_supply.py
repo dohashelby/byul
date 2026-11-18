@@ -124,6 +124,39 @@ def test_current_template_and_api_projection_preserve_unknown_supply_scope(tmp_p
     assert "EXAMPLE-private-model-content" not in stored and "prompt_token_ids" not in stored
 
 
+def test_paired_template_fixture_matches_conditions_and_keeps_exact_per_side_mapping(tmp_path):
+    from tools.mvp_versions import versions
+
+    seeds = versions()
+    drafts = {}
+    for side, pin in seeds.items():
+        folder = tmp_path / side
+        folder.mkdir()
+        env, topology, _, cfg = inputs(folder)
+        env = env.model_copy(update={
+            "id": f"ENV-TEMPLATE-{side.upper()}",
+            "engine": env.engine.model_copy(update={"version": pin["version"], "image_digest": pin["image"]}),
+        }).seal()
+        topology["environment_ref"] = env.ref().model_dump(mode="json")
+        topology["observed_version"] = pin["version"]
+        topology["engine"]["image_digest"] = pin["image"]
+        topology["kubernetes"]["engine"].update(image=pin["image"], image_id=pin["image"])
+        topology["model_mapping"].update(environment_ref=topology["environment_ref"],
+                                         host_snapshot=f"/srv/EXAMPLE_PRIVATE_{side}/model")
+        Path(cfg["target"]).write_bytes(canonical_json(topology))
+        world = World(topology)
+        drafts[side] = KubernetesTemplateSupplyExecutor(cfg, runner=world.runner).run(
+            baseline_pack().checks["SUP-03"], env, VALUES, VllmAdapter(), folder / "work")
+        assert drafts[side].observations["template_identity_verified"].value is True
+        assert drafts[side].data_origin.value == "EXAMPLE"
+        assert summary(drafts[side])["model_mapping_sha256"] == sha256_hex(canonical_json(topology["model_mapping"]))
+
+    baseline, candidate = drafts["baseline"], drafts["candidate"]
+    assert baseline.comparability.fixture_sha256 == candidate.comparability.fixture_sha256
+    assert baseline.comparability.config_sha256 == candidate.comparability.config_sha256
+    assert summary(baseline)["model_mapping_sha256"] != summary(candidate)["model_mapping_sha256"]
+
+
 @pytest.mark.parametrize("mode", ["tokens", "wrong-model", "wrong-id", "http-error", "http-exception", "cleanup"])
 def test_later_response_gap_retains_independent_membership_without_inventing_fail(tmp_path, mode):
     draft, _, _, _ = run(tmp_path, mode, {"allowed_template_sha256": []})

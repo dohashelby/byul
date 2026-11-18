@@ -69,7 +69,8 @@ def classify(row, reply, required):
 
 
 def project(rows):
-    unprotected = [r["name"] for r in rows if r["tls_required"] and r["state"] in {"no_tls", "peer_rejected"}]
+    # A TLS peer rejection verifies refusal. The helper sends no record data.
+    unprotected = [r["name"] for r in rows if r["tls_required"] and r["state"] == "no_tls"]
     wrong = [r["name"] for r in rows if r["tls_required"] and r["wrong_peer_state"] == "accepted"]
     unknown = [r["name"] for r in rows if r["state"] == "unreachable"]
     return unprotected, wrong, unknown

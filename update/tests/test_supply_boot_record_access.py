@@ -286,6 +286,30 @@ def test_boot_record_binding_is_closed(damage):
         contract.validate_record(packet, check_id="SUP-07", role="normal", environment_ref={"id": 1}, target_sha256="t", source_sha256=SOURCE)
 
 
+@pytest.mark.parametrize(("field", "invalid"), [
+    ("path_sha256", "not-a-digest"), ("writer_allowed", 0), ("modified", "false"),
+    ("consumed", "false"), ("verified_before_use", None),
+])
+def test_sup07_requires_explicit_cache_observation_types(field, invalid):
+    env_ref, target = {"id": 1}, "b" * 64
+    packet = good_packet(env_ref, target)
+    row = {"path_sha256": "a" * 64, "writer_allowed": False, "modified": True,
+           "consumed": True, "verified_before_use": False}
+    packet["rows"] = [row]
+    binding = {"check_id": "SUP-07", "role": "normal", "environment_ref": env_ref,
+               "target_sha256": target, "source_sha256": SOURCE}
+
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-07", verified, VALUES) == (
+        [{"reason": "tampered_cache_consumed", "path_sha256": "a" * 64}], [])
+    row["consumed"] = False
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-07", verified, VALUES) == ([], [])
+    row[field] = invalid
+    with pytest.raises(ValueError, match="SUPPLY_BOOT_RECORD_INVALID"):
+        contract.validate_record(json.loads(json.dumps(packet)), **binding)
+
+
 def test_reader_allows_only_its_own_record_beyond_native_reads():
     reader = boot.SupplyBootReader.__new__(boot.SupplyBootReader)
     reader.binding, reader.session, reader.file_read_limit = {"engine": {"container": "engine"}}, "a" * 32, 1

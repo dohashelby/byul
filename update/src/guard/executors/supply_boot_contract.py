@@ -98,11 +98,12 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
                     or any(type(row[key]) is not bool for key in ("stopped", "temporary_cleaned"))):
                 raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
             stages.add(stage)
-    if check_id == 'SUP-15' and any(
-            any(type(row[key]) is not bool for key in ('relevant_change', 'reused', 'compatibility_verified'))
-            or type(row['path_sha256']) is not str or _SHA.fullmatch(row['path_sha256']) is None
-            for row in packet['rows']):
-        raise ValueError('SUPPLY_BOOT_RECORD_INVALID')
+    if check_id in {"SUP-07", "SUP-15"}:
+        flags = _ROWS[check_id] - {"path_sha256"}
+        for row in packet["rows"]:
+            if (type(row["path_sha256"]) is not str or _SHA.fullmatch(row["path_sha256"]) is None
+                    or any(type(row[key]) is not bool for key in flags)):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
     return packet
 
 

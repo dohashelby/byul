@@ -10,10 +10,12 @@ import re
 from guard.core.compare import compare, comparison_differences
 from guard.core.judge import judge_evidence
 from guard.core.select import _in_scope, check_policy_value, evaluate_check
-from guard.executors import run_binding
+from guard.executors import passive_api_hop, run_binding
 from guard.models import Ref, load_pack, weakest_origin
 from guard.models.artifacts import model_closure_sha256
 from guard.models.objects import object_from_dict
+from guard.runtime.kubernetes_binding import validate_container_binding
+from guard.store import Store
 from guard.validation_evidence import read_objects, verify_store_files
 from tools.mvp_a_input_preflight import _pairs
 from tools.mvp_versions import versions
@@ -36,7 +38,65 @@ class InvalidReport(ValueError):
     pass
 
 
-def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of):
+def _passive_hop_values(evd):
+    document = evd.execution.run_binding if evd is not None else None
+    values = document.get('values') if isinstance(document, dict) else None
+    if evd is not None and evd.check_id == 'PLT-08' and isinstance(values, dict) and values.get('profile') == passive_api_hop.PROFILE:
+        return values
+    return None
+
+
+def _verify_passive_hop(evd, source, env, policy, plan, artifact_store, values):
+    """Recheck the verified same-report source artifact without a live target."""
+    if (artifact_store is None or source is None or evd.artifacts
+            or set(values) != {'profile', 'source_evidence', 'source_artifact_sha256', 'target_sha256'}
+            or evd.execution.run_binding.get('schema') != run_binding.SCHEMA_2
+            or values['source_evidence'] != _dump(source.ref())
+            or source.ref() not in evd.refs or not plan.inputs.execution_recipe_sha256
+            or source.plan != evd.plan or source.environment != evd.environment or source.side != evd.side
+            or not evd.execution.attempt_id or source.execution.attempt_id != evd.execution.attempt_id
+            or source.data_origin != 'MEASURED' or source.data_origin != evd.data_origin
+            or source.comparability != evd.comparability or source.execution.finished_at is None
+            or evd.execution.started_at is None or source.execution.finished_at > evd.execution.started_at
+            or evd.normal_control.attempted or evd.normal_control.succeeded is not None
+            or any(step.attempted for step in evd.challenges)):
+        return False
+    try:
+        target_hash = values['target_sha256']
+        if type(target_hash) is not str or SHA256.fullmatch(target_hash) is None:
+            return False
+        summary, artifact_hash = passive_api_hop._read_summary(artifact_store, source)
+        if artifact_hash != values['source_artifact_sha256']:
+            return False
+        binding = summary['kubernetes']['binding']
+        if (type(binding) is not dict or set(binding) != {'context', 'run_id', 'engine', 'probe'}
+                or not re.fullmatch(r'[A-Za-z0-9._:@/-]{1,200}', binding['context'])
+                or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', binding['run_id'])):
+            return False
+        for role in ('engine', 'probe'):
+            validate_container_binding(binding[role])
+        if (binding['engine']['image'] != env.engine.image_digest
+                or any(binding['engine'][field] == binding['probe'][field] for field in ('pod_uid', 'container_id', 'pod_ip'))):
+            return False
+        first, last = passive_api_hop._bound_request(summary, source, binding, target_hash)
+        prohibited = policy.values.get('PLT-08', {}).get('plaintext_forbidden')
+        if type(prohibited) is not bool:
+            return False
+        trial = {**values, 'original_source_data_origin': source.data_origin.value, 'transport': 'plain_http',
+                 'source_role': 'selected_owned_kubernetes_probe', 'destination_role': 'selected_owned_kubernetes_engine_pod',
+                 'method': 'POST', 'route': '/v1/completions', 'outcome': 200, 'capture_complete': True,
+                 'owner_binding_verified_before_after': True, 'started_at': first.isoformat(), 'finished_at': last.isoformat(),
+                 'global_plaintext_forbidden': prohibited, 'hop_policy_adjudicated': False, 'deployed_caller_path_verified': False}
+        return {key: value.model_dump(mode='json') for key, value in evd.observations.items()} == {
+            'api_transport_trials': {'value': [trial], 'collected': True},
+            'forbidden_plaintext_successes': {'value': None, 'collected': False},
+            'api_transport_scope_complete': {'value': False, 'collected': True},
+        }
+    except (KeyError, OSError, TypeError, ValueError, AttributeError):
+        return False
+
+
+def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, source=None, artifact_store=None):
     side = {'environment': _dump(env.ref()), 'evidence': _dump(evd.ref()) if evd else None,
             'result': _dump(result.ref()) if result else None, 'verdicts': None, 'blocking_codes': []}
     blockers = side['blocking_codes']
@@ -52,7 +112,11 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of):
             blockers.append(f'EXECUTION_{execution.status.value}')
         if evd.data_origin != 'MEASURED' or execution.operator is not None or execution.override_reason:
             blockers.append('AUTOMATED_MEASUREMENT_REQUIRED')
-        if (not evd.artifacts or any(artifact.bytes < 1 for artifact in evd.artifacts)
+        passive_values = _passive_hop_values(evd)
+        passive_verified = passive_values is not None and _verify_passive_hop(evd, source, env, policy, plan, artifact_store, passive_values)
+        if passive_values is not None and not passive_verified:
+            blockers.append('PASSIVE_API_HOP_PROVENANCE_INVALID')
+        if ((not passive_verified and not evd.artifacts) or any(artifact.bytes < 1 for artifact in evd.artifacts)
                 or execution.executor is None or execution.executor.name != check.executor
                 or execution.adapter is None or execution.adapter.name != env.engine.name
                 or not SHA256.fullmatch(execution.executor.config_sha256)):
@@ -94,7 +158,7 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of):
     return side
 
 
-def _verified_rows(original_report, objects, pack, expected):
+def _verified_rows(original_report, objects, pack, expected, artifact_store=None):
     parsed = list(map(object_from_dict, objects))
     by_ref = {_key(obj.ref()): obj for obj in parsed}
     if len(by_ref) != len(parsed) or any(not obj.hash_ok() for obj in parsed):
@@ -162,8 +226,15 @@ def _verified_rows(original_report, objects, pack, expected):
                 raise InvalidReport('ORIGINAL_SIDE_REFS_AMBIGUOUS')
             if kind == 'EVD':
                 env_ref = side_env[pair[1]].ref()
+                expected_refs = [plan.ref(), env_ref]
+                passive_values = _passive_hop_values(obj)
+                if passive_values is not None:
+                    source_ref = Ref.model_validate(passive_values.get('source_evidence'))
+                    if source_ref.kind != 'EVD' or len(obj.refs) != 3:
+                        raise InvalidReport('ORIGINAL_EVIDENCE_BINDING_MISMATCH')
+                    expected_refs.append(source_ref)
                 if (obj.plan != plan.ref() or obj.environment != env_ref
-                        or {_key(ref) for ref in obj.refs} != {_key(plan.ref()), _key(env_ref)}):
+                        or {_key(ref) for ref in obj.refs} != {_key(ref) for ref in expected_refs}):
                     raise InvalidReport('ORIGINAL_EVIDENCE_BINDING_MISMATCH')
             table[pair] = obj
     rows = {}
@@ -187,9 +258,17 @@ def _verified_rows(original_report, objects, pack, expected):
                     check_policy_value(check_id, param.key, param.type, policy_values.get(param.key))
                 except ValueError:
                     blockers.append('ORIGINAL_POLICY_VALUE_UNAVAILABLE')
-        sides = {side: _verify_side(check, item, evidence.get((check_id, side)), results.get((check_id, side)),
-                                    getattr(shown, side), env, policy, plan, report.created_at)
-                 for side, env in side_env.items()}
+        sides = {}
+        for side, env in side_env.items():
+            source = None
+            if check_id == 'PLT-08':
+                # PLT-01 sorts first and its exact displayed RES/EVD has been replayed.
+                original = rows.get('PLT-01', {}).get(side)
+                if original is not None and not original['blocking_codes']:
+                    source = evidence.get(('PLT-01', side))
+            sides[side] = _verify_side(check, item, evidence.get((check_id, side)), results.get((check_id, side)),
+                                       getattr(shown, side), env, policy, plan, report.created_at,
+                                       source=source, artifact_store=artifact_store)
         base_evd, cand_evd = (evidence.get((check_id, side)) for side in SIDES)
         observed_diff = comparison_differences(base_evd.comparability, cand_evd.comparability) if base_evd and cand_evd else []
         if all(side['verdicts'] is not None for side in sides.values()):
@@ -247,12 +326,12 @@ def review(run_inputs, *, pack, expected, assignments=None):
             assigned[check_id] = _dump(ref)
     reviews, policies = [], []
     by_check = defaultdict(list)
-    for report, objects, original_pack in run_inputs:
+    for report, objects, original_pack, *stores in run_inputs:
         if original_pack.ref() != pack.ref():
             reviews.append({'verified': False, 'reason': 'PACK_REF_MISMATCH'})
             continue
         try:
-            rows, refs, official = _verified_rows(report, objects, pack, expected)
+            rows, refs, official = _verified_rows(report, objects, pack, expected, stores[0] if stores else None)
         except InvalidReport as error:
             reviews.append({'verified': False, 'reason': str(error)})
             continue
@@ -312,7 +391,7 @@ def review(run_inputs, *, pack, expected, assignments=None):
     }
 
 
-def _read_runs(pairs):
+def _read_runs(pairs, *, include_artifact_store=False):
     for store, report_path in pairs:
         objects = read_objects(store)
         report = json.loads(report_path.read_bytes(), object_pairs_hook=_pairs)
@@ -325,7 +404,8 @@ def _read_runs(pairs):
         # graph for the subsequent exact-ref and object-seal checks.
         verification_objects = [obj for obj in objects if obj['kind'] != 'PLAN' or (
             obj['id'], obj['revision'], obj['content_sha256']) == (plan_ref.id, plan_ref.revision, plan_ref.sha256)]
-        yield report, objects, verify_store_files(store, verification_objects)
+        run = report, objects, verify_store_files(store, verification_objects)
+        yield (*run, Store.read_only(store)) if include_artifact_store else run
 
 
 def main():
@@ -343,7 +423,7 @@ def main():
     assignments = json.loads(args.assignments.read_bytes(), object_pairs_hook=_pairs) if args.assignments else None
     if args.assignments and type(assignments) is not dict:
         parser.error('--assignments must contain a JSON object')
-    result = review(_read_runs(args.run), pack=pack, expected=versions(), assignments=assignments)
+    result = review(_read_runs(args.run, include_artifact_store=True), pack=pack, expected=versions(), assignments=assignments)
     with args.output.open('x', encoding='utf-8') as stream:
         json.dump(result, stream, ensure_ascii=False, indent=2)
 

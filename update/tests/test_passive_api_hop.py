@@ -13,21 +13,27 @@ from guard.executors import passive_api_hop as subject
 from guard.executors.kubernetes_container_config import KubernetesContainerConfigExecutor
 from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex
 from guard.models.objects import Operator
+from guard.runtime.kubernetes_http import KubernetesHTTP
 from guard.store import Store
 from tests.builders import T0, policy
 from tests.test_kubernetes_process_consumers import PERMISSION_VALUES, PRIVATE, ProcessWorld
 from tests.test_model_preparation_integration import full_inputs
+from tests.update_builders import GPU_RUNTIME
 
 
-@pytest.fixture
-def paired_original(tmp_path, monkeypatch):
+def paired_controls(tmp_path, monkeypatch, *, review_fixture=False):
     environment, target = full_inputs()
+    if review_fixture:
+        environment = environment.model_copy(update={
+            'data_origin': DataOrigin.DECLARED, 'runtime': environment.runtime.model_copy(update=GPU_RUNTIME),
+        }).seal()
     target['lab'] = False
     baseline = environment.model_copy(update={'engine': environment.engine.model_copy(update={'version': '0.30.0'})}).seal()
     candidate = environment.model_copy(update={'id': 'ENV-PASSIVE-CANDIDATE'}).seal()
     environments = [baseline, candidate]
     sides = {}
     worlds_by_path = {}
+    worlds_by_target = {}
     for side, env in zip((Side.baseline, Side.candidate), environments):
         bound = deepcopy(target)
         bound.update(environment_ref=env.ref().model_dump(mode='json'), observed_version=env.engine.version)
@@ -39,6 +45,7 @@ def paired_original(tmp_path, monkeypatch):
         target_path.write_bytes(canonical_json(bound))
         sides[side.value] = {'container_config': {'target': str(target_path)}}
         worlds_by_path[str(target_path)] = ProcessWorld(bound)
+        worlds_by_target[sha256_hex(canonical_json(bound))] = worlds_by_path[str(target_path)]
     pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
     pol = policy(pack.ref(), scope={'include': ['PLT-01', 'PLT-08']},
                  values={'PLT-01': PERMISSION_VALUES, 'PLT-08': {'plaintext_forbidden': True}})
@@ -52,13 +59,24 @@ def paired_original(tmp_path, monkeypatch):
     def with_runner(self, cfg, **kwargs):
         initialize(self, cfg, **kwargs, runner=worlds_by_path[cfg['target']].runner)
 
-    monkeypatch.setattr(KubernetesContainerConfigExecutor, '__init__', with_runner)
+    if review_fixture:
+        # Simulate the owned transport report for the auditor's positive branch.
+        # All output lives in pytest's temporary store.
+        transport_init = KubernetesHTTP.__init__
+
+        def with_fixture_transport(self, target, env, **kwargs):
+            transport_init(self, target, env, **kwargs)
+            self.runner = worlds_by_target[self.target_sha256].runner
+
+        monkeypatch.setattr(KubernetesHTTP, '__init__', with_fixture_transport)
+    else:
+        monkeypatch.setattr(KubernetesContainerConfigExecutor, '__init__', with_runner)
     evds = run_plan(store, pack, plan, RunConfig(executors=executors, adapter='vllm', requested=config,
         side_configs={side: RunConfig(executors=executors, adapter='vllm', raw=values) for side, values in sides.items()}))
     originals = {}
     for source in (evd for evd in evds if evd.check_id == 'PLT-01'):
         assert source.execution.status == ExecStatus.COMPLETED
-        assert source.data_origin == DataOrigin.EXAMPLE
+        assert source.data_origin == (DataOrigin.MEASURED if review_fixture else DataOrigin.EXAMPLE)
         world = worlds_by_path[sides[source.side.value]['container_config']['target']]
         assert len(world.packets) == world.process_reads == 1
         scope = {'plan_ref': plan.ref(), 'side': source.side, 'attempt_id': source.execution.attempt_id,
@@ -66,6 +84,11 @@ def paired_original(tmp_path, monkeypatch):
         originals[source.side] = (store, source, scope, world)
     assert set(originals) == {Side.baseline, Side.candidate}
     return originals
+
+
+@pytest.fixture
+def paired_original(tmp_path, monkeypatch):
+    return paired_controls(tmp_path, monkeypatch)
 
 
 @pytest.fixture

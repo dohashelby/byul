@@ -4,13 +4,18 @@ import json
 
 import pytest
 
-from guard.executors import run_binding
+from guard.core.judge import judge_plan
+from guard.core.report import build_report
+from guard.executors import passive_api_hop, run_binding
+from guard.models import canonical_json, load_pack, sha256_hex, utcnow
 from guard.models.artifacts import model_closure_sha256
-from guard.models.objects import object_from_dict
+from guard.models.objects import Execution, object_from_dict
 from guard.store.bundle import export_bundle, restore_bundle
+from guard.store.packs import put_pack
 from guard.update_acceptance import assess_update
 from tests import update_builders as builders
 from tests.test_update_acceptance import patch_case
+from tests.test_passive_api_hop import paired_controls
 from tools import mvp_compare_review as tool
 
 
@@ -239,3 +244,56 @@ def test_not_applicable_requires_two_original_environment_conditions(monkeypatch
                        choose=lambda env: env['id'].endswith('CANDIDATE'))
     result = tool.review([wrong], pack=case[2], expected=_expected(case))
     assert result['rows']['REQ-03']['status'] == 'ORIGINAL_ROW_MISSING'
+
+
+@pytest.mark.parametrize('damage', [None, 'different-rpt-original', 'changed-digest', 'changed-trial'])
+def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_path, monkeypatch, damage):
+    originals = paired_controls(tmp_path, monkeypatch, review_fixture=True)
+    pack_path = tool.ROOT / 'packs/PACK-BASELINE'
+    pack = load_pack(pack_path)
+    for side, (store, source, scope, _) in originals.items():
+        plan = store.resolve(scope['plan_ref'])
+        prepared = next(evd for evd in store.iter_kind('EVD') if evd.check_id == 'PLT-08' and evd.side == side)
+        draft = passive_api_hop.draft_passive_api_hop(store, **scope)
+        trial, = draft.observations['api_transport_trials'].value
+        values = {key: trial[key] for key in ('profile', 'source_evidence', 'source_artifact_sha256', 'target_sha256')}
+        if side == 'baseline':
+            if damage == 'different-rpt-original':
+                store.put(source.model_copy(update={'revision': source.revision + 1}).seal())
+            elif damage == 'changed-digest':
+                values['source_artifact_sha256'] = '0' * 64
+                trial['source_artifact_sha256'] = values['source_artifact_sha256']
+            elif damage == 'changed-trial':
+                trial['hop_policy_adjudicated'] = True
+        binding = {'schema': run_binding.SCHEMA_2, 'check_id': 'PLT-08', 'side': side.value,
+                   'attempt_id': scope['attempt_id'], 'environment_sha256': source.environment.sha256,
+                   'files': {}, 'validity': None, 'issued_at': draft.started_at.isoformat(), 'values': values}
+        execution = Execution(status=draft.status, executor={'name': 'api_transport', 'version': passive_api_hop.PROFILE,
+                              'config_sha256': sha256_hex(canonical_json(draft.config))}, adapter=source.execution.adapter,
+                              started_at=draft.started_at, finished_at=draft.finished_at,
+                              attempt_id=scope['attempt_id'], run_binding=binding)
+        store.put(prepared.model_copy(update={'revision': prepared.revision + 1, 'refs': [*prepared.refs, source.ref()],
+            'data_origin': draft.data_origin, 'execution': execution, 'normal_control': draft.normal_control,
+            'observations': draft.observations, 'comparability': draft.comparability}).seal())
+
+    put_pack(store, pack_path)
+    as_of = utcnow()
+    judge_plan(store, pack, plan, as_of)
+    report = build_report(store, pack, plan, as_of)
+    store.put(report)
+    report_path = tmp_path / 'report.json'
+    report_path.write_bytes(canonical_json(report.to_dict()))
+    bundle, restored = tmp_path / 'evidence.zip', tmp_path / 'restored'
+    export_bundle(store.root, bundle)
+    restore_bundle(bundle, restored)
+    runs = list(tool._read_runs([(restored, report_path)], include_artifact_store=True))
+    result = tool.review(runs, pack=pack, expected=_expected(runs[0][:3]))
+    assert result['reports'][0]['verified']
+    row = result['rows']['PLT-08']
+    assert row['candidate']['verdicts']['security'] == 'UNKNOWN'
+    assert (row['baseline']['verdicts'] or {}).get('security') == ('UNKNOWN' if damage is None else None)
+    assert ('PASSIVE_API_HOP_PROVENANCE_INVALID' in row['baseline']['blocking_codes']) is (damage is not None)
+    if damage is None:
+        assert row['status'] == 'MEASURED_ROWS_VERIFIED'
+        assert all(not row[side]['blocking_codes'] for side in tool.SIDES)
+    assert not assess_update(*runs[0][:3], profile='plan-scope/2')['evidence_contract_valid']

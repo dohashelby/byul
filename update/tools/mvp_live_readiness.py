@@ -123,7 +123,7 @@ def _inspect(source, check, pack, issued_at):
     implementation = config.get('executors', {}).get(check.executor)
     if implementation not in ('real', 'kubernetes'):
         raise ValueError('MVP_ACTIVE_EXECUTOR_REQUIRED')
-    requires_native_matrix = check.collection_profile in (INPUT_MATRIX, REUSED_MATRIX)
+    requires_native_matrix = getattr(check, 'collection_profile', None) in (INPUT_MATRIX, REUSED_MATRIX)
     if requires_native_matrix and implementation != 'kubernetes':
         raise ValueError('NATIVE_INPUT_KUBERNETES_REQUIRED')
     if registry.resolve_executor(check.executor, implementation, engine=env.engine.name,
@@ -200,7 +200,8 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
     for cid, check in sorted(active.items()):
         rules = (check.judge.params if check.judge else {})
         security_rules = bool(rules.get('pass_when_all') or rules.get('fail_when_any'))
-        requires_native_matrix = check.collection_profile in (INPUT_MATRIX, REUSED_MATRIX)
+        collection_profile = getattr(check, 'collection_profile', None)
+        requires_native_matrix = collection_profile in (INPUT_MATRIX, REUSED_MATRIX)
         active_implementations = ('kubernetes',) if requires_native_matrix else ('real', 'kubernetes')
         for selected_side in selected_sides:
             expected = expected_versions[selected_side]
@@ -221,7 +222,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
                 except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as error:
                     row['blocking_codes'] = [_code(error)]
             if requires_native_matrix:
-                row['blocking_codes'].extend(_native_matrix_blockers(expected, check.collection_profile))
+                row['blocking_codes'].extend(_native_matrix_blockers(expected, collection_profile))
             if not implementations:
                 row['blocking_codes'].append('CURRENT_EXECUTOR_UNAVAILABLE')
             if not security_rules:

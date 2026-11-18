@@ -13,12 +13,13 @@ from guard.executors.kubernetes_credential_copy import KubernetesCredentialCopyR
 from guard.models import DataOrigin, Gap, canonical_json, sha256_hex
 from tests.builders import baseline_pack, environment, policy
 from tools import mvp_credential_copy_inputs as inputs
+from tools.mvp_runtime_policy import AMENDMENT
 
 
 def owned_declarations():
     pack = baseline_pack()
     base = policy(pack.ref(), status='CONFIRMED', confirmed_by='tests', confirmed_at='2026-11-17T00:00:00Z',
-                  data_origin=DataOrigin.DECLARED, source_document_sha256=sha256_hex(inputs.AMENDMENT.read_bytes()),
+                  data_origin=DataOrigin.DECLARED, source_document_sha256=sha256_hex(AMENDMENT.read_bytes()),
                   values={'PLT-12': {'copy_max_record_delay_ms': 5000}})
     environments = {side: environment(id='ENV-' + side, origin=DataOrigin.DECLARED,
         engine={'name': row['engine'], 'version': row['version'], 'image_digest': row['image']})
@@ -78,14 +79,14 @@ def test_materialized_files_pass_the_product_binding(tmp_path):
 
 
 @pytest.mark.parametrize('case,diagnostic', [
-    ('wrong-policy', 'COPY_APPROVED_POLICY_REQUIRED'),
-    ('scope', 'COPY_APPROVED_POLICY_REQUIRED'),
-    ('wrong-fixed-value', 'COPY_APPROVED_POLICY_VALUES_MISMATCH'),
+    ('wrong-policy', 'MVP_APPROVED_POLICY_REQUIRED'),
+    ('scope', 'MVP_APPROVED_POLICY_REQUIRED'),
+    ('wrong-fixed-value', 'MVP_APPROVED_POLICY_VALUES_MISMATCH'),
     ('wrong-environment', 'COPY_SELECTION_ENVIRONMENT_MISMATCH'),
     ('empty', 'COPY_SELECTION_INVENTORY_INVALID'),
     ('duplicate', 'COPY_INVENTORY_INVALID'),
     ('credential-value', 'COPY_SELECTION_INVENTORY_INVALID'),
-    ('existing-conflict', 'COPY_EXISTING_TREATMENTS_MISMATCH'),
+    ('existing-conflict', 'MVP_EXISTING_RUNTIME_VALUES_MISMATCH'),
 ])
 def test_cannot_replace_policy_or_accept_unbound_inventory(case, diagnostic):
     pack, base, environments, source = owned_declarations()

@@ -10,11 +10,17 @@ import yaml
 from guard.models import Environment, canonical_json, load_pack, sha256_hex
 from tests import test_mvp_sup08_inputs as old
 from tests.test_code_selection_observation import IMAGE
+from tests.test_ma6_release_profiles import historical_versions
 from tools import gpu_a_aws_lab, mvp_sup08_inputs, mvp_sup08_local_audit as tool
 from tools.mvp_versions import versions
 
 
-def local_assets(tmp_path, monkeypatch):
+def local_assets(tmp_path, monkeypatch, *, historical=False):
+    version_source = versions
+    if historical:
+        version_source = historical_versions
+        for module in (old, mvp_sup08_inputs, tool):
+            monkeypatch.setattr(module, 'versions', version_source)
     fixture_file, envs, targets = old.source(tmp_path, monkeypatch)
     fixture = json.loads(fixture_file.read_bytes())
     model = tmp_path / 'EXAMPLE-model'
@@ -65,7 +71,7 @@ def local_assets(tmp_path, monkeypatch):
     launch = tmp_path / 'launch'
     launch.mkdir()
     sides = {}
-    for side, expected in versions().items():
+    for side, expected in version_source().items():
         folder = launch / side
         folder.mkdir()
         engine, probe, render = gpu_a_aws_lab.render(old.fixtures.HANDOFF,
@@ -110,7 +116,7 @@ def test_example_environment_contracts_are_not_actual_environment_proof(tmp_path
 
 @pytest.mark.parametrize('damage',['missing','wrong-value','duplicate','value-from','render-selection','undeclared-env'])
 def test_rehashed_launch_cannot_normalize_a_wrong_engine_selection(tmp_path,monkeypatch,damage):
-    fixture,launch,_,_=local_assets(tmp_path,monkeypatch)
+    fixture,launch,_,_=local_assets(tmp_path,monkeypatch,historical=True)
     path=launch.parent/'baseline/engine.yaml'
     deployment,service=list(yaml.safe_load_all(path.read_bytes()))
     entries=deployment['spec']['template']['spec']['containers'][0]['env']
@@ -156,7 +162,7 @@ def test_engine_selection_comparison_uses_provider_data_for_other_variable_names
 @pytest.mark.parametrize('damage', ['missing-selection', 'wrong-env', 'rewritten-env', 'duplicate-env',
                                   'changed-engine', 'unrelated-env'])
 def test_self_rehashed_engine_selection_changes_or_other_env_differences_remain_invalid(tmp_path, monkeypatch, damage):
-    fixture, launch, _, _ = local_assets(tmp_path, monkeypatch)
+    fixture, launch, _, _ = local_assets(tmp_path, monkeypatch, historical=True)
     side = 'candidate' if damage == 'unrelated-env' else 'baseline'
     folder = launch.parent / side
     render_file = folder / 'render.json'
@@ -245,8 +251,13 @@ def test_reader_refuses_symlink_without_following_it(tmp_path, monkeypatch):
 def test_both_launch_commands_use_current_provider_data(tmp_path, monkeypatch):
     from guard.adapters.engine_provider import VllmProvider
     _, launch, _, _ = local_assets(tmp_path, monkeypatch)
-    for side, expected in versions().items():
+    pair = versions()
+    assert [pair[side]['version'] for side in tool.SIDES] == ['0.30.0', '0.31.0']
+    for side, expected in pair.items():
         deployment, _ = list(yaml.safe_load_all((launch.parent / side / 'engine.yaml').read_bytes()))
         engine, = deployment['spec']['template']['spec']['containers']
-        assert engine['command'] == VllmProvider().release_profile(expected['version'])['launch']['command']
-        assert engine['command'] != ['/usr/local/bin/vllm-nonroot-entrypoint.sh']
+        release = VllmProvider().release_profile(expected['version'])
+        render = json.loads((launch.parent / side / 'render.json').read_bytes())
+        assert engine['image'] == render['engine_image'] == expected['image']
+        assert engine['command'] == render['launch']['command'] == release['launch']['command']
+        assert render['launch']['engine'] == release['launch']['engine'] == 'V1'

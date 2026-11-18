@@ -210,6 +210,18 @@ RECORD_CASES = [
 ]
 
 
+def test_lif01_total_budget_ignores_stop_outside_selected_stage_costs():
+    budgets = {"fetch": 10, "load": 10}
+    values = {**VALUES, "supply_stage_budget_ms": budgets, "supply_stage_budget_bytes": budgets}
+    cost = {"elapsed_ms": 7, "peak_bytes": 1, "stopped": False, "temporary_cleaned": True}
+    rows = [{**cost, "stage": "fetch"}, {**cost, "stage": "load"}, {**cost, "stage": "compile", "stopped": True}]
+    evaluate = contract.EVALUATORS["LIF-01"]
+    assert evaluate(rows, values) == ([{"reason": "total_budget_exceeded_without_stop"}], [])
+
+    rows[1]["stopped"] = True
+    assert evaluate(rows, values) == ([], [])
+
+
 @pytest.mark.parametrize("check_id,bad,good,reason", RECORD_CASES)
 def test_record_rows_show_violation_and_clean_case(check_id, bad, good, reason):
     assert reason in [v["reason"] for v in contract.EVALUATORS[check_id]([bad], VALUES)[0]]
@@ -518,3 +530,45 @@ def test_collect_role_record_failure_still_collects_native(tmp_path, monkeypatch
         lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0, "missing": []})
     part_ = executor._collect_role(PACK.checks["SUP-05"], env, values, "normal")
     assert part_["row"]["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"] and part_["native"] is not None
+
+
+@pytest.mark.parametrize("condition", ["valid", "bad_type", "duplicate_stage", "unverified_owner"])
+def test_lif01_keeps_only_bound_reported_stage_costs(tmp_path, monkeypatch, condition):
+    env = environment(model={"id": "test"})
+    executor, values, digest = role_inputs(tmp_path, monkeypatch, "LIF-01", env)
+    values.update(supply_stage_budget_ms={"fetch": 10}, supply_stage_budget_bytes={"fetch": 100}, supply_total_budget_ms=10)
+    cost = {"stage": "fetch", "elapsed_ms": 7, "peak_bytes": 29, "stopped": False, "temporary_cleaned": True}
+    packet = good_packet(env.ref().model_dump(mode="json"), digest, "LIF-01")
+    packet["change"] = change(applied=False)
+    packet["rows"] = [dict(cost), {**cost, "stage": "EXAMPLE-UNSELECTED-DETAIL"}]
+    if condition == "bad_type":
+        packet["rows"][0]["peak_bytes"] = "EXAMPLE-NONNUMERIC"
+    elif condition == "duplicate_stage":
+        packet["rows"].append(dict(cost))
+    raw = canonical_json(packet)
+    calls = []
+
+    def read_file(self, client, target, *, container, image, path):
+        calls.append(path)
+        return raw, {"capture_sha256": sha256_hex(raw), "owner_binding_verified": condition != "unverified_owner"}
+
+    monkeypatch.setattr(FakeReader, "read_file", read_file)
+    monkeypatch.setattr(FakeReader, "report", lambda self: {})
+    draft = executor.run(PACK.checks["LIF-01"], env, values, None, tmp_path)
+    summary = json.loads((tmp_path / "supply_boot_summary.json").read_text())
+    normal, missing_challenge = draft.observations["supply_boot_sessions"].value
+
+    assert calls == [boot.record_path("a" * 32)]
+    assert summary["sessions"] == [normal, missing_challenge]
+    assert missing_challenge["diagnostic_codes"] == ["SUPPLY_BOOT_INPUT_UNAVAILABLE"]
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.observations["supply_boot_record_authenticated"].value is False
+    assert "EXAMPLE-UNSELECTED-DETAIL" not in json.dumps(summary)
+    assert "EXAMPLE-NONNUMERIC" not in json.dumps(summary)
+    assert [artifact.name for artifact in draft.artifacts] == ["supply_boot_summary.json"]
+    if condition == "valid":
+        assert normal["reported_stage_costs"] == [cost]
+        assert normal["record_sha256"] == sha256_hex(raw)
+    else:
+        assert "reported_stage_costs" not in normal and normal["record_sha256"] is None
+        assert normal["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"]

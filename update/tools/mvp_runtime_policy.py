@@ -5,6 +5,7 @@ from pathlib import Path
 from guard.core.select import _in_scope
 from guard.models import DataOrigin, PolicyStatus, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
+from guard.store import AppendOnlyError, Store
 
 ROOT = Path(__file__).resolve().parents[1]
 AMENDMENT = ROOT / 'docs/dev-1/mvp-enterprise-policy-20261118.json'
@@ -43,3 +44,23 @@ def fill_runtime_values(policy, check_id, materialized):
     return policy.model_copy(update={'revision': policy.revision + 1, 'created_at': utcnow(),
         'refs': [*policy.refs, policy.ref()],
         'values': {**policy.values, check_id: {**values, **materialized}}}).seal()
+
+
+def seed_run_store(root, base, revised):
+    """Commit the exact predecessor and candidate together, reusing an identical prior attempt."""
+    if root is None:
+        return revised
+    store = Store(root)
+    try:
+        store.put_many([base] if base.ref() == revised.ref() else [base, revised])
+    except AppendOnlyError as error:
+        store.resolve(base.ref())
+        try:
+            stored = store.get(revised.id, revised.revision)
+        except KeyError:
+            raise error from None
+        candidate = revised.model_copy(update={'created_at': stored.created_at}).seal()
+        if candidate.ref() != stored.ref():
+            raise
+        return stored
+    return revised

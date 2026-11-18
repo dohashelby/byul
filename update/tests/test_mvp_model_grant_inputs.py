@@ -7,14 +7,14 @@ import pytest
 from guard.core.select import select
 from guard.executors import run_binding
 from guard.executors.kubernetes_model_authorization import normalize_policy
-from guard.models import DataOrigin, Gap, canonical_json, sha256_hex
-from tests.builders import baseline_pack, environment, policy
+from guard.models import DataOrigin, Gap, canonical_json, load_pack, sha256_hex
+from tests.builders import environment, policy
 from tools import mvp_model_grant_inputs as inputs
-from tools.mvp_runtime_policy import AMENDMENT, BASE_DECISIONS
+from tools.mvp_runtime_policy import AMENDMENT, BASE_DECISIONS, ROOT
 
 
 def declarations():
-    pack = baseline_pack()
+    pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     decisions = json.loads(BASE_DECISIONS.read_bytes())['decisions']
     values = {row['key']: row['value'] for row in decisions if row['check_id'] == 'REQ-05' and row['key'] != inputs.GRANT}
     base = policy(pack.ref(), status='CONFIRMED', confirmed_by='tests', confirmed_at='2026-11-17T00:00:00Z',

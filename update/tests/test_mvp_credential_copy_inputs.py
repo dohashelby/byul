@@ -10,16 +10,17 @@ from guard.collectors.file import load_policy
 from guard.core.select import select
 from guard.executors import credential_copy_contract as contract, run_binding
 from guard.executors.kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor, load_inventory
-from guard.models import DataOrigin, Gap, canonical_json, sha256_hex
-from tests.builders import baseline_pack, environment, policy
+from guard.models import DataOrigin, Gap, canonical_json, load_pack, sha256_hex
+from guard.store import Store
+from tests.builders import environment, policy
 from tools import mvp_credential_copy_inputs as inputs
-from tools.mvp_runtime_policy import AMENDMENT
+from tools import mvp_runtime_policy as runtime_policy
 
 
 def owned_declarations():
-    pack = baseline_pack()
+    pack = load_pack(runtime_policy.ROOT / 'packs/PACK-BASELINE')
     base = policy(pack.ref(), status='CONFIRMED', confirmed_by='tests', confirmed_at='2026-11-17T00:00:00Z',
-                  data_origin=DataOrigin.DECLARED, source_document_sha256=sha256_hex(AMENDMENT.read_bytes()),
+                  data_origin=DataOrigin.DECLARED, source_document_sha256=sha256_hex(runtime_policy.AMENDMENT.read_bytes()),
                   values={'PLT-12': {'copy_max_record_delay_ms': 5000}})
     environments = {side: environment(id='ENV-' + side, origin=DataOrigin.DECLARED,
         engine={'name': row['engine'], 'version': row['version'], 'image_digest': row['image']})
@@ -34,7 +35,7 @@ def owned_declarations():
     return pack, base, environments, source
 
 
-def test_materialized_files_pass_the_product_binding(tmp_path):
+def test_materialized_files_pass_the_product_binding(tmp_path, monkeypatch):
     pack, base, environments, source = owned_declarations()
     policy_path = tmp_path / 'base.json'
     policy_path.write_bytes(canonical_json(base.to_dict()))
@@ -44,10 +45,12 @@ def test_materialized_files_pass_the_product_binding(tmp_path):
     selection = tmp_path / 'selection.json'
     selection.write_bytes(canonical_json(source))
     out = tmp_path / 'out'
+    store_path = tmp_path / 'run-store'
     with pytest.raises(ValueError, match='COPY_SELECTION_SOURCE_CHANGED'):
-        inputs.prepare(policy_path, paths, selection, '0' * 64, out)
-    assert not out.exists()
-    manifest = inputs.prepare(policy_path, paths, selection, sha256_hex(selection.read_bytes()), out)
+        inputs.prepare(policy_path, paths, selection, '0' * 64, out, store=store_path)
+    assert not out.exists() and not store_path.exists()
+    digest = sha256_hex(selection.read_bytes())
+    manifest = inputs.prepare(policy_path, paths, selection, digest, out, store=store_path)
     assert not manifest['actual_membership_verified'] and not manifest['treatment_observed']
     assert manifest == json.loads((out / 'manifest.json').read_bytes())
     assert all(sha256_hex((out / name).read_bytes()) == digest for name, digest in manifest['files'].items())
@@ -57,6 +60,11 @@ def test_materialized_files_pass_the_product_binding(tmp_path):
     assert revised.id == base.id and revised.revision == base.revision + 1
     assert revised.refs[-1] == base.ref() and revised.scope == base.scope
     assert (revised.confirmed_by, revised.confirmed_at) == (base.confirmed_by, base.confirmed_at)
+    store = Store.read_only(store_path)
+    assert store.resolve(base.ref()) == base and store.resolve(revised.ref()) == revised
+    monkeypatch.setattr(runtime_policy, 'utcnow', lambda: revised.created_at + timedelta(seconds=1))
+    replay = inputs.prepare(policy_path, paths, selection, digest, tmp_path / 'retry', store=store_path)
+    assert replay == manifest and store.revisions(base.id) == [base.revision, revised.revision]
     ordered = [environments[side] for side in ('baseline', 'candidate')]
     assert Gap.NO_POLICY_VALUE in select(pack, ordered, base, mode='update').item('PLT-12').gaps
     item = select(pack, ordered, revised, mode='update').item('PLT-12')

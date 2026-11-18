@@ -46,14 +46,17 @@ def validate_policy(values):
 
 def _segments(cfg, names):
     rows = cfg.get("record_segments")
-    if type(rows) is not list or {row.get("name") if type(row) is dict else None for row in rows} != set(names):
+    if type(rows) is not list or len(rows) != len(names):
         raise ValueError("RECORD_TRANSPORT_CONFIGURATION_INVALID")
     for row in rows:
-        if (set(row) - {"name", "container", "host", "port", "server_name", "wrong_server_name", "ca_file"}
+        if (type(row) is not dict or type(row.get("name")) is not str
+                or set(row) - {"name", "container", "host", "port", "server_name", "wrong_server_name", "ca_file"}
                 or any(type(row.get(k)) is not str or not row[k] for k in ("container", "host", "server_name", "wrong_server_name"))
                 or type(row.get("port")) is not int or not 1 <= row["port"] <= 65535
                 or row["server_name"] == row["wrong_server_name"]):
             raise ValueError("RECORD_TRANSPORT_CONFIGURATION_INVALID")
+    if {row["name"] for row in rows} != set(names):
+        raise ValueError("RECORD_TRANSPORT_CONFIGURATION_INVALID")
     return rows
 
 

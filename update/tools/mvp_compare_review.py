@@ -100,7 +100,8 @@ def _verify_passive_hop(evd, source, env, policy, plan, artifact_store, values):
 
 def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, source=None, artifact_store=None):
     side = {'environment': _dump(env.ref()), 'evidence': _dump(evd.ref()) if evd else None,
-            'result': _dump(result.ref()) if result else None, 'verdicts': None, 'blocking_codes': []}
+            'result': _dump(result.ref()) if result else None, 'verdicts': None, 'blocking_codes': [],
+            'execution_status': evd.execution.status.value if evd else None}
     blockers = side['blocking_codes']
     if evd is None:
         blockers.append('ORIGINAL_EVIDENCE_MISSING')
@@ -386,12 +387,30 @@ def review(run_inputs, *, pack, expected, assignments=None):
     exact_policy = bool(policies) and all(policy == policies[0] for policy in policies)
     verified_inputs = bool(reviews) and all(report['verified'] for report in reviews)
     complete = not unresolved and exact_policy and verified_inputs
+    execution_coverage = {}
+    for side in SIDES:
+        coverage = {'not_run': [], 'aborted': [], 'unverified': [], 'verified_measured': [], 'verified_not_applicable': []}
+        for check_id, row in inventory.items():
+            source = row.get(side, {})
+            execution_status = source.get('execution_status')
+            if row['status'] == 'SELECTION_VERIFIED':
+                coverage['verified_not_applicable'].append(check_id)
+            elif execution_status in {'NOT_RUN', 'ABORTED'}:
+                coverage[execution_status.lower()].append(check_id)
+            elif execution_status == 'COMPLETED' and not source['blocking_codes']:
+                coverage['verified_measured'].append(check_id)
+            else:
+                coverage['unverified'].append(check_id)
+        execution_coverage[side] = coverage
+    execution_complete = exact_policy and verified_inputs and all(
+        not (row['not_run'] or row['aborted'] or row['unverified']) for row in execution_coverage.values())
     return {
         'schema': 'guard-mvp-compare-review/1', 'pack_ref': _dump(pack.ref()),
         'policy_ref': policies[0] if exact_policy else None, 'active_checks': len(active), 'reports': reviews,
         'assigned_reports': assigned,
         'unknown_security_check_ids': unknown, 'unknown_security_count': len(unknown),
         'unknown_security_limit': UNKNOWN_LIMIT, 'unresolved_check_ids': unresolved,
+        'execution_coverage': execution_coverage, 'paired_execution_complete': execution_complete,
         'comparison_complete': complete, 'unknown_security_limit_met': complete and len(unknown) <= UNKNOWN_LIMIT,
         'all_reports_official': verified_inputs and all(report['official'] for report in reviews), 'rows': inventory,
     }

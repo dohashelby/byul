@@ -161,11 +161,10 @@ def main():
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     if len(pack.active_checks()) != 69:
         raise ValueError('MVP_ACTIVE_SCOPE_MISMATCH')
-    output = args.output.resolve()
-    if any(output.is_relative_to(store.resolve()) for store, _ in args.run):
+    if any(args.output.resolve().is_relative_to(store.resolve()) for store, _ in args.run):
         parser.error('--output must be outside the restored stores')
     result = review(_read_runs(args.run), pack=pack, expected=versions())
-    with output.open('x', encoding='utf-8') as stream:
+    with args.output.open('x', encoding='utf-8') as stream:
         json.dump(result, stream, ensure_ascii=False, indent=2)
 
 

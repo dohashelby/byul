@@ -25,6 +25,7 @@ from guard.executors import registry, run_binding
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
 from guard.models import load_pack
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
+from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
 from tools.mvp_a_input_preflight import _code, _pairs, _read
 from tools.mvp_versions import versions
 
@@ -63,15 +64,18 @@ def _native_matrix_blockers(expected, profile):
     return blockers
 
 
-def _check_native_prepared(spec, target, image):
+def _check_native_prepared(spec, target, env):
     if (type(spec) is not dict or set(spec) - {'prepared_dir', 'prepared_sha256', 'prepared_uid'}
             or type(spec.get('prepared_dir')) is not str or not spec['prepared_dir']
             or not native_input._sha(spec.get('prepared_sha256'))
             or ('prepared_uid' in spec and type(spec['prepared_uid']) is not int)):
         raise ValueError('NATIVE_INPUT_CAPTURE_SETTINGS_INVALID')
-    if (target.get('lab') is not True or type(target.get('engine')) is not dict
-            or target['engine'].get('image_digest') != image):
+    if target.get('lab') is not True:
         raise ValueError('NATIVE_INPUT_CAPTURE_TARGET_MISMATCH')
+    try:
+        validate_target_binding(target, env)
+    except KubernetesBindingError:
+        raise ValueError('NATIVE_INPUT_CAPTURE_TARGET_MISMATCH') from None
     try:
         manifest, _, _ = native_input.load_prepared(
             Path(spec['prepared_dir']).absolute(), expected_uid=spec.get('prepared_uid'))
@@ -79,7 +83,7 @@ def _check_native_prepared(spec, target, image):
         raise ValueError('NATIVE_INPUT_PREPARED_MISSING') from None
     except (OSError, ValueError, TypeError, KeyError):
         raise ValueError('NATIVE_INPUT_PREPARED_INVALID') from None
-    if (manifest['image'] != image
+    if (manifest['image'] != env.engine.image_digest
             or sha256(native_input.runtime.canonical(manifest)).hexdigest() != spec['prepared_sha256']):
         raise ValueError('NATIVE_INPUT_CAPTURE_BINDING_CHANGED')
 
@@ -153,7 +157,7 @@ def _inspect(source, check, pack, issued_at):
     except (ValueError, TypeError, KeyError):
         raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
     if requires_native_matrix:
-        _check_native_prepared(cfg.get('native_input_capture'), target_data, env.engine.image_digest)
+        _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
         after, current = _read(source[role]['path'])
         if current != identity or after != files[role]:

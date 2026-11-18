@@ -110,6 +110,7 @@ def test_typed_but_unsupported_policy_is_refused_by_the_actual_executor_before_n
     ('missing', 'NATIVE_INPUT_PREPARED_MISSING'),
     ('digest', 'NATIVE_INPUT_CAPTURE_BINDING_CHANGED'),
     ('target-image', 'NATIVE_INPUT_CAPTURE_TARGET_MISMATCH'),
+    ('pod-image', 'NATIVE_INPUT_CAPTURE_TARGET_MISMATCH'),
     ('owner', 'NATIVE_INPUT_PREPARED_INVALID'),
     ('asset', 'NATIVE_INPUT_PREPARED_INVALID'),
     ('real', 'NATIVE_INPUT_KUBERNETES_REQUIRED'),
@@ -146,7 +147,9 @@ def test_current_matrix_binds_actual_prepared_producer_output_offline(
     }).seal()
     target['environment_ref'] = env.ref().model_dump(mode='json')
     target['lab'] = True
-    target['engine']['image_digest'] = 'EXAMPLE-other-image' if capture == 'target-image' else identity['image']
+    other_image = 'example.invalid/engine@sha256:' + '0' * 64
+    target['engine']['image_digest'] = other_image if capture == 'target-image' else identity['image']
+    target['kubernetes']['engine']['image'] = other_image if capture == 'pod-image' else identity['image']
     values = input_values() if check_id == 'REQ-09' else reused_values()
     pol = policy(pack.ref(), scope={'include': [check_id]}, values={check_id: values})
     files = {}

@@ -104,12 +104,17 @@ class KubernetesSupplyBootExecutor:
             packet = contract.validate_record(strict_json(raw, limit=MAX_BYTES), check_id=check.id, role=role,
                 environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
                 source_sha256=values["supply_record_source_sha256"])
+            if check.id == "LIF-01" and provenance["owner_binding_verified"] is not True:
+                raise ValueError("SUPPLY_BOOT_RECORD_OWNER_UNVERIFIED")
             row.update(collected=True, record_sha256=provenance["capture_sha256"],
                        owner_binding_verified=provenance["owner_binding_verified"])
             result["packet"] = packet
             if check.id in {'SUP-15', 'SUP-16'}:
                 result['record_bytes'] = raw
             result["evaluated"] = contract.evaluate_record(check.id, packet, values)
+            if check.id == "LIF-01":
+                row["reported_stage_costs"] = [stage for stage in packet["rows"]
+                                               if stage["stage"] in values["supply_stage_budget_ms"]]
         except Exception:
             row["diagnostic_codes"].append("SUPPLY_BOOT_RECORD_UNAVAILABLE")
         if check.id in contract.NATIVE_CHECKS:

@@ -89,6 +89,15 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
     fields = _ROWS.get(check_id)
     if fields is not None and any(type(row) is not dict or set(row) != fields for row in packet["rows"]):
         raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+    if check_id == "LIF-01":
+        stages = set()
+        for row in packet["rows"]:
+            stage = row["stage"]
+            if (type(stage) is not str or not stage or stage in stages
+                    or any(type(row[key]) is not int or row[key] < 0 for key in ("elapsed_ms", "peak_bytes"))
+                    or any(type(row[key]) is not bool for key in ("stopped", "temporary_cleaned"))):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+            stages.add(stage)
     if check_id == 'SUP-15' and any(
             any(type(row[key]) is not bool for key in ('relevant_change', 'reused', 'compatibility_verified'))
             or type(row['path_sha256']) is not str or _SHA.fullmatch(row['path_sha256']) is None

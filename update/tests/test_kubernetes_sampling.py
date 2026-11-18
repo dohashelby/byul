@@ -355,6 +355,7 @@ def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combinatio
         assert len(world.execs) == 1 and world.execs[0]["id"] == NORMAL_LABEL and world.execs[0]["headers"] == {}
         assert draft.status == (ExecStatus.ABORTED if owner_changed else ExecStatus.COMPLETED)
         assert draft.data_origin == DataOrigin.EXAMPLE
+        assert draft.normal_control.attempted is True
         assert draft.normal_control.succeeded is (None if owner_changed else True)
         assert all(not step.attempted for step in draft.challenges)
         observations = _normalize(definition, draft)["observations"]
@@ -369,6 +370,7 @@ def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combinatio
         saved = json.loads(raw)
         assert saved["ownership_verified_before_after"] is (not owner_changed)
         assert saved["normal_completion_shape_verified"] is (not owner_changed)
+        assert saved["http_dispatch_observed"] is (None if owner_changed else True)
         if owner_changed:
             assert saved["response_capture"] is None
         else:
@@ -378,11 +380,13 @@ def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combinatio
         server.shutdown(); server.server_close(); thread.join(timeout=2)
 
 
-@pytest.mark.parametrize("fault", ["missing-hash", "wrong-env", "unknown-option", "missing-max-tokens", "roles", "wrong-check"])
+@pytest.mark.parametrize("fault", ["missing-hash", "wrong-env", "unknown-option", "missing-max-tokens", "roles", "wrong-check",
+                                 "wrong-executor", "unsupported-catalog-version"])
 def test_req10_normal_rejects_unbound_or_unsupported_input_before_remote_io(tmp_path, fault):
     from guard.models import canonical_json, sha256_hex
 
-    selected, target, definition, path = normal_sampling_inputs(tmp_path, "0.30.0")
+    version = "999.0.0" if fault == "unsupported-catalog-version" else "0.30.0"
+    selected, target, definition, path = normal_sampling_inputs(tmp_path, version)
     if fault == "wrong-env":
         target["environment_ref"]["sha256"] = "0" * 64
     path.write_bytes(canonical_json(target))
@@ -395,6 +399,8 @@ def test_req10_normal_rejects_unbound_or_unsupported_input_before_remote_io(tmp_
         config["roles"] = {}
     if fault == "wrong-check":
         definition = definition.model_copy(update={"id": "REQ-09"})
+    if fault == "wrong-executor":
+        definition = definition.model_copy(update={"executor": "input_validation"})
     world = World(target)
     approved = None if fault == "missing-hash" else sha256_hex(path.read_bytes())
     executor = KubernetesSamplingExecutor(config, runner=world.runner, expected_target_sha256=approved)

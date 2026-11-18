@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import math
 
+from guard.adapters.engine_profiles import supports
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
 from guard.models.base import utcnow
 from guard.runtime.bounded import strict_json
@@ -31,7 +32,8 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
     def validate_configuration(self, check):
         if NORMAL_OPTION not in self.cfg:
             return super().validate_configuration(check)
-        if (self.cfg[NORMAL_OPTION] is not True or check.id != "REQ-10" or getattr(check, "collection_profile", None) is not None
+        if (self.cfg[NORMAL_OPTION] is not True or check.id != "REQ-10" or check.executor != self.name
+                or getattr(check, "collection_profile", None) is not None
                 or set(self.cfg) - {"target", NORMAL_OPTION, "kubectl_binary", "request_timeout", "max_duration_seconds"}
                 or type(self.cfg.get("target")) is not str or not self.cfg["target"]
                 or len(check.functional_probes) != 1):
@@ -63,7 +65,7 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
             target_sha = sha256_hex(canonical_json(target))
-            if (adapter is None or env.engine.name != "vllm" or env.engine.version not in ("0.30.0", "0.31.0")
+            if (adapter is None or not supports(env.engine.name, env.engine.version, "sampling")
                     or type(target) is not dict or target["lab"] is not False
                     or target.get("synthetic") is True or self._expected_target_sha256 != target_sha):
                 raise ValueError
@@ -95,8 +97,11 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
                         and capture.get("original_body_sha256") == response.get("body_sha256"))
         normal = False
         if complete and control_state(response, transport.api_model, NORMAL_PATH) == "pass":
-            payload = strict_json(response["body"].encode(), limit=131072)
-            normal = len(payload["choices"]) == 1 and payload["usage"]["completion_tokens"] == NORMAL_OPTIONS["max_tokens"]
+            try:
+                payload = strict_json(response["body"].encode(), limit=131072)
+                normal = len(payload["choices"]) == 1 and payload["usage"]["completion_tokens"] == NORMAL_OPTIONS["max_tokens"]
+            except (KeyError, TypeError, ValueError):
+                normal = False
         cleanup = list(report["cleanup_errors"])
         error = None if normal and not report["collection_gap"] and not cleanup else "SAMPLING_NORMAL_OBSERVATION_INCOMPLETE"
         observations = {
@@ -109,6 +114,7 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         summary = {"profile": "kubernetes-owned-normal-sampling/1", "target_sha256": target_sha,
                    "probe_source_sha256": report["probe_source_sha256"], "binding_sha256": report["binding_sha256"],
                    "request_body_sha256": sha256_hex(canonical_json(body)), "supplied_sampling_options": options,
+                   "http_dispatch_observed": True if bound and type(response.get("outcome")) is int else None,
                    "ownership_verified_before_after": bound, "outcome": response.get("outcome") if bound else None,
                    "response_capture": capture if bound else None, "normal_completion_shape_verified": normal,
                    "uncollected": ["sampling_limits", "runner_consumption", "rejections", "structured_output", "tool_selection"]}
@@ -126,8 +132,8 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         if error and origin == DataOrigin.MEASURED:
             origin = DataOrigin.DECLARED
         return EvidenceDraft(status=ExecStatus.ABORTED if error else ExecStatus.COMPLETED, data_origin=origin,
-            normal_control={"attempted": bound, "succeeded": normal if bound else None,
-                            "detail": "One in-policy ordinary completion; renderer and runner consumption were not observed."},
+            normal_control={"attempted": True, "succeeded": normal if bound else None,
+                            "detail": "One in-policy collection attempt. HTTP dispatch is recorded only with a verified response."},
             challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
             observations={key: {"value": value, "collected": collected} for key, (value, collected) in observations.items()},
             artifacts=artifacts, config={NORMAL_OPTION: True, "target_sha256": target_sha},

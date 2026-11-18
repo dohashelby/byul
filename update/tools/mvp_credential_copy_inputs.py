@@ -10,7 +10,7 @@ from guard.executors import credential_copy_contract as copy_contract, run_bindi
 from guard.models import DataOrigin, Environment, Policy, canonical_json, load_pack, sha256_hex
 from guard.runtime.bounded import strict_json
 from tools.mvp_a_input_preflight import _read
-from tools.mvp_runtime_policy import ROOT, POLICY_MAX_BYTES, approved_rules, fill_runtime_values
+from tools.mvp_runtime_policy import ROOT, POLICY_MAX_BYTES, approved_rules, fill_runtime_values, seed_run_store
 from tools.mvp_versions import versions
 
 SELECTION_SCHEMA = 'guard-mvp-credential-copy-selection/1'
@@ -70,7 +70,7 @@ def materialize(policy, pack, environments, selection):
     return policy, inventory
 
 
-def prepare(policy_path, environment_paths, selection_path, expected_selection_sha256, output):
+def prepare(policy_path, environment_paths, selection_path, expected_selection_sha256, output, *, store=None):
     policy_raw, _ = _read(policy_path)
     policy = Policy.model_validate(strict_json(policy_raw, limit=POLICY_MAX_BYTES))
     selection_raw, _ = _read(selection_path)
@@ -82,6 +82,10 @@ def prepare(policy_path, environment_paths, selection_path, expected_selection_s
                     for side, path in environment_paths.items()}
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     bound_policy, inventory = materialize(policy, pack, environments, selection)
+    output = Path(output)
+    if output.exists():
+        raise FileExistsError(output)
+    bound_policy = seed_run_store(store, policy, bound_policy)
     outputs = {'policy.json': canonical_json(bound_policy.to_dict()), 'copy-inventory.json': canonical_json(inventory)}
     manifest = {
         'base_policy_ref': policy.ref().model_dump(mode='json'),
@@ -91,7 +95,6 @@ def prepare(policy_path, environment_paths, selection_path, expected_selection_s
         'files': {name: sha256_hex(raw) for name, raw in outputs.items()},
         'data_origin': 'DECLARED', 'actual_membership_verified': False, 'treatment_observed': False,
     }
-    output = Path(output)
     output.mkdir(exist_ok=False)
     for name, raw in outputs.items():
         with (output / name).open('xb') as stream:
@@ -109,9 +112,10 @@ def main():
     parser.add_argument('--selection', type=Path, required=True, help='Owned, non-secret copy IDs and actual start time')
     parser.add_argument('--selection-sha256', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--store', type=Path, help='Append the exact base and new POL to the prepared Guard run store')
     args = parser.parse_args()
     prepare(args.policy, {'baseline': args.baseline_environment, 'candidate': args.candidate_environment},
-            args.selection, args.selection_sha256, args.output)
+            args.selection, args.selection_sha256, args.output, store=args.store)
 
 
 if __name__ == '__main__':

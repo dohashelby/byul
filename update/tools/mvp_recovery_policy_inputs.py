@@ -10,7 +10,7 @@ from guard.models import DataOrigin, Environment, Policy, canonical_json, load_p
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_resource_recovery import PROFILE, PROBE_SOURCE_SHA256
 from tools.mvp_a_input_preflight import _read
-from tools.mvp_runtime_policy import ROOT, POLICY_MAX_BYTES, approved_rules, fill_runtime_values
+from tools.mvp_runtime_policy import ROOT, POLICY_MAX_BYTES, approved_rules, fill_runtime_values, seed_run_store
 from tools.mvp_versions import versions
 
 CHECK = 'LIF-11'
@@ -97,6 +97,7 @@ def main():
     parser.add_argument('--preflight', type=Path, required=True)
     parser.add_argument('--preflight-sha256', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--store', type=Path, help='Append the exact base and new POL to the prepared Guard run store')
     args = parser.parse_args()
     policy = Policy.model_validate(strict_json(_read(args.policy)[0], limit=POLICY_MAX_BYTES))
     sides = ('baseline', 'candidate')
@@ -107,6 +108,9 @@ def main():
         raise ValueError('MVP_RECOVERY_PREFLIGHT_SOURCE_CHANGED')
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     revised = materialize(policy, pack, envs, targets, strict_json(raw, limit=MAX_SOURCE_BYTES))
+    if args.output.exists():
+        raise FileExistsError(args.output)
+    revised = seed_run_store(args.store, policy, revised)
     with args.output.open('xb') as stream:
         stream.write(canonical_json(revised.to_dict()))
 

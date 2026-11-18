@@ -8,7 +8,7 @@ from guard.collectors.model_mapping import validate_model_mapping
 from guard.models import DataOrigin, Environment, Policy, canonical_json, load_pack, sha256_hex
 from guard.runtime.bounded import strict_json
 from tools.mvp_a_input_preflight import _read
-from tools.mvp_runtime_policy import ROOT, POLICY_MAX_BYTES, approved_rules, fill_runtime_values
+from tools.mvp_runtime_policy import ROOT, POLICY_MAX_BYTES, approved_rules, fill_runtime_values, seed_run_store
 from tools.mvp_versions import versions
 
 CHECK = 'REQ-05'
@@ -71,7 +71,7 @@ def materialize(policy, pack, environments, targets, inventory):
     return fill_runtime_values(policy, CHECK, {GRANT: [grant]})
 
 
-def prepare(policy_path, environment_paths, target_paths, inventory_path, expected_inventory_sha256, output):
+def prepare(policy_path, environment_paths, target_paths, inventory_path, expected_inventory_sha256, output, *, store=None):
     policy_raw = _read(policy_path)[0]
     policy = Policy.model_validate(strict_json(policy_raw, limit=POLICY_MAX_BYTES))
     environments = {side: Environment.model_validate(strict_json(_read(path)[0]))
@@ -82,7 +82,11 @@ def prepare(policy_path, environment_paths, target_paths, inventory_path, expect
         raise ValueError('MVP_MODEL_GRANT_INVENTORY_CHANGED')
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     bound = materialize(policy, pack, environments, targets, strict_json(inventory_raw))
-    with Path(output).open('xb') as stream:
+    output = Path(output)
+    if output.exists():
+        raise FileExistsError(output)
+    bound = seed_run_store(store, policy, bound)
+    with output.open('xb') as stream:
         stream.write(canonical_json(bound.to_dict()))
     return bound.ref()
 
@@ -96,10 +100,11 @@ def main():
     parser.add_argument('--inventory', type=Path, required=True)
     parser.add_argument('--inventory-sha256', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--store', type=Path, help='Append the exact base and new POL to the prepared Guard run store')
     args = parser.parse_args()
     prepare(args.policy, {'baseline': args.baseline_environment, 'candidate': args.candidate_environment},
             {'baseline': args.baseline_target, 'candidate': args.candidate_target}, args.inventory,
-            args.inventory_sha256, args.output)
+            args.inventory_sha256, args.output, store=args.store)
 
 
 if __name__ == '__main__':

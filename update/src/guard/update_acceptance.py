@@ -12,6 +12,7 @@ import re
 from guard.core.compare import compare_results, comparison_differences
 from guard.core.judge import pass_gate
 from guard.core.select import check_policy_value
+from guard.input_matrix_policy import PROFILE as INPUT_MATRIX_PROFILE, planned as planned_input_matrix
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import canonical_json, sha256_hex, weakest_origin
 from guard.models.objects import object_from_dict
@@ -21,13 +22,51 @@ SIDES = ("baseline", "candidate")
 AXES = ("security", "functional", "performance")
 _HASH = re.compile(r"[0-9a-f]{64}")
 _IMAGE = re.compile(r".+@sha256:[0-9a-f]{64}")
+_HTTP_STATUS = re.compile(r"[1-5][0-9]{2}")
 
 
 def _key(ref):
     return (ref.kind, ref.id, ref.revision, ref.sha256)
 
 
-def _coverage_blocks(check, evd):
+def _input_matrix_coverage_blocks(check, policy_values, value):
+    """Compare original coverage to the sealed policy's submitted pairs."""
+    cases = planned_input_matrix(check, policy_values)
+    controls = set()
+    for case_id in cases:
+        pair, label = case_id.rsplit("|", 1)
+        controls.update({pair + "|before", pair + "|after_" + label})
+    planned_controls, functional = value("functional_probes_planned"), value("functional_probe_results")
+    blocks = []
+    if (not isinstance(planned_controls, list) or len(planned_controls) != len(controls)
+            or not all(isinstance(control, str) for control in planned_controls)
+            or set(planned_controls) != controls or not isinstance(functional, dict)
+            or set(functional) != controls or any(v not in ("pass", "fail") for v in functional.values())):
+        blocks.append("planned input matrix normal functional probes are incomplete")
+
+    kinds = ("token_id", "length")
+    incomplete = "planned input matrix boundary cases are incomplete"
+    rows, outcomes = value("input_matrix_cases"), value("challenge_outcomes")
+    if (value("input_matrix_planned") != cases or not isinstance(rows, list) or len(rows) != len(cases)
+            or value("challenges_planned") != list(kinds) or not isinstance(outcomes, dict)
+            or set(outcomes) != set(cases).union(kinds)):
+        return [*blocks, incomplete]
+    first_outcomes = {}
+    for case_id, row in zip(cases, rows):
+        status = outcomes[case_id]
+        endpoint, format_name, label = case_id.rsplit("|", 2)
+        if (not isinstance(status, str) or not _HTTP_STATUS.fullmatch(status) or not isinstance(row, dict)
+                or row.get("case_id") != case_id or row.get("endpoint") != endpoint
+                or row.get("format") != format_name or row.get("case") != label
+                or row.get("attempted") is not True or row.get("outcome") != status):
+            return [*blocks, incomplete]
+        first_outcomes.setdefault(label, status)
+    if any(outcomes[kind] != first_outcomes.get(kind, "unavailable") for kind in kinds):
+        blocks.append(incomplete)
+    return blocks
+
+
+def _coverage_blocks(check, evd, policy_values):
     """Collection completeness beyond PASS: a FAIL must not hide missing trials.
 
     These are the existing five collectors' bounded observation contracts, not
@@ -36,6 +75,9 @@ def _coverage_blocks(check, evd):
     def value(name):
         obs = evd.observations.get(name)
         return obs.value if obs and obs.collected else None
+
+    if check.id == "REQ-09" and check.collection_profile == INPUT_MATRIX_PROFILE:
+        return _input_matrix_coverage_blocks(check, policy_values, value)
 
     blocks = []
     planned, functional = value("functional_probes_planned"), value("functional_probe_results")
@@ -225,8 +267,8 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
             if (item.check_revision != check.revision or item.executor != check.executor
                     or check.judge is None or check.judge.plugin != plugin.name):
                 raise ValueError(f"{cid}: PLAN definition/executor/rule_table differs from the fixed pack")
+            values = policy.values.get(cid, {})
             for param in check.policy_params:
-                values = policy.values.get(cid, {})
                 if param.required and param.key not in values:
                     raise ValueError(f"{cid}: original policy value is missing: {param.key}")
                 if param.key in values:
@@ -275,9 +317,9 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                 if (result.judge.name != plugin.name or result.judge.version != plugin.version
                         or result.judge.params_sha256 != sha256_hex(canonical_json(check.judge.params))):
                     raise ValueError(f"{cid}/{side}: original judge version/parameters mismatch")
-                raw = plugin.judge(check, evd, check.judge.params, policy.values.get(cid, {}))
+                raw = plugin.judge(check, evd, check.judge.params, values)
                 blocks = pass_gate(check, evd)
-                coverage_blocks = _coverage_blocks(check, evd)
+                coverage_blocks = _coverage_blocks(check, evd, values)
                 steps = [challenge.step for challenge in evd.challenges]
                 if len(steps) != len(set(steps)) or set(steps) - set(check.challenge_steps):
                     raise ValueError(f"{cid}/{side}: duplicate or unrecognized challenge records")

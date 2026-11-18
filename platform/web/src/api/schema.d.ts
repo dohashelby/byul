@@ -1483,6 +1483,18 @@ export interface components {
             /** Regressed */
             regressed: number;
         };
+        /** ReportFinding */
+        ReportFinding: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "forbidden_code_revision_imported";
+            /** Field */
+            field: string;
+            /** Revision */
+            revision: string;
+        };
         /** ReportFocus */
         ReportFocus: {
             /** Regressed */
@@ -1536,6 +1548,19 @@ export interface components {
             verification_level: string | null;
             /** Reasons */
             reasons: string[];
+            /** Missing Observations */
+            missing_observations?: string[];
+            /** Unverified Observations */
+            unverified_observations?: string[];
+            evidence_ref?: components["schemas"]["ManifestRef"] | null;
+            finding?: components["schemas"]["ReportFinding"] | null;
+        };
+        /** ReportTarget */
+        ReportTarget: {
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
         };
         /**
          * ReportView
@@ -1588,6 +1613,10 @@ export interface components {
             approval?: unknown;
             /** Inputs Manifest */
             inputs_manifest: components["schemas"]["ManifestRef"][];
+            /** Targets */
+            targets?: {
+                [key: string]: components["schemas"]["ReportTarget"];
+            };
             /** Checks */
             checks: components["schemas"]["ReportCheck"][];
         };

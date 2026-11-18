@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..models import RevalidationList, VerificationDetail, VerificationList
+from ..sources.report_evidence import enrich_report
 from ..sources.update import report_view
 from ..state import AppState, get_state, partition
 
@@ -43,11 +44,14 @@ def result(report_id: str, state: AppState = Depends(get_state)) -> dict[str, An
     if item is None:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "보고서가 없거나 형식 오류입니다"})
     entry = by_id.get(report_id)
+    report = report_view(item)
+    if entry:
+        enrich_report(report, item, entry.object_store)
     return {
         "item": item,
         "raw_checks": entry.raw_checks if entry else None,
         "raw_path": entry.path if entry else None,
-        "report": report_view(item),
+        "report": report,
         "source": state.source("update"),
     }
 

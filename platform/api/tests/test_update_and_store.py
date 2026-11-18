@@ -15,6 +15,7 @@ from byul_platform.contracts import canonical_sha256
 from byul_platform.diff import json_diff
 from byul_platform.inputs import MVP_PACK
 from byul_platform.main import create_app
+from byul_platform.sources.report_evidence import _import_violation
 from byul_platform.sources.update import rpt_to_verification_result
 from byul_platform.store import FileDocumentStore, RevisionExists
 from conftest import EXAMPLES, FIXTURES, load_json
@@ -86,7 +87,28 @@ def test_reports_dir_source(tmp_path):
         assert len(body["invalid"]) == 1  # 형식이 틀린 보고서는 버리지 않고 형식 오류로 낸다
         detail = c.get("/api/update/results/RPT-01M598RR3HPSJNHA1MENFA6P74").json()
         assert detail["raw_checks"]["SUP-01"]["question"]
+        assert detail["report"]["targets"] == {}
+        assert detail["report"]["checks"][0]["single"]["finding"] is None
         assert len(detail["item"]["checks"]) == 77
+
+
+def test_sup08_display_requires_a_measured_module_import():
+    source = RPT.parents[5] / "update/docs/evidence/gpu-a-SUP-08-20261114.json"
+    baseline, candidate = load_json(source)["runs"]
+    assert _import_violation(baseline["evidence"][0]) is None
+
+    evidence = candidate["evidence"][0]
+    finding = _import_violation(evidence)
+    assert finding is not None
+    assert finding["code"] == "forbidden_code_revision_imported"
+    assert finding["field"] == "mm_processor_kwargs.code_revision"
+
+    without_marker = copy.deepcopy(evidence)
+    trial = without_marker["observations"]["code_selection_confirmed_violations"]["value"][0]
+    trial["execution_markers"][finding["revision"]]["module_sha256"] = "0" * 64
+    assert _import_violation(without_marker) is None
+
+    assert _import_violation({**evidence, "data_origin": "EXAMPLE"}) is None
 
 
 # --- store -------------------------------------------------------------------

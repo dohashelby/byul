@@ -204,6 +204,12 @@ class VerificationList(BaseModel):
     source: SourceInfo
 
 
+class ReportFinding(BaseModel):
+    code: Literal["forbidden_code_revision_imported"]
+    field: str
+    revision: str
+
+
 class ReportSide(BaseModel):
     result_id: str | None
     result_revision: int | None
@@ -212,6 +218,10 @@ class ReportSide(BaseModel):
     performance: str | None
     verification_level: str | None
     reasons: list[str]
+    missing_observations: list[str] = Field(default_factory=list)
+    unverified_observations: list[str] = Field(default_factory=list)
+    evidence_ref: ManifestRef | None = None
+    finding: ReportFinding | None = None
 
 
 class ReportMark(BaseModel):
@@ -285,6 +295,11 @@ class ManifestRef(BaseModel):
     sha256: str | None
 
 
+class ReportTarget(BaseModel):
+    name: str
+    version: str
+
+
 class ReportView(BaseModel):
     """update 보고서 화면(삭제된 update HTML 보고서의 내용). 값은 계약 verification-result(0.2)에서 꺼낸다."""
 
@@ -310,6 +325,7 @@ class ReportView(BaseModel):
     not_selected: list[NotSelectedRow]
     approval: JsonValue = None
     inputs_manifest: list[ManifestRef]
+    targets: dict[str, ReportTarget] = Field(default_factory=dict)
     checks: list[ReportCheck]
 
 

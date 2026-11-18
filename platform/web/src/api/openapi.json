@@ -4113,6 +4113,30 @@
         ],
         "title": "ReportCounts"
       },
+      "ReportFinding": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "forbidden_code_revision_imported",
+            "title": "Code"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "field",
+          "revision"
+        ],
+        "title": "ReportFinding"
+      },
       "ReportFocus": {
         "properties": {
           "regressed": {
@@ -4343,6 +4367,40 @@
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "missing_observations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Observations"
+          },
+          "unverified_observations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unverified Observations"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManifestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportFinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4356,6 +4414,24 @@
           "reasons"
         ],
         "title": "ReportSide"
+      },
+      "ReportTarget": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "ReportTarget"
       },
       "ReportView": {
         "properties": {
@@ -4529,6 +4605,13 @@
             },
             "type": "array",
             "title": "Inputs Manifest"
+          },
+          "targets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ReportTarget"
+            },
+            "type": "object",
+            "title": "Targets"
           },
           "checks": {
             "items": {

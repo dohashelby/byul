@@ -51,7 +51,7 @@ class ExecutionUpdateSource:
 
     def __init__(self, base: UpdateSource, root: Path):
         self.base = base
-        self.generated = ReportDirUpdateSource(root)
+        self.generated = ReportDirUpdateSource(root, root.parent / "objects" / "store.sqlite")
 
     def _has_reports(self) -> bool:
         # Source badges are read on every API request. Do not parse all RPTs for a badge.

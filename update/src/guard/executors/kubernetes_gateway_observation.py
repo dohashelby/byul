@@ -22,9 +22,11 @@ import time
 
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import capture_pipes, strict_json
-from guard.runtime.kubernetes_http import GATEWAY_EVENT_PROFILE, KubernetesHTTP
+from guard.runtime.kubernetes_binding import validate_container_binding
+from guard.runtime.kubernetes_http import GATEWAY_EVENT_PROFILE, REQUEST_BINDING_PROFILE, KubernetesHTTP
 from guard.runtime.kubernetes_routes import KubernetesRoutesHTTP
 from . import observation_contract as base
+from .base import DraftArtifact, EvidenceDraft
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesCaptureError, KubernetesLifecycleReader
 from .owned_capture import _FILE_READER, MAX_BYTES
@@ -34,6 +36,8 @@ POLICY_TYPES = {**base.POLICY_TYPES, "observation_gateway_target_id": "str"}
 OBSERVATIONS = dict(base.OBSERVATIONS)
 RECORD_PATH = "/srv/serving/runtime/data/gateway_records.jsonl"
 RECORD_SCHEMA = "runtime-mvp-record/1.0"
+SNAPSHOT_OPTION = "gateway_record_snapshot_only"
+SNAPSHOT_SOURCE = "gateway_record_source"
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
 
 
@@ -55,6 +59,24 @@ def principal_sha256(principal_id):
 
 def gateway_target_sha256(target_id):
     return sha256_hex(("target:" + target_id).encode())
+
+
+def final_records(lines, *, run_id, session=None):
+    """Select original finals and fail on malformed JSONL instead of dropping lines."""
+    rows = []
+    for number, line in enumerate(lines, 1):
+        if not line.strip():
+            continue
+        try:
+            value = strict_json(line.encode(), limit=MAX_BYTES)
+        except ValueError:
+            raise ValueError(f"RUNTIME_RECORD_LINE_INVALID:{number}") from None
+        if type(value) is not dict or value.get("schema_version") != RECORD_SCHEMA:
+            raise ValueError(f"RUNTIME_RECORD_SCHEMA_UNSUPPORTED:{number}")
+        if (value.get("phase") == "final" and value.get("run_id") == run_id
+                and (session is None or value.get("observation_session_id") == session)):
+            rows.append(value)
+    return rows
 
 
 def record_events(lines, *, run_id):
@@ -92,11 +114,11 @@ def record_events(lines, *, run_id):
 
 
 class GatewayRecordReader(KubernetesLifecycleReader):
-    def __init__(self, routes, target, session, *, binary, duration, runner):
-        if target.get("lab") is not True:
+    def __init__(self, binding, target, session, *, binary, duration, runner, snapshot_only=False):
+        if target.get("lab") is not (not snapshot_only):
             raise KubernetesCaptureError()
-        binding = {"context": routes.binding["context"], "run_id": routes.binding["run_id"],
-                   "engine": deepcopy(routes.binding["gateway"])}
+        binding = {"context": binding["context"], "run_id": binding["run_id"],
+                   "engine": deepcopy(binding["gateway"])}
         self._initialize(binding, target, {"session": session}, binary=binary, duration=duration, runner=runner)
 
     def _program(self, container, argv, max_bytes):
@@ -104,6 +126,147 @@ class GatewayRecordReader(KubernetesLifecycleReader):
                 or argv != ["python3", "-c", _FILE_READER, RECORD_PATH, str(MAX_BYTES)] or max_bytes != 2 * MAX_BYTES):
             raise KubernetesCaptureError()
         return "file"
+
+
+def snapshot_record(raw, *, source, values, run_id):
+    """Select one preidentified, successful original final row from an owned file."""
+    if not 0 < len(raw) <= MAX_BYTES or not raw.endswith(b"\n"):
+        raise ValueError("GATEWAY_AUDIT_FILE_INCOMPLETE")
+    rows = final_records(raw.decode("utf-8").splitlines(), run_id=run_id, session=values["observation_session"])
+    matches = [row for row in rows if type(row.get("request_id")) is str
+               and sha256_hex(row["request_id"].encode()) == source["request_sha256"]]
+    if len(matches) != 1:
+        raise ValueError("GATEWAY_AUDIT_FINAL_NOT_UNIQUE")
+    row, = matches
+    decision, auth, delivery, policy, target = (row.get(key) for key in ("decision", "auth", "delivery", "policy", "target"))
+    if (row.get("environment") != source["environment"] or row.get("target_id") != source["target_id"]
+            or row.get("backend_kind") != "vllm" or row.get("data_origin") != "external_backend"
+            or row.get("route") not in ("POST /v1/completions", "POST /v1/chat/completions")
+            or row.get("final_outcome") != "completed"
+            or not all(type(item) is dict for item in (decision, auth, delivery, policy, target))
+            or target.get("target_id") != source["target_id"] or target.get("registration") != "ok"
+            or decision.get("result") != "ALLOWED" or type(decision.get("http_status")) is not int or decision["http_status"] != 200
+            or auth.get("state") != "authenticated" or delivery.get("attempted") is not True
+            or delivery.get("response") != "completed" or policy.get("sha256") != source["runtime_policy_sha256"]):
+        raise ValueError("GATEWAY_AUDIT_FINAL_SCOPE_MISMATCH")
+    record = record_events([canonical_json(row).decode()], run_id=run_id)
+    if not record or record[0]["actor_sha256"] != values["observation_allowed_actor_sha256"]:
+        raise ValueError("GATEWAY_AUDIT_ACTOR_MISMATCH")
+    source_reported_at = base._time(row.get("recorded_at")).isoformat()
+    return record[0], sha256_hex(canonical_json(row)), source_reported_at
+
+
+class KubernetesGatewayRecordSnapshotExecutor:
+    """Canonical OBS-01 snapshot from one existing Gateway-owned file."""
+    name = "required_event_record"
+    version = "0.2.0+gateway-record-snapshot"
+
+    def __init__(self, cfg, *, runner=None, expected_target_sha256=None):
+        self.cfg, self.runner, self.expected_target = cfg, runner, expected_target_sha256
+
+    def validate_policy(self, check, values):
+        if type(self.cfg) is not dict:
+            raise ValueError("GATEWAY_AUDIT_CONFIGURATION_INVALID")
+        source = self.cfg.get(SNAPSHOT_SOURCE)
+        if (check.id != "OBS-01" or check.collection_profile != base.PROFILE
+                or self.cfg.get(SNAPSHOT_OPTION) is not True
+                or set(self.cfg) - {"target", SNAPSHOT_OPTION, SNAPSHOT_SOURCE, "kubectl_binary", "max_duration_seconds"}
+                or type(source) is not dict or set(source) != {"environment", "target_id", "runtime_policy_sha256", "request_sha256"}
+                or any(type(source[key]) is not str or _ID.fullmatch(source[key]) is None for key in ("environment", "target_id"))
+                or any(not base.fingerprint(source[key]) for key in ("runtime_policy_sha256", "request_sha256"))):
+            raise ValueError("GATEWAY_AUDIT_CONFIGURATION_INVALID")
+        base.normalize_policy(values)
+        if "ACCESS_ALLOWED" not in values["observation_required_events"]:
+            raise ValueError("GATEWAY_AUDIT_POLICY_SCOPE_UNSUPPORTED")
+
+    def run(self, check, env, policy_values, adapter, workdir):
+        self.validate_policy(check, policy_values)
+        values = policy_values
+        started = utcnow()
+        start, end = base.normalize_policy(values)
+        try:
+            with Path(self.cfg["target"]).open("rb") as stream:
+                target = strict_json(stream.read(65537), limit=65536)
+            target_sha = sha256_hex(canonical_json(target))
+            if (target["lab"] is not False or not env.hash_ok() or adapter is None or env.engine.name != "vllm"
+                    or self.expected_target != target_sha or values["observation_target_sha256"] != target_sha
+                    or env.ref().sha256 != values["observation_environment_sha256"] or not start <= started <= end):
+                raise ValueError
+            gateway = target["kubernetes_gateway"]
+            validate_container_binding(gateway)
+            engine_view = {key: value for key, value in target.items() if key != "kubernetes_gateway"}
+            duration = self.cfg.get("max_duration_seconds", 120)
+            binary = self.cfg.get("kubectl_binary", "kubectl")
+            transport = KubernetesHTTP(engine_view, env, duration=duration, binary=binary,
+                                       runner=self.runner, profile=REQUEST_BINDING_PROFILE)
+            for role in ("engine", "probe"):
+                other = transport.binding[role]
+                if (any(gateway[key] != other[key] for key in ("namespace", "namespace_uid"))
+                        or any(gateway[key] == other[key] for key in ("pod_uid", "container_id", "pod_ip"))):
+                    raise ValueError
+            binding = {**transport.binding, "gateway": gateway}
+            reader = GatewayRecordReader(binding, target, values["observation_session"], binary=binary,
+                                         duration=duration, runner=self.runner, snapshot_only=True)
+        except (KeyError, TypeError, ValueError, OSError, AttributeError):
+            raise ValueError("GATEWAY_AUDIT_TARGET_UNVERIFIED") from None
+        record = capture = None
+        error = None
+        source = self.cfg[SNAPSHOT_SOURCE]
+        try:
+            transport._verify()
+            raw, provenance = reader.read_file(reader, target, container=gateway["container"], image=gateway["image"], path=RECORD_PATH)
+            transport._verify()
+            file_sha = sha256_hex(raw)
+            if (provenance.get("owner_binding_verified") is not True or provenance.get("capture_sha256") != file_sha
+                    or provenance.get("bytes") != len(raw) or not start <= utcnow() <= end):
+                raise ValueError
+            record, record_sha, recorded_at = snapshot_record(raw, source=source, values=values, run_id=binding["run_id"])
+            capture = {"stage": "gateway-record-snapshot", "environment_sha256": env.ref().sha256,
+                       "target_sha256": target_sha, "gateway_owner_sha256": sha256_hex(canonical_json(gateway)),
+                       "gateway_image_ref_sha256": sha256_hex(gateway["image"].encode()),
+                       "runtime_session_sha256": sha256_hex(values["observation_session"].encode()),
+                       "declared_producer_sha256": values["observation_expected_source_sha256"],
+                       "file_bytes_sha256": file_sha, "file_bytes": len(raw), "owner_binding_verified": True,
+                       "record_sha256": record_sha, "source_reported_recorded_at": recorded_at,
+                       "event_policy_matches": record["policy_sha256"] == values["observation_event_policy_sha256"],
+                       "source_ended": False, "event_arrival_time_verified": False}
+        except (KeyError, TypeError, ValueError, OSError, RuntimeError):
+            error = "GATEWAY_AUDIT_RECORD_UNAVAILABLE"
+        cleanup = list(transport.cleanup_errors)
+        if reader.report().get("parent_cleanup_unverified"):
+            cleanup.append("GATEWAY_AUDIT_PARENT_CLEANUP_UNVERIFIED")
+        if reader.gap or cleanup:
+            error = error or "GATEWAY_AUDIT_COLLECTION_INCOMPLETE"
+        observed = record is not None
+        missing = [{"case_id": None, "event": event,
+                    "reason": "independent_trigger_and_collection_time_unverified" if event == "ACCESS_ALLOWED" and observed
+                    else "no_selected_gateway_final_record"} for event in values["observation_required_events"]]
+        observations = {
+            "required_event_trials": (None, False), "required_event_records": ([record] if observed else None, observed),
+            "required_event_matches": (None, False), "required_event_missing": (missing, True),
+            "required_event_conflict_candidates": (None, False), "required_event_collection": ([capture] if observed else [], True),
+            "required_event_records_collected": (observed, True), "required_event_producer_authenticated": (False, True),
+            "required_event_independent_trigger_verified": (False, True), "required_event_scope_complete": (False, True),
+        }
+        artifacts = []
+        try:
+            path = Path(workdir) / "gateway_record_snapshot.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("xb") as stream:
+                stream.write(canonical_json({"capture": capture, "record": record, "diagnostic": error}))
+            artifacts.append(DraftArtifact(name=path.name, path=path, collector=f"{self.name}/{self.version}"))
+        except OSError:
+            error = error or "GATEWAY_AUDIT_ARTIFACT_UNAVAILABLE"
+            cleanup.append("GATEWAY_AUDIT_ARTIFACT_UNAVAILABLE")
+        return EvidenceDraft(
+            status=ExecStatus.ABORTED if error else ExecStatus.COMPLETED,
+            data_origin=DataOrigin.EXAMPLE if self.runner is not None or env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
+            normal_control={"attempted": False, "succeeded": None, "detail": "Read one existing Gateway final record."},
+            challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
+            observations={key: {"value": value, "collected": collected} for key, (value, collected) in observations.items()},
+            artifacts=artifacts, config={"profile": base.PROFILE, SNAPSHOT_OPTION: True, "target_sha256": target_sha,
+                                        "gateway_record_source_sha256": sha256_hex(canonical_json(source))},
+            started_at=started, finished_at=utcnow(), abort_reason=error, cleanup_errors=cleanup)
 
 
 class KubernetesGatewayRequiredEventExecutor(HttpCheckExecutor):
@@ -180,7 +343,7 @@ class KubernetesGatewayRequiredEventExecutor(HttpCheckExecutor):
                 summary["diagnostic_codes"].append("GATEWAY_RECORD_UNAVAILABLE")
             summary["collection"].append(row)
         try:
-            reader = GatewayRecordReader(routes, ctx._full_target, values["observation_session"],
+            reader = GatewayRecordReader(routes.binding, ctx._full_target, values["observation_session"],
                                          binary=self.cfg.get("kubectl_binary", "kubectl"),
                                          duration=self.cfg.get("max_duration_seconds", 120), runner=self.runner or capture_pipes)
             reader.snapshot()

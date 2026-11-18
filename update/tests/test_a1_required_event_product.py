@@ -114,7 +114,7 @@ def inputs(tmp_path,mode='normal'):
     return environment,world,values,pack,receipt
 
 
-@pytest.mark.parametrize('mode', ['normal','wrong-record-target','missing','bad-source','pod-replaced'])
+@pytest.mark.parametrize('mode', ['normal','wrong-record-target','wrong-actor','missing','bad-source','pod-replaced'])
 def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key(tmp_path,mode):
     environment,world,values,_,_=inputs(tmp_path,mode)
     world.target['lab']=False
@@ -154,6 +154,10 @@ def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key
         assert observations['required_event_records'].value==[record]
         capture,=observations['required_event_collection'].value
         assert capture['owner_binding_verified'] and capture['file_bytes_sha256']==sha256_hex(canonical_json(world._packet()))
+    if mode=='wrong-actor':
+        assert observations['required_event_records'].value==[]
+        summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+        assert summary['unmatched_actor_count']==1 and 'OBSERVATION_RECORD_ACTOR_UNVERIFIED' in summary['diagnostic_codes']
     assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
 
 

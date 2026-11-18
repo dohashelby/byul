@@ -109,18 +109,24 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         reader=RequiredEventReader(ctx.cprobe,ctx.target,values['observation_session'],
             binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120),
             runner=self.runner or capture_pipes,snapshot_only=True)
-        packet=None; provenance=None; records=[]; diagnostic=None
+        packet=None; provenance=None; records=[]; diagnostics=[]; unmatched_actor_count=0
         try:
             packet,provenance=self._read_bound_packet(ctx,reader,*normalize_policy(values))
             run_hash=sha256_hex(reader.binding['run_id'].encode())
-            records=[row for row in packet['events'] if row['event'] in values['observation_required_events']
-                     and row['run_sha256']==run_hash and row['target_sha256']==values['observation_target_sha256']]
-            if not records:diagnostic='OBSERVATION_RECORD_SCOPE_EMPTY'
+            expected_actors={'ACCESS_ALLOWED':values['observation_allowed_actor_sha256'],
+                             'ACCESS_DENIED':values['observation_denied_actor_sha256']}
+            scoped=[row for row in packet['events'] if row['event'] in expected_actors
+                    and row['event'] in values['observation_required_events']
+                    and row['run_sha256']==run_hash and row['target_sha256']==values['observation_target_sha256']]
+            records=[row for row in scoped if row['actor_sha256']==expected_actors[row['event']]]
+            unmatched_actor_count=len(scoped)-len(records)
+            if not records:diagnostics.append('OBSERVATION_RECORD_SCOPE_EMPTY')
+            if unmatched_actor_count:diagnostics.append('OBSERVATION_RECORD_ACTOR_UNVERIFIED')
         except (KeyError,ValueError,TypeError,OSError,KubernetesCaptureError):
-            diagnostic='OBSERVATION_RECORD_UNAVAILABLE'
+            diagnostics.append('OBSERVATION_RECORD_UNAVAILABLE')
         reader_report=reader.report()
         ctx._obs_cleanup=['OBSERVATION_RECORD_PARENT_CLEANUP_UNVERIFIED'] if reader_report.get('parent_cleanup_unverified') else []
-        ctx._obs_gap=bool(diagnostic or reader.gap or ctx._obs_cleanup)
+        ctx._obs_gap=bool(not records or reader.gap or ctx._obs_cleanup)
         collected=packet is not None
         capture={'stage':'record-snapshot','collected':collected,
                  'owner_binding_verified':collected,'file_bytes_sha256':provenance['capture_sha256'] if collected else None,
@@ -138,7 +144,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             'required_event_independent_trigger_verified':(False,True),'required_event_scope_complete':(False,True),
         }
         summary={'profile':PROFILE,'record_snapshot_only':True,'capture':capture,
-                 'diagnostic_codes':[diagnostic] if diagnostic else [],'record_transport':reader_report,
+                 'diagnostic_codes':diagnostics,'record_transport':reader_report,'unmatched_actor_count':unmatched_actor_count,
                  'fixture':{'profile':PROFILE,'scope':'owned-existing-audit-record-snapshot'},
                  'independent_trigger_verified':False,'event_arrival_time_verified':False}
         normal={'attempted':False,'succeeded':None,'detail':'Read a bounded existing audit record; no request was sent.'}

@@ -7,11 +7,14 @@ from pathlib import Path
 import os,stat
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP,REQUIRED_EVENT_PROFILE
+from guard.runtime.kubernetes_http import KubernetesHTTP,REQUEST_BINDING_PROFILE,REQUIRED_EVENT_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_observation import RequiredEventReader
 from .owned_capture import MAX_BYTES
 from . import credential_copy_contract as contract
+
+SNAPSHOT_OPTION='copy_record_snapshot_only'
+SNAPSHOT_VERSION='0.2.0+copy-record-snapshot'
 
 
 def load_inventory(path,expected_hash,expected_policy):
@@ -35,33 +38,48 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
+        if self.cfg.get(SNAPSHOT_OPTION) is True:self.version=SNAPSHOT_VERSION
 
     def validate_policy(self,check,values):
         if check.id!='PLT-12' or getattr(check,'collection_profile',None)!=contract.PROFILE:raise ValueError('COPY_PROFILE_UNSUPPORTED')
         contract.normalize_policy(values)
+        if SNAPSHOT_OPTION in self.cfg:
+            if (self.cfg[SNAPSHOT_OPTION] is not True
+                    or set(self.cfg)-{'target','copy_inventory','kubectl_binary','max_duration_seconds',SNAPSHOT_OPTION}):
+                raise ValueError('COPY_RECORD_SNAPSHOT_CONFIGURATION_INVALID')
+            business={key:values[key] for key in ('copy_max_record_delay_ms',contract.DECISION_KEY) if key in values}
+            if not business.get(contract.DECISION_KEY) or sha256_hex(canonical_json(business))!=values['copy_policy_sha256']:
+                raise ValueError('COPY_RECORD_SNAPSHOT_POLICY_UNVERIFIED')
 
     def run(self,check,env,policy_values,adapter,workdir):
         self.validate_policy(check,policy_values)
+        snapshot_only=self.cfg.get(SNAPSHOT_OPTION) is True
         try:
-            if set(self.cfg)-{'target','copy_inventory','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
+            if set(self.cfg)-{'target','copy_inventory','kubectl_binary','max_duration_seconds',SNAPSHOT_OPTION} or adapter is None:raise ValueError
             start,end=contract.normalize_policy(policy_values)
             if env.ref().sha256!=policy_values['copy_environment_sha256'] or not start<=utcnow()<=end:raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             target_hash=sha256_hex(canonical_json(target))
-            if (target.get('lab') is not True or target_hash!=policy_values['copy_target_sha256']
+            expected_lab=not snapshot_only
+            if (target.get('lab') is not expected_lab or target_hash!=policy_values['copy_target_sha256']
+                    or snapshot_only and self.expected_target is None
                     or self.expected_target is not None and target_hash!=self.expected_target):raise ValueError
             inventory=load_inventory(self.cfg['copy_inventory'],policy_values['copy_inventory_sha256'],policy_values['copy_policy_sha256'])
             # @38 (RB3-Q4): treatments are decided in policy; the run's inventory must carry exactly them.
             if contract.DECISION_KEY in policy_values and contract.treatments(inventory)!=policy_values[contract.DECISION_KEY]:raise ValueError
         except (KeyError,TypeError,ValueError,OSError,RuntimeError):raise ValueError('COPY_CONFIGURATION_INVALID') from None
+        profile=REQUEST_BINDING_PROFILE if snapshot_only else REQUIRED_EVENT_PROFILE
         transport=KubernetesHTTP(target,env,duration=self.cfg.get('max_duration_seconds',120),
-            binary=self.cfg.get('kubectl_binary','kubectl'),runner=self.runner,profile=REQUIRED_EVENT_PROFILE)
+            binary=self.cfg.get('kubectl_binary','kubectl'),runner=self.runner,profile=profile)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,
             allow_mutating=False,keys={},secrets=[],cprobe=transport,workdir=workdir,started=utcnow())
-        ctx._copy_inventory=inventory;return self._finish(ctx)
+        ctx._copy_inventory=inventory;ctx._copy_snapshot_only=snapshot_only
+        if snapshot_only:ctx.http_probe_profile=profile
+        return self._finish(ctx)
 
     def collect(self,ctx):
         values=ctx.policy_values;start,end=contract.normalize_policy(values);reader=None;snapshots=[];collection=[];diagnostics=[]
+        snapshot_only=getattr(ctx,'_copy_snapshot_only',False)
         def collect_stage(stage):
             row={'stage':stage,'collected':False,'file_bytes_sha256':None,'file_bytes':None,'owner_binding_verified':False,'collected_at':utcnow().isoformat()}
             try:
@@ -73,15 +91,25 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
                     target_sha256=values['copy_target_sha256'],session=values['copy_record_session'],
                     source_sha256=values['copy_record_source_sha256'],inventory_sha256=values['copy_inventory_sha256'],policy_sha256=values['copy_policy_sha256'])
                 if provenance.get('owner_binding_verified') is not True or not start<=utcnow()<=end:raise ValueError
+                snapshot={'stage':stage,'collected':True,'packet':packet}
+                if snapshot_only:
+                    if not start<=contract.stamp(packet['recorded_at'])<=utcnow():raise ValueError
+                    events=[event for event in packet['events'] if event['type']=='COPY_INVENTORY_CLAIM']
+                    snapshot.update(packet={**packet,'events':events}, event_scope='copy-inventory-claims-only',
+                                    source_event_count=len(packet['events']))
                 row.update(collected=True,file_bytes_sha256=sha256_hex(raw),file_bytes=len(raw),
                     owner_binding_verified=provenance.get('owner_binding_verified') is True)
-                snapshots.append({'stage':stage,'collected':True,'packet':packet})
+                snapshots.append(snapshot)
             except Exception:diagnostics.append('COPY_RECORD_UNAVAILABLE')
             collection.append(row)
         try:
             reader=RequiredEventReader(ctx.cprobe,ctx.target,values['copy_record_session'],
-                binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120),runner=self.runner or capture_pipes)
-            reader.snapshot();collect_stage('before');reader.snapshot();collect_stage('after');reader.snapshot()
+                binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120),
+                runner=self.runner or capture_pipes,snapshot_only=snapshot_only)
+            if snapshot_only:
+                collect_stage('snapshot')
+            else:
+                reader.snapshot();collect_stage('before');reader.snapshot();collect_stage('after');reader.snapshot()
         except Exception:diagnostics.append('COPY_PREFLIGHT_OR_GENERATION_UNAVAILABLE')
         projected=contract.project(ctx._copy_inventory,snapshots,values)
         report=None;transport=None;cleanup=[]
@@ -94,7 +122,8 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
                 if reader._parent_cleanup_failures:cleanup.append('COPY_RECORD_PARENT_CLEANUP_UNVERIFIED')
             except Exception:diagnostics.append('COPY_READER_REPORT_UNAVAILABLE')
         semantic='actual_copy_membership_treatment_reuse_and_authority_unverified'
-        ctx._copy_gap=bool(diagnostics or projected['conflicts'] or any(code!=semantic for code in projected['missing']) or len(snapshots)!=2)
+        ctx._copy_gap=bool(diagnostics or projected['conflicts'] or len(snapshots)!=(1 if snapshot_only else 2)
+            or not snapshot_only and any(code!=semantic for code in projected['missing']))
         ctx._copy_cleanup=cleanup
         summary={'profile':contract.PROFILE,'inventory':ctx._copy_inventory,'snapshots':snapshots,'collection':collection,
             'projection':projected,'reader':report,'transport':transport,'diagnostic_codes':sorted(set(diagnostics)),
@@ -108,12 +137,23 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
             'copy_treatment_verified':False,'copy_reuse_enforcer_verified':False,'copy_issuer_verified':False,'copy_scope_complete':False}
         normal={'attempted':False,'succeeded':None,'detail':'Read-only declarations; actual copy membership/treatment/reuse and normal credential control are independently unverified.'}
         challenges=[{'step':step,'attempted':False,'observations':{'copy_scope_complete':False}} for step in ctx.check.challenge_steps]
-        return {key:{'value':value,'collected':True} for key,value in observations.items()},normal,challenges,summary
+        output={key:{'value':value,'collected':True} for key,value in observations.items()}
+        if snapshot_only:
+            summary[SNAPSHOT_OPTION]=True
+            summary['fixture']['scope']='one-owned-copy-inventory-record-snapshot'
+            for key in ('copy_treatment_candidates','copy_reuse_candidates','copy_issuer_declarations'):
+                output[key]={'value':None,'collected':False}
+            if not snapshots:
+                for key in ('copy_record_snapshots','copy_event_declarations'):
+                    output[key]={'value':None,'collected':False}
+        return output,normal,challenges,summary
 
     def _finish(self,ctx):
         draft=super()._finish(ctx)
         ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
         draft.data_origin=min(draft.data_origin,ceiling,key=lambda value:ORIGIN_STRENGTH[value])
-        if ctx._copy_gap or ctx._copy_cleanup:draft.status=ExecStatus.ABORTED
+        if ctx._copy_gap or ctx._copy_cleanup:
+            draft.status=ExecStatus.ABORTED
+            if getattr(ctx,'_copy_snapshot_only',False):draft.abort_reason=draft.abort_reason or 'COPY_RECORD_SNAPSHOT_INCOMPLETE'
         draft.cleanup_errors.extend(ctx._copy_cleanup)
         return draft

@@ -790,6 +790,11 @@
       "manifest_sha256": "6255865edce58e03c98dc3f5cb6234651d72c2018e9da186f7c926577ac0d029",
       "reviewed_by": "Codex / paired record scopes and evidence consumers self-review / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T19:30:12+00:00"
+    },
+    {
+      "manifest_sha256": "7640f410eb307e883334436fc3cefff27cce577dbdde1f1f283573c8088d0eb9",
+      "reviewed_by": "Codex / exact SUP-05 provenance and PLT-09 state review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T19:45:49+00:00"
     }
   ]
 }

@@ -37,8 +37,19 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         if self.cfg.get('record_snapshot_only') is True:
             self.requires_roles=False
             self.version='0.2.0+record-snapshot'
+        if self.cfg.get('copy_record_snapshot_only') is True:
+            from .kubernetes_credential_copy import SNAPSHOT_VERSION
+            self.requires_roles=False
+            self.version=SNAPSHOT_VERSION
+
+    def keys(self):
+        if self.cfg.get('copy_record_snapshot_only') is True:return {}
+        return super().keys()
 
     def validate_policy(self,check,values):
+        if 'copy_record_snapshot_only' in self.cfg:
+            from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
+            return KubernetesCredentialCopyRecordExecutor(self.cfg).validate_policy(check,values)
         if 'record_snapshot_only' in self.cfg and (
                 self.cfg['record_snapshot_only'] is not True or check.id!='OBS-01'
                 or getattr(check,'collection_profile',None)!=PROFILE
@@ -62,8 +73,8 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             return gateway.KubernetesGatewayRequiredEventExecutor(self.cfg,runner=self.runner,environ=self._environ,
                 expected_target_sha256=self.expected_target).run(check,env,policy_values,adapter,workdir)
         if check.id=='PLT-12':
-            from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
-            if set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds'}:
+            from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor,SNAPSHOT_OPTION
+            if set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds',SNAPSHOT_OPTION}:
                 raise ValueError('COPY_CONFIGURATION_INVALID')
             selected={key:value for key,value in self.cfg.items() if key!='roles'}
             return KubernetesCredentialCopyRecordExecutor(selected,runner=self.runner,environ=self._environ,

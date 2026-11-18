@@ -5,11 +5,13 @@ from pathlib import Path
 import base64,json,socket,subprocess
 import pytest
 from typer.testing import CliRunner
+from guard.adapters.vllm import VllmAdapter
 from guard.cli import app
 from guard.executors import credential_copy_contract as contract,kubernetes_credential_copy as copy_executor,run_binding
+from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
 from guard.executors.owned_capture import _FILE_READER,MAX_BYTES
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
-from guard.models import canonical_json,load_pack,sha256_hex,utcnow
+from guard.models import DataOrigin,ExecStatus,canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
 from tests.run_binding_support import for_pack, run_table_toml
@@ -126,7 +128,7 @@ def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,
     assert all(evd.observations[key].value is False for key in ('copy_producer_authenticated','copy_membership_verified','copy_treatment_verified','copy_reuse_enforcer_verified','copy_issuer_verified','copy_scope_complete'))
     assert world.sent==[] and receipt['unchanged_definition_bytes']==76 and not receipt['full_PLT12_complete']
     rows=evd.observations['copy_event_declarations'].value
-    if mode=='normal':assert len(rows)==4 and evd.execution.status.value=='COMPLETED'
+    if mode=='normal':assert len(rows)==4 and evd.execution.status.value=='COMPLETED' and world.reads==2
     if mode=='duplicate-event':assert len(rows)==4
     if mode=='reuse-allowed':assert evd.observations['copy_reuse_candidates'].value[0]['declared_reuse_allowed']
     if mode=='treatment-failed':assert evd.observations['copy_treatment_candidates'].value[0]['declared_failure']
@@ -197,3 +199,83 @@ def test_read_only_copy_profile_never_loads_role_keys(tmp_path):
     draft=executor.run(pack.checks['PLT-12'],environment,values,VllmAdapter(),tmp_path/'work')
     assert draft.normal_control.attempted is False and world.sent==[]
     assert draft.observations['copy_producer_authenticated'].value is False
+
+
+def snapshot_inputs(tmp_path,mode='normal',*,declared=False):
+    environment,world,values,_,_,path=inputs(tmp_path,mode)
+    if declared:
+        environment=environment.model_copy(update={'data_origin':DataOrigin.DECLARED}).seal()
+        ref=environment.ref().model_dump(mode='json')
+        world.target['environment_ref']=ref
+        world.copy_packet['environment_ref']=ref
+        values['copy_environment_sha256']=environment.ref().sha256
+    world.target['lab']=False
+    digest=sha256_hex(canonical_json(world.target))
+    values['copy_target_sha256']=world.copy_packet['target_sha256']=digest
+    inventory=json.loads(path.read_bytes())
+    values[contract.DECISION_KEY]=contract.treatments(inventory)
+    business={key:values[key] for key in ('copy_max_record_delay_ms',contract.DECISION_KEY)}
+    values['copy_policy_sha256']=inventory['policy_sha256']=world.copy_packet['policy_sha256']=sha256_hex(canonical_json(business))
+    path.write_bytes(canonical_json(inventory))
+    values['copy_inventory_sha256']=world.copy_packet['inventory_sha256']=sha256_hex(path.read_bytes())
+    target=tmp_path/'target.json';target.write_bytes(canonical_json(world.target))
+    pack=load_pack(Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE')
+    return environment,world,values,pack,{'target':str(target),'copy_inventory':str(path),'copy_record_snapshot_only':True},digest
+
+
+@pytest.mark.parametrize('mode',['normal','missing','wrong-source','pod-replaced','outside-inventory'])
+def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mode):
+    environment,world,values,pack,cfg,digest=snapshot_inputs(tmp_path,mode,declared=True)
+    if mode=='outside-inventory':world.copy_packet['events'][0]['copy_id']='0'*32
+
+    def read_only(argv,**kwargs):
+        assert 'input_bytes' not in kwargs
+        output=world.runner(argv,**kwargs)
+        if 'exec' in argv:world.after_exec=True
+        return output
+
+    monkeypatch.setattr(copy_executor,'capture_pipes',read_only)
+    monkeypatch.setattr(http,'capture_pipes',read_only)
+    class NoCredentialReads(dict):
+        def get(self,*args,**kwargs):raise AssertionError('copy snapshot read a credential')
+        def __getitem__(self,key):raise AssertionError('copy snapshot read a credential')
+    executor=KubernetesRequiredEventExecutor(cfg,environ=NoCredentialReads(),expected_target_sha256=digest)
+    assert executor.roles()=={} and executor.keys()=={}
+    draft=executor.run(pack.checks['PLT-12'],environment,values,VllmAdapter(),tmp_path/'snapshot')
+    assert world.reads==1 and not world.sent
+    assert draft.data_origin==DataOrigin.DECLARED and draft.status==(ExecStatus.COMPLETED if mode=='normal' else ExecStatus.ABORTED)
+    assert not draft.normal_control.attempted and all(not row.attempted for row in draft.challenges)
+    for key in ('copy_treatment_candidates','copy_reuse_candidates','copy_issuer_declarations'):
+        assert not draft.observations[key].collected
+    for key in ('copy_producer_authenticated','copy_membership_verified','copy_treatment_verified',
+                'copy_reuse_enforcer_verified','copy_issuer_verified','copy_scope_complete'):
+        assert draft.observations[key].value is False
+    if mode=='normal':
+        snapshot,=draft.observations['copy_record_snapshots'].value
+        record,=draft.observations['copy_event_declarations'].value
+        assert snapshot['stage']=='snapshot' and snapshot['event_scope']=='copy-inventory-claims-only'
+        assert snapshot['source_event_count']>1 and record['type']=='COPY_INVENTORY_CLAIM'
+        attachment,=draft.observations['copy_collection'].value
+        assert attachment['stage']=='snapshot' and attachment['owner_binding_verified'] and attachment['file_bytes_sha256']
+    if mode in {'missing','wrong-source','pod-replaced'}:
+        assert draft.observations['copy_record_snapshots'].collected is False
+    assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
+
+
+@pytest.mark.parametrize('damage',['no-exact-target','old-lab','roles','obs01','obs01-option','policy','inventory'])
+def test_copy_snapshot_opt_in_rejects_unbound_or_sibling_configuration(tmp_path,damage):
+    environment,world,values,pack,cfg,digest=snapshot_inputs(tmp_path)
+    if damage=='roles':cfg['roles']={'allowed':'UNUSED'}
+    if damage=='obs01-option':cfg['record_snapshot_only']=True
+    if damage=='policy':values['copy_policy_sha256']='f'*64
+    if damage=='inventory':values['copy_inventory_sha256']='f'*64
+    if damage=='old-lab':
+        world.target['lab']=True
+        Path(cfg['target']).write_bytes(canonical_json(world.target))
+        digest=values['copy_target_sha256']=sha256_hex(canonical_json(world.target))
+    executor=KubernetesRequiredEventExecutor(cfg,runner=world.runner,
+        expected_target_sha256=None if damage=='no-exact-target' else digest)
+    check=pack.checks['OBS-01' if damage=='obs01' else 'PLT-12']
+    with pytest.raises(ValueError,match='COPY_'):
+        executor.run(check,environment,values,VllmAdapter(),tmp_path/'snapshot')
+    assert not world.calls and not world.reads and not world.sent

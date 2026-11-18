@@ -76,7 +76,7 @@ def _coverage_blocks(check, evd, policy_values):
         obs = evd.observations.get(name)
         return obs.value if obs and obs.collected else None
 
-    if check.id == "REQ-09" and check.collection_profile == INPUT_MATRIX_PROFILE:
+    if check.id == "REQ-09" and getattr(check, "collection_profile", None) == INPUT_MATRIX_PROFILE:
         return _input_matrix_coverage_blocks(check, policy_values, value)
 
     blocks = []

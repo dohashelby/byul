@@ -623,7 +623,7 @@
   "update/src/guard/store/bundle.py": "8c4202b79719b7c8fc4765bb5bfe1a9bfcaf870eead24818395236ff941a35dc",
   "update/src/guard/store/packs.py": "b8ef806f1218d25e436324ad82ce62cf83ba7371e241d544df0060ad35d73de8",
   "update/src/guard/store/sqlite.py": "2c96362f341202fe83d85b05519a51bfe782a982d39a41c8445843d75d360664",
-  "update/src/guard/update_acceptance.py": "d5e7e455c47aeaca8b0c1667ee02e2406b0a4ab9f1569e827cb0d42d1eca4142",
+  "update/src/guard/update_acceptance.py": "699d888bd87a905ccea2629cad03081642c4f24373dfb1d958433e4f175fbd0b",
   "update/src/guard/update_validation.py": "6fa489db160c31d39b8d23e91a53e34b4277db597eaf1c6c440e6f7782802e08",
   "update/src/guard/validation_evidence.py": "875a820a72a14d64b6c7b008c0ad86d5d4278b25cf82c595b200ed72e343e48e",
   "update/tools/b1_integration_cpu.py": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",

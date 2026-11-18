@@ -740,6 +740,11 @@
       "manifest_sha256": "6116056170305fae21e19fdfb13e53e763234f422debced1918352e6be6d5b16",
       "reviewed_by": "Codex / REQ-09 matrix audit and OBS-01/11 evidence timing; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T08:30:07+00:00"
+    },
+    {
+      "manifest_sha256": "c8946f571281f415999e96066c54869872ffa99578706f506cb904a7d48a5908",
+      "reviewed_by": "Codex / REQ-09 historical audit profile compatibility; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T09:04:43+00:00"
     }
   ]
 }

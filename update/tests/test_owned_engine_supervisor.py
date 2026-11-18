@@ -140,7 +140,15 @@ def test_owner_socket_roundtrip_returns_authenticated_current_status_and_cleans_
     try:
         deadline=time.monotonic()+5
         while not(directory/'control.sock').exists()and server.poll()is None and time.monotonic()<deadline:time.sleep(.01)
-        result=harness.client(path,directory,'status')
+        # bind() creates the path before the server starts listening.
+        while True:
+            try:
+                result = harness.client(path, directory, 'status')
+                break
+            except ConnectionRefusedError:
+                if server.poll() is not None or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
         child_pid=result['generations'][0]['identity']['pid']
         assert result['supervisor']['pid']==server.pid and harness.process(child_pid)['parent_pid']==server.pid
         assert not result['fault_causality_verified']and not result['new_normal_inference_verified']

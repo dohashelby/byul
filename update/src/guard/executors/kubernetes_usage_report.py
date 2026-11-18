@@ -135,6 +135,15 @@ class _UsageReader(KubernetesLifecycleReader):
         self.programs["usage"] = program
         self.wrapped["usage"] = supervised_source(program)
 
+    def _request(self, args, *, deadline, cap):
+        raw = super()._request(args, deadline=deadline, cap=cap)
+        if self._local and args[1:3] == ["get", "pod"]:
+            pod = strict_json(raw, limit=cap)
+            if pod.get("spec", {}).get("shareProcessNamespace", False) is not False:
+                self.gap = True
+                raise KubernetesCaptureError()
+        return raw
+
     def _program(self, container, argv, max_bytes):
         if container != self.binding["engine"]["container"] or type(argv) is not list:
             raise KubernetesCaptureError()
@@ -303,7 +312,7 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                    "local_snapshot_presence": {
                        stage: {sha256_hex(row["path"].encode()): row["exists"] for row in snapshot["files"]}
                        for stage, snapshot in (("before", before), ("after", after)) if snapshot is not None},
-                   "send_observed": False, "fresh_process_verified": False, "settings_subject": "engine-container-pid-1",
+                   "send_observation_available": False, "fresh_process_verified": False, "settings_subject": "engine-container-pid-1",
                    "fixture": {"profile": SILENCE_PROFILE, "scope": "owned-local-report-files-and-one-normal-inference",
                                "reader_sha256": sha256_hex(_LOCAL_READER.encode()),
                                "probe_source_sha256": transport.source_sha256}}

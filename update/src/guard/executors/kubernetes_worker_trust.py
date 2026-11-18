@@ -57,7 +57,7 @@ def collect(ctx):
     summary = {'profile': PROFILE, 'target_sha256': record['target_sha256'], 'binding_verified': record['binding_verified_before_after'],
                'process_inventory_stable': (record['packet'] or {}).get('pid_inventory_stable') is True,
                'stable_process_rows': len(stable_rows), 'ambiguous_processes': ambiguous, 'diagnostic_codes': diagnostics,
-               'worker_role_authenticated': False, 'scope': 'policy-marker matches among reported processes in the selected container',
+               'worker_role_authenticated': False, 'scope': 'policy-marker matches in the selected owned reader PID namespace',
                'fixture': {'profile': PROFILE, 'process_profile': record['profile'], 'source_sha256': record['program_sha256']}}
     normal = {'attempted': False, 'succeeded': None, 'detail': 'Read-only marker, process identity and UID observations.'}
     challenges = [{'step': step, 'attempted': False} for step in ctx.check.challenge_steps]

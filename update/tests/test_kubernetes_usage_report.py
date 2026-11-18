@@ -159,6 +159,10 @@ class LocalUsageWorld(FullWorld):
                       'capture_complete': True, 'utf8_valid': True, 'eof': self.mode != 'partial-control', 'body_truncated': False}]
         else:
             result = super().runner(argv, **kwargs)
+            if self.mode == 'shared-pid' and 'get' in argv and 'pod' in argv:
+                pod = json.loads(result['stdout_bytes'])
+                pod['spec']['shareProcessNamespace'] = True
+                result['stdout_bytes'] = canonical_json(pod)
             result['capture'].update(bounded_at_source=True, timed_out=False, truncated=False)
             return result
         return {'returncode': 0, 'stdout_bytes': canonical_json(value), 'stderr_bytes': PRIVATE.encode(),
@@ -168,7 +172,7 @@ class LocalUsageWorld(FullWorld):
 @pytest.mark.parametrize('mode,completed,collected,verdict', [
     ('absent', True, True, 'UNKNOWN'), ('new', True, True, 'FAIL'), ('one-unreadable', True, False, 'UNKNOWN'),
     ('all-unreadable', False, False, 'UNKNOWN'), ('optout-missing', False, False, 'UNKNOWN'),
-    ('process-changed', False, False, 'UNKNOWN'), ('partial-control', False, False, 'UNKNOWN'),
+    ('process-changed', False, False, 'UNKNOWN'), ('partial-control', False, False, 'UNKNOWN'), ('shared-pid', False, False, 'UNKNOWN'),
 ])
 def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, mode, completed, collected, verdict):
     env, target = full_inputs()
@@ -182,8 +186,8 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, mode
                                                     'usage_wait_seconds': 0}, runner=world.runner,
                                                    expected_target_sha256=sha256_hex(canonical_json(target)))
     draft = executor.run(check, env, LOCAL_VALUES, VllmAdapter(), tmp_path / 'work')
-    assert world.snapshots == (1 if mode == 'optout-missing' else 2)
-    assert world.controls == (0 if mode == 'optout-missing' else 1)
+    assert world.snapshots == {'optout-missing': 1, 'shared-pid': 0}.get(mode, 2)
+    assert world.controls == (0 if mode in {'optout-missing', 'shared-pid'} else 1)
     assert draft.status == (ExecStatus.COMPLETED if completed else ExecStatus.ABORTED)
     assert draft.data_origin.value == 'EXAMPLE'
     assert draft.observations['usage_new_local_reports'].collected is collected

@@ -339,6 +339,13 @@ def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combinatio
     thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
     try:
         selected, target, definition, path = normal_sampling_inputs(tmp_path, version)
+        selected = selected.model_copy(update={
+            "model": selected.model.model_copy(update={"inventory_sha256": "a" * 64}),
+            "runtime": selected.runtime.model_copy(update={
+                "gpu_count": 1, "gpu_model": "EXAMPLE GPU", "driver": "EXAMPLE driver",
+            }),
+        }).seal()
+        target["environment_ref"] = selected.ref().model_dump(mode="json")
         target["engine"]["trusted_url"] = f"http://127.0.0.1:{server.server_port}"
         path.write_bytes(canonical_json(target))
         world = World(target)
@@ -373,8 +380,15 @@ def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combinatio
         assert saved["http_dispatch_observed"] is (None if owner_changed else True)
         if owner_changed:
             assert saved["response_capture"] is None
+            assert draft.comparability.fixture_sha256 is None and draft.comparability.config_sha256 is None
         else:
             assert len(saved["response_capture"]["original_body_sha256"]) == 64
+            fixture = {"profile": "kubernetes-owned-normal-sampling/1",
+                       "request_body_sha256": sha256_hex(canonical_json(seen[0][2]))}
+            assert draft.comparability.fixture_sha256 == sha256_hex(canonical_json(fixture))
+            assert len(draft.comparability.config_sha256) == 64
+            assert (draft.comparability.model_inventory_sha256, draft.comparability.gpu, draft.comparability.driver) == (
+                selected.model.inventory_sha256, selected.runtime.gpu_model, selected.runtime.driver)
         assert PRIVATE not in raw and "guard sampling control" not in raw
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)

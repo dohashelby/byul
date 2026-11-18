@@ -7,6 +7,7 @@ from guard.adapters.engine_profiles import supports
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
 from guard.models.base import utcnow
 from guard.runtime.bounded import strict_json
+from guard.runtime.comparison import execution_conditions
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP, PROFILE
 from .base import DraftArtifact, EvidenceDraft
 from .content_common import control_state
@@ -15,6 +16,7 @@ from .response_projection import capture_metadata
 from .sampling_validation import SamplingValidationExecutor
 
 NORMAL_OPTION = "normal_sampling_only"
+NORMAL_PROFILE = "kubernetes-owned-normal-sampling/1"
 NORMAL_PATH = "/v1/completions"
 NORMAL_LABEL = "func|POST_" + NORMAL_PATH
 NORMAL_OPTIONS = {"temperature": 0.5, "top_p": 0.9, "max_tokens": 1, "min_tokens": 0}
@@ -111,7 +113,7 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
             "functional_probe_results": ({NORMAL_LABEL: "pass"} if normal else None, normal),
             "sampling_health_results": (None, False), "runner_consumption_verified": (False, True),
         }
-        summary = {"profile": "kubernetes-owned-normal-sampling/1", "target_sha256": target_sha,
+        summary = {"profile": NORMAL_PROFILE, "target_sha256": target_sha,
                    "probe_source_sha256": report["probe_source_sha256"], "binding_sha256": report["binding_sha256"],
                    "request_body_sha256": sha256_hex(canonical_json(body)), "supplied_sampling_options": options,
                    "http_dispatch_observed": True if bound and type(response.get("outcome")) is int else None,
@@ -131,12 +133,24 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         origin = DataOrigin(transport.process_observation_origin)
         if error and origin == DataOrigin.MEASURED:
             origin = DataOrigin.DECLARED
+        comparability = {}
+        if not error and type(target.get("comparison_config")) is dict and target["comparison_config"]:
+            fixture = {"profile": NORMAL_PROFILE, "request_body_sha256": summary["request_body_sha256"]}
+            settings = {"profile": NORMAL_PROFILE, "request_timeout": self.cfg.get("request_timeout", 3),
+                        "max_duration_seconds": self.cfg.get("max_duration_seconds", 120),
+                        "probe_source_sha256": report["probe_source_sha256"]}
+            comparability = {
+                "fixture_sha256": sha256_hex(canonical_json(fixture)),
+                "config_sha256": sha256_hex(canonical_json(execution_conditions(target, settings, []))),
+                "model_inventory_sha256": env.model.inventory_sha256, "gpu": env.runtime.gpu_model,
+                "driver": env.runtime.driver, "cpu": env.runtime.cpu,
+            }
         return EvidenceDraft(status=ExecStatus.ABORTED if error else ExecStatus.COMPLETED, data_origin=origin,
             normal_control={"attempted": True, "succeeded": normal if bound else None,
                             "detail": "One in-policy collection attempt. HTTP dispatch is recorded only with a verified response."},
             challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
             observations={key: {"value": value, "collected": collected} for key, (value, collected) in observations.items()},
-            artifacts=artifacts, config={NORMAL_OPTION: True, "target_sha256": target_sha},
+            artifacts=artifacts, comparability=comparability, config={NORMAL_OPTION: True, "target_sha256": target_sha},
             started_at=started, finished_at=utcnow(), abort_reason=error, cleanup_errors=cleanup)
 
     def run(self, check, env, policy_values, adapter, workdir):

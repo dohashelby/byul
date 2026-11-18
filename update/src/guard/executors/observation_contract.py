@@ -109,7 +109,7 @@ def correlate(snapshots,trials,values,*,run_sha256):
         absent=[k for k in fields if candidate is None or candidate[k] is None]
         arrival=[s['collected_monotonic_ns'] for s in snapshots if candidate is not None and candidate in s['packet']['events']
             and s['collected_monotonic_ns']>=trial['finished_monotonic_ns']]
-        delay=(min(arrival)-trial['finished_monotonic_ns'])//1_000_000 if arrival else None
+        delay=(min(arrival)-trial['finished_monotonic_ns']+999_999)//1_000_000 if arrival else None
         matched=(candidate is not None and not mismatches and not absent and trial['expected_response_observed']
             and delay is not None and delay<=values['observation_max_delay_ms'])
         matches.append({'case_id':trial['case_id'],'event':expected_event,'candidate_count':len(relevant),

@@ -106,6 +106,7 @@ def inputs(tmp_path,mode='normal'):
         'observation_allowed_actor_sha256':'d'*64,'observation_denied_actor_sha256':'e'*64}
     if mode=='required-unimplemented':values['observation_required_events']=list(sorted(EVENTS));values['observation_required_fields'].append('approval_sha256')
     if mode=='deadline':values['observation_max_delay_ms']=0
+    if mode in {'deadline-boundary','deadline-nanosecond-late'}:values['observation_max_delay_ms']=1
     world.values=values;receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
     if 4 in run_binding.stages_for(pack.checks['OBS-01']):
         values['observation_event_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'OBS-01',values)))
@@ -114,13 +115,25 @@ def inputs(tmp_path,mode='normal'):
 
 @pytest.mark.parametrize('mode',['normal','wrong-actor','wrong-record-target','missing-field','duplicate-record','empty','missing','recovered',
     'final-missing','unclosed','dropped','bad-source','producer-trust-claim','raw-field','bad-control','denied-allowed','after-error',
-    'http-cleanup','record-cleanup','restart','pod-replaced','attachment','required-unimplemented'])
+    'http-cleanup','record-cleanup','restart','pod-replaced','attachment','required-unimplemented',
+    'deadline-boundary','deadline-nanosecond-late'])
 def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts(tmp_path,monkeypatch,mode):
     environment,world,values,pack,receipt=inputs(tmp_path,mode)
     monkeypatch.setenv('OBS_ALLOWED',ALLOWED);monkeypatch.setenv('OBS_DENIED',DENIED)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr(observation,'capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected external runtime')
     monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)
+    if mode in {'deadline-boundary','deadline-nanosecond-late'}:
+        correlate = observation.correlate
+        observed_delay_ns = 1_000_000 + (mode == 'deadline-nanosecond-late')
+
+        def correlate_at_policy_boundary(snapshots, trials, values, **kwargs):
+            trial_end_ns = 100_000_000
+            return correlate(
+                [{**snapshot, 'collected_monotonic_ns': trial_end_ns + observed_delay_ns} for snapshot in snapshots],
+                [{**trial, 'finished_monotonic_ns': trial_end_ns} for trial in trials], values, **kwargs)
+
+        monkeypatch.setattr(observation, 'correlate', correlate_at_policy_boundary)
     if mode=='attachment':
         original=Path.open
         def open_file(path,*a,**kw):
@@ -143,11 +156,18 @@ def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts
     assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,k).value=='UNKNOWN' for k in ('security','functional','performance'))
     assert e.normal_control.succeeded is None
     for key in ('required_event_producer_authenticated','required_event_independent_trigger_verified','required_event_scope_complete'):assert e.observations[key].value is False
-    assert e.execution.status.value==('COMPLETED' if mode=='normal' else 'ABORTED')
+    assert e.execution.status.value==('COMPLETED' if mode in {'normal','deadline-boundary'} else 'ABORTED')
     if mode=='normal':
         assert world.sent==['obs01-before','obs01-denied','obs01-after'] and world.reads==2
         assert all(m['declared_record_match_observed'] and not m['producer_authenticated'] for m in e.observations['required_event_matches'].value)
         assert len(e.observations['required_event_records'].value)==3 and not e.observations['required_event_missing'].value
+    if mode in {'deadline-boundary','deadline-nanosecond-late'}:
+        late = mode == 'deadline-nanosecond-late'
+        matches = e.observations['required_event_matches'].value
+        assert len(matches) == 3
+        assert all(row['collection_arrival_upper_bound_ms'] == (2 if late else 1) for row in matches)
+        assert all(row['declared_record_match_observed'] is (not late) for row in matches)
+        assert bool(e.observations['required_event_missing'].value) is late
     if mode in {'wrong-actor','wrong-record-target','duplicate-record'}:
         assert e.observations['required_event_conflict_candidates'].value
         assert all(not r['confirmed_violation'] for r in e.observations['required_event_conflict_candidates'].value)

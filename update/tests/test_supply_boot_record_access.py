@@ -210,6 +210,18 @@ RECORD_CASES = [
 ]
 
 
+def test_lif01_total_budget_ignores_stop_outside_selected_stage_costs():
+    budgets = {"fetch": 10, "load": 10}
+    values = {**VALUES, "supply_stage_budget_ms": budgets, "supply_stage_budget_bytes": budgets}
+    cost = {"elapsed_ms": 7, "peak_bytes": 1, "stopped": False, "temporary_cleaned": True}
+    rows = [{**cost, "stage": "fetch"}, {**cost, "stage": "load"}, {**cost, "stage": "compile", "stopped": True}]
+    evaluate = contract.EVALUATORS["LIF-01"]
+    assert evaluate(rows, values) == ([{"reason": "total_budget_exceeded_without_stop"}], [])
+
+    rows[1]["stopped"] = True
+    assert evaluate(rows, values) == ([], [])
+
+
 @pytest.mark.parametrize("check_id,bad,good,reason", RECORD_CASES)
 def test_record_rows_show_violation_and_clean_case(check_id, bad, good, reason):
     assert reason in [v["reason"] for v in contract.EVALUATORS[check_id]([bad], VALUES)[0]]

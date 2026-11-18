@@ -108,6 +108,7 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
 
 def _stage_budget(rows, values):
     violations, missing, total = [], [], 0
+    selected_stage_stopped = False
     budget_ms, budget_bytes = values["supply_stage_budget_ms"], values["supply_stage_budget_bytes"]
     seen = {row["stage"]: row for row in rows}
     for stage in budget_ms:
@@ -116,11 +117,12 @@ def _stage_budget(rows, values):
             missing.append("stage_cost_unavailable:" + stage)
             continue
         total += row["elapsed_ms"]
+        selected_stage_stopped = selected_stage_stopped or row["stopped"]
         if (row["elapsed_ms"] > budget_ms[stage] or row["peak_bytes"] > budget_bytes.get(stage, row["peak_bytes"])) and not row["stopped"]:
             violations.append({"reason": "stage_budget_exceeded_without_stop", "stage": stage})
         if not row["temporary_cleaned"]:
             violations.append({"reason": "temporary_resources_left", "stage": stage})
-    if total > values["supply_total_budget_ms"] and not any(row["stopped"] for row in rows):
+    if total > values["supply_total_budget_ms"] and not selected_stage_stopped:
         violations.append({"reason": "total_budget_exceeded_without_stop"})
     return violations, missing
 

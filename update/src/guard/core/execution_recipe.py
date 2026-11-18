@@ -6,11 +6,12 @@ import inspect
 from guard.models import canonical_json, sha256_hex, utcnow
 
 
-def configuration_sha256(cfg, environments=()):
+def configuration_sha256(cfg, environments=(), *, target_snapshots=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
     paths added after selection are absent from the original requested config.
+    Requested snapshot paths receive the same private bytes used for their hash.
     """
     def normalize(value):
         if isinstance(value, dict):
@@ -19,6 +20,7 @@ def configuration_sha256(cfg, environments=()):
         if isinstance(value, Path): return str(value)
         return value
     inputs = {}
+    captured_digests = {}
     late_candidate = cfg.get('update', {}).get('kubernetes_candidate_binding') == 'after_baseline'
     def files(value, location=()):
         if not isinstance(value, dict): return
@@ -30,6 +32,12 @@ def configuration_sha256(cfg, environments=()):
                     # Its derivation and ENV are committed now; the owned Pod
                     # generation is observed/sealed by the transition at run time.
                     inputs[str(path)] = {'binding': 'owned-candidate-after-baseline/1'}
+                elif target_snapshots is not None and path in target_snapshots:
+                    if path not in captured_digests:
+                        raw = path.read_bytes() if path.is_file() else None
+                        target_snapshots[path] = raw
+                        captured_digests[path] = sha256_hex(raw) if raw is not None else None
+                    inputs[str(path)] = captured_digests[path]
                 else: inputs[str(path)] = sha256_hex(path.read_bytes()) if path.is_file() else None
             elif isinstance(item, dict): files(item, (*location, key))
     files(cfg)
@@ -75,9 +83,9 @@ def validate_policy_time(policy):
         raise ValueError('POLICY_EXPIRED')
 
 
-def bind_recipe(plan, cfg, environments=()):
+def bind_recipe(plan, cfg, environments=(), *, target_snapshots=None):
     return plan.model_copy(update={'inputs': plan.inputs.model_copy(update={
-        'execution_recipe_sha256': configuration_sha256(cfg, environments)})}).seal()
+        'execution_recipe_sha256': configuration_sha256(cfg, environments, target_snapshots=target_snapshots)})}).seal()
 
 
 @contextmanager

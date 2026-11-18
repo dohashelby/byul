@@ -770,6 +770,11 @@
       "manifest_sha256": "91942e34bf80eb8574b0ce85a52895c1e42c09ee5e4ae538d3c425e91b55fb81",
       "reviewed_by": "Codex / scoped local usage and worker trust observations; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T16:31:27+00:00"
+    },
+    {
+      "manifest_sha256": "8a30682d35cd5900b650a1518078859af4b2fbb89beb355dee761104e315b1a7",
+      "reviewed_by": "Codex / exact prebound target recipe snapshots; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T16:39:43+00:00"
     }
   ]
 }

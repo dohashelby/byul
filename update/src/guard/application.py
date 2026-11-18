@@ -130,37 +130,45 @@ def _update_config_for_execution(pack, cfg, allowed_checks):
     return scoped
 
 
-def _pin_prebound_kubernetes_targets(side_cfg, env, plan, allowed_checks, *, prebound):
-    """Resolve the bounded collectors' target hashes from recipe-bound inputs."""
-    from guard.models import canonical_json, sha256_hex
-    from guard.runtime.bounded import strict_json
-    from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
-
-    selected = {item.check_id: item.executor for item in plan.items if item.selected and item.check_id in allowed_checks}
+def _bounded_kubernetes_targets(raw, selected):
+    paths = {}
     for check_id, option in KUBERNETES_BOUND_CHECK_OPTIONS.items():
         name = selected.get(check_id)
-        if side_cfg.executors.get(name) != "kubernetes":
+        if raw.get("executors", {}).get(name) != "kubernetes":
             continue
         try:
-            effective = for_check(side_cfg.raw, name, check_id).get(name, {})
+            effective = for_check(raw, name, check_id).get(name, {})
         except ValueError:
             continue  # Per-check execution reports the malformed configuration.
         if type(effective) is not dict or effective.get(option) is not True:
             continue
-        key = "_kubernetes_target_sha256_by_executor"
-        hashes = side_cfg.raw.get(key)
-        if type(hashes) is not dict:
-            hashes = side_cfg.raw[key] = {}
+        target = effective.get("target")
+        paths[name] = Path(target) if isinstance(target, (str, Path)) else None
+    return paths
+
+
+def _pin_prebound_kubernetes_targets(raw, env, paths, target_snapshots):
+    """Derive bounded target identity from the recipe's exact captured bytes."""
+    from guard.models import canonical_json, sha256_hex
+    from guard.runtime.bounded import strict_json
+    from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
+
+    key = "_kubernetes_target_sha256_by_executor"
+    hashes = raw.get(key)
+    if type(hashes) is not dict:
+        hashes = raw[key] = {}
+    for name, path in paths.items():
         hashes.pop(name, None)
-        if prebound:
-            try:
-                with Path(effective["target"]).open("rb") as stream:
-                    target = strict_json(stream.read(65537), limit=65536)
-                validate_target_binding(target, env)
-                if target["lab"] is False:
-                    hashes[name] = sha256_hex(canonical_json(target))
-            except (KeyError, TypeError, ValueError, OSError, KubernetesBindingError):
-                continue  # The scoped executor will withhold dispatch without a verified hash.
+        content = target_snapshots.get(path)
+        if content is None:
+            continue
+        try:
+            target = strict_json(content, limit=65536)
+            validate_target_binding(target, env)
+            if target["lab"] is False:
+                hashes[name] = sha256_hex(canonical_json(target))
+        except (KeyError, TypeError, ValueError, KubernetesBindingError):
+            continue  # The scoped executor will withhold dispatch without a verified hash.
 
 
 def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
@@ -201,7 +209,13 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                             as_of=as_of) if chg is not None or previous is not None else None
     plan = (select(pack, envs, policy, change=chg, mode=Mode.update, context=context)
             if context is not None else select(pack, envs, policy, mode=Mode.update))
-    plan = bind_recipe(plan, cfg, envs)
+    target_paths, target_snapshots = {}, {}
+    if mode == "external" and allowed_checks is not None:
+        selected = {item.check_id: item.executor for item in plan.items if item.selected and item.check_id in allowed_checks}
+        target_paths = {side: _bounded_kubernetes_targets(raw, selected) for side, raw in side_cfgs.items()}
+        if cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound":
+            target_snapshots = {path: None for paths in target_paths.values() for path in paths.values() if path is not None}
+    plan = bind_recipe(plan, cfg, envs, target_snapshots=target_snapshots or None)
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
     rc = RunConfig(executors=cfg.get("executors", {}), requested=deepcopy(cfg))
@@ -243,9 +257,8 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
-            if allowed_checks is not None:
-                prebound = cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"
-                _pin_prebound_kubernetes_targets(side_cfg, env, plan, allowed_checks, prebound=prebound)
+            if target_paths.get(side.value):
+                _pin_prebound_kubernetes_targets(side_cfg.raw, env, target_paths[side.value], target_snapshots)
             run_plan(store, pack, plan, rc, only_side=side)
             continue
         c = side_cfg.raw

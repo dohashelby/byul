@@ -1,6 +1,7 @@
 """Exact paired metadata config through the same side/check merge used at runtime."""
 from copy import deepcopy
 import json
+from pathlib import Path
 import socket
 import subprocess
 import sys
@@ -10,6 +11,8 @@ import pytest
 
 from guard.configuration import for_check, merge_config, update_allowed_checks
 from guard import application
+from guard.core.execution_recipe import bind_recipe, configuration_sha256
+from guard.core.select import select
 from guard.executors import kubernetes_template_supply as template_executor, registry
 from guard.executors.base import EvidenceDraft
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
@@ -257,3 +260,38 @@ def test_local_metadata_scope_pins_public_update_targets_and_withholds_shared_si
         if row.check_id in {'OBS-05', 'PLT-07', 'PLT-02'}:
             assert row.execution.status == ExecStatus.NOT_RUN
             assert row.execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
+
+
+def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, sources):
+    pack, sides, policy_path = sources
+    target_path = sides['baseline']['target']
+    original_bytes = target_path.read_bytes()
+    envs = [tool.Environment.model_validate_json(side['environment'].read_bytes()) for side in sides.values()]
+    pol = tool.Policy.model_validate_json(policy_path.read_bytes())
+    cfg = {'update': {'allowed_checks': ['OBS-04']}, 'executors': {'boundary_egress': 'kubernetes'},
+           'boundary_egress': {'target': str(target_path)},
+           'check_config': {'OBS-04': {'target': str(target_path), 'local_observation_only': True}}}
+    plan = select(pack, envs, pol, mode='update')
+    expected_recipe = configuration_sha256(cfg, envs)
+    paths = application._bounded_kubernetes_targets(cfg, {'OBS-04': 'boundary_egress'})
+    snapshots = {target_path: None}
+    reads = []
+    read_bytes = Path.read_bytes
+
+    def counted(path):
+        if path == target_path:
+            reads.append(path)
+        return read_bytes(path)
+
+    with monkeypatch.context() as guard:
+        guard.setattr(Path, 'read_bytes', counted)
+        bound = bind_recipe(plan, cfg, envs, target_snapshots=snapshots)
+        assert reads == [target_path]
+        assert snapshots[target_path] == original_bytes
+        assert bound.inputs.execution_recipe_sha256 == expected_recipe
+        _write(target_path, {'schema': 'replaced-source-fixture'})
+        application._pin_prebound_kubernetes_targets(cfg, envs[0], paths, snapshots)
+        assert reads == [target_path]
+    assert cfg['_kubernetes_target_sha256_by_executor'] == {
+        'boundary_egress': sha256_hex(canonical_json(json.loads(original_bytes)))}
+    assert configuration_sha256(cfg, envs) != expected_recipe

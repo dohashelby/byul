@@ -282,6 +282,7 @@ export const RT_TRIGGER: Record<string, string> = {
 };
 
 export const EXEC_VERDICT: Record<string, string> = {
+  deny_attempted: "실행 거부 시도",
   allowed_in_phase: "단계별 허용",
   exception: "승인 예외",
   outside_allowlist: "허용 목록 외 실행",

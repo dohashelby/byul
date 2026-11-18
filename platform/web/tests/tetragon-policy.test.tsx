@@ -55,3 +55,19 @@ it("종료 확인과 파일 읽기 거부 미확인을 다른 칸에 표시한�
   expect(screen.getByText(/커널 task의 PID namespace·시작 시각/)).toBeTruthy();
   expect(screen.queryByText("파일 읽기 차단 확인")).toBeNull();
 });
+
+it("실행 거부 근거를 파일 읽기·프로세스 종료와 다른 칸에 표시한다", async () => {
+  const item = state();
+  item.verifications = [{ id: "exec-proof", context: "test", namespace: "trial", policy: "runtime-tg-exec-01", method: "lsm_bprm_check", data_origin: "synthetic",
+    started_at: "2026-11-16T00:00:00Z", finished_at: "2026-11-16T00:00:03Z", facts: {}, events: [],
+    verification: { expected_effect: "exec_denial", exec_denial: "confirmed", file_read_denial: "unknown", process_termination: "unknown", service_recovery: "unknown", monitor_restored: true, status: "passed" } }];
+  mockApi({ "/api/runtime/tetragon-status": { item, source: SOURCE } });
+  renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <TetragonPolicyPage />);
+  const restored = await screen.findByText("감시 복귀 확인");
+  const row = restored.closest("tr")!;
+  const cells = within(row).getAllByRole("cell");
+  expect(cells[2].textContent).toBe("미확인");
+  expect(cells[3].textContent).toBe("확인");
+  expect(cells[4].textContent).toBe("미확인");
+  expect(screen.getByText("목표: 실행 거부")).toBeTruthy();
+});

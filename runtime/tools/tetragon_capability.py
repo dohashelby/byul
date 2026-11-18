@@ -66,6 +66,11 @@ def classify_capabilities(
         supported.append("override_lsm")
     else:
         unknown.append("override_lsm")
+    # Generic LSM support does not prove this hook is in BTF or can load.
+    if "lsm_file_open" in unavailable:
+        unavailable.append("lsm_bprm_check")
+    else:
+        unknown.append("lsm_bprm_check")
     openat = sorted(symbol for symbol in (symbols or set()) if symbol.endswith("sys_openat"))
     if override_config is False or override_probe is False or (symbols is not None and not openat):
         unavailable.append("override_syscall")

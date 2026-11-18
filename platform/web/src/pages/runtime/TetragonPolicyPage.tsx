@@ -10,6 +10,7 @@ const METHODS: Record<string, string> = {
   override_only: "오류 반환 규칙 (Override)",
   override_lsm: "파일 접근 거부 + 프로세스 종료",
   override_syscall: "파일 열기 거부 (openat)",
+  lsm_bprm_check: "실행 거부, 프로세스 유지 (BPF LSM)",
   lsm_file_open: "파일 열기만 거부, 프로세스 유지 (BPF LSM)",
   sigkill_fd_install: "프로세스 강제 종료",
 };
@@ -52,6 +53,7 @@ export function TetragonPolicyPage() {
       const transitions = state.transitions ?? [];
       const verifications = state.verifications ?? [];
       const monitoring = state.monitoring;
+      const hasExec = verifications.some((v) => v.verification.expected_effect === "exec_denial");
       return <>
         <p className="notice">정책 모드는 서버에서 조회한 값입니다. 실제 차단 효과는 아래 시험 결과에서 파일 읽기 거부와 프로세스 종료를 각각 확인합니다.</p>
         <div className="row wrap">
@@ -120,11 +122,12 @@ export function TetragonPolicyPage() {
         </TableCard>
         <TableCard title="실제 시험 결과·근거">
           <p className={rt.pad}>시험용 대상과 기록된 시간 구간의 결과입니다. 프로세스 종료 확인만으로 파일 읽기 거부를 확정하지 않습니다.</p>
-          <table className={rt.statusTable}><thead><tr><th>시험·자료</th><th>방식·검증 목표</th><th>파일 읽기 거부</th><th>프로세스 종료</th><th>재시작·복구</th><th>감시 복귀·근거</th></tr></thead><tbody>
+          <table className={rt.statusTable}><thead><tr><th>시험·자료</th><th>방식·검증 목표</th><th>파일 읽기 거부</th>{hasExec && <th>실행 거부</th>}<th>프로세스 종료</th><th>재시작·복구</th><th>감시 복귀·근거</th></tr></thead><tbody>
             {verifications.map((v) => <tr key={v.id}>
               <td>{formatTime(v.finished_at)}<div className="small">{v.namespace}</div><OriginBadge origin={v.data_origin === "real" ? "MEASURED" : "EXAMPLE"} detail={v.data_origin === "real" ? "real" : "synthetic"} /></td>
-              <td>{METHODS[v.method] ?? v.method}<div className="small muted">목표: {v.verification.expected_effect === "file_read_denial" ? "읽기 거부" : "프로세스 종료"}</div>{v.variant === "override_only_diagnostic" && <Badge tone="caution">Override 단독 진단 · 시험 전용</Badge>}</td>
+              <td>{METHODS[v.method] ?? v.method}<div className="small muted">목표: {v.verification.expected_effect === "exec_denial" ? "실행 거부" : v.verification.expected_effect === "file_read_denial" ? "읽기 거부" : "프로세스 종료"}</div>{v.variant === "override_only_diagnostic" && <Badge tone="caution">Override 단독 진단 · 시험 전용</Badge>}</td>
               <td>{effect(v.verification.file_read_denial)}{v.verification.file_denial_basis && <div className="small muted">{v.verification.file_denial_basis === "userspace_errno" ? "읽기 오류 반환" : "커널 읽기 검사 거부"}</div>}</td>
+              {hasExec && <td>{effect(v.verification.exec_denial ?? "unknown")}</td>}
               <td>{effect(v.verification.process_termination)}</td>
               <td>{effect(v.verification.service_recovery)}</td>
               <td>{v.verification.status === "unsupported" ? "규칙 로드 미지원" : v.verification.monitor_restored ? "감시 복귀 확인" : "감시 복귀 미확인"}

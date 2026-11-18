@@ -24,6 +24,18 @@
 
 기존 정책 승인 범위는 0.30.0 소유 lab이다. A는 두 판본의 승인 범위와 증거 생산자를 확정하고, B는 정확 Ref와 해당 범위 자료를 받아 판정 및 비교를 검토한다. [기존 정책 기록](../dev-1/mvp-enterprise-policy-20261118.json)
 
+## 기존 승인 규칙의 실행값 연결
+
+아래 도구는 봉인된 V2 출처의 팩 39 정책과 기준·후보 ENV를 입력으로 받는다. 실행에 필요한 값만 같은 정책의 새 revision에 채운다. 새 저장소를 사용할 때는 `--store`로 원본 정책과 새 정책을 함께 등록하고, 새 정책 파일을 비교의 양쪽에 전달한다.
+
+| 점검 | 실행값 도구 | 대조할 실제 입력 |
+| --- | --- | --- |
+| `REQ-05` | `tools.mvp_model_grant_inputs` | 양쪽의 승인 게이트웨이 권한 주체, 정확한 target과 고정 모델 리비전의 별칭 매핑. 각 수신 경로의 해시를 원본과 대조한다. |
+| `PLT-12` | `tools.mvp_credential_copy_inputs` | 양쪽 ENV에 결합한 소유 사본 목록과 실제 시작 시각. 출력 인벤토리를 `--copy-record-inputs`의 쪽별 `copy_inventory`에 연결하고 실제 기록의 `record_session`과 `record_producer`를 함께 넣는다. |
+| `LIF-11` | `tools.mvp_recovery_policy_inputs` | 양쪽 TP2 소유 rank가 일치하는 실제 사전점검의 선택 자원과 census. 회수 기한은 시작 30초 뒤이며 관측 창은 10분이다. GPU·큐·공유 참조를 포함한 나머지 자원 원본은 별도로 필요하다. |
+
+봉인 정책과 입력 파일을 준비한 뒤 실제 원본 수집 여부를 EVD에서 확인한다. [정책 결합 도구](../../tools/mvp_runtime_policy.py) · [비교 입력 조립](../../tools/mvp_metadata_wiring.py)
+
 ## 실행과 검토의 범위
 
 두 판본에 동일한 모델·토폴로지의 ENV 쌍과 하나의 정확 POL Ref를 결합한다. 점검별 설정은 양쪽의 `[sides.<side>.check_config.<ID>]`에서 조정한다. `guard prepare-update`는 POL이 선정한 모든 점검을 양쪽에서 확인한다. 실행기를 비활성화한 점검은 준비 불가로 표시되고 제품 실행에서 `NOT_RUN`으로 남을 수 있다. 다른 토폴로지를 별도 계획으로 나눠야 하면 각 계획의 승인된 선정 범위와 실측 의미를 먼저 결정한다. [제품 계획 조립](../../src/guard/application.py) [실행기 선택](../../src/guard/core/run.py)

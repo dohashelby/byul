@@ -326,6 +326,18 @@ def test_plt09_handshake_results(tmp_path, reply, security):
     assert evd.observations["record_transport_sender_verified"].value is False
 
 
+@pytest.mark.parametrize("wrong_peer,security", [(REFUSED_PEER, "UNKNOWN"), (OK, "FAIL")])
+def test_plt09_expected_peer_rejection_is_not_an_unprotected_transfer(tmp_path, wrong_peer, security):
+    docker = HelperDocker([handshake(REFUSED_PEER, wrong_peer)])
+    evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), TRANSPORT,
+                           extra_cfg={"record_segments": [SEGMENT]})
+    assert evd.observations["record_transport_trials"].value[0]["state"] == "peer_rejected"
+    assert evd.observations["record_transport_unprotected"].value == []
+    assert evd.observations["record_transport_sender_verified"].value is False
+    assert evd.normal_control.succeeded is None
+    assert result.verdicts.security.value == security
+
+
 def test_plt09_segment_mismatch_is_rejected_before_any_probe(tmp_path):
     docker = HelperDocker([])
     evd, _ = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), TRANSPORT,

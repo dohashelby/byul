@@ -348,6 +348,69 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
     assert configuration_sha256(cfg, envs) != expected_recipe
 
 
+def test_req10_pair_preserves_policy_scope_and_pins_the_staged_candidate(tmp_path, sources, monkeypatch):
+    from guard.core.run import run_plan
+    from guard.store.packs import put_pack
+
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {'REQ-10': {'allowed_sampling_options': ['temperature', 'top_p', 'max_tokens', 'min_tokens'],
+                         'rejection_codes': ['400', '422']}}
+    pol = original.model_copy(update={'values': values,
+        'scope': original.scope.model_copy(update={'include': ['REQ-10']})}).seal()
+    _write(policy_path, pol.to_dict())
+    default, _, _ = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+    assert 'sampling_validation' not in default['executors']
+    cfg, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', normal_sampling=True)
+    assert cfg['update']['allowed_checks'] == ['REQ-10'], decisions
+    assert cfg['check_config'] == {'REQ-10': {'normal_sampling_only': True}}
+    assert all('run_binding' not in side for side in cfg['sides'].values())
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    unscoped = deepcopy(cfg)
+    unscoped['update'].pop('allowed_checks')
+    blocked = application.update_readiness(pack, envs, pol, unscoped)
+    assert next(row for row in blocked['checks'] if row['check'] == 'inputs')['detail'] == (
+        'NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID')
+
+    fresh = tmp_path / 'fresh-sampling-target.json'
+    staged = tool.staged_config(cfg, fresh)
+    preliminary, previous = tool._source(sides['candidate']['target'])
+    with pytest.raises(FileNotFoundError):
+        tool.revalidate_candidate(staged, envs[1], previous)
+    for number, role in enumerate(('engine', 'probe'), 200):
+        preliminary['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        preliminary['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, preliminary)
+    hashes = tool.revalidate_candidate(staged, envs[1], previous)
+    assert hashes == {'sampling_validation': sha256_hex(canonical_json(preliminary))}
+    effective = for_check(merge_config(staged, staged['sides']['candidate']), 'sampling_validation', 'REQ-10')
+    executor = registry.build_executor('sampling_validation', 'kubernetes',
+        {**effective, '_kubernetes_target_sha256_by_executor': hashes},
+        engine=envs[1].engine.name, version=envs[1].engine.version)
+    assert executor._expected_target_sha256 == hashes['sampling_validation']
+
+    store = Store(tmp_path / 'store')
+    put_pack(store, pack.path)
+    for item in (*envs, pol):
+        store.put(item)
+    plan = bind_recipe(select(pack, envs, pol, mode='update'), staged, envs)
+    store.put(plan)
+
+    def no_dispatch(*_args, **_kwargs):
+        raise AssertionError('An omitted normal scope cannot dispatch the original sampling executor')
+
+    monkeypatch.setattr(registry, 'build_executor', no_dispatch)
+    run = application.run_config(staged)
+    run.side_configs['candidate'].raw['check_config'].pop('REQ-10')
+    with pytest.raises(ValueError, match='NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, plan, run)
+    run.side_configs['baseline'].raw['check_config'].pop('REQ-10')
+    with pytest.raises(ValueError, match='OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID'):
+        run_plan(store, pack, plan, run)
+
+
 def test_lif04_normal_preparation_binds_actual_target_without_enabling_stream_sibling(tmp_path, sources):
     from tests.test_lif04_normal_stream import configuration
 

@@ -13,13 +13,18 @@ CHECK_CONFIG = "check_config"
 UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
 GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
 NORMAL_STREAM_OPTION = "normal_stream_only"
+NORMAL_SAMPLING_OPTION = "normal_sampling_only"
+_NORMAL_ONLY_CASES = {
+    "LIF-04": ("stream_buffer", NORMAL_STREAM_OPTION, "NORMAL_STREAM_EXECUTION_SCOPE_INVALID"),
+    "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
+}
 RECORD_SNAPSHOT_OPTIONS = {
     "OBS-01": "record_snapshot_only",
     "PLT-12": "copy_record_snapshot_only",
 }
 KUBERNETES_BOUND_CHECK_OPTIONS = {
     **RECORD_SNAPSHOT_OPTIONS,
-    "LIF-04": NORMAL_STREAM_OPTION,
+    **{check_id: option for check_id, (_, option, _) in _NORMAL_ONLY_CASES.items()},
     "OBS-04": "local_observation_only",
     "PLT-02": "protected_path_metadata_only",
     "PLT-06": "worker_trust_metadata_only",
@@ -109,18 +114,24 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
             sessions = [binding.get("record_session") for _, binding in scoped.values() if type(binding) is dict]
             if len(sessions) == 2 and sessions[0] == sessions[1]:
                 raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SESSIONS_MUST_DIFFER")
-        stream_overlay = overlays.get("LIF-04") if type(overlays) is dict else None
-        if any(type(settings) is dict and NORMAL_STREAM_OPTION in settings
-               for settings in (raw.get("stream_buffer"), stream_overlay)):
-            stream = for_check(raw, "stream_buffer", "LIF-04").get("stream_buffer", {})
-            if (stream[NORMAL_STREAM_OPTION] is not True or allowed_checks is None
-                    or {cid for cid in allowed_checks if pack.checks[cid].executor == "stream_buffer"} != {"LIF-04"}
-                    or raw.get("executors", {}).get("stream_buffer") != "kubernetes"
-                    or raw.get("update", {}).get("mode", "external") != "external" or raw.get("lab_activation")):
-                raise ValueError("NORMAL_STREAM_EXECUTION_SCOPE_INVALID")
-            scoped["LIF-04"] = (stream, None)
+        for check_id, (executor, option, scope_error) in _NORMAL_ONLY_CASES.items():
+            overlay = overlays.get(check_id) if type(overlays) is dict else None
+            if not any(type(settings) is dict and option in settings for settings in (raw.get(executor), overlay)):
+                continue
+            settings = for_check(raw, executor, check_id).get(executor, {})
+            if (settings[option] is not True or allowed_checks is None
+                    or {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {check_id}
+                    or raw.get("executors", {}).get(executor) != "kubernetes"
+                    or raw.get("update", {}).get("mode", "external") != "external"
+                    or raw.get("lab_activation") or raw.get("record_attestation")):
+                raise ValueError(scope_error)
+            scoped[check_id] = (settings, None)
         scopes.append(scoped)
         gateway_modes.append(scoped.get("OBS-01", ({}, None))[0].get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
+    for check_id, (_, _, scope_error) in _NORMAL_ONLY_CASES.items():
+        sides = [check_id in scoped for scoped in scopes]
+        if any(sides) and (len(sides) != 2 or not all(sides)):
+            raise ValueError(scope_error)
     if any(scopes) and (len(scopes) != 2 or set(scopes[0]) != set(scopes[1])):
         raise ValueError(error)
     if any(gateway_modes) and not all(gateway_modes):

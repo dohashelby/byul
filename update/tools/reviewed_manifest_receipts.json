@@ -800,6 +800,11 @@
       "manifest_sha256": "b455a27db986d4e5074f727514d70da6ec692cec23fc41cfd6646d25c7a2c1a8",
       "reviewed_by": "Codex / owned Gateway record, normal stream and terminal owner readback / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T20:40:18+00:00"
+    },
+    {
+      "manifest_sha256": "c445e35985185d8240f95af1d3baff5166c6535b0d137073ad5f990cc373c355",
+      "reviewed_by": "Codex / ordinary approved sampling in the owned paired target / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T21:22:29+00:00"
     }
   ]
 }

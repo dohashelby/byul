@@ -34,10 +34,10 @@ CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', '
                    'SUP-03': 'template_validation', 'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
                    'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc',
                    'OBS-01': 'required_event_record', 'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
-                   'LIF-04': 'stream_buffer',
+                   'LIF-04': 'stream_buffer', 'REQ-10': 'sampling_validation',
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
-               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'PLT-02', 'LIF-04', passive_api_hop.CHECK})
+               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'PLT-02', 'LIF-04', 'REQ-10', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
@@ -258,7 +258,7 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
 
 def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None, passive_plt08=False,
              protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None,
-             gateway_record_inputs=None, normal_stream_buffer=False):
+             gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -297,7 +297,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             raise ValueError('GATEWAY_RECORD_INPUT_MODE_CONFLICT')
         records['OBS-01'] = _gateway_record_inputs(gateway_record_inputs)
     optional = {passive_api_hop.CHECK: passive_plt08, 'PLT-02': protected_ipc_metadata,
-                'LIF-04': normal_stream_buffer, **dict.fromkeys(records, True)}
+                'LIF-04': normal_stream_buffer, 'REQ-10': normal_sampling, **dict.fromkeys(records, True)}
     check_ids = (*CHECKS, *(cid for cid, requested in optional.items() if requested))
     for check_id in check_ids:
         check = pack.checks[check_id]
@@ -385,6 +385,8 @@ def main():
                         help='Paired prebound OBS-01 inputs for one selected, already recorded normal Gateway request')
     parser.add_argument('--normal-stream-buffer', action='store_true',
                         help='Observe only ordinary SSE framing and fixed owned container memory for LIF-04')
+    parser.add_argument('--normal-sampling', action='store_true',
+                        help='Observe one ordinary completion using the approved REQ-10 sampling options')
     parser.add_argument('--copy-record-inputs', type=Path,
                         help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
@@ -400,7 +402,7 @@ def main():
                                         node_image_verification=args.node_image_verification, passive_plt08=args.passive_plt08,
                                         protected_ipc_metadata=args.protected_ipc_metadata, observation_run_bindings=observation,
                                         copy_record_inputs=copies, gateway_record_inputs=gateway,
-                                        normal_stream_buffer=args.normal_stream_buffer)
+                                        normal_stream_buffer=args.normal_stream_buffer, normal_sampling=args.normal_sampling)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

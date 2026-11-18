@@ -14,8 +14,10 @@ UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
 GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
 NORMAL_STREAM_OPTION = "normal_stream_only"
 NORMAL_SAMPLING_OPTION = "normal_sampling_only"
+NORMAL_TOKEN_INPUT_OPTION = "normal_token_input_only"
 _NORMAL_ONLY_CASES = {
     "LIF-04": ("stream_buffer", NORMAL_STREAM_OPTION, "NORMAL_STREAM_EXECUTION_SCOPE_INVALID"),
+    "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
     "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
 }
 RECORD_SNAPSHOT_OPTIONS = {
@@ -82,6 +84,13 @@ def for_check(raw, executor, check_id):
     return out
 
 
+def normal_token_input_requested(raw):
+    """Detect the option before validating its value, check, or paired scope."""
+    overlays = raw.get(CHECK_CONFIG)
+    settings = (raw.get("input_validation"), *(overlays.values() if type(overlays) is dict else ()))
+    return any(type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section for section in settings)
+
+
 def bounded_metadata_scopes(configurations, pack, allowed_checks):
     """Bind the explicitly configured metadata cases without enabling sibling collectors."""
     name = "required_event_record"
@@ -92,6 +101,10 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         scoped = {}
         overlays = raw.get(CHECK_CONFIG)
         bindings = raw.get("run_binding")
+        if type(overlays) is dict and any(
+                check_id != "REQ-09" and type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section
+                for check_id, section in overlays.items()):
+            raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
         for check_id, option in RECORD_SNAPSHOT_OPTIONS.items():
             overlay = overlays.get(check_id) if type(overlays) is dict else None
             sections = (raw.get(name), overlay)
@@ -123,7 +136,8 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {check_id}
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
-                    or raw.get("lab_activation") or (check_id == "REQ-10" and raw.get("record_attestation"))):
+                    or raw.get("lab_activation")
+                    or (check_id in {"REQ-09", "REQ-10"} and raw.get("record_attestation"))):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
         scopes.append(scoped)

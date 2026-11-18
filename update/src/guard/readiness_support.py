@@ -177,7 +177,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
         row['code_available'] = True
-        if kube and check_id in {'OBS-01', 'PLT-02', 'PLT-12', 'LIF-04', 'REQ-10'}:
+        if kube and check_id in {'OBS-01', 'PLT-02', 'PLT-12', 'LIF-04', 'REQ-09', 'REQ-10'}:
             effective = for_check(cfg, executor, check_id).get(executor, {})
             setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
             if type(effective) is dict and effective.get(setting) is True:
@@ -195,6 +195,9 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 elif check_id == 'LIF-04':
                     row["scope"] = "ordinary stream framing and fixed owned container memory observations"
                     row["limitations"].append("bounded normal stream only; backpressure, debug behavior and release stay unverified")
+                elif check_id == 'REQ-09':
+                    row["scope"] = "owned tokenization and one ordinary completion using the returned token IDs"
+                    row["limitations"].append("rejection boundaries and native processor consumption stay unverified")
                 else:
                     row["scope"] = "one ordinary completion with the approved sampling options"
                     row["limitations"].append("sampling limits, rejections, structured output and runner consumption stay unverified")

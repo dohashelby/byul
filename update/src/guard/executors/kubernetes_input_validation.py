@@ -29,6 +29,25 @@ _NORMAL_LABEL = "func|POST_" + NORMAL_PATH
 _NORMAL_CASE = NORMAL_ENDPOINT + "|" + NORMAL_FORMAT
 
 
+def normal_input_transports(target, env, *, duration, binary="kubectl", runner=None):
+    """Validate the declared normal-input profile and build both non-dispatching transports."""
+    try:
+        if (type(target) is not dict or target["lab"] is not False or target.get("synthetic") is True
+                or not supports(env.engine.name, env.engine.version, "request_input_checks")):
+            raise ValueError
+        model_window = target["comparison_config"]["launch"]["max_model_len"]
+        if type(model_window) is not int or model_window <= 1:
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("KUBERNETES_INPUT_NORMAL_TARGET_UNVERIFIED") from None
+    tokenizer = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=runner,
+                               profile=REQUEST_BINDING_PROFILE)
+    completion = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=runner,
+                                 profile=INPUT_VALIDATION_PROFILE)
+    completion.deadline = tokenizer.deadline
+    return model_window, tokenizer, completion
+
+
 def _normal_exchange(transport, path, label, body, timeout):
     response = {}
     if timeout > 0:
@@ -140,18 +159,11 @@ class KubernetesInputValidationExecutor(InputValidationExecutor):
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
             target_sha = sha256_hex(canonical_json(target))
-            if (adapter is None or not supports(env.engine.name, env.engine.version, "request_input_checks")
-                    or type(target) is not dict or target["lab"] is not False or target.get("synthetic") is True
-                    or self._expected_target_sha256 != target_sha):
+            if adapter is None or self._expected_target_sha256 != target_sha:
                 raise ValueError
-            model_window = target["comparison_config"]["launch"]["max_model_len"]
-            if type(model_window) is not int or model_window <= 1:
-                raise ValueError
-            transport_options = {"duration": self.cfg.get("max_duration_seconds", 12),
-                                 "binary": self.cfg.get("kubectl_binary", "kubectl"), "runner": self._kubectl_runner}
-            tokenizer = KubernetesHTTP(target, env, profile=REQUEST_BINDING_PROFILE, **transport_options)
-            completion = KubernetesHTTP(target, env, profile=INPUT_VALIDATION_PROFILE, **transport_options)
-            completion.deadline = tokenizer.deadline
+            model_window, tokenizer, completion = normal_input_transports(
+                target, env, duration=self.cfg.get("max_duration_seconds", 12),
+                binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner)
         except (KeyError, TypeError, ValueError, OSError, KubernetesBindingError):
             raise ValueError("KUBERNETES_INPUT_NORMAL_TARGET_UNVERIFIED") from None
 

@@ -14,7 +14,7 @@ from typing import Any
 from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
 from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, UPDATE_CHECK_OUTSIDE_SCOPE, merge_config,
-                                 bounded_metadata_scopes, update_allowed_checks)
+                                 bounded_metadata_scopes, normal_token_input_requested, update_allowed_checks)
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -110,9 +110,13 @@ def validate_update_run_config(cfg: RunConfig) -> None:
 
 def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
     from .execution_recipe import execution_lock, configuration_sha256, validate_policy_time
+    requested = cfg.requested if cfg.requested is not None else cfg.raw
+    if plan.mode != Mode.update and any(normal_token_input_requested(config)
+            for config in (requested, cfg.raw, *(side.raw for side in cfg.side_configs.values()))):
+        raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
     validate_policy_time(store.resolve(plan.inputs.policy))
     environments = [store.resolve(r) for r in plan.inputs.environments]
-    if plan.inputs.execution_recipe_sha256 is not None and configuration_sha256(cfg.requested if cfg.requested is not None else cfg.raw, environments) != plan.inputs.execution_recipe_sha256:
+    if plan.inputs.execution_recipe_sha256 is not None and configuration_sha256(requested, environments) != plan.inputs.execution_recipe_sha256:
         raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
     with execution_lock(store.root, plan.id):
         cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')

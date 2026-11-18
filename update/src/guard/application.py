@@ -12,7 +12,8 @@ import secrets
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
 from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
-                                 bounded_metadata_scopes, for_check, update_allowed_checks)
+                                 bounded_metadata_scopes, for_check, normal_token_input_requested,
+                                 update_allowed_checks)
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
@@ -70,6 +71,19 @@ def _credentials(cfg, gateway_profile):
     return cfg, keys
 
 
+def _kubernetes_transition_configurations(side_cfgs):
+    """The scoped REQ-09 observer uses a bound target without a lifecycle transition."""
+    if any(normal_token_input_requested(c) for c in side_cfgs.values()):
+        # Even an invalid request must reach the scope validator without
+        # implicitly activating legacy input validation.
+        side_cfgs = {side: {**c, "executors": {name: impl for name, impl in c.get("executors", {}).items()
+                                              if name != "input_validation"}}
+                     for side, c in side_cfgs.items()}
+    names = tuple(name for name in ("request_binding", "input_validation")
+                  if any(c.get("executors", {}).get(name) == "kubernetes" for c in side_cfgs.values()))
+    return side_cfgs, names
+
+
 def update_inputs(envs, cfg: dict):
     """Shared input checks; no containers, stores or output directories are created."""
     mode = cfg.get("update", {}).get("mode", "external")
@@ -102,17 +116,16 @@ def update_inputs(envs, cfg: dict):
                         or not actual or actual.split("@")[-1] != (env.engine.image_digest or "").split("@")[-1]):
                     raise ValueError(f"{side}: target identity differs from ENV; regenerate/verify target metadata")
 
-    if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()
-           for name in ("request_binding","input_validation")):
+    transition_cfgs, transition_executors = _kubernetes_transition_configurations(side_cfgs)
+    if transition_executors:
         if mode!="external" or cfg.get("update",{}).get("kubernetes_transition",True) is not True:
             raise ValueError("KUBERNETES_TRANSITION_REQUIRED")
-        name=next(name for name in ("request_binding","input_validation")
-                  if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()))
+        name = transition_executors[0]
         paths=[c.get(name,{}).get("target") for c in side_cfgs.values()]
         if not all(paths) or Path(paths[0]).resolve()==Path(paths[1]).resolve():
             raise ValueError("KUBERNETES_TRANSITION_TARGETS_UNVERIFIED")
         try:
-            KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
+            KubernetesTransition(envs,transition_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
                 poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
                 candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
         except Exception:
@@ -157,12 +170,12 @@ def _pin_prebound_kubernetes_targets(raw, env, paths, target_snapshots):
         if content is None:
             continue
         try:
-            hashes[check_id] = _scoped_target_sha256(content, env)
+            hashes[check_id] = _scoped_target_sha256(content, env, normal_token_input=check_id == "REQ-09")
         except ValueError:
             continue  # The scoped executor will withhold dispatch without a verified hash.
 
 
-def _scoped_target_sha256(content, env, *, gateway_snapshot=False):
+def _scoped_target_sha256(content, env, *, gateway_snapshot=False, normal_token_input=False):
     from guard.models import canonical_json, sha256_hex
     from guard.runtime.bounded import strict_json
     from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
@@ -174,6 +187,9 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False):
             if gateway_snapshot:
                 from guard.executors.kubernetes_gateway_observation import snapshot_owner
                 snapshot_owner(target, binding)
+            if normal_token_input:
+                from guard.executors.kubernetes_input_validation import normal_input_transports
+                normal_input_transports(target, env, duration=1)
             return sha256_hex(canonical_json(target))
     except (KeyError, TypeError, ValueError, KubernetesBindingError):
         pass
@@ -187,7 +203,12 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     validate_policy_time(policy)
     cfg = deepcopy(cfg)
     allowed_checks = update_allowed_checks(cfg, pack)
-    prepared = update_inputs(envs, _update_config_for_execution(pack, cfg, allowed_checks))
+    scoped = _update_config_for_execution(pack, cfg, allowed_checks)
+    sides = scoped.get("sides", {})
+    if normal_token_input_requested(scoped) or any(normal_token_input_requested(raw) for raw in sides.values()):
+        bounded_metadata_scopes((merge_config(scoped, sides.get(side, {})) for side in ("baseline", "candidate")),
+                                pack, allowed_checks)
+    prepared = update_inputs(envs, scoped)
     with provider_leases(envs, [prepared[2].get(s, {}) for s in ('baseline', 'candidate')]) as leases:
         return _execute_update(store, pack, envs, policy, cfg, run_dir, as_of,
             change=change, previous_plan=previous_plan, prepared=prepared, leases=leases)
@@ -239,9 +260,9 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
     lifecycle_errors = []
     diagnostic_refs = []
     kube_transition=None
-    if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()
-           for name in ("request_binding","input_validation")):
-        kube_transition=KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
+    transition_cfgs, transition_executors = _kubernetes_transition_configurations(side_cfgs)
+    if transition_executors:
+        kube_transition=KubernetesTransition(envs,transition_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
             poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
                 candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
     candidate_blocked = False
@@ -380,6 +401,8 @@ def _validation_inputs(env, cfg: dict):
     """One managed engine, using the same launch contract as update."""
     if passive_api_hop.requested(cfg):
         raise ValueError("PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID")
+    if normal_token_input_requested(cfg):
+        raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
     effective = deepcopy(cfg)
     options = effective.get("validation", {})
     if type(options) is not dict or type(options.get("credential_canary", False)) is not bool:
@@ -509,9 +532,9 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             kube_only = all(impl == "kubernetes" for impl in implementations) and (
                 bool(implementations) or allowed_checks is not None)
             if kube_only:
-                transition_requested = any(
-                    name in side.executors for side in sides for name in ("request_binding", "input_validation")
-                )
+                effective_sides = ({side: config.raw for side, config in requested.side_configs.items()}
+                                   or {"baseline": requested.raw})
+                transition_requested = bool(_kubernetes_transition_configurations(effective_sides)[1])
         validate_pack(pack)
         if single:
             effective, managed = _validation_inputs(envs[0], cfg)
@@ -565,7 +588,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         raise ValueError("KUBERNETES_SCOPED_TARGET_INVALID")
                     with path.open("rb") as stream:
                         _scoped_target_sha256(stream.read(65537), selected_env,
-                            gateway_snapshot=settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
+                            gateway_snapshot=settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True,
+                            normal_token_input=item.check_id == "REQ-09")
                 executor = factory(c)
                 support = support_by_key[side, item.check_id]
                 # These collectors distinguish a valid policy outside their

@@ -348,6 +348,162 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
     assert configuration_sha256(cfg, envs) != expected_recipe
 
 
+def test_req09_pair_checks_owned_targets_and_withholds_legacy_siblings(tmp_path, sources, monkeypatch):
+    from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor
+
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    pol = original.model_copy(update={
+        'scope': original.scope.model_copy(update={'include': ['REQ-08', 'REQ-09', 'SUP-08']}),
+        'values': {'REQ-09': {'allowed_endpoints': ['POST /v1/completions', 'POST /v1/chat/completions'],
+                              'allowed_input_formats': ['token_ids', 'text'],
+                              'allowed_input_pairs': ['POST /v1/completions|token_ids',
+                                                      'POST /v1/chat/completions|text'],
+                              'max_input_tokens': 127, 'rejection_codes': ['400', '422']}},
+    }).seal()
+    _write(policy_path, pol.to_dict())
+    output, store = tmp_path / 'token-input', tmp_path / 'store'
+    default, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store)
+    assert 'input_validation' not in default['executors']
+
+    def no_transition(*_args, **_kwargs):
+        raise AssertionError('A scoped normal input does not admit legacy lifecycle collection')
+
+    monkeypatch.setattr(application, 'KubernetesTransition', no_transition)
+    fresh = tmp_path / 'fresh-token-target.json'
+    args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store), '--output', str(output),
+            '--normal-token-input', '--candidate-target-after-baseline', str(fresh)]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            args.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', args)
+    tool.main()
+
+    cfg = tomllib.loads((output / 'preliminary-guard.toml').read_text())
+    assert cfg['executors'] == {'input_validation': 'kubernetes'}
+    assert cfg['check_config'] == {'REQ-09': {'normal_token_input_only': True}}
+    assert cfg['update']['allowed_checks'] == ['REQ-09']
+    assert all(settings == {'input_validation': {'target': str(sides[side]['target'])}}
+               for side, settings in cfg['sides'].items())
+    readiness = json.loads((output / 'readiness.json').read_bytes())
+    rows = [row for row in readiness['rows'] if row['check_id'] == 'REQ-09']
+    assert readiness['active_checks'] == 69 and len(rows) == 2
+    for row in rows:
+        assert row['file_binding_valid'] and row['normal_token_input_only'], row
+        assert row['blocking_codes'] == ['LIVE_EXECUTOR_PREFLIGHT_REQUIRED']
+        assert not row['engine_executed'] and not row['ready_for_execution']
+    shared = readiness['metadata_wiring']['REQ-09']['shared_executor_checks']
+    assert set(shared) == {'REQ-08', 'SUP-08'}
+    assert all(not row['transport_dispatched'] for sibling in shared.values() for row in sibling.values())
+
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    pinned = {env.id: sha256_hex(canonical_json(json.loads(entry['target'].read_bytes())))
+              for env, entry in zip(envs, sides.values())}
+    seen = set()
+
+    def fixture_normal(self, check, env, *_args):
+        assert check.id == 'REQ-09' and self._expected_target_sha256 == pinned[env.id]
+        seen.add(env.id)
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
+
+    monkeypatch.setattr(KubernetesInputValidationExecutor, '_run_normal', fixture_normal)
+    report, _ = application.execute_update(Store(store), pack, envs, pol, cfg, tmp_path / 'prebound', utcnow())
+    assert seen == set(pinned)
+    assert next(row for row in report.by_check if row.check_id == 'REQ-09').selected
+
+    staged = tomllib.loads((output / 'guard.toml').read_text())
+    previous = readiness['candidate_handoff']['preliminary_target']
+    current = json.loads(sides['candidate']['target'].read_bytes())
+    for number, role in enumerate(('engine', 'probe'), 200):
+        current['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        current['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, current)
+    expected = sha256_hex(canonical_json(current))
+    assert tool.revalidate_candidate(staged, envs[1], previous) == {'input_validation': expected}
+    merged = merge_config(staged, staged['sides']['candidate'])
+    executor = registry.build_executor('input_validation', 'kubernetes',
+        {**for_check(merged, 'input_validation', 'REQ-09'),
+         '_kubernetes_target_sha256_by_executor': {'input_validation': expected}},
+        engine=envs[1].engine.name, version=envs[1].engine.version)
+    assert executor._expected_target_sha256 == expected
+    current['comparison_config']['launch']['max_model_len'] = True
+    _write(fresh, current)
+    with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_TARGET_UNAVAILABLE'):
+        tool.revalidate_candidate(staged, envs[1], previous)
+    _write(sides['candidate']['target'], current)
+    invalid = application.update_readiness(pack, envs, pol, cfg)
+    assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == (
+        'KUBERNETES_SCOPED_TARGET_INVALID')
+
+
+def test_req09_rejects_mixed_legacy_dispatch_before_any_executor(tmp_path, sources, monkeypatch):
+    from guard.core.run import run_plan
+    from guard.store.packs import put_pack
+
+    pack, sides, policy_path = sources
+    pol = tool.Policy.model_validate_json(policy_path.read_bytes())
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    base = {'executors': {'input_validation': 'kubernetes'}, 'update': {'allowed_checks': ['REQ-09']},
+            'sides': {side: {'input_validation': {'target': str(entry['target'])}} for side, entry in sides.items()}}
+
+    def no_dispatch(*_args, **_kwargs):
+        raise AssertionError('A missing or misplaced marker must never activate legacy input validation')
+
+    monkeypatch.setattr(application, 'KubernetesTransition', no_dispatch)
+    half = deepcopy(base)
+    half['sides']['baseline']['check_config'] = {'REQ-09': {'normal_token_input_only': True}}
+    wrong = {**base, 'check_config': {'SUP-08': {'normal_token_input_only': True}}}
+    scoped = {**base, 'check_config': {'REQ-09': {'normal_token_input_only': True}}}
+    unscoped = {**scoped, 'update': {}}
+    with_sibling = {**scoped, 'update': {'allowed_checks': ['REQ-08', 'REQ-09']}}
+    store = Store(tmp_path / 'store')
+    for invalid in (half, wrong, unscoped, with_sibling):
+        ready = application.update_readiness(pack, envs, pol, invalid)
+        assert next(row for row in ready['checks'] if row['check'] == 'inputs')['detail'] == (
+            'NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID')
+        with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID'):
+            application.execute_update(store, pack, envs, pol, invalid, tmp_path / 'update', utcnow())
+    assert not (tmp_path / 'update').exists()
+
+    put_pack(store, pack.path)
+    for item in (*envs, pol):
+        store.put(item)
+    plan = bind_recipe(select(pack, envs, pol, mode='update'), scoped, envs)
+    store.put(plan)
+    monkeypatch.setattr(registry, 'build_executor', no_dispatch)
+    run = application.run_config(scoped)
+    run.side_configs['candidate'].raw['check_config'].pop('REQ-09')
+    with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, plan, run)
+    run.side_configs['baseline'].raw['check_config'].pop('REQ-09')
+    with pytest.raises(ValueError, match='OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID'):
+        run_plan(store, pack, plan, run)
+
+    audit = select(pack, envs[:1], pol, mode='audit')
+    with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, audit, application.run_config(scoped))
+    with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID'):
+        application._validation_inputs(envs[0], scoped)
+
+    mixed = deepcopy(scoped)
+    mixed['executors']['request_binding'] = 'kubernetes'
+    requested = application.run_config(mixed)
+    transition, names = application._kubernetes_transition_configurations(
+        {side: config.raw for side, config in requested.side_configs.items()})
+    assert names == ('request_binding',)
+    assert all(side['executors'] == {'request_binding': 'kubernetes'} for side in transition.values())
+    assert all(set(config.raw['executors']) == {'request_binding', 'input_validation'}
+               for config in requested.side_configs.values())
+    for side in requested.side_configs.values():
+        side.raw.pop('check_config')
+    _, legacy = application._kubernetes_transition_configurations(
+        {side: config.raw for side, config in requested.side_configs.items()})
+    assert legacy == ('request_binding', 'input_validation')
+
+
 def test_req10_pair_preserves_policy_scope_and_pins_the_staged_candidate(tmp_path, sources, monkeypatch):
     from guard.core.run import run_plan
     from guard.store.packs import put_pack

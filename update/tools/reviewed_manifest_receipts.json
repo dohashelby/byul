@@ -815,6 +815,11 @@
       "manifest_sha256": "d0161adbb4be514943944bb77a4c6b41a6c4adc1fff12be99cc37d1de6ddf9c7",
       "reviewed_by": "Codex / typed SUP-07 cache evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T21:46:21+00:00"
+    },
+    {
+      "manifest_sha256": "4eb5858787eed47532bdadd4339b43ab32c44f2822049d361e33f6191e407af2",
+      "reviewed_by": "Codex / owned normal token input pair and explicit scope / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T22:43:02+00:00"
     }
   ]
 }

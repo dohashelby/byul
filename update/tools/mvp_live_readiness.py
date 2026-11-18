@@ -19,9 +19,11 @@ from guard.adapters import vllm_native_input_profiles, vllm_native_input_rejecti
 from guard.collectors import native_input, native_input_qualification
 from guard.collectors import native_input_rejection_qualification, reused_input_qualification
 from guard.collectors.file import load_environment, load_policy
-from guard.configuration import for_check, merge_config
+from guard.configuration import (NORMAL_TOKEN_INPUT_OPTION, bounded_metadata_scopes, for_check, merge_config,
+                                 normal_token_input_requested)
 from guard.core.select import _in_scope, check_policy_value
 from guard.executors import passive_api_hop, registry, run_binding
+from guard.executors.kubernetes_input_validation import normal_input_transports
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
 from guard.models import load_pack
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
@@ -126,13 +128,14 @@ def _inspect(source, check, pack, issued_at):
     allowed = update_allowed_checks(config, pack)
     if allowed is not None and check.id not in allowed:
         raise ValueError(UPDATE_CHECK_OUTSIDE_SCOPE)
+    side_configs = {side: merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES}
+    if any(normal_token_input_requested(raw) for raw in side_configs.values()):
+        bounded_metadata_scopes(side_configs.values(), pack, allowed)
     passive_hop = check.id == passive_api_hop.CHECK and passive_api_hop.validate_scope(
-        pack, (merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES), allowed,
-        explicitly_requested=passive_api_hop.requested(config))
+        pack, side_configs.values(), allowed, explicitly_requested=passive_api_hop.requested(config))
     if passive_hop and not _in_scope(passive_api_hop.SOURCE_CHECK, policy):
         raise ValueError('PASSIVE_API_HOP_SOURCE_NOT_ADMITTED')
-    config = merge_config(config, config.get('sides', {}).get(source['side'], {}))
-    config = for_check(config, check.executor, check.id)
+    config = for_check(side_configs[source['side']], check.executor, check.id)
     implementation = config.get('executors', {}).get(check.executor)
     if implementation not in ('real', 'kubernetes'):
         raise ValueError('MVP_ACTIVE_EXECUTOR_REQUIRED')
@@ -143,6 +146,7 @@ def _inspect(source, check, pack, issued_at):
                                  version=env.engine.version) is None:
         raise ValueError('MVP_EXECUTOR_UNAVAILABLE')
     cfg = config.get(check.executor, {})
+    normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
     target = cfg.get('target')
     if implementation == 'kubernetes' and target is None:
         raise ValueError('MVP_CURRENT_TARGET_REQUIRED')
@@ -153,6 +157,11 @@ def _inspect(source, check, pack, issued_at):
         if target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
         target_state = (target, raw_target, identity)
+    if normal_token_input:
+        try:
+            normal_input_transports(target_data, env, duration=1)
+        except (KubernetesBindingError, ValueError):
+            raise ValueError('NORMAL_TOKEN_INPUT_TARGET_UNAVAILABLE') from None
     if passive_hop:
         passive_api_hop.validate_policy(check, values)
         passive_api_hop.validate_target(target_data, env)
@@ -169,7 +178,7 @@ def _inspect(source, check, pack, issued_at):
             executor.validate_policy(check, effective)
         except (ValueError, TypeError, KeyError):
             raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
-    if requires_native_matrix:
+    if requires_native_matrix and not normal_token_input:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
         after, current = _read(source[role]['path'])
@@ -187,7 +196,8 @@ def _inspect(source, check, pack, issued_at):
     return {'file_binding_valid': True, 'executor_policy_valid': True, 'environment_ref': env.ref().model_dump(mode='json'),
             'environment_origin': env.data_origin.value, 'implementation': implementation,
             'binding_schema': binding['schema'] if binding else None,
-            'files': {role: source[role] for role in files}, 'blocking_codes': blockers}
+            'files': {role: source[role] for role in files}, 'blocking_codes': blockers,
+            **({NORMAL_TOKEN_INPUT_OPTION: True} if normal_token_input else {})}
 
 
 def audit(index_file, *, pack=None, issued_at=None, side=None):
@@ -240,7 +250,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
                     row.update(_inspect(sources[cid, selected_side], check, pack, now))
                 except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as error:
                     row['blocking_codes'] = [_code(error)]
-            if requires_native_matrix:
+            if requires_native_matrix and not row.get(NORMAL_TOKEN_INPUT_OPTION):
                 row['blocking_codes'].extend(_native_matrix_blockers(expected, collection_profile))
             if not implementations:
                 row['blocking_codes'].append('CURRENT_EXECUTOR_UNAVAILABLE')

@@ -150,14 +150,34 @@ def test_staged_configuration_requires_a_fresh_candidate_before_hash_binding(tmp
     current = deepcopy(preliminary)
     for number, role in enumerate(('engine', 'probe'), 100):
         current['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        current['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
     _write(fresh, current)
     assert tool.revalidate_candidate(staged, env, pointer) == dict.fromkeys(
         config['executors'], sha256_hex(canonical_json(current)))
     assert json.loads(path.read_bytes()) == preliminary
+    for ownership_change in ('context', 'namespace_uid'):
+        moved = deepcopy(current)
+        if ownership_change == 'context':
+            moved['kubernetes']['context'] = 'fixture-unrelated-context'
+        else:
+            moved['kubernetes']['probe']['namespace_uid'] = '00000000-0000-0000-0000-000000000120'
+        _write(fresh, moved)
+        with pytest.raises(ValueError, match='METADATA_CANDIDATE_OWNERSHIP_CHANGED'):
+            tool.revalidate_candidate(staged, env, pointer)
     current['comparison_config']['launch']['max_model_len'] += 1
     _write(fresh, current)
     with pytest.raises(ValueError, match='METADATA_CANDIDATE_CONDITIONS_CHANGED'):
         tool.revalidate_candidate(staged, env, pointer)
+
+
+def test_template_wiring_requires_the_configured_hash_in_approved_policy(tmp_path, sources):
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {**original.values, 'SUP-03': {'allowed_template_sha256': []}}
+    _write(policy_path, original.model_copy(update={'values': values}).seal().to_dict())
+    config, _, checks = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+    assert 'template_validation' not in config['executors']
+    assert set(checks['SUP-03']['sides'].values()) == {'CONFIGURED_TEMPLATE_POLICY_APPROVAL_MISSING'}
 
 
 def test_missing_shared_policy_blocks_both_container_checks_without_filling_values(tmp_path, sources):

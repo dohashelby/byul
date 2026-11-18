@@ -82,7 +82,13 @@ def revalidate_candidate(config, env, preliminary_ref):
         raise ValueError('METADATA_PRELIMINARY_TARGET_CHANGED')
     current, _ = _source(current_path)
     old, new = _transport(preliminary, env), _transport(current, env)
-    if any(old.binding[role]['pod_uid'] == new.binding[role]['pod_uid'] for role in ('engine', 'probe')):
+    roles = ('engine', 'probe')
+    if (old.binding['context'] != new.binding['context']
+            or any(old.binding[role][key] != new.binding[role][key]
+                   for role in roles for key in ('namespace', 'namespace_uid'))):
+        raise ValueError('METADATA_CANDIDATE_OWNERSHIP_CHANGED')
+    if any(old.binding[role][key] == new.binding[role][key]
+           for role in roles for key in ('pod_uid', 'container_id')):
         raise ValueError('METADATA_CANDIDATE_GENERATION_NOT_FRESH')
     if execution_conditions(preliminary, {}, []) != execution_conditions(current, {}, []):
         raise ValueError('METADATA_CANDIDATE_CONDITIONS_CHANGED')
@@ -111,9 +117,12 @@ def _check_reason(check, env, target, transport, values, *, policy):
         adapter = factory() if factory is not None else None
         ctx = SimpleNamespace(env=env, target=target, adapter=adapter, cprobe=transport, api_model=transport.api_model)
         command = target['engine'].get('command')
+        approved_target = template_supply._target(ctx, kubernetes=True)
         if (type(command) is not list or not command or any(type(arg) is not str or not arg for arg in command)
-                or template_supply._target(ctx, kubernetes=True) is None):
+                or approved_target is None):
             return 'CONFIGURED_TEMPLATE_TARGET_REQUIRED'
+        if approved_target[3]['sha256'] not in values[template_supply.POLICY_KEY]:
+            return 'CONFIGURED_TEMPLATE_POLICY_APPROVAL_MISSING'
     return None
 
 

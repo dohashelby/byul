@@ -18,7 +18,7 @@ from pathlib import Path
 import re
 import time
 
-from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
+from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.kubernetes_http import LOG_INTEGRITY_PROFILE, KubernetesBindingError, KubernetesHTTP
 from . import log_collection_gap
 from .http_common import Ctx
@@ -111,6 +111,11 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         draft.cleanup_errors.extend(transport.report()["cleanup_errors"])
         if transport.injected:
             draft.data_origin = DataOrigin.EXAMPLE
+        if (getattr(check, "collection_profile", None) == log_collection_gap.PROFILE
+                and (not ctx._collection_status_available or draft.cleanup_errors)):
+            draft.status = ExecStatus.ABORTED
+            draft.abort_reason = draft.abort_reason or "COLLECTION_STATUS_UNAVAILABLE"
+            draft.data_origin = min(draft.data_origin, DataOrigin.DECLARED, key=ORIGIN_STRENGTH.get)
         return draft
 
     def _snapshot(self, ctx, launch, deadline):
@@ -228,6 +233,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         except Exception:
             diagnostics.append("COLLECTION_STATUS_UNAVAILABLE")
         collected = result is not None
+        ctx._collection_status_available = collected
         obs = {"collection_gap_violations": {"value": result and result["violations"], "collected": collected},
                "collection_records_unverified": {"value": result and result["unverified"], "collected": collected},
                "collection_records_missing": {"value": result and result["missing"], "collected": collected},
@@ -237,6 +243,8 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         summary = {"profile": log_collection_gap.PROFILE, "diagnostic_codes": diagnostics,
                    "record_sha256": sha256_hex(canonical_json(packet)) if packet is not None else None,
                    "file_sha256": file_sha256, "source": "owned probe Pod /guard-collection/data/<session>/collection-status.json",
+                   "selected_record_timeline": [row for row in packet["events"] if row["record"] in values["required_records"]] if collected else None,
+                   "producer_authenticated": False, "independent_event_verified": False,
                    "fixture": {"profile": log_collection_gap.PROFILE, "schema": log_collection_gap.SCHEMA}}
         normal = {"attempted": collected, "succeeded": None, "detail": "상태 기록의 정상 도착은 생산자 미인증 주장이다."}
         return obs, normal, [{"step": step, "attempted": False} for step in ctx.check.challenge_steps], summary

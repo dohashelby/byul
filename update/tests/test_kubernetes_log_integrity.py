@@ -170,14 +170,21 @@ def test_obs11_record_from_the_probe_pod_reuses_the_original_evaluation(tmp_path
     env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE}, model={'id': 'fixture-model'})
     late = {'record': 'request', 'event_at_ms': 0, 'arrived_at_ms': None, 'gap_marked_at_ms': 5000, 'alert_at_ms': None,
             'dependent_result': 'PASS', 'clock_uncertainty_ms': 10}
-    draft, _, _ = run(tmp_path, monkeypatch, definition=gap_check(), values=GAP_VALUES, status=status(env, [late]))
+    unrelated = {**late, 'record': 'private-unselected-record-name'}
+    draft, observer, _ = run(tmp_path, monkeypatch, definition=gap_check(), values=GAP_VALUES, status=status(env, [late, unrelated]))
     reasons = {v['reason'] for v in draft.observations['collection_gap_violations'].value}
     assert reasons == {'gap_not_marked_in_time', 'alert_not_raised_in_time', 'dependent_test_passed_without_record'}
+    assert draft.status.value=='COMPLETED' and not observer.validated and observer.attached==0
+    summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+    assert summary['selected_record_timeline']==[late] and summary['producer_authenticated'] is False
+    assert 'private-unselected-record-name' not in json.dumps(summary)
 
 
 def test_obs11_unreadable_record_stays_uncollected(tmp_path, monkeypatch):
-    draft, _, _ = run(tmp_path, monkeypatch, definition=gap_check(), values=GAP_VALUES, status=None)
+    draft, observer, _ = run(tmp_path, monkeypatch, definition=gap_check(), values=GAP_VALUES, status=None)
     assert draft.observations['collection_gap_violations'].collected is False
+    assert draft.status.value=='ABORTED' and draft.abort_reason=='COLLECTION_STATUS_UNAVAILABLE'
+    assert draft.data_origin.value=='EXAMPLE' and not observer.validated and observer.attached==0
 
 
 def test_transport_accepts_only_the_seven_fixed_body_ids():

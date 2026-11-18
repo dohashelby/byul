@@ -15,8 +15,11 @@ GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
 NORMAL_STREAM_OPTION = "normal_stream_only"
 NORMAL_SAMPLING_OPTION = "normal_sampling_only"
 NORMAL_TOKEN_INPUT_OPTION = "normal_token_input_only"
+NORMAL_SERVING_READINESS_OPTION = "normal_serving_readiness_only"
+NORMAL_SERVING_READINESS_SCOPE_ERROR = "NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID"
 _NORMAL_ONLY_CASES = {
     "LIF-04": ("stream_buffer", NORMAL_STREAM_OPTION, "NORMAL_STREAM_EXECUTION_SCOPE_INVALID"),
+    "OBS-02": ("observation_state", NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR),
     "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
     "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
 }
@@ -91,6 +94,24 @@ def normal_token_input_requested(raw):
     return any(type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section for section in settings)
 
 
+def _serving_readiness_markers(value, path=()):
+    if type(value) is dict:
+        for key, child in value.items():
+            location = (*path, key)
+            if key == NORMAL_SERVING_READINESS_OPTION:
+                yield location, child
+            else:
+                yield from _serving_readiness_markers(child, location)
+    elif type(value) is list:
+        for index, child in enumerate(value):
+            yield from _serving_readiness_markers(child, (*path, index))
+
+
+def normal_serving_readiness_requested(raw):
+    """Detect a serving-readiness opt-in before validating its placement or value."""
+    return next(_serving_readiness_markers(raw), None) is not None
+
+
 def bounded_metadata_scopes(configurations, pack, allowed_checks):
     """Bind the explicitly configured metadata cases without enabling sibling collectors."""
     name = "required_event_record"
@@ -101,6 +122,14 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         scoped = {}
         overlays = raw.get(CHECK_CONFIG)
         bindings = raw.get("run_binding")
+        for path, value in _serving_readiness_markers(raw):
+            if path[:2] in {("sides", "baseline"), ("sides", "candidate")}:
+                path = path[2:]
+            if value is not True or path not in {
+                ("observation_state", NORMAL_SERVING_READINESS_OPTION),
+                (CHECK_CONFIG, "OBS-02", NORMAL_SERVING_READINESS_OPTION),
+            }:
+                raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
         if type(overlays) is dict and any(
                 check_id != "REQ-09" and type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section
                 for check_id, section in overlays.items()):
@@ -137,7 +166,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
-                    or (check_id in {"REQ-09", "REQ-10"} and raw.get("record_attestation"))):
+                    or (check_id in {"OBS-02", "REQ-09", "REQ-10"} and raw.get("record_attestation"))
+                    or (check_id == "OBS-02" and "run_binding" in raw
+                        and (type(bindings) is not dict or check_id in bindings))):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
         scopes.append(scoped)

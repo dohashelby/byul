@@ -12,7 +12,8 @@ import secrets
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
 from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
-                                 NORMAL_TOKEN_INPUT_OPTION, bounded_metadata_scopes, for_check,
+                                 NORMAL_SERVING_READINESS_SCOPE_ERROR, bounded_metadata_scopes,
+                                 for_check, normal_serving_readiness_requested,
                                  normal_token_input_requested, update_allowed_checks)
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
@@ -145,6 +146,14 @@ def _update_config_for_execution(pack, cfg, allowed_checks):
     return scoped
 
 
+def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
+    sides = cfg.get("sides", {})
+    if (normal_serving_readiness_requested(cfg) or normal_token_input_requested(cfg)
+            or any(normal_token_input_requested(raw) for raw in sides.values())):
+        bounded_metadata_scopes((merge_config(cfg, sides.get(side, {})) for side in ("baseline", "candidate")),
+                                pack, allowed_checks)
+
+
 def _bounded_kubernetes_targets(raw, selected):
     paths = {}
     for check_id, option in KUBERNETES_BOUND_CHECK_OPTIONS.items():
@@ -170,12 +179,12 @@ def _pin_prebound_kubernetes_targets(raw, env, paths, target_snapshots):
         if content is None:
             continue
         try:
-            hashes[check_id] = _scoped_target_sha256(content, env, normal_token_input=check_id == "REQ-09")
+            hashes[check_id] = _scoped_target_sha256(content, env, scoped_check=check_id)
         except ValueError:
             continue  # The scoped executor will withhold dispatch without a verified hash.
 
 
-def _scoped_target_sha256(content, env, *, gateway_snapshot=False, normal_token_input=False):
+def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=None):
     from guard.models import canonical_json, sha256_hex
     from guard.runtime.bounded import strict_json
     from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
@@ -187,7 +196,10 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, normal_token_
             if gateway_snapshot:
                 from guard.executors.kubernetes_gateway_observation import snapshot_owner
                 snapshot_owner(target, binding)
-            if normal_token_input:
+            if scoped_check == "OBS-02":
+                from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
+                normal_serving_readiness_transport(target, env, duration=1)
+            elif scoped_check == "REQ-09":
                 from guard.executors.kubernetes_normal_token_input import normal_input_transports
                 normal_input_transports(target, env, duration=1)
             return sha256_hex(canonical_json(target))
@@ -203,12 +215,8 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     validate_policy_time(policy)
     cfg = deepcopy(cfg)
     allowed_checks = update_allowed_checks(cfg, pack)
-    scoped = _update_config_for_execution(pack, cfg, allowed_checks)
-    sides = scoped.get("sides", {})
-    if normal_token_input_requested(scoped) or any(normal_token_input_requested(raw) for raw in sides.values()):
-        bounded_metadata_scopes((merge_config(scoped, sides.get(side, {})) for side in ("baseline", "candidate")),
-                                pack, allowed_checks)
-    prepared = update_inputs(envs, scoped)
+    _validate_requested_normal_scopes(cfg, pack, allowed_checks)
+    prepared = update_inputs(envs, _update_config_for_execution(pack, cfg, allowed_checks))
     with provider_leases(envs, [prepared[2].get(s, {}) for s in ('baseline', 'candidate')]) as leases:
         return _execute_update(store, pack, envs, policy, cfg, run_dir, as_of,
             change=change, previous_plan=previous_plan, prepared=prepared, leases=leases)
@@ -401,6 +409,8 @@ def _validation_inputs(env, cfg: dict):
     """One managed engine, using the same launch contract as update."""
     if passive_api_hop.requested(cfg):
         raise ValueError("PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID")
+    if normal_serving_readiness_requested(cfg):
+        raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
     if normal_token_input_requested(cfg):
         raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
     effective = deepcopy(cfg)
@@ -540,6 +550,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             effective, managed = _validation_inputs(envs[0], cfg)
             prepared = ("managed", {"single": effective}, {"single": managed})
         else:
+            _validate_requested_normal_scopes(cfg, pack, allowed_checks)
             prepared = update_inputs(envs, execution_config)
             bounded_metadata_scopes(prepared[1].values(), pack, allowed_checks)
         option_group = "validation" if single else "update"
@@ -584,8 +595,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 settings = c.get(item.executor, {})
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
-                normal_token_input = (item.check_id == "REQ-09" and type(settings) is dict
-                                      and NORMAL_TOKEN_INPUT_OPTION in settings)
+                explicit_observer = (item.check_id in {"OBS-02", "REQ-09"} and type(settings) is dict
+                                     and option in settings)
                 if kube and option and type(settings) is dict and settings.get(option) is True:
                     path = Path(settings["target"])
                     if not path.is_file() or path.is_symlink():
@@ -593,10 +604,10 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     with path.open("rb") as stream:
                         _scoped_target_sha256(stream.read(65537), selected_env,
                             gateway_snapshot=settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True,
-                            normal_token_input=normal_token_input)
+                            scoped_check=item.check_id)
                 executor = (registry.build_executor(item.executor, implementation, c,
                                 engine=selected_env.engine.name, version=selected_env.engine.version)
-                            if normal_token_input else factory(c))
+                            if explicit_observer else factory(c))
                 support = support_by_key[side, item.check_id]
                 # These collectors distinguish a valid policy outside their
                 # bounded profile from malformed input. Still validate launch

@@ -13,8 +13,11 @@ from typing import Any
 
 from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
-from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, UPDATE_CHECK_OUTSIDE_SCOPE, merge_config,
-                                 bounded_metadata_scopes, normal_token_input_requested, update_allowed_checks)
+from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, NORMAL_SERVING_READINESS_OPTION,
+                                 NORMAL_SERVING_READINESS_SCOPE_ERROR,
+                                 UPDATE_CHECK_OUTSIDE_SCOPE, bounded_metadata_scopes, merge_config,
+                                 normal_serving_readiness_requested, normal_token_input_requested,
+                                 update_allowed_checks)
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -111,9 +114,12 @@ def validate_update_run_config(cfg: RunConfig) -> None:
 def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
     from .execution_recipe import execution_lock, configuration_sha256, validate_policy_time
     requested = cfg.requested if cfg.requested is not None else cfg.raw
-    if plan.mode != Mode.update and any(normal_token_input_requested(config)
-            for config in (requested, cfg.raw, *(side.raw for side in cfg.side_configs.values()))):
-        raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
+    if plan.mode != Mode.update:
+        configurations = (requested, cfg.raw, *(side.raw for side in cfg.side_configs.values()))
+        if any(normal_serving_readiness_requested(config) for config in configurations):
+            raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
+        if any(normal_token_input_requested(config) for config in configurations):
+            raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
     validate_policy_time(store.resolve(plan.inputs.policy))
     environments = [store.resolve(r) for r in plan.inputs.environments]
     if plan.inputs.execution_recipe_sha256 is not None and configuration_sha256(requested, environments) != plan.inputs.execution_recipe_sha256:
@@ -275,10 +281,18 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     if run_binding.keys_for(check):
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
+            target_options = {}
+            if (check.id == 'OBS-02' and type(section) is dict
+                    and NORMAL_SERVING_READINESS_OPTION in section):
+                hashes = raw.get("_kubernetes_target_sha256_by_executor")
+                expected_target = hashes.get(item.executor) if type(hashes) is dict else None
+                if expected_target is None:
+                    raise run_binding.RunBindingUnavailable("RUN_BINDING_OBS02_NORMAL_TARGET_UNAVAILABLE")
+                target_options["expected_target_sha256"] = expected_target
             binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
-                run_cfg=run_binding.run_config(cfg.raw, check.id), policy_ref=plan.inputs.policy)
+                run_cfg=run_binding.run_config(cfg.raw, check.id), policy_ref=plan.inputs.policy, **target_options)
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)

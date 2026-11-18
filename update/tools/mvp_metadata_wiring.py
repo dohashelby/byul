@@ -18,6 +18,7 @@ from guard.executors import passive_api_hop, registry, run_binding, template_sup
 from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snapshot_owner
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
+from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
@@ -34,11 +35,12 @@ from tools.mvp_versions import versions
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
                    'SUP-03': 'template_validation', 'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
                    'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc',
-                   'OBS-01': 'required_event_record', 'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
+                   'OBS-01': 'required_event_record', 'OBS-02': 'observation_state',
+                   'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
                    'LIF-04': 'stream_buffer', 'REQ-09': 'input_validation', 'REQ-10': 'sampling_validation',
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
-               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'PLT-02', 'LIF-04', 'REQ-09', 'REQ-10', passive_api_hop.CHECK})
+               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-04', 'REQ-09', 'REQ-10', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
@@ -177,6 +179,11 @@ def revalidate_candidate(config, env, preliminary_ref):
         raise ValueError('METADATA_PRELIMINARY_TARGET_CHANGED')
     current, _ = _source(current_path)
     old, new = _transport(preliminary, env), _transport(current, env)
+    if 'observation_state' in executors:
+        try:
+            normal_serving_readiness_transport(current, env, duration=1, runner=_detached_runner)
+        except (KubernetesBindingError, ValueError):
+            raise ValueError('NORMAL_SERVING_READINESS_TARGET_UNAVAILABLE') from None
     if 'input_validation' in executors:
         try:
             normal_input_transports(current, env, duration=1, runner=_detached_runner)
@@ -213,6 +220,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
+        if check.id == 'OBS-02':
+            config[check.executor]['target'] = target_path
+            try:
+                normal_serving_readiness_transport(target, env, duration=1, runner=_detached_runner)
+            except (KubernetesBindingError, ValueError):
+                return 'NORMAL_SERVING_READINESS_TARGET_UNAVAILABLE'
         if check.id == 'REQ-09':
             config[check.executor]['target'] = target_path
             try:
@@ -276,7 +289,8 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
 
 def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None, passive_plt08=False,
              protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None,
-             gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False):
+             gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
+             normal_serving_readiness=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -316,6 +330,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         records['OBS-01'] = _gateway_record_inputs(gateway_record_inputs)
     optional = {passive_api_hop.CHECK: passive_plt08, 'PLT-02': protected_ipc_metadata,
                 'LIF-04': normal_stream_buffer, 'REQ-10': normal_sampling, 'REQ-09': normal_token_input,
+                'OBS-02': normal_serving_readiness,
                 **dict.fromkeys(records, True)}
     check_ids = (*CHECKS, *(cid for cid, requested in optional.items() if requested))
     for check_id in check_ids:
@@ -408,6 +423,8 @@ def main():
                         help='Observe one ordinary completion using the approved REQ-10 sampling options')
     parser.add_argument('--normal-token-input', action='store_true',
                         help='Observe an ordinary REQ-09 completion using the bound tokenizer result')
+    parser.add_argument('--normal-serving-readiness', action='store_true',
+                        help='Observe the owned Pod readiness and ordinary serving correspondence for OBS-02')
     parser.add_argument('--copy-record-inputs', type=Path,
                         help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
@@ -424,7 +441,8 @@ def main():
                                         protected_ipc_metadata=args.protected_ipc_metadata, observation_run_bindings=observation,
                                         copy_record_inputs=copies, gateway_record_inputs=gateway,
                                         normal_stream_buffer=args.normal_stream_buffer, normal_sampling=args.normal_sampling,
-                                        normal_token_input=args.normal_token_input)
+                                        normal_token_input=args.normal_token_input,
+                                        normal_serving_readiness=args.normal_serving_readiness)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

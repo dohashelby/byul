@@ -348,6 +348,126 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
     assert configuration_sha256(cfg, envs) != expected_recipe
 
 
+def test_obs02_normal_readiness_binds_the_same_product_plan_and_owned_targets(tmp_path, sources, monkeypatch):
+    from guard.executors import run_binding
+    from guard.executors.kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
+
+    pack, sides, policy_path = sources
+    prior = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {'observation_state_required_components': ['http_listener', 'request_selection', 'engine_core', 'worker'],
+              'profiler_backend_kind': 'torch', 'profiler_required_ranks': ['0', '1']}
+    policy = prior.model_copy(update={'values': {'OBS-02': values},
+        'scope': prior.scope.model_copy(update={'include': ['OBS-02']})}).seal()
+    _write(policy_path, policy.to_dict())
+    output, store_path, fresh = (tmp_path / name for name in ('readiness', 'store', 'fresh-target.json'))
+    default, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store_path)
+    assert 'observation_state' not in default['executors']
+    args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store_path), '--output', str(output),
+            '--normal-serving-readiness', '--candidate-target-after-baseline', str(fresh)]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            args.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', args)
+    tool.main()
+    prebound = tomllib.loads((output / 'preliminary-guard.toml').read_text())
+    assert prebound['executors'] == {'observation_state': 'kubernetes'}
+    assert prebound['update']['allowed_checks'] == ['OBS-02']
+    assert prebound['check_config'] == {'OBS-02': {'normal_serving_readiness_only': True}}
+    assert all('run_binding' not in side for side in prebound['sides'].values())
+    readiness = json.loads((output / 'readiness.json').read_bytes())
+    rows = [row for row in readiness['rows'] if row['check_id'] == 'OBS-02']
+    assert readiness['active_checks'] == 69 and len(rows) == 2
+    for row in rows:
+        assert row['file_binding_valid'] and row['normal_serving_readiness_only'], row
+        assert row['binding_schema'] == run_binding.SCHEMA
+        assert row['blocking_codes'] == ['LIVE_EXECUTOR_PREFLIGHT_REQUIRED']
+        assert not row['engine_executed'] and not row['ready_for_execution']
+
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    prepared = application.update_readiness(pack, envs, policy, prebound)
+    assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
+    expected = {env.id: sha256_hex(canonical_json(json.loads(entry['target'].read_bytes())))
+                for env, entry in zip(envs, sides.values())}
+
+    def fixture_normal(self, check, env, received, *_args):
+        assert check.id == 'OBS-02' and received == values
+        assert self._expected_target_sha256 == expected[env.id]
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
+
+    monkeypatch.setattr(KubernetesNormalServingReadinessExecutor, 'run', fixture_normal)
+    store = Store(store_path)
+    report, _ = application.execute_update(store, pack, envs, policy, prebound, tmp_path / 'prebound', utcnow())
+    row = next(row for row in report.by_check if row.check_id == 'OBS-02')
+    assert row.selected and row.baseline.security == row.candidate.security == 'UNKNOWN'
+    for side in ('baseline', 'candidate'):
+        evidence = store.resolve(store.resolve(getattr(row, side).result).evidence)
+        binding = evidence.execution.run_binding
+        assert evidence.execution.status == ExecStatus.COMPLETED and not run_binding.verify(binding, evidence)
+        assert binding['schema'] == run_binding.SCHEMA and 'values' not in binding
+        assert binding['files'] == {'observation_state_target_sha256': expected[evidence.environment.id]}
+
+    staged = tomllib.loads((output / 'guard.toml').read_text())
+    candidate = json.loads(sides['candidate']['target'].read_bytes())
+    for number, role in enumerate(('engine', 'probe'), 200):
+        candidate['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        candidate['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, candidate)
+    handoff = readiness['candidate_handoff']['preliminary_target']
+    actual = sha256_hex(canonical_json(candidate))
+    assert tool.revalidate_candidate(staged, envs[1], handoff) == {'observation_state': actual}
+    settings = {'target': str(fresh), 'normal_serving_readiness_only': True}
+    with pytest.raises(run_binding.RunBindingUnavailable, match='RUN_BINDING_OBS02_NORMAL_TARGET_CHANGED'):
+        run_binding.effective_values(pack.checks['OBS-02'], settings, envs[1], values,
+            side='candidate', attempt_id='fixture', issued_at=utcnow(), expected_target_sha256='f' * 64)
+    candidate['synthetic'] = True
+    _write(fresh, candidate)
+    with pytest.raises(ValueError, match='NORMAL_SERVING_READINESS_TARGET_UNAVAILABLE'):
+        tool.revalidate_candidate(staged, envs[1], handoff)
+
+
+def test_obs02_normal_marker_cannot_dispatch_legacy_or_unpaired_paths(tmp_path, sources, monkeypatch):
+    from guard.core.run import run_plan
+    from guard.executors.kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
+
+    pack, sides, policy_path = sources
+    policy = tool.Policy.model_validate_json(policy_path.read_bytes())
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    base = {'executors': {'observation_state': 'kubernetes'}, 'update': {'allowed_checks': ['OBS-02']},
+            'sides': {side: {'observation_state': {'target': str(paths['target'])}} for side, paths in sides.items()}}
+    option = 'normal_serving_readiness_only'
+    half = deepcopy(base)
+    half['sides']['baseline']['check_config'] = {'OBS-02': {option: True}}
+    scoped = {**base, 'check_config': {'OBS-02': {option: True}}}
+    denied = {**base, 'check_config': {'OBS-02': {option: False}}}
+    misplaced = {**base, 'check_config': {'OBS-01': {option: True}}}
+    wrong_table = {**base, 'executors': {**base['executors'], option: True}}
+    unscoped = {**scoped, 'update': {}}
+    mixed = {**scoped, 'run_binding': {'OBS-02': {}}}
+    wrapped = {**scoped, 'lab_activation': {'mode': 'example'}}
+
+    def no_preparation(*_args, **_kwargs):
+        raise AssertionError('Unsafe or malformed scope reached target preparation')
+
+    monkeypatch.setattr(application, 'update_inputs', no_preparation)
+    store = Store(tmp_path / 'store')
+    for invalid in (half, denied, misplaced, wrong_table, unscoped, mixed, wrapped):
+        with pytest.raises(ValueError, match='NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID'):
+            application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'update', utcnow())
+    assert not (tmp_path / 'update').exists()
+    with pytest.raises(ValueError, match='NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID'):
+        application._validation_inputs(envs[0], scoped)
+    with pytest.raises(ValueError, match='NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(scoped))
+
+    cfg = {'observation_state': {'target': str(sides['baseline']['target']), option: False}}
+    executor = registry.build_executor('observation_state', 'kubernetes', cfg,
+        engine=envs[0].engine.name, version=envs[0].engine.version)
+    assert type(executor) is KubernetesNormalServingReadinessExecutor
+    with pytest.raises(ValueError, match='OBS02_NORMAL_SCOPE_INVALID'):
+        executor.validate_policy(pack.checks['OBS-02'], {})
+
+
 def test_req09_pair_checks_owned_targets_and_withholds_legacy_siblings(tmp_path, sources, monkeypatch):
     from guard.executors.kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
 

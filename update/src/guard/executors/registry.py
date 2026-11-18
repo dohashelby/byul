@@ -23,7 +23,8 @@ from guard.adapters.base import EngineAdapter
 from guard.adapters.fake import FakeAdapter
 from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
-from guard.configuration import NORMAL_TOKEN_INPUT_OPTION
+from guard.configuration import (NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
+                                 NORMAL_TOKEN_INPUT_OPTION)
 
 from .base import Executor
 from .container_config import ContainerConfigExecutor
@@ -40,6 +41,7 @@ from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
 from .kubernetes_input_validation import KubernetesInputValidationExecutor
+from .kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
 from .kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
 from .response_content import ResponseContentExecutor
 from .kubernetes_response_content import KubernetesResponseContentExecutor
@@ -206,6 +208,13 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
         # A mixed update also has collectors with their own targets and
         # generations. Only the explicitly bound executors receive its hash.
         cfg = {**cfg, '_kubernetes_target_sha256': cfg['_kubernetes_target_sha256_by_executor'].get(executor)}
+    if executor == "observation_state":
+        settings = cfg.get(executor)
+        if type(settings) is dict and NORMAL_SERVING_READINESS_OPTION in settings:
+            if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
+                raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
+            return KubernetesNormalServingReadinessExecutor(
+                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if executor == "input_validation":
         settings = cfg.get(executor)
         if type(settings) is dict and NORMAL_TOKEN_INPUT_OPTION in settings:

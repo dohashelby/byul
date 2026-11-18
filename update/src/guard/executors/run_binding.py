@@ -42,7 +42,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from guard.configuration import NORMAL_STREAM_OPTION
+from guard.configuration import NORMAL_SERVING_READINESS_OPTION, NORMAL_STREAM_OPTION
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
@@ -473,13 +473,28 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 
 
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
-            run_cfg=None, policy_row=None, policy_ref=None):
+            run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
     `policy_row` is this check's values as written in the POL (stage 4).
     """
     stages = stages_for(check)
+    if check.id == 'OBS-02' and type(executor_cfg) is dict and NORMAL_SERVING_READINESS_OPTION in executor_cfg:
+        if (check.executor != 'observation_state' or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK['OBS-02']
+                or executor_cfg[NORMAL_SERVING_READINESS_OPTION] is not True or run_cfg is not None):
+            raise RunBindingUnavailable('RUN_BINDING_OBS02_NORMAL_SCOPE_INVALID')
+        key = 'observation_state_target_sha256'
+        try:
+            target = file_hash(check.id, key, executor_cfg)
+        except (KeyError, OSError, TypeError, ValueError):
+            raise RunBindingUnavailable('RUN_BINDING_OBS02_NORMAL_TARGET_UNAVAILABLE') from None
+        if expected_target_sha256 is not None and target != expected_target_sha256:
+            raise RunBindingUnavailable('RUN_BINDING_OBS02_NORMAL_TARGET_CHANGED')
+        document = {'schema': SCHEMA, 'check_id': check.id, 'side': side, 'attempt_id': attempt_id,
+                    'environment_sha256': env.ref().sha256, 'files': {key: target}, 'validity': None,
+                    'issued_at': _stamp(issued_at)}
+        return document, {}
     keys = tuple(k for k in KEYS_BY_CHECK.get(check.id, ()) if 1 in stages)
     if check.id == 'LIF-04' and check.executor == 'stream_buffer' and executor_cfg.get(NORMAL_STREAM_OPTION) is True:
         from .stream_buffer_contract import PROFILE

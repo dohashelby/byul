@@ -72,6 +72,11 @@ def test_req09_normal_reuses_only_ids_from_verified_tokenizer(tmp_path, version,
     thread.start()
     try:
         env, target, _, path = normal_sampling_inputs(tmp_path, version)
+        env = env.model_copy(update={
+            'model': env.model.model_copy(update={'inventory_sha256': 'a' * 64}),
+            'runtime': env.runtime.model_copy(update={'gpu_count': 1, 'gpu_model': 'EXAMPLE GPU', 'driver': 'EXAMPLE driver'}),
+        }).seal()
+        target['environment_ref'] = env.ref().model_dump(mode='json')
         target['engine']['trusted_url'] = f'http://127.0.0.1:{server.server_port}'
         target['comparison_config'] = {'launch': {'max_model_len': 128}}
         path.write_bytes(canonical_json(target))
@@ -108,8 +113,15 @@ def test_req09_normal_reuses_only_ids_from_verified_tokenizer(tmp_path, version,
     assert summary['api_reported_prompt_tokens'] == (2 if fault is None else None)
     if fault is None:
         assert summary['tokenizer']['binding_sha256'] == summary['completion']['binding_sha256']
+        fixture = {'tokenizer_body_sha256': sha256_hex(canonical_json(requests[0][2])),
+                   'completion_body_sha256': sha256_hex(canonical_json(requests[1][2]))}
+        assert draft.comparability.fixture_sha256 == sha256_hex(canonical_json(fixture))
+        assert len(draft.comparability.config_sha256) == 64
+        assert (draft.comparability.model_inventory_sha256, draft.comparability.gpu, draft.comparability.driver) == (
+            env.model.inventory_sha256, env.runtime.gpu_model, env.runtime.driver)
     else:
         assert summary['completion'] is None
+        assert draft.comparability.fixture_sha256 is None and draft.comparability.config_sha256 is None
     observations = _normalize(check, draft)['observations']
     assert not observations['input_matrix_complete']['value'] and not observations['challenge_consumption']['collected']
     assert observations['input_matrix_planned']['value'] == planned(check, NORMAL_INPUT_POLICY)

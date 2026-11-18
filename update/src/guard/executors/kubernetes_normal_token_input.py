@@ -7,6 +7,7 @@ from guard.input_matrix_policy import PROFILE as MATRIX_PROFILE, pairs, planned
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
 from guard.models.base import utcnow
 from guard.runtime.bounded import strict_json
+from guard.runtime.comparison import execution_conditions
 from guard.runtime.kubernetes_http import (INPUT_VALIDATION_PROFILE, REQUEST_BINDING_PROFILE,
                                           KubernetesBindingError, KubernetesHTTP)
 from .base import DraftArtifact, EvidenceDraft
@@ -14,6 +15,7 @@ from .content_common import control_state, validate_content_settings
 from .response_projection import capture_metadata
 
 NORMAL_OPTION = "normal_token_input_only"
+PROFILE = "kubernetes-owned-normal-token-input/1"
 NORMAL_PATH = "/v1/completions"
 NORMAL_ENDPOINT = "POST " + NORMAL_PATH
 NORMAL_FORMAT = "token_ids"
@@ -162,7 +164,7 @@ class KubernetesNormalTokenInputExecutor:
         if normal:
             observations["functional_probe_results"] = {"value": {_NORMAL_CASE: "pass"}, "collected": True}
 
-        summary = {"profile": "kubernetes-owned-normal-token-input/1", "target_sha256": target_sha,
+        summary = {"profile": PROFILE, "target_sha256": target_sha,
                    "tokenizer": tokenize, "completion": result, "tokenizer_count": count if tokenized else None,
                    "tokenizer_tokens_sha256": sha256_hex(canonical_json(token_ids)) if tokenized else None,
                    "api_reported_prompt_tokens": prompt_count, "normal_completion_shape_verified": normal,
@@ -181,9 +183,24 @@ class KubernetesNormalTokenInputExecutor:
         origin = DataOrigin(tokenizer.process_observation_origin)
         if error and origin == DataOrigin.MEASURED:
             origin = DataOrigin.DECLARED
+        comparability = {}
+        if not error:
+            fixture = {"tokenizer_body_sha256": tokenize["request_body_sha256"],
+                       "completion_body_sha256": result["request_body_sha256"]}
+            settings = {"profile": PROFILE, "request_timeout": self.cfg.get("request_timeout", 3),
+                        "max_duration_seconds": self.cfg.get("max_duration_seconds", 12),
+                        "tokenizer_probe_sha256": tokenize["probe_source_sha256"],
+                        "completion_probe_sha256": result["probe_source_sha256"]}
+            comparability = {
+                "fixture_sha256": sha256_hex(canonical_json(fixture)),
+                "config_sha256": sha256_hex(canonical_json(execution_conditions(target, settings, []))),
+                "model_inventory_sha256": env.model.inventory_sha256, "gpu": env.runtime.gpu_model,
+                "driver": env.runtime.driver, "cpu": env.runtime.cpu,
+            }
         return EvidenceDraft(status=ExecStatus.ABORTED if error else ExecStatus.COMPLETED, data_origin=origin,
             normal_control={"attempted": result is not None, "succeeded": True if normal else None,
                             "detail": "One approved token-array control; API response counts do not verify worker consumption."},
             challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
-            observations=observations, artifacts=artifacts, config={NORMAL_OPTION: True, "target_sha256": target_sha},
+            observations=observations, artifacts=artifacts, comparability=comparability,
+            config={NORMAL_OPTION: True, "target_sha256": target_sha},
             started_at=started, finished_at=utcnow(), abort_reason=error, cleanup_errors=cleanup)

@@ -12,6 +12,7 @@ from guard.core.execution_recipe import validate_policy_time
 from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
 from guard.executors import registry, run_binding, template_supply_approval as template_supply
+from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from guard.models import Environment, Policy, load_pack
 from guard.models.artifacts import model_closure_sha256
@@ -23,9 +24,9 @@ from tools.j02_run_config import write_config
 from tools.mvp_a_input_preflight import _pairs, _read
 from tools.mvp_versions import versions
 
-CHECKS = ('SUP-04', 'PLT-01', 'PLT-04', 'SUP-03')
+CHECKS = ('SUP-04', 'PLT-01', 'PLT-04', 'SUP-03', 'OBS-03')
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
-METADATA_EXECUTORS = frozenset({'container_config', 'credential_exposure', 'template_validation'})
+METADATA_EXECUTORS = frozenset({'container_config', 'credential_exposure', 'template_validation', 'log_analysis'})
 
 
 def _source(path):
@@ -110,6 +111,8 @@ def _check_reason(check, env, target, transport, values, *, policy):
         executor.validate_policy(check, values)
     except (KeyError, TypeError, ValueError):
         return 'METADATA_EXECUTOR_OR_POLICY_UNAVAILABLE'
+    if check.id == 'OBS-03' and type(executor) is not KubernetesLogAnalysisExecutor:
+        return 'NORMAL_LOG_EXECUTOR_UNAVAILABLE'
     if check.id == 'SUP-03':
         if type(executor) is not KubernetesTemplateSupplyExecutor:
             return 'CONFIGURED_TEMPLATE_EXECUTOR_UNAVAILABLE'

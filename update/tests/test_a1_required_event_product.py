@@ -11,11 +11,12 @@ import pytest
 from typer.testing import CliRunner
 from guard.cli import app
 from guard.adapters.vllm import VllmAdapter
-from guard.models import canonical_json,load_pack,sha256_hex,utcnow
+from guard.models import DataOrigin,ExecStatus,canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.executors import kubernetes_observation as observation, run_binding
 from guard.executors.observation_contract import EVENTS,FIELDS,SCHEMA,normalize_policy,validate_record
 from guard.executors.owned_capture import _FILE_READER
+from guard.executors.registry import build_executor
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
 from tests.run_binding_support import for_pack, run_table_toml
@@ -111,6 +112,71 @@ def inputs(tmp_path,mode='normal'):
     if 4 in run_binding.stages_for(pack.checks['OBS-01']):
         values['observation_event_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'OBS-01',values)))
     return environment,world,values,pack,receipt
+
+
+@pytest.mark.parametrize('mode', ['normal','wrong-record-target','wrong-actor','missing','bad-source','pod-replaced'])
+def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key(tmp_path,mode):
+    environment,world,values,_,_=inputs(tmp_path,mode)
+    world.target['lab']=False
+    digest=values['observation_target_sha256']=sha256_hex(canonical_json(world.target))
+    record={key:None for key in FIELDS}
+    record.update(seq=0,event_id_sha256='1'*64,event='ACCESS_ALLOWED',actor_sha256=values['observation_allowed_actor_sha256'],
+        target_sha256=digest,run_sha256=sha256_hex(world.target['kubernetes']['run_id'].encode()),
+        policy_sha256=values['observation_event_policy_sha256'],source_sha256=values['observation_expected_source_sha256'])
+    world.records=[record]
+    target_path=tmp_path/'target.json'
+    target_path.write_bytes(canonical_json(world.target))
+    pack=load_pack(Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE')
+    executor=build_executor('required_event_record','kubernetes',{'required_event_record':{
+        'target':str(target_path),'record_snapshot_only':True},'_kubernetes_target_sha256':digest},
+        engine=environment.engine.name,version=environment.engine.version)
+
+    def read_only(argv,**kwargs):
+        assert 'input_bytes' not in kwargs
+        result=world.runner(argv,**kwargs)
+        if 'exec' in argv:world.after_exec=True
+        return result
+
+    executor.runner=read_only
+    draft=executor.run(pack.checks['OBS-01'],environment,values,VllmAdapter(),tmp_path/'snapshot')
+    assert not world.sent and world.reads==1
+    assert draft.data_origin==DataOrigin.EXAMPLE
+    assert draft.status==(ExecStatus.COMPLETED if mode=='normal' else ExecStatus.ABORTED)
+    assert not draft.normal_control.attempted and all(not step.attempted for step in draft.challenges)
+    observations=draft.observations
+    assert observations['required_event_trials'].collected is False
+    assert observations['required_event_matches'].collected is False
+    assert all(observations[key].value is False for key in ('required_event_scope_complete',
+        'required_event_producer_authenticated','required_event_independent_trigger_verified'))
+    assert all(row['reason']=='independent_trigger_and_collection_time_unverified'
+               for row in observations['required_event_missing'].value)
+    if mode=='normal':
+        assert observations['required_event_records'].value==[record]
+        capture,=observations['required_event_collection'].value
+        assert capture['owner_binding_verified'] and capture['file_bytes_sha256']==sha256_hex(canonical_json(world._packet()))
+    if mode=='wrong-actor':
+        assert observations['required_event_records'].value==[]
+        summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+        assert summary['unmatched_actor_count']==1 and 'OBSERVATION_RECORD_ACTOR_UNVERIFIED' in summary['diagnostic_codes']
+    assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
+
+
+@pytest.mark.parametrize('damage',['no-exact-target','roles','sibling','lab'])
+def test_canonical_obs01_snapshot_rejects_unsafe_configuration_before_read(tmp_path,damage):
+    environment,world,values,_,_=inputs(tmp_path)
+    world.target['lab']=damage=='lab'
+    digest=values['observation_target_sha256']=sha256_hex(canonical_json(world.target))
+    target_path=tmp_path/'target.json'
+    target_path.write_bytes(canonical_json(world.target))
+    pack=load_pack(Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE')
+    cfg={'target':str(target_path),'record_snapshot_only':True}
+    if damage=='roles':cfg['roles']={'allowed':'OBS_ALLOWED'}
+    executor=observation.KubernetesRequiredEventExecutor(cfg,runner=world.runner,
+        expected_target_sha256=None if damage=='no-exact-target' else digest)
+    check=pack.checks['PLT-12' if damage=='sibling' else 'OBS-01']
+    with pytest.raises(ValueError,match='OBSERVATION_'):
+        executor.run(check,environment,values,VllmAdapter(),tmp_path/'snapshot')
+    assert not world.calls and not world.sent and not world.reads
 
 
 @pytest.mark.parametrize('mode',['normal','wrong-actor','wrong-record-target','missing-field','duplicate-record','empty','missing','recovered',

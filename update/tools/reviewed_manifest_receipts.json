@@ -825,6 +825,11 @@
       "manifest_sha256": "c87917f34eade2bb4c29cb2d01eaa500eebe886aceebb39ec9758a9cbea2d3ce",
       "reviewed_by": "Codex / isolated normal token observer and native producer preservation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T23:09:21+00:00"
+    },
+    {
+      "manifest_sha256": "0b015206c9e91cfc99887919ca9b433218e27c1942de8faa715eec650c6d96ca",
+      "reviewed_by": "Codex / paired normal serving readiness and REQ09/10 comparison / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T23:45:25+00:00"
     }
   ]
 }

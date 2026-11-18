@@ -101,34 +101,112 @@ def test_typed_but_unsupported_policy_is_refused_by_the_actual_executor_before_n
     assert not report['engine_executed']and not report['ready_for_execution']
 
 
-@pytest.mark.parametrize('capture_present',[False,True])
-def test_current_matrix_admission_checks_effective_check_config_without_live_success(tmp_path,monkeypatch,capture_present):
-    import yaml
+@pytest.mark.parametrize('check_id,projection', [
+    ('REQ-08', 'REUSED_INPUT_PROJECTION'), ('REQ-09', 'NATIVE_REJECTION_PROJECTION'),
+])
+@pytest.mark.parametrize('capture,reason', [
+    ('valid', None),
+    ('absent', 'MVP_EXECUTOR_POLICY_INVALID'),
+    ('missing', 'NATIVE_INPUT_PREPARED_MISSING'),
+    ('digest', 'NATIVE_INPUT_CAPTURE_BINDING_CHANGED'),
+    ('target-image', 'NATIVE_INPUT_CAPTURE_TARGET_MISMATCH'),
+    ('owner', 'NATIVE_INPUT_PREPARED_INVALID'),
+    ('asset', 'NATIVE_INPUT_PREPARED_INVALID'),
+    ('real', 'NATIVE_INPUT_KUBERNETES_REQUIRED'),
+])
+def test_current_matrix_binds_actual_prepared_producer_output_offline(
+        tmp_path, monkeypatch, check_id, projection, capture, reason):
+    import os
+
+    from guard.collectors import native_input
     from guard.models import canonical_json
+    from tools import verify_req10_consumption
     from tests.builders import policy
-    from tests.test_input_matrix import values
+    from tests.test_input_matrix import values as input_values
     from tests.test_model_preparation_integration import full_inputs
-    def forbidden(*args,**kwargs):raise AssertionError('no target or engine during file admission')
-    monkeypatch.setattr(socket,'socket',forbidden);monkeypatch.setattr(subprocess,'Popen',forbidden)
-    pack=load_pack(tool.ROOT/'packs/PACK-BASELINE');expected=tool.versions()['candidate'];env,target=full_inputs()
-    env=env.model_copy(update={'engine':env.engine.model_copy(update={'name':expected['engine'],'version':expected['version'],'image_digest':expected['image']}),
-        'runtime':env.runtime.model_copy(update={'gpu_count':2,'gpu_model':'EXAMPLE-GPU','driver':'EXAMPLE-driver'})}).seal()
-    target['environment_ref']=env.ref().model_dump(mode='json')
-    pol=policy(pack.ref(),scope={'include':['REQ-09']},values={'REQ-09':values()})
-    files={}
-    for role,obj in [('environment',env.to_dict()),('policy',pol.to_dict()),('target',target)]:
-        file=tmp_path/(role+'.json');file.write_bytes(canonical_json(obj));files[role]=file
-    cfg=tmp_path/'guard.toml'
-    text='[executors]\ninput_validation="kubernetes"\n[adapter]\nname="vllm"\n[input_validation]\ntarget='+json.dumps(str(files['target']))+'\nvocab_size=100\nvocab_source="EXAMPLE"\n'
-    if capture_present:text+='[check_config.REQ-09.native_input_capture]\nprepared_dir="EXAMPLE-not-installed"\nprepared_sha256="'+'a'*64+'"\n'
-    cfg.write_text(text);files['configuration']=cfg
-    entry={'check_id':'REQ-09','side':'candidate',**{role:{'path':str(files[role]),'sha256':sha256(files[role].read_bytes()).hexdigest()}
-        for role in('environment','policy','configuration')}}
-    index=tmp_path/'index.json';index.write_text(json.dumps({**blank(),'inputs':[entry]}))
-    result=tool.audit(index,side='candidate');row=next(r for r in result['rows']if r['check_id']=='REQ-09')
-    assert row['file_binding_valid']is capture_present and len(result['rows'])==69
-    if capture_present:
-        assert row['executor_policy_valid']is True and 'EXAMPLE_ENV_NOT_ACTUAL'in row['blocking_codes']
-        assert 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'in row['blocking_codes']
-    else:assert row['blocking_codes']==['MVP_EXECUTOR_POLICY_INVALID']
-    assert not row['ready_for_execution']and not row['engine_executed']and row['actual_results']is None
+    from tests.test_reused_input_matrix import values as reused_values
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('no target or engine during file admission')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    release = next(row for row in json.loads(tool.vllm_native_input_rejection.PROFILES.read_bytes())['profiles']
+                   if row['version'] == '0.30.0')
+    identity = {key: release[key] for key in ('engine', 'version', 'image')}
+    versions = {**tool.versions(), 'candidate': identity}
+    monkeypatch.setattr(tool, 'versions', lambda: versions)
+    env, target = full_inputs()
+    env = env.model_copy(update={
+        'engine': env.engine.model_copy(update={'name': identity['engine'], 'version': identity['version'],
+                                                'image_digest': identity['image']}),
+        'runtime': env.runtime.model_copy(update={'gpu_count': 2, 'gpu_model': 'EXAMPLE-GPU',
+                                                 'driver': 'EXAMPLE-driver'}),
+    }).seal()
+    target['environment_ref'] = env.ref().model_dump(mode='json')
+    target['lab'] = True
+    target['engine']['image_digest'] = 'EXAMPLE-other-image' if capture == 'target-image' else identity['image']
+    values = input_values() if check_id == 'REQ-09' else reused_values()
+    pol = policy(pack.ref(), scope={'include': [check_id]}, values={check_id: values})
+    files = {}
+    for role, obj in [('environment', env.to_dict()), ('policy', pol.to_dict()), ('target', target)]:
+        file = tmp_path / (role + '.json')
+        file.write_bytes(canonical_json(obj))
+        files[role] = file
+
+    cfg = tmp_path / 'guard.toml'
+    implementation = 'real' if capture == 'real' else 'kubernetes'
+    config = (f'[executors]\ninput_validation="{implementation}"\n[adapter]\nname="vllm"\n'
+              f'[input_validation]\ntarget={json.dumps(str(files["target"]))}\n'
+              'vocab_size=100\nvocab_source="EXAMPLE"\n')
+    if check_id == 'REQ-08':
+        config += 'reused_token_ids=[5,7]\n'
+    prepared = tmp_path / 'prepared'
+    if capture != 'absent':
+        digest = 'a' * 64
+        if capture not in {'missing', 'real'}:
+            monkeypatch.setattr(verify_req10_consumption, 'verify', lambda _: {'reviewed_common_commit': 'a' * 64})
+            manifest = native_input.prepare(prepared, image=identity['image'], repository=tool.ROOT.parent)
+            if capture != 'digest':
+                digest = sha256(native_input.runtime.canonical(manifest)).hexdigest()
+            if capture == 'asset':
+                (prepared / 'sitecustomize.py').write_bytes(b'# EXAMPLE-changed-observer')
+        config += (f'[check_config.{check_id}.native_input_capture]\n'
+                   f'prepared_dir={json.dumps(str(prepared))}\nprepared_sha256="{digest}"\n')
+        if capture == 'owner':
+            config += f'prepared_uid={os.geteuid() + 1}\n'
+    cfg.write_text(config)
+    files['configuration'] = cfg
+    entry = {'check_id': check_id, 'side': 'candidate', **{
+        role: {'path': str(files[role]), 'sha256': sha256(files[role].read_bytes()).hexdigest()}
+        for role in ('environment', 'policy', 'configuration')}}
+    index = tmp_path / 'index.json'
+    index.write_text(json.dumps({**blank(), 'inputs': [entry]}))
+    result = tool.audit(index, side='candidate')
+    row = next(r for r in result['rows'] if r['check_id'] == check_id)
+    assert len(result['rows']) == 69
+    assert row['file_binding_valid'] is row['executor_policy_valid'] is (reason is None)
+    if reason is None:
+        assert {'EXAMPLE_ENV_NOT_ACTUAL', 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'} <= set(row['blocking_codes'])
+        private_key = json.loads((prepared / 'settings.json').read_bytes())['key']
+        assert private_key not in json.dumps(result)
+    else:
+        assert reason in row['blocking_codes']
+    assert projection + '_GPU_UNQUALIFIED' in row['blocking_codes']
+    assert row['available_implementations'] == ['kubernetes']
+    assert row['ready_for_execution'] is row['engine_executed'] is False and row['actual_results'] is None
+
+
+def test_unpinned_image_reports_separate_missing_profiles_and_qualifications(tmp_path, monkeypatch):
+    versions = tool.versions()
+    versions['candidate'] = {**versions['candidate'], 'image': 'example.invalid/engine@sha256:' + '0' * 64}
+    monkeypatch.setattr(tool, 'versions', lambda: versions)
+    report = run(tmp_path, blank())
+    candidates = {r['check_id']: r for r in report['rows'] if r['side'] == 'candidate'}
+    for check_id, projection in [('REQ-08', 'REUSED_INPUT_PROJECTION'), ('REQ-09', 'NATIVE_REJECTION_PROJECTION')]:
+        assert {
+            'ACTUAL_INPUT_FILES_MISSING', 'NATIVE_INPUT_PROFILE_UNAVAILABLE', 'NATIVE_REJECTION_PROFILE_UNAVAILABLE',
+            'NATIVE_INPUT_CAPTURE_GPU_UNQUALIFIED', projection + '_GPU_UNQUALIFIED',
+        } <= set(candidates[check_id]['blocking_codes'])
+    assert 'NATIVE_INPUT_PROFILE_UNAVAILABLE' not in candidates['REQ-10']['blocking_codes']

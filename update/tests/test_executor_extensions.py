@@ -366,6 +366,15 @@ def test_obs11_clock_uncertainty_and_missing_record_are_not_clean():
     assert log_collection_gap.evaluate({"events": [{**gap_row(), "record": "other"}]}, GAP)["missing"] == ["access"]
 
 
+@pytest.mark.parametrize("row", [
+    gap_row(arrived_at_ms=999), gap_row(gap_marked_at_ms=999), gap_row(alert_at_ms=999),
+    gap_row(clock_uncertainty_ms=-1),
+])
+def test_obs11_impossible_event_chronology_is_unverified(row):
+    result = log_collection_gap.evaluate({"events": [row]}, GAP)
+    assert result == {"violations": [], "unverified": ["access"], "missing": [], "normal": []}
+
+
 def test_obs11_record_shape_and_binding_are_closed():
     good = {"schema": log_collection_gap.SCHEMA, "session": GAP["collection_session"], "environment_ref": {"id": 1}, "events": [gap_row()]}
     log_collection_gap.validate_record(good, environment_ref={"id": 1}, session=GAP["collection_session"])
@@ -395,6 +404,19 @@ def test_obs11_declared_late_detection_fails_and_clean_record_stays_unknown(tmp_
     (tmp_path / "clean").mkdir()
     _, result = gap_run(tmp_path / "clean", monkeypatch, packet(gap_row()))
     assert result.verdicts.security.value == "UNKNOWN"
+
+
+def test_obs11_unverified_timeline_preserves_an_independent_observed_violation(tmp_path, monkeypatch):
+    env = environment(model={"id": "test"})
+    packet = {"schema": log_collection_gap.SCHEMA, "session": GAP["collection_session"],
+              "environment_ref": env.ref().model_dump(mode="json"),
+              "events": [gap_row(arrived_at_ms=999), gap_row(gap_marked_at_ms=None)]}
+    evidence, result = gap_run(tmp_path, monkeypatch, packet)
+    assert evidence.observations["collection_records_unverified"].value == ["access"]
+    assert evidence.observations["collection_normal_arrivals"].value == []
+    assert evidence.observations["collection_gap_violations"].value == [
+        {"record": "access", "reason": "gap_not_marked_in_time"}]
+    assert result.verdicts.security.value == "FAIL"
 
 
 def test_obs11_unavailable_status_record_is_unknown(tmp_path, monkeypatch):

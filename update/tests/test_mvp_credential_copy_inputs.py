@@ -10,15 +10,15 @@ from guard.collectors.file import load_policy
 from guard.core.select import select
 from guard.executors import credential_copy_contract as contract, run_binding
 from guard.executors.kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor, load_inventory
-from guard.models import DataOrigin, Gap, canonical_json, sha256_hex
+from guard.models import DataOrigin, Gap, canonical_json, load_pack, sha256_hex
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import environment, policy
 from tools import mvp_credential_copy_inputs as inputs
 from tools import mvp_runtime_policy as runtime_policy
 
 
 def owned_declarations():
-    pack = baseline_pack()
+    pack = load_pack(runtime_policy.ROOT / 'packs/PACK-BASELINE')
     base = policy(pack.ref(), status='CONFIRMED', confirmed_by='tests', confirmed_at='2026-11-17T00:00:00Z',
                   data_origin=DataOrigin.DECLARED, source_document_sha256=sha256_hex(runtime_policy.AMENDMENT.read_bytes()),
                   values={'PLT-12': {'copy_max_record_delay_ms': 5000}})

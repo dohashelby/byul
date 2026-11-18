@@ -5,17 +5,17 @@ import pytest
 
 from guard.core.select import select
 from guard.executors.resource_recovery_contract import stamp
-from guard.models import DataOrigin, Gap, canonical_json, sha256_hex
-from tests.builders import baseline_pack, environment, policy
+from guard.models import DataOrigin, Gap, canonical_json, load_pack, sha256_hex
+from tests.builders import environment, policy
 from tests.test_a1_resource_recovery import packet, selection
 from tools import mvp_recovery_policy_inputs as inputs
-from tools.mvp_runtime_policy import AMENDMENT, BASE_DECISIONS
+from tools.mvp_runtime_policy import AMENDMENT, BASE_DECISIONS, ROOT
 
 T0 = datetime(2026, 11, 18, 18, tzinfo=timezone.utc)
 
 
 def pair():
-    pack = baseline_pack()
+    pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     decisions = json.loads(BASE_DECISIONS.read_bytes())['decisions']
     computed = {inputs.START, inputs.END, inputs.ABSENT_AFTER}
     values = {row['key']: row['value'] for row in decisions if row['check_id'] == 'LIF-11' and row['key'] not in computed}

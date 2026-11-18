@@ -810,6 +810,11 @@
       "manifest_sha256": "4e2b15f97e3c073b5f2c4fc47e872fe559d3652b343d0f53da9aec5f81a14e72",
       "reviewed_by": "Codex / exact normal sampling target admission and existing stream scope / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T21:24:32+00:00"
+    },
+    {
+      "manifest_sha256": "d0161adbb4be514943944bb77a4c6b41a6c4adc1fff12be99cc37d1de6ddf9c7",
+      "reviewed_by": "Codex / typed SUP-07 cache evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T21:46:21+00:00"
     }
   ]
 }

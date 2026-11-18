@@ -372,6 +372,8 @@ M-A 파일 사전 점검도 공통·쪽별 설정 뒤 `for_check()`를 적용해
 
 명세에 `executors`를 적으면 그 표를 그대로 쓴다. 보고서의 `executors_selected`가 `declared`인지 `kubernetes_auto`인지 남긴다. 자동 선택은 구현 이름만 정한다. 빠진 target·설정·정책 값은 계속 MISSING_INPUT으로 보고하고, 판정이나 실행 자격을 만들지 않는다. `guard update`의 미기재 실행기 처리(NOT_RUN)는 바꾸지 않았다.
 
+선택형 `[update] allowed_checks`는 두 쪽에 공통으로 적용하는 실행 점검 목록이다. MVP 조립 도구는 양쪽 입력을 확인한 점검 ID를 이 목록에 기록한다. PLAN은 정책과 적용 조건으로 고른 점검을 유지한다. 목록 밖의 선택 점검은 실제 실행에서 `UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE`를 가진 `NOT_RUN`으로 남는다. 목록과 입력 파일을 실행 recipe에 고정하고, 준비 보고서는 전체 실행 범위에서 보류된 점검 수를 표시한다.
+
 ## 12. RB2-J 결정 반영 (2026-11-14)
 
 | 결정 | 반영 |

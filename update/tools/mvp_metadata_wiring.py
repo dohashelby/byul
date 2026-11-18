@@ -8,10 +8,13 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+from guard.adapters.engine_profiles import supports
+from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, update_allowed_checks
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
-from guard.executors import registry, run_binding, template_supply_approval as template_supply
+from guard.executors import registry, template_supply_approval as template_supply
+from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from guard.models import Environment, Policy, load_pack
@@ -24,9 +27,13 @@ from tools.j02_run_config import write_config
 from tools.mvp_a_input_preflight import _pairs, _read
 from tools.mvp_versions import versions
 
-CHECKS = ('SUP-04', 'PLT-01', 'PLT-04', 'SUP-03', 'REQ-07', 'OBS-03')
+CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
+                   'SUP-03': 'template_validation', 'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
+                   'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc'}
+CHECKS = tuple(CHECK_EXECUTORS)
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
-METADATA_EXECUTORS = frozenset({'container_config', 'credential_exposure', 'template_validation', 'log_analysis'})
+METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
+CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
 
 
 def _source(path):
@@ -74,6 +81,16 @@ def revalidate_candidate(config, env, preliminary_ref):
             or any(impl != 'kubernetes' for impl in executors.values())
             or any(type(value) is not dict or set(value) != {'target'} for value in candidate.values())):
         raise ValueError('METADATA_STAGED_CONFIGURATION_INVALID')
+    allowed = config['update'].get('allowed_checks')
+    restricted_executors = {CHECK_EXECUTORS[cid] for cid in KUBERNETES_BOUND_CHECK_OPTIONS}
+    if allowed is None:
+        if restricted_executors.intersection(executors):
+            raise ValueError('METADATA_STAGED_EXECUTION_SCOPE_INVALID')
+    elif (type(allowed) is not list or any(type(cid) is not str or cid not in CHECK_EXECUTORS for cid in allowed)
+          or len(set(allowed)) != len(allowed) or {CHECK_EXECUTORS[cid] for cid in allowed} != set(executors)
+          or any(config.get('check_config', {}).get(cid) != {CHECK_OPTIONS[cid]: True}
+                 for cid in allowed if cid in CHECK_OPTIONS)):
+        raise ValueError('METADATA_STAGED_EXECUTION_SCOPE_INVALID')
     paths = {value['target'] for value in candidate.values()}
     if len(paths) != 1:
         raise ValueError('METADATA_FRESH_CANDIDATE_PATH_REQUIRED')
@@ -104,8 +121,10 @@ def _check_reason(check, env, target, transport, values, *, policy):
         return 'MVP_POLICY_SCOPE_MISMATCH'
     if any(key.required and key.key not in values for key in check.policy_params):
         return 'MVP_POLICY_VALUE_MISSING'
+    if check.executor != CHECK_EXECUTORS[check.id]:
+        return 'METADATA_EXECUTOR_UNAVAILABLE'
     try:
-        config = {check.executor: {'req07_normal_only': True} if check.id == 'REQ-07' else {}}
+        config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
         executor = registry.build_executor(check.executor, 'kubernetes', config,
                                            engine=env.engine.name, version=env.engine.version)
         executor.validate_policy(check, values)
@@ -113,6 +132,12 @@ def _check_reason(check, env, target, transport, values, *, policy):
         return 'METADATA_EXECUTOR_OR_POLICY_UNAVAILABLE'
     if check.id == 'OBS-03' and type(executor) is not KubernetesLogAnalysisExecutor:
         return 'NORMAL_LOG_EXECUTOR_UNAVAILABLE'
+    if check.id == 'OBS-04' and registry.resolve_executor(check.executor, 'kubernetes', engine=env.engine.name,
+            version=env.engine.version) is not registry.EXECUTORS.get('boundary_egress:kubernetes'):
+        return 'LOCAL_USAGE_EXECUTOR_UNAVAILABLE'
+    if check.id == 'PLT-06' and (type(executor) is not KubernetesIPCProductExecutor
+                                 or not supports(env.engine.name, env.engine.version, 'unix_ipc')):
+        return 'WORKER_TRUST_EXECUTOR_UNAVAILABLE'
     if check.id in ('SUP-03', 'REQ-07'):
         if type(executor) is not KubernetesTemplateSupplyExecutor:
             return 'CONFIGURED_TEMPLATE_EXECUTOR_UNAVAILABLE'
@@ -185,26 +210,29 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             bindings.append({'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer})
         if check_id == 'SUP-04' and node_image_verification is not None:
             config.setdefault('check_config', {})[check_id] = {'node_image_verification': node_image_verification}
-        if check_id == 'REQ-07':
-            config.setdefault('check_config', {})[check_id] = {'req07_normal_only': True}
-    if 'template_validation' in config['executors']:
+        if check_id in CHECK_OPTIONS:
+            config.setdefault('check_config', {})[check_id] = {CHECK_OPTIONS[check_id]: True}
+    config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
+    allowed = update_allowed_checks(config, pack)
+    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06')
+    anchors = [cid for cid in shared_checks if CHECK_EXECUTORS[cid] in config['executors']]
+    if anchors:
         plan = select(pack, [base, candidate], policy, mode='update')
         run = RunConfig(executors=config['executors'])
-        siblings = {}
-        for check in pack.active_checks():
-            if check.executor != 'template_validation' or candidates.get(check.id, {}).get('configuration_enabled'):
-                continue
-            row = plan.item(check.id)
-            siblings[check.id] = {}
-            for side, (env, _, _, _, _) in sides.items():
-                blocked = _blocked_reason(row, run, env) if row.selected else None
-                if row.selected and run_binding.keys_for(check) and not blocked:
-                    blocked = 'RUN_BINDING_INPUT_UNAVAILABLE'
-                status = 'NOT_SELECTED' if not row.selected else 'NOT_RUN' if blocked else 'ABORTED'
-                siblings[check.id][side] = {'expected_if_invoked': status,
-                    'reason': row.not_selected_reason.value if not row.selected else blocked or 'EXECUTOR_FAILURE',
-                    'transport_dispatched': False}
-        candidates['SUP-03']['shared_executor_checks'] = siblings
+        for anchor in anchors:
+            siblings = {}
+            for check in pack.active_checks():
+                if check.executor != CHECK_EXECUTORS[anchor] or check.id in allowed:
+                    continue
+                row = plan.item(check.id)
+                siblings[check.id] = {
+                    side: {'expected_if_invoked': 'NOT_RUN' if row.selected else 'NOT_SELECTED',
+                           'reason': _blocked_reason(row, run, env, allowed_checks=allowed) if row.selected
+                                     else row.not_selected_reason.value,
+                           'transport_dispatched': False}
+                    for side, (env, _, _, _, _) in sides.items()
+                }
+            candidates[anchor]['shared_executor_checks'] = siblings
     return config, bindings, candidates
 
 

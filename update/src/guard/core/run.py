@@ -13,6 +13,7 @@ from typing import Any
 
 from guard.executors import registry
 from guard.executors.base import EvidenceDraft
+from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, update_allowed_checks
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -65,7 +66,9 @@ def _empty_evidence_parts(check: CheckDef) -> dict[str, Any]:
     }
 
 
-def _blocked_reason(item: PlanItem, cfg: RunConfig, env=None) -> str | None:
+def _blocked_reason(item: PlanItem, cfg: RunConfig, env=None, *, allowed_checks=None) -> str | None:
+    if allowed_checks is not None and item.check_id not in allowed_checks:
+        return UPDATE_CHECK_OUTSIDE_SCOPE
     if Gap.NO_EXECUTOR in item.gaps:
         return "NO_EXECUTOR: check has no automated executor (manual test required)"
     if item.executor not in cfg.executors:
@@ -120,7 +123,9 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
     policy = store.resolve(plan.inputs.policy)
+    allowed_checks = None
     if plan.mode == Mode.update:
+        allowed_checks = update_allowed_checks(cfg.requested if cfg.requested is not None else cfg.raw, pack)
         validate_update_run_config(cfg)
 
     plan_ref = plan.ref()
@@ -170,7 +175,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             )
             side_cfg.attempt_id = cfg.attempt_id
             evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,
-                           policy_validity=(policy.valid_from, policy.valid_until))
+                           policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks)
             try:
                 store.put(evd)
             except Exception:
@@ -188,7 +193,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
 
 
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
-             policy_validity=(None, None)) -> Evidence:
+             policy_validity=(None, None), *, allowed_checks=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -200,7 +205,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             **_empty_evidence_parts(check),
         ).seal()
 
-    reason = _blocked_reason(item, cfg, env)
+    reason = _blocked_reason(item, cfg, env, allowed_checks=allowed_checks)
     if reason:
         return stopped(ExecStatus.NOT_RUN, reason)
     if cfg.abort_reason:

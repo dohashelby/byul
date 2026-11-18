@@ -11,6 +11,7 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
+from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, for_check, update_allowed_checks
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
@@ -117,13 +118,59 @@ def update_inputs(envs, cfg: dict):
     return mode, side_cfgs, managed
 
 
+def _update_config_for_execution(pack, cfg, allowed_checks):
+    if allowed_checks is None:
+        return cfg
+    allowed_executors = {pack.checks[cid].executor for cid in allowed_checks}
+    scoped = deepcopy(cfg)
+    for settings in (scoped, *scoped.get("sides", {}).values()):
+        if "executors" in settings:
+            settings["executors"] = {name: impl for name, impl in settings["executors"].items()
+                                      if name in allowed_executors}
+    return scoped
+
+
+def _pin_prebound_kubernetes_targets(side_cfg, env, plan, allowed_checks, *, prebound):
+    """Resolve the bounded collectors' target hashes from recipe-bound inputs."""
+    from guard.models import canonical_json, sha256_hex
+    from guard.runtime.bounded import strict_json
+    from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
+
+    selected = {item.check_id: item.executor for item in plan.items if item.selected and item.check_id in allowed_checks}
+    for check_id, option in KUBERNETES_BOUND_CHECK_OPTIONS.items():
+        name = selected.get(check_id)
+        if side_cfg.executors.get(name) != "kubernetes":
+            continue
+        try:
+            effective = for_check(side_cfg.raw, name, check_id).get(name, {})
+        except ValueError:
+            continue  # Per-check execution reports the malformed configuration.
+        if type(effective) is not dict or effective.get(option) is not True:
+            continue
+        key = "_kubernetes_target_sha256_by_executor"
+        hashes = side_cfg.raw.get(key)
+        if type(hashes) is not dict:
+            hashes = side_cfg.raw[key] = {}
+        hashes.pop(name, None)
+        if prebound:
+            try:
+                with Path(effective["target"]).open("rb") as stream:
+                    target = strict_json(stream.read(65537), limit=65536)
+                validate_target_binding(target, env)
+                if target["lab"] is False:
+                    hashes[name] = sha256_hex(canonical_json(target))
+            except (KeyError, TypeError, ValueError, OSError, KubernetesBindingError):
+                continue  # The scoped executor will withhold dispatch without a verified hash.
+
+
 def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
                    *, change=None, previous_plan=None):
     from guard.core.execution_recipe import validate_policy_time
     from guard.runtime.resource_lease import provider_leases
     validate_policy_time(policy)
     cfg = deepcopy(cfg)
-    prepared = update_inputs(envs, cfg)
+    allowed_checks = update_allowed_checks(cfg, pack)
+    prepared = update_inputs(envs, _update_config_for_execution(pack, cfg, allowed_checks))
     with provider_leases(envs, [prepared[2].get(s, {}) for s in ('baseline', 'candidate')]) as leases:
         return _execute_update(store, pack, envs, policy, cfg, run_dir, as_of,
             change=change, previous_plan=previous_plan, prepared=prepared, leases=leases)
@@ -135,6 +182,7 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
     from guard.core.execution_recipe import bind_recipe, validate_policy_time
     validate_policy_time(policy)
     mode, side_cfgs, managed = prepared
+    allowed_checks = update_allowed_checks(cfg, pack)
     change_input = read_change(change, pack, store)
     previous = resolve_plan(store, previous_plan)
     if change_input is not None or previous is not None:
@@ -195,6 +243,9 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
+            if allowed_checks is not None:
+                prebound = cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"
+                _pin_prebound_kubernetes_targets(side_cfg, env, plan, allowed_checks, prebound=prebound)
             run_plan(store, pack, plan, rc, only_side=side)
             continue
         c = side_cfg.raw
@@ -422,11 +473,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     kube_only = False
     transition_requested = False
     try:
+        allowed_checks = None if single else update_allowed_checks(cfg, pack)
+        execution_config = _update_config_for_execution(pack, cfg, allowed_checks)
         if not single and cfg.get("update", {}).get("mode", "external") == "external":
-            requested = run_config(cfg)
+            requested = run_config(execution_config)
             sides = requested.side_configs.values() if requested.side_configs else (requested,)
             implementations = [impl for side in sides for impl in side.executors.values()]
-            kube_only = bool(implementations) and all(impl == "kubernetes" for impl in implementations)
+            kube_only = all(impl == "kubernetes" for impl in implementations) and (
+                bool(implementations) or allowed_checks is not None)
             if kube_only:
                 transition_requested = any(
                     name in side.executors for side in sides for name in ("request_binding", "input_validation")
@@ -436,7 +490,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             effective, managed = _validation_inputs(envs[0], cfg)
             prepared = ("managed", {"single": effective}, {"single": managed})
         else:
-            prepared = update_inputs(envs, cfg)
+            prepared = update_inputs(envs, execution_config)
         option_group = "validation" if single else "update"
         if any(c.get(option_group, {}).get("credential_canary", False) for c in prepared[1].values()) and policy.status.value != "DRAFT":
             raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
@@ -447,12 +501,16 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         selected = [item for item in plan.items if item.selected]
         if not selected:
             raise ValueError("policy selected no checks")
+        executable = selected if allowed_checks is None else [item for item in selected if item.check_id in allowed_checks]
+        if allowed_checks is not None and len(executable) != len(selected):
+            record("execution-scope", False,
+                   f"{len(selected) - len(executable)} selected checks are outside the configured update execution scope")
         for (side, c), env in zip(prepared[1].items(), envs):
             check_support.extend({"side": side, **row} for row in assess_check_support(
                 pack, env, policy, c, selected_check_ids=[item.check_id for item in selected],
-                managed=prepared[0] == "managed"))
+                managed=prepared[0] == "managed", allowed_checks=allowed_checks))
         support_by_key = {(row["side"], row["check_id"]): row for row in check_support}
-        for item in selected:
+        for item in executable:
             if item.gaps:
                 raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
             for side, c in prepared[1].items():
@@ -463,7 +521,6 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
-                from guard.configuration import for_check
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 executor = factory(c)
                 support = support_by_key[side, item.check_id]

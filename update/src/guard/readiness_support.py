@@ -13,8 +13,9 @@ import re
 
 from guard.automation_policy import (string_list, validate_log_integrity_policy,
                                      validate_request_binding_policy, validate_template_policy)
+from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, for_check
 from guard.core.select import check_policy_value
-from guard.executors import registry
+from guard.executors import ipc_trust_scope, log_collection_gap, registry, request_field_probe, run_binding
 from guard.executors.request_binding import SUPPORTED_POLICY as BINDING_POLICY
 from guard.executors.log_integrity_parser import PROFILE as LOG_PROFILE, TRUSTED_FIELDS
 from guard.executors.response_content import OPTIONS as RETURN_OPTIONS
@@ -26,6 +27,7 @@ from guard.executors.running_image_approval import PROFILE as IMAGE_APPROVAL_PRO
 from guard.executors.template_supply_approval import (PROFILE as TEMPLATE_SUPPLY_PROFILE,
                                                       validate_policy as validate_template_supply_policy)
 from guard.input_policy import policy_context
+from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX, selected as reused_matrix_policy
 
 
 # Descriptions of the existing collectors, not a second plugin registry.
@@ -57,20 +59,31 @@ def _policy_shape(check, values, *, kubernetes_template=False):
             raise ValueError("required policy value is missing")
         if param.key in values:
             check_policy_value(check.id, param.key, param.type, values[param.key])
+    profile = getattr(check, "collection_profile", None)
     if check.executor == "template_validation":
         if getattr(check, "collection_profile", None) == TEMPLATE_SUPPLY_PROFILE:
             validate_template_supply_policy(check, values, {})
         elif check.id != "SUP-13" or not kubernetes_template:
             validate_template_policy(values)
     elif check.executor == "unix_ipc":
-        from guard.executors.unix_ipc import policy_shape
-        policy_shape(values)
+        if profile == ipc_trust_scope.PROFILE:
+            ipc_trust_scope.validate_policy(values)
+        else:
+            from guard.executors.unix_ipc import policy_shape
+            policy_shape(values)
     elif check.executor == "container_config" and getattr(check, "collection_profile", None) == IMAGE_APPROVAL_PROFILE:
         validate_image_approval_policy(values)
     elif check.executor == "request_binding":
         validate_request_binding_policy(values)
     elif check.executor == "log_integrity":
-        validate_log_integrity_policy(values)
+        if profile == log_collection_gap.PROFILE:
+            log_collection_gap.validate_policy_shape(values)
+        else:
+            validate_log_integrity_policy(values)
+    elif check.executor == "input_validation" and request_field_probe.supported(check):
+        request_field_probe.validate_policy(check, values)
+    elif check.executor == "input_validation" and profile == REUSED_MATRIX:
+        reused_matrix_policy(check, values)
     elif check.executor in {"input_validation", "sampling_validation", "response_content", "log_analysis"}:
         for param in check.policy_params:
             if param.type == "list[str]":
@@ -81,7 +94,7 @@ def _policy_shape(check, values, *, kubernetes_template=False):
 
 
 def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: Iterable[str],
-                         managed: bool = True) -> list[dict]:
+                         managed: bool = True, allowed_checks=None) -> list[dict]:
     """Describe each selected check without rejecting or rewriting its policy.
 
     The caller supplies the effective configuration for one side. Input shape,
@@ -118,6 +131,19 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("no automatic executor; manual evidence import remains a separate path")
             continue
+        profile = getattr(check, "collection_profile", None)
+        scoped_out = allowed_checks is not None and check_id not in allowed_checks
+        if scoped_out:
+            row["reasons"].append(UPDATE_CHECK_OUTSIDE_SCOPE)
+        if profile == log_collection_gap.PROFILE:
+            row["scope"] = "configured deadlines and a source-bound log collection session"
+            try:
+                session = run_binding.run_config(cfg, check_id)
+            except ValueError:
+                row["reasons"].append("RUN_BINDING_CONFIG_INVALID")
+            else:
+                if type(session) is not dict or not session.get("record_session"):
+                    row["reasons"].append("a source-bound collection session input is required")
         implementation = cfg.get("executors", {}).get(executor)
         kube = implementation == "kubernetes" and not managed
         kube_template = kube and executor == "template_validation"
@@ -129,6 +155,8 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("required policy values are missing or malformed; support cannot be determined")
             continue
         row["policy_valid"] = True
+        if scoped_out:
+            continue
         selected_factory = (registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
                             if implementation == "real" or kube else None)
         if selected_factory is None:
@@ -137,7 +165,6 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             continue
         row['code_available'] = True
         if executor == 'engine_sensor':
-            from guard.configuration import for_check
             selected_executor = selected_factory(for_check(cfg, executor, check.id))
             describe = getattr(selected_executor, 'support', None)
             state = describe(check.id, check.collection_profile, env) if callable(describe) else {'implemented': False, 'reason': 'PLUGIN_SUPPORT_CONTRACT_UNAVAILABLE'}
@@ -166,7 +193,6 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append(reason)
 
         if kube_template:
-            from guard.configuration import for_check
             try:
                 selected_factory(for_check(cfg, executor, check_id)).validate_policy(check, values)
             except (TypeError, ValueError):
@@ -180,7 +206,22 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                     row["limitations"].append("limit enforcement, request template overrides and worker consumption require separate evidence")
             continue
 
+        if profile == log_collection_gap.PROFILE:
+            row["status"] = "UNKNOWN"
+            row["limitations"].append("session identity, producer records and collection timing require runtime verification")
+            continue
+
         if executor == "unix_ipc":
+            if profile == ipc_trust_scope.PROFILE:
+                row["scope"] = "owned process trust-group and identity metadata"
+                row["status"] = "UNKNOWN"
+                row["limitations"].append("worker group attribution, isolation and shared-resource scope require separate evidence")
+                if kube:
+                    try:
+                        selected_factory(for_check(cfg, executor, check_id)).validate_policy(check, values)
+                    except (ValueError, TypeError):
+                        unsupported("the configured Kubernetes collector does not admit this worker trust profile")
+                continue
             from guard.executors.unix_ipc import UnixIPCExecutor
             try:
                 UnixIPCExecutor(cfg.get("unix_ipc", {}), docker=object()).validate_policy(check, values)
@@ -252,6 +293,11 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 if launch.get("logging_profile") != "request-info-v1":
                     unsupported("the fixed native INFO logging launch profile is absent or unsupported")
         elif executor == "input_validation":
+            if request_field_probe.supported(check) or profile == REUSED_MATRIX:
+                row["scope"] = "declared request fields and exact engine-bound observation inputs"
+                row["status"] = "UNKNOWN"
+                row["limitations"].append("approved runtime assets and field consumption require separate verification")
+                continue
             context = policy_context(check, values)
             if context is not None and context.blocked:
                 unsupported("valid endpoint/input-format policy exceeds the single submitted token-array profile", policy_scope=True)

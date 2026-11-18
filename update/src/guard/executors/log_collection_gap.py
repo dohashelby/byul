@@ -18,7 +18,7 @@ _FIELDS = {"record", "event_at_ms", "arrived_at_ms", "gap_marked_at_ms", "alert_
 _DICTS = ("collection_deadline_ms", "max_clock_uncertainty_ms", "detection_deadline_ms", "alert_deadline_ms")
 
 
-def validate_policy(values):
+def validate_policy_shape(values):
     records = values.get("required_records") if type(values) is dict else None
     if type(records) is not list or not records or any(type(r) is not str or not r for r in records):
         raise ValueError("COLLECTION_GAP_POLICY_INVALID")
@@ -27,6 +27,10 @@ def validate_policy(values):
         if (type(table) is not dict or set(table) != set(records)
                 or any(type(v) is not int or isinstance(v, bool) or v < 0 for v in table.values())):
             raise ValueError("COLLECTION_GAP_POLICY_INVALID")
+
+
+def validate_policy(values):
+    validate_policy_shape(values)
     if type(values.get("collection_session")) is not str or re.fullmatch("[0-9a-f]{32}", values["collection_session"]) is None:
         raise ValueError("COLLECTION_GAP_POLICY_INVALID")
 

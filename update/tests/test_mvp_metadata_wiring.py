@@ -8,9 +8,12 @@ import tomllib
 
 import pytest
 
-from guard.configuration import for_check, merge_config
+from guard.configuration import for_check, merge_config, update_allowed_checks
+from guard import application
 from guard.executors import kubernetes_template_supply as template_executor, registry
-from guard.models import DataOrigin, canonical_json, load_pack, sha256_hex
+from guard.executors.base import EvidenceDraft
+from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
+from guard.store import Store
 from tests.builders import T0, policy
 from tests.test_model_preparation_integration import full_inputs
 from tests.test_template_supply_approval import SHA
@@ -125,7 +128,7 @@ def test_shared_template_siblings_stop_before_any_target_or_transport_access(tmp
             guard.setattr(template_executor.Path, 'open', forbidden)
             guard.setattr(template_executor, 'KubernetesHTTP', forbidden)
             decision = checks['SUP-03']['shared_executor_checks']['SUP-13'][side]
-            assert decision == {'expected_if_invoked': 'ABORTED', 'reason': 'EXECUTOR_FAILURE',
+            assert decision == {'expected_if_invoked': 'NOT_RUN', 'reason': 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE',
                                 'transport_dispatched': False}
             for check_id in ('REQ-07', 'SUP-13'):
                 with pytest.raises(ValueError, match='KUBERNETES_TEMPLATE_PROFILE_UNSUPPORTED'):
@@ -193,3 +196,64 @@ def test_missing_shared_policy_blocks_both_container_checks_without_filling_valu
     assert 'container_config' not in config['executors']
     assert checks['SUP-04']['sides']['baseline'] == 'MVP_POLICY_VALUE_MISSING'
     assert checks['PLT-01']['sides']['baseline'] == 'SHARED_CONTAINER_CHECK_INPUT_UNAVAILABLE'
+
+
+def test_local_metadata_scope_pins_public_update_targets_and_withholds_shared_siblings(tmp_path, monkeypatch, sources):
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    policy_document = json.loads((tool.readiness.ROOT / 'docs/dev-1/mvp-enterprise-policy-20261116.json').read_bytes())
+    related = ['OBS-04', 'OBS-05', 'PLT-07', 'PLT-06', 'PLT-02']
+    values = deepcopy(original.values)
+    for row in policy_document['decisions']:
+        if row['check_id'] in related:
+            values.setdefault(row['check_id'], {})[row['key']] = row['value']
+    pol = original.model_copy(update={'values': values, 'scope': original.scope.model_copy(update={'include': related})}).seal()
+    _write(policy_path, pol.to_dict())
+    config, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+    assert set(config['update']['allowed_checks']) == {'OBS-04', 'PLT-06'}
+    assert update_allowed_checks(config, pack) == {'OBS-04', 'PLT-06'}
+    mixed = deepcopy(config)
+    mixed['sides']['candidate']['update'] = {'allowed_checks': related}
+    with pytest.raises(ValueError, match='UPDATE_ALLOWED_CHECKS_MUST_BE_COMMON'):
+        update_allowed_checks(mixed, pack)
+    assert config['check_config'] == {'OBS-04': {'local_observation_only': True},
+                                      'PLT-06': {'worker_trust_metadata_only': True}}
+    for anchor, siblings in (('OBS-04', ('OBS-05', 'PLT-07')), ('PLT-06', ('PLT-02',))):
+        for check_id in siblings:
+            for decision in decisions[anchor]['shared_executor_checks'][check_id].values():
+                assert decision == {'expected_if_invoked': 'NOT_RUN', 'reason': 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE',
+                                    'transport_dispatched': False}
+
+    envs = [tool.Environment.model_validate_json(side['environment'].read_bytes()) for side in sides.values()]
+    readiness = application.update_readiness(pack, envs, pol, config)
+    assert readiness['ready'] is False
+    assert any(row['check'] == 'execution-scope' and not row['ok'] for row in readiness['checks'])
+    assert all('UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE' in row['reasons'] for row in readiness['check_support']
+               if row['check_id'] in {'OBS-05', 'PLT-07', 'PLT-02'})
+    expected = {env.id: sha256_hex(canonical_json(json.loads(sides[side]['target'].read_bytes())))
+                for side, env in zip(sides, envs)}
+    seen = []
+
+    class Example:
+        version = '1'
+
+        def __init__(self, name, raw):
+            self.name = name
+            self.target_hash = raw['_kubernetes_target_sha256']
+
+        def run(self, check, env, *_args):
+            assert check.id in {'OBS-04', 'PLT-06'} and self.target_hash == expected[env.id]
+            seen.append((check.id, env.id))
+            return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                                 normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
+
+    for name in config['executors']:
+        monkeypatch.setitem(registry.EXECUTORS, f'{name}:kubernetes', lambda raw, name=name: Example(name, raw))
+    store = Store(tmp_path / 'store')
+    report, _ = application.execute_update(store, pack, envs, pol, config, tmp_path / 'update', utcnow())
+    assert set(seen) == {(cid, env.id) for cid in ('OBS-04', 'PLT-06') for env in envs}
+    assert all(next(row for row in report.by_check if row.check_id == cid).selected for cid in related)
+    for row in store.iter_kind('EVD'):
+        if row.check_id in {'OBS-05', 'PLT-07', 'PLT-02'}:
+            assert row.execution.status == ExecStatus.NOT_RUN
+            assert row.execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'

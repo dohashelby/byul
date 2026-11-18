@@ -121,7 +121,11 @@ def _inspect(source, check, pack, issued_at):
                 raise ValueError('MVP_POLICY_VALUE_MISSING')
         else:
             check_policy_value(check.id, field.key, field.type, values[field.key])
+    from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, update_allowed_checks
     config = tomllib.loads(files['configuration'].decode('utf-8'))
+    allowed = update_allowed_checks(config, pack)
+    if allowed is not None and check.id not in allowed:
+        raise ValueError(UPDATE_CHECK_OUTSIDE_SCOPE)
     config = merge_config(config, config.get('sides', {}).get(source['side'], {}))
     config = for_check(config, check.executor, check.id)
     implementation = config.get('executors', {}).get(check.executor)

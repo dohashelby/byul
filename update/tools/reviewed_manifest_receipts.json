@@ -765,6 +765,11 @@
       "manifest_sha256": "fcfc0bde9008912f8fbfe7558fed24fa814b9b3b824216fc4f0f96e4128bbaa4",
       "reviewed_by": "Codex / paired normal log and template observations; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T13:52:28+00:00"
+    },
+    {
+      "manifest_sha256": "91942e34bf80eb8574b0ce85a52895c1e42c09ee5e4ae538d3c425e91b55fb81",
+      "reviewed_by": "Codex / scoped local usage and worker trust observations; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T16:31:27+00:00"
     }
   ]
 }

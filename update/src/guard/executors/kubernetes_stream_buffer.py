@@ -1,7 +1,7 @@
 """LIF04 existing CLI, owned read controls and opt-in actual transport metadata."""
 from pathlib import Path
 import uuid
-from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
+from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_stream_buffer_http import KubernetesStreamBufferHTTP,HTTP_PROFILE,SLOTS
 from guard.adapters import vllm_stream_buffer_sensor as sensor,vllm_stream_buffer_metadata as metadata
@@ -12,6 +12,7 @@ from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
 from .stream_buffer_contract import PROFILE,normalize_policy,stamp
+from . import normal_stream_buffer
 
 
 BUDGET_PROFILE='kubernetes-stream-buffer-budget-observation-v1'
@@ -26,31 +27,43 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
+        self.normal_only=self.cfg.get('normal_stream_only') is True
+        if self.normal_only:self.version='0.1.0+normal-stream'
 
     def validate_policy(self,check,values):
         if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('STREAM_BUFFER_PROFILE_UNSUPPORTED')
-        normalize_policy(values)
+        if 'normal_stream_only' in self.cfg and (not self.normal_only or check.id!='LIF-04'
+                or set(self.cfg)-normal_stream_buffer.NORMAL_CONFIG_KEYS or self.b_common_inputs is not None):
+            raise ValueError('STREAM_BUFFER_NORMAL_CONFIGURATION_INVALID')
+        normalize_policy(values,normal_only=self.normal_only)
 
     def run(self,check,env,policy_values,adapter,workdir):
         from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check,policy_values)
         try:
-            if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
+            if (adapter is None or not self.normal_only and set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            digest=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end,profiles=normalize_policy(policy_values)
+            digest=sha256_hex(canonical_json(target));start,end,profiles=normalize_policy(policy_values,normal_only=self.normal_only)
             if (digest!=policy_values['buffer_target_sha256'] or env.ref().sha256!=policy_values['buffer_environment_sha256']
+                    or self.normal_only and self.expected_target is None
                     or self.expected_target is not None and digest!=self.expected_target
-                    or prepared['profile'] not in {sensor.PROFILE,release_observation.STREAM_PROFILE,baseline_stream.PROFILE}
-                    or sha256_hex(canonical_json(prepared))!=policy_values['buffer_prepared_sha256'] or not start<=utcnow()<=end):raise ValueError
+                    or not start<=utcnow()<=end):raise ValueError
+            prepared=None if self.normal_only else load_prepared(self.cfg['prepared'])
+            if not self.normal_only and (prepared['profile'] not in {sensor.PROFILE,release_observation.STREAM_PROFILE,baseline_stream.PROFILE}
+                    or sha256_hex(canonical_json(prepared))!=policy_values['buffer_prepared_sha256']):raise ValueError
         except (ValueError,KeyError,TypeError,RuntimeError,OSError):raise ValueError('STREAM_BUFFER_CONFIGURATION_INVALID') from None
         transport=KubernetesStreamBufferHTTP(target,env,read_profiles=profiles,runner=self.runner,
-            duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))
+            duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'),normal_only=self.normal_only)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,allow_mutating=False,
             keys={'none':None},secrets=[],cprobe=transport,workdir=workdir,started=utcnow(),http_probe_profile=HTTP_PROFILE)
-        ctx._buffer_prepared=prepared;return self._finish(ctx)
+        ctx._buffer_prepared=prepared
+        ctx._stream_window=(start,end)
+        return self._finish(ctx)
 
     def collect(self,ctx):
+        if self.normal_only:
+            return normal_stream_buffer.collect(ctx,*ctx._stream_window)
         from guard.collectors.lifecycle import request_header_fingerprint
         start,end,profiles=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex
         trials=[];diagnostics=[];reader=None;packet=None;sealed=False
@@ -159,7 +172,11 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
         except Exception:diagnostics.append('BUDGET_RSS_CAPTURE_UNAVAILABLE')
 
     def _finish(self,ctx):
-        draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
+        draft=super()._finish(ctx)
+        origin=DataOrigin(ctx.cprobe.base.process_observation_origin) if self.normal_only else DataOrigin.EXAMPLE
+        if self.normal_only and (ctx._buffer_gap or draft.status!=ExecStatus.COMPLETED):
+            origin=min(origin,DataOrigin.DECLARED,key=ORIGIN_STRENGTH.get)
+        draft.data_origin=min(draft.data_origin,origin,key=ORIGIN_STRENGTH.get)
         if ctx._buffer_gap:
             draft.status=ExecStatus.ABORTED
             if draft.abort_reason is None:

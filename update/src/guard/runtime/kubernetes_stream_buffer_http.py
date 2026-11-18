@@ -1,20 +1,35 @@
 """LIF04 closed existing stdlib requests; client facts are not server memory."""
 
 from guard.adapters.engine_profiles import supports
+from guard.executors.stream_probe import MAX_EVENTS
 from copy import deepcopy
 import math,re,threading
 from guard.models import canonical_json,sha256_hex
+from .bounded import strict_json
 from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
 from .kubernetes_stream_buffer import normalize_read_profiles
 
 HTTP_PROFILE='kubernetes-owned-stream-buffer-http-v1'
 SLOTS=('normal-before','normal','slow','slow-close','normal-after')
+NORMAL_SLOTS=('normal-before','normal','normal-after')
+
+
+def completion_shape(text, model):
+    try:
+        body = strict_json(text.encode('utf-8'), limit=131072)
+        choices = body.get('choices') if type(body) is dict else None
+        return (type(choices) is list and 1 <= len(choices) <= 8 and body.get('model') == model
+                and all(type(choice) is dict and type(choice.get('text')) is str for choice in choices))
+    except (AttributeError, UnicodeError, ValueError):
+        return False
 
 
 class KubernetesStreamBufferHTTP:
     profile=HTTP_PROFILE
-    def __init__(self,target,env,*,read_profiles,runner=None,duration=120,binary='kubectl'):
-        if target.get('lab') is not True or not supports(env.engine.name, env.engine.version):raise KubernetesBindingError()
+    def __init__(self,target,env,*,read_profiles,runner=None,duration=120,binary='kubectl',normal_only=False):
+        if (type(normal_only) is not bool or target.get('lab') is not (not normal_only)
+                or not supports(env.engine.name, env.engine.version)):raise KubernetesBindingError()
+        self.normal_only=normal_only
         self.read_profiles=normalize_read_profiles(read_profiles)
         self.base=KubernetesHTTP(target,env,runner=runner,duration=duration,binary=binary,profile=REQUEST_BINDING_PROFILE)
         self.binding=deepcopy(self.base.binding);self.api_model=self.base.api_model;self.model_mapping=deepcopy(self.base.model_mapping)
@@ -31,6 +46,7 @@ class KubernetesStreamBufferHTTP:
                 if type(r) is not dict or set(r)-{'id','mode','method','url','headers','body','read_profile'} or type(r.get('id')) is not str:raise ValueError
                 slot=r['id'].removeprefix('lif04-')
                 if r['id']!='lif04-'+slot or slot not in SLOTS or slot in self._cases or 'normal-after' in self._cases:raise ValueError
+                if self.normal_only and (len(self._cases)>=len(NORMAL_SLOTS) or NORMAL_SLOTS[len(self._cases)]!=slot):raise ValueError
                 if slot!='normal-before' and 'normal-before' not in self._cases:raise ValueError
                 streaming=slot not in {'normal-before','normal-after'};headers=r.get('headers')
                 if type(headers) is not dict or set(headers)!={'X-Request-Id'} or type(headers['X-Request-Id']) is not str:raise ValueError
@@ -60,6 +76,18 @@ class KubernetesStreamBufferHTTP:
                     'eof':value.get('eof') is True,'terminal_seen':value.get('terminal_seen') is True,'client_closed':False,
                     'client_close_ms':None,'read_count':None,'read_pause_count':None,'read_observations':[],'intentional_client_close':False,
                     'body_bytes':value.get('body_bytes') if type(value.get('body_bytes')) is int and 0<=value['body_bytes']<=131072 else None}
+                if self.normal_only:
+                    row['body_sha256']=value['body_sha256'] if complete else None
+                    if streaming:
+                        events=value.get('events')
+                        row['normal_event_sequence_verified']=(complete and row['event_stream'] and row['terminal_seen']
+                            and value.get('stop_reason')=='eof' and value.get('post_terminal_events')==0
+                            and type(events) is list and 2<=len(events)<=MAX_EVENTS
+                            and all(type(event) is dict and event.get('seq') == index and type(event.get('data')) is str
+                                    for index, event in enumerate(events))
+                            and events[-1]['data']=='[DONE]'
+                            and all(completion_shape(event['data'], self.api_model) for event in events[:-1]))
+                        row['event_count']=len(events) if row['normal_event_sequence_verified'] else None
                 if expected is not None:
                     count,pause,observations=value.get('read_count'),value.get('read_pause_count'),value.get('read_observations')
                     if (type(count) is not int or not 0<=count<=expected['close_after_reads'] or type(pause) is not int or not 0<=pause<=count

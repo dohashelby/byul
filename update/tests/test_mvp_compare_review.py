@@ -97,6 +97,31 @@ def test_executor_specific_record_artifact_survives_export_restore_and_rejudgmen
     assert all(row[side]['verdicts']['security'] == 'PASS' for side in tool.SIDES)
 
 
+def test_two_original_reports_from_one_restored_store_keep_exact_plan_refs(tmp_path, monkeypatch):
+    first = builders.build_update_case(tmp_path)
+    original_evidence = builders.Evidence
+
+    def next_run_evidence(**raw):
+        raw['id'] += '-SECOND'
+        return original_evidence(**raw)
+
+    monkeypatch.setattr(builders, 'Evidence', next_run_evidence)
+    second = builders.build_update_case(tmp_path, candidate_fail=True)
+    reports = [tmp_path / 'first-report.json', tmp_path / 'second-report.json']
+    for path, case in zip(reports, (first, second), strict=True):
+        path.write_text(json.dumps(case[0]), encoding='utf-8')
+    bundle, restored = tmp_path / 'evidence.zip', tmp_path / 'restored'
+    export_bundle(tmp_path / 'store', bundle)
+    restore_bundle(bundle, restored)
+    runs = list(tool._read_runs((restored, path) for path in reports))
+    assert all(len([obj for obj in run[1] if obj['kind'] == 'PLAN']) == 2 for run in runs)
+    authoritative = object_from_dict(second[0]).ref().model_dump(mode='json')
+    result = tool.review(runs, pack=first[2], expected=_expected(first), assignments={'REQ-01': authoritative})
+    assert len({entry['refs']['plan']['sha256'] for entry in result['reports']}) == 2
+    assert result['rows']['REQ-01']['candidate']['verdicts']['security'] == 'FAIL'
+    assert result['rows']['REQ-01']['report'] == authoritative
+
+
 def test_config_difference_keeps_real_verdict_and_exact_blocker():
     case = builders.build_pure_update_case(candidate_fail=True, different_config=True)
     result = tool.review([case], pack=case[2], expected=_expected(case))

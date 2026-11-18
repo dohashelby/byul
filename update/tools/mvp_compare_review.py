@@ -315,7 +315,17 @@ def review(run_inputs, *, pack, expected, assignments=None):
 def _read_runs(pairs):
     for store, report_path in pairs:
         objects = read_objects(store)
-        yield json.loads(report_path.read_bytes(), object_pairs_hook=_pairs), objects, verify_store_files(store, objects)
+        report = json.loads(report_path.read_bytes(), object_pairs_hook=_pairs)
+        saved = object_from_dict(report)
+        if saved.kind != 'RPT' or not saved.hash_ok() or report not in objects:
+            raise InvalidReport('ORIGINAL_RPT_MISMATCH')
+        plan_ref, = [ref for ref in saved.inputs_manifest if ref.kind == 'PLAN']
+        # The existing verifier takes one PLAN to locate the pinned pack. Keep
+        # every other object in its artifact scan and retain the entire saved
+        # graph for the subsequent exact-ref and object-seal checks.
+        verification_objects = [obj for obj in objects if obj['kind'] != 'PLAN' or (
+            obj['id'], obj['revision'], obj['content_sha256']) == (plan_ref.id, plan_ref.revision, plan_ref.sha256)]
+        yield report, objects, verify_store_files(store, verification_objects)
 
 
 def main():

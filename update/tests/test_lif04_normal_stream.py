@@ -3,6 +3,9 @@
 from datetime import timedelta
 import json
 from pathlib import Path
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -123,3 +126,33 @@ def test_normal_stream_requires_exact_readonly_admission_before_io(tmp_path, bad
     executor = KubernetesStreamBufferExecutor(cfg, runner=no_read, environ={}, expected_target_sha256=pin)
     with pytest.raises(ValueError, match='STREAM_BUFFER_.*CONFIGURATION_INVALID'):
         executor.run(check, env, values, VllmAdapter(), tmp_path / 'work')
+
+
+@pytest.mark.parametrize('same_group', [True, False])
+def test_memory_source_reads_the_selected_cgroup_fixture(tmp_path, same_group):
+    proc, cgroup = tmp_path / 'proc', tmp_path / 'cgroup'
+    for process in ('self', '1'):
+        (proc / process / 'ns').mkdir(parents=True)
+    for namespace in ('pid', 'mnt', 'cgroup'):
+        source = proc / 'self' / 'ns' / namespace
+        source.touch()
+        os.link(source, proc / '1' / 'ns' / namespace)
+    (proc / 'self/cgroup').write_text('0::/owned/engine\n', encoding='ascii')
+    (proc / '1/cgroup').write_text('0::/owned/engine\n' if same_group else '0::/owned/other\n', encoding='ascii')
+    (proc / 'self/mountinfo').write_text(f'29 24 0:27 / {cgroup} ro - cgroup2 cgroup rw\n', encoding='ascii')
+    (cgroup / 'owned/engine').mkdir(parents=True)
+    (cgroup / 'owned/engine/memory.current').write_text('424242\n', encoding='ascii')
+    # The shipped producer receives no path arguments. This fixture substitutes only the roots.
+    replacements = {'/proc/': str(proc) + '/', '/proc/self/ns/': str(proc / 'self/ns') + '/',
+                    '/proc/1/ns/': str(proc / '1/ns') + '/', '/proc/self/mountinfo': str(proc / 'self/mountinfo'),
+                    '/sys/fs/cgroup': str(cgroup)}
+    script = normal.MEMORY_SOURCE
+    for original, replacement in replacements.items():
+        script = script.replace(repr(original), repr(replacement))
+    result = subprocess.run([sys.executable, '-I', '-S', '-B', '-c', script], capture_output=True, check=True, timeout=5)
+    packet = json.loads(result.stdout)
+    assert packet['schema'] == 'guard-owned-container-memory/1'
+    if same_group:
+        assert packet['memory_current_bytes'] == 424242 and len(packet['domain_sha256']) == 64
+    else:
+        assert packet == {'schema': 'guard-owned-container-memory/1', 'unavailable': True}

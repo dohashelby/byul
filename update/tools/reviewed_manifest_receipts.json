@@ -775,6 +775,11 @@
       "manifest_sha256": "8a30682d35cd5900b650a1518078859af4b2fbb89beb355dee761104e315b1a7",
       "reviewed_by": "Codex / exact prebound target recipe snapshots; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T16:39:43+00:00"
+    },
+    {
+      "manifest_sha256": "a8df0f6c64f2823880cfa42761e9274aeca8a4d54eec77d928d7fceb39c8baf9",
+      "reviewed_by": "Codex / paired passive PLT-08 evidence self-review under 2026-11-12 decision 5",
+      "reviewed_at": "2026-11-18T18:01:02+00:00"
     }
   ]
 }

@@ -95,9 +95,9 @@ def test_normal_stream_and_memory_are_collected_without_slow_slots(tmp_path, mod
         draft = executor.run(check, env, values, VllmAdapter(), tmp_path / 'work')
     assert draft.data_origin == 'EXAMPLE'
     assert draft.status == ('COMPLETED' if mode == 'normal' else 'ABORTED')
-    assert draft.observations['activation_scope_complete']['value'] is False
-    assert draft.observations['activation_violations']['value'] == []
-    row, = draft.observations['activation_steps']['value']
+    assert draft.observations['activation_scope_complete'].value is False
+    assert draft.observations['activation_violations'].value == []
+    row, = draft.observations['activation_steps'].value
     assert row['same_memory_domain_verified'] is (mode == 'normal')
     assert [t['case_id'] for t in row['trials']] == world.requests
     assert world.requests == (['lif04-normal-before', 'lif04-normal'] if mode == 'wrong-stream'

@@ -38,6 +38,8 @@ def gateway_pair(tmp_path, sources):
         environment = Environment.model_validate_json(paths['environment'].read_bytes())
         engine_target = json.loads(paths['target'].read_bytes())
         engine_target['kubernetes']['run_id'] = 'fixture-' + side
+        binding = engine_target['kubernetes']
+        binding['probe'].update(namespace=binding['engine']['namespace'], namespace_uid=binding['engine']['namespace_uid'])
         _write(paths['target'], engine_target)
         directory = tmp_path / (side + '-bundle')
         directory.mkdir()

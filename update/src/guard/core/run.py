@@ -14,7 +14,7 @@ from typing import Any
 from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
 from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, UPDATE_CHECK_OUTSIDE_SCOPE, merge_config,
-                                 record_snapshot_scopes, update_allowed_checks)
+                                 bounded_metadata_scopes, update_allowed_checks)
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -130,8 +130,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
         allowed_checks = update_allowed_checks(requested, pack)
         validate_update_run_config(cfg)
         sides = ("baseline", "candidate")
-        actual = record_snapshot_scopes((cfg.side_configs.get(side, cfg).raw for side in sides), pack, allowed_checks)
-        expected = record_snapshot_scopes(
+        actual = bounded_metadata_scopes((cfg.side_configs.get(side, cfg).raw for side in sides), pack, allowed_checks)
+        expected = bounded_metadata_scopes(
             (merge_config(requested, requested.get("sides", {}).get(side, {})) for side in sides), pack, allowed_checks)
         if actual != expected:
             raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")

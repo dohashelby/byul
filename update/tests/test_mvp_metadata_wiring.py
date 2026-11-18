@@ -348,6 +348,81 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
     assert configuration_sha256(cfg, envs) != expected_recipe
 
 
+def test_lif04_normal_preparation_binds_actual_target_without_enabling_stream_sibling(tmp_path, sources):
+    from tests.test_lif04_normal_stream import configuration
+
+    pack, sides, policy_path = sources
+    _, _, _, full_values = configuration(tmp_path)
+    lif04 = {row.key: full_values[row.key] for row in pack.checks['LIF-04'].policy_params}
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    pol = original.model_copy(update={'values': {'LIF-04': lif04},
+        'scope': original.scope.model_copy(update={'include': ['LIF-03', 'LIF-04']})}).seal()
+    _write(policy_path, pol.to_dict())
+    cfg, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
+                                       normal_stream_buffer=True)
+    assert cfg['update']['allowed_checks'] == ['LIF-04']
+    assert cfg['check_config'] == {'LIF-04': {'normal_stream_only': True}}
+    assert decisions['LIF-04']['shared_executor_checks']['LIF-03']['baseline']['transport_dispatched'] is False
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    staged = tool.staged_config(cfg, tmp_path / 'fresh-stream-target.json')
+    assert staged['sides']['candidate']['stream_buffer'] == {'target': str(tmp_path / 'fresh-stream-target.json')}
+    altered = deepcopy(cfg)
+    altered['update']['allowed_checks'].append('LIF-03')
+    invalid = application.update_readiness(pack, envs, pol, altered)
+    assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == (
+        'NORMAL_STREAM_EXECUTION_SCOPE_INVALID')
+
+
+def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_requests(tmp_path, sources, monkeypatch):
+    from tools import mvp_gateway_preparation as preparation
+
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {'OBS-01': {'observation_required_events': ['ACCESS_ALLOWED', 'ACCESS_DENIED'],
+                         'observation_required_fields': ['actor_sha256', 'target_sha256', 'run_sha256', 'policy_sha256'],
+                         'observation_max_delay_ms': 5000}}
+    pol = original.model_copy(update={'values': values,
+        'scope': original.scope.model_copy(update={'include': ['OBS-01', 'PLT-12']})}).seal()
+    _write(policy_path, pol.to_dict())
+    producer = tmp_path / 'selected-producer.py'
+    producer.write_bytes(b'# fixture producer\n')
+    monkeypatch.setattr(preparation, 'PRODUCER_SHA256', sha256_hex(producer.read_bytes()))
+    gateway_inputs = {}
+    for number, (side, paths) in enumerate(sides.items(), 1):
+        target_doc = json.loads(paths['target'].read_bytes())
+        roles = target_doc['kubernetes']
+        roles['probe'].update(namespace=roles['engine']['namespace'], namespace_uid=roles['engine']['namespace_uid'])
+        target_doc['kubernetes_gateway'] = {**roles['engine'], 'pod': f'gateway-{side}', 'container': 'gateway',
+            'pod_uid': f'00000000-0000-0000-0001-{number:012d}', 'container_id': f'containerd://{90 + number:064x}',
+            'pod_ip': f'10.2.3.{number}', 'image': preparation.GATEWAY_IMAGE, 'image_id': preparation.GATEWAY_IMAGE}
+        _write(paths['target'], target_doc)
+        gateway_inputs[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
+            'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64},
+            'gateway_record_source': {'environment': preparation.GATEWAY_ENV, 'target_id': 'fixture-target',
+                'runtime_policy_sha256': 'f' * 64, 'request_sha256': f'{number:064x}'}}
+    cfg, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
+                                       gateway_record_inputs=gateway_inputs)
+    assert cfg['update']['allowed_checks'] == ['OBS-01'], decisions
+    assert cfg['check_config']['OBS-01'] == {'record_snapshot_only': True, 'gateway_record_snapshot_only': True}
+    assert decisions['OBS-01']['shared_executor_checks']['PLT-12']['baseline']['transport_dispatched'] is False
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    with pytest.raises(ValueError, match='GATEWAY_RECORDS_REQUIRE_PREBOUND_PAIR'):
+        tool.staged_config(cfg, tmp_path / 'unbound-candidate.json')
+    bad_mode = deepcopy(cfg)
+    bad_mode['sides']['candidate']['check_config']['OBS-01']['gateway_record_snapshot_only'] = False
+    invalid = application.update_readiness(pack, envs, pol, bad_mode)
+    assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == (
+        'OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID')
+    gateway_inputs['candidate']['gateway_record_source']['request_sha256'] = (
+        gateway_inputs['baseline']['gateway_record_source']['request_sha256'])
+    with pytest.raises(ValueError, match='GATEWAY_DISTINCT_PAIRED_RECORDS_REQUIRED'):
+        tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', gateway_record_inputs=gateway_inputs)
+
+
 def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())

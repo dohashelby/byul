@@ -795,6 +795,11 @@
       "manifest_sha256": "7640f410eb307e883334436fc3cefff27cce577dbdde1f1f283573c8088d0eb9",
       "reviewed_by": "Codex / exact SUP-05 provenance and PLT-09 state review / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T19:45:49+00:00"
+    },
+    {
+      "manifest_sha256": "b455a27db986d4e5074f727514d70da6ec692cec23fc41cfd6646d25c7a2c1a8",
+      "reviewed_by": "Codex / owned Gateway record, normal stream and terminal owner readback / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T20:40:18+00:00"
     }
   ]
 }

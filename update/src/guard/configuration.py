@@ -11,12 +11,15 @@ def merge_config(base, override):
 
 CHECK_CONFIG = "check_config"
 UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
+GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
+NORMAL_STREAM_OPTION = "normal_stream_only"
 RECORD_SNAPSHOT_OPTIONS = {
     "OBS-01": "record_snapshot_only",
     "PLT-12": "copy_record_snapshot_only",
 }
 KUBERNETES_BOUND_CHECK_OPTIONS = {
     **RECORD_SNAPSHOT_OPTIONS,
+    "LIF-04": NORMAL_STREAM_OPTION,
     "OBS-04": "local_observation_only",
     "PLT-02": "protected_path_metadata_only",
     "PLT-06": "worker_trust_metadata_only",
@@ -74,21 +77,27 @@ def for_check(raw, executor, check_id):
     return out
 
 
-def record_snapshot_scopes(configurations, pack, allowed_checks):
-    """Keep the two snapshot children isolated within the shared record executor."""
+def bounded_metadata_scopes(configurations, pack, allowed_checks):
+    """Bind the explicitly configured metadata cases without enabling sibling collectors."""
     name = "required_event_record"
     error = "OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID"
     scopes = []
+    gateway_modes = []
     for raw in configurations:
         scoped = {}
         overlays = raw.get(CHECK_CONFIG)
         bindings = raw.get("run_binding")
         for check_id, option in RECORD_SNAPSHOT_OPTIONS.items():
             overlay = overlays.get(check_id) if type(overlays) is dict else None
-            if not any(type(settings) is dict and option in settings for settings in (raw.get(name), overlay)):
+            sections = (raw.get(name), overlay)
+            gateway = check_id == "OBS-01" and any(
+                type(settings) is dict and GATEWAY_RECORD_SNAPSHOT_OPTION in settings for settings in sections)
+            if not gateway and not any(type(settings) is dict and option in settings for settings in sections):
                 continue
             settings = for_check(raw, name, check_id).get(name, {})
-            if settings.get(option) is not True:
+            if (settings.get(option) is not True or gateway and
+                    (settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is not True
+                     or raw.get("update", {}).get("kubernetes_candidate_binding", "prebound") != "prebound")):
                 raise ValueError(error)
             scoped[check_id] = (settings, bindings.get(check_id) if type(bindings) is dict else None)
         if scoped:
@@ -100,7 +109,20 @@ def record_snapshot_scopes(configurations, pack, allowed_checks):
             sessions = [binding.get("record_session") for _, binding in scoped.values() if type(binding) is dict]
             if len(sessions) == 2 and sessions[0] == sessions[1]:
                 raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SESSIONS_MUST_DIFFER")
+        stream_overlay = overlays.get("LIF-04") if type(overlays) is dict else None
+        if any(type(settings) is dict and NORMAL_STREAM_OPTION in settings
+               for settings in (raw.get("stream_buffer"), stream_overlay)):
+            stream = for_check(raw, "stream_buffer", "LIF-04").get("stream_buffer", {})
+            if (stream[NORMAL_STREAM_OPTION] is not True or allowed_checks is None
+                    or {cid for cid in allowed_checks if pack.checks[cid].executor == "stream_buffer"} != {"LIF-04"}
+                    or raw.get("executors", {}).get("stream_buffer") != "kubernetes"
+                    or raw.get("update", {}).get("mode", "external") != "external" or raw.get("lab_activation")):
+                raise ValueError("NORMAL_STREAM_EXECUTION_SCOPE_INVALID")
+            scoped["LIF-04"] = (stream, None)
         scopes.append(scoped)
+        gateway_modes.append(scoped.get("OBS-01", ({}, None))[0].get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
     if any(scopes) and (len(scopes) != 2 or set(scopes[0]) != set(scopes[1])):
+        raise ValueError(error)
+    if any(gateway_modes) and not all(gateway_modes):
         raise ValueError(error)
     return scopes

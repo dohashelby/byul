@@ -156,6 +156,20 @@ def snapshot_record(raw, *, source, values, run_id):
     return record[0], sha256_hex(canonical_json(row)), source_reported_at
 
 
+def snapshot_owner(target, engine_binding):
+    """Require a distinct Gateway in both exact owned Pod roles' namespace."""
+    gateway = target["kubernetes_gateway"]
+    validate_container_binding(gateway)
+    if gateway["container"] != "gateway" or gateway["restart_count"] != 0:
+        raise ValueError("GATEWAY_AUDIT_TARGET_UNVERIFIED")
+    for role in ("engine", "probe"):
+        other = engine_binding[role]
+        if (any(gateway[key] != other[key] for key in ("namespace", "namespace_uid"))
+                or any(gateway[key] == other[key] for key in ("pod_uid", "container_id", "pod_ip"))):
+            raise ValueError("GATEWAY_AUDIT_TARGET_UNVERIFIED")
+    return gateway
+
+
 class KubernetesGatewayRecordSnapshotExecutor:
     """Canonical OBS-01 snapshot from one existing Gateway-owned file."""
     name = "required_event_record"
@@ -192,18 +206,12 @@ class KubernetesGatewayRecordSnapshotExecutor:
                     or self.expected_target != target_sha or values["observation_target_sha256"] != target_sha
                     or env.ref().sha256 != values["observation_environment_sha256"] or not start <= started <= end):
                 raise ValueError
-            gateway = target["kubernetes_gateway"]
-            validate_container_binding(gateway)
             engine_view = {key: value for key, value in target.items() if key != "kubernetes_gateway"}
             duration = self.cfg.get("max_duration_seconds", 120)
             binary = self.cfg.get("kubectl_binary", "kubectl")
             transport = KubernetesHTTP(engine_view, env, duration=duration, binary=binary,
                                        runner=self.runner, profile=REQUEST_BINDING_PROFILE)
-            for role in ("engine", "probe"):
-                other = transport.binding[role]
-                if (any(gateway[key] != other[key] for key in ("namespace", "namespace_uid"))
-                        or any(gateway[key] == other[key] for key in ("pod_uid", "container_id", "pod_ip"))):
-                    raise ValueError
+            gateway = snapshot_owner(target, transport.binding)
             binding = {**transport.binding, "gateway": gateway}
             reader = GatewayRecordReader(binding, target, values["observation_session"], binary=binary,
                                          duration=duration, runner=self.runner, snapshot_only=True)

@@ -42,6 +42,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from guard.configuration import NORMAL_STREAM_OPTION
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
@@ -480,6 +481,10 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     """
     stages = stages_for(check)
     keys = tuple(k for k in KEYS_BY_CHECK.get(check.id, ()) if 1 in stages)
+    if check.id == 'LIF-04' and check.executor == 'stream_buffer' and executor_cfg.get(NORMAL_STREAM_OPTION) is True:
+        from .stream_buffer_contract import PROFILE
+        if getattr(check, 'collection_profile', None) == PROFILE:
+            keys = tuple(key for key in keys if key != 'buffer_prepared_sha256')
     if not stages:
         return None, {}
     wanted = config_keys(check)

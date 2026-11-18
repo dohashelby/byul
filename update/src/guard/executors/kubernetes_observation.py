@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import time
 import uuid
+from guard.configuration import GATEWAY_RECORD_SNAPSHOT_OPTION
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP,REQUEST_BINDING_PROFILE,REQUIRED_EVENT_PROFILE
@@ -37,16 +38,32 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         if self.cfg.get('record_snapshot_only') is True:
             self.requires_roles=False
             self.version='0.2.0+record-snapshot'
+        if self.cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True:
+            from .kubernetes_gateway_observation import KubernetesGatewayRecordSnapshotExecutor
+            self.requires_roles=False
+            self.version=KubernetesGatewayRecordSnapshotExecutor.version
         if self.cfg.get('copy_record_snapshot_only') is True:
             from .kubernetes_credential_copy import SNAPSHOT_VERSION
             self.requires_roles=False
             self.version=SNAPSHOT_VERSION
 
     def keys(self):
-        if self.cfg.get('copy_record_snapshot_only') is True:return {}
+        if (self.cfg.get('copy_record_snapshot_only') is True
+                or self.cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True):
+            return {}
         return super().keys()
 
+    def _gateway_snapshot(self):
+        from .kubernetes_gateway_observation import KubernetesGatewayRecordSnapshotExecutor
+        if self.cfg.get('record_snapshot_only') is not True:
+            raise ValueError('GATEWAY_AUDIT_CONFIGURATION_INVALID')
+        settings = {key: value for key, value in self.cfg.items() if key != 'record_snapshot_only'}
+        return KubernetesGatewayRecordSnapshotExecutor(settings, runner=self.runner,
+            expected_target_sha256=self.expected_target)
+
     def validate_policy(self,check,values):
+        if GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg:
+            return self._gateway_snapshot().validate_policy(check,values)
         if 'copy_record_snapshot_only' in self.cfg:
             from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
             return KubernetesCredentialCopyRecordExecutor(self.cfg).validate_policy(check,values)
@@ -66,6 +83,8 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         normalize_policy(values)
 
     def run(self,check,env,policy_values,adapter,workdir):
+        if GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg:
+            return self._gateway_snapshot().run(check,env,policy_values,adapter,workdir)
         self.validate_policy(check,policy_values)
         from . import kubernetes_gateway_observation as gateway
         if getattr(check,'collection_profile',None)==gateway.PROFILE:

@@ -419,7 +419,18 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
 
     prepared = None
     check_support = []
+    kube_only = False
+    transition_requested = False
     try:
+        if not single and cfg.get("update", {}).get("mode", "external") == "external":
+            requested = run_config(cfg)
+            sides = requested.side_configs.values() if requested.side_configs else (requested,)
+            implementations = [impl for side in sides for impl in side.executors.values()]
+            kube_only = bool(implementations) and all(impl == "kubernetes" for impl in implementations)
+            if kube_only:
+                transition_requested = any(
+                    name in side.executors for side in sides for name in ("request_binding", "input_validation")
+                )
         validate_pack(pack)
         if single:
             effective, managed = _validation_inputs(envs[0], cfg)
@@ -478,18 +489,23 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         # Validation errors contain field descriptions; daemon output is never copied.
         record("inputs", False, str(exc) if isinstance(exc, ValueError) else type(exc).__name__)
 
-    kube_requested=cfg.get("executors",{}).get("request_binding")=="kubernetes" or any(
-        c.get("executors",{}).get("request_binding")=="kubernetes" for c in cfg.get("sides",{}).values())
-    if kube_requested:
-        record("kubernetes-static-binding",prepared is not None,"Exact target/ENV declarations checked; actual cluster, Pods, template and GPU remain unverified")
-        if cfg.get("update",{}).get("kubernetes_candidate_binding")=="after_baseline":
-            record("candidate-binding-deferred",True,"Only baseline target is selected; exact candidate ENV/generation will be required after baseline API termination, before candidate dispatch")
-        if not single and envs[0].engine.image_digest==envs[1].engine.image_digest:
-            record("image-pair",False,"use different image digests for an update validation")
-        return {"ready":all(c["ok"] for c in checks),"checks":checks,"check_support":check_support,
-            "limitations":["Static Kubernetes preparation only; no kubectl, Docker, engine or GPU execution.",
-                "Existing inspected image/source limits remain; unreviewed GPU images are unsupported.",
-                "Operator supplies exact running generations and controls termination/recovery. API termination does not prove GPU release."]}
+    if kube_only:
+        limitations = ["Static Kubernetes preparation only; no kubectl, Docker, engine or GPU execution.",
+                       "Existing inspected image/source limits remain; unreviewed GPU images are unsupported."]
+        if transition_requested:
+            record("kubernetes-static-binding", prepared is not None,
+                   "Exact target/ENV declarations checked; actual cluster, Pods, template and GPU remain unverified")
+            if prepared is not None and cfg.get("update", {}).get("kubernetes_candidate_binding") == "after_baseline":
+                record("candidate-binding-deferred", True,
+                       "Only baseline target is selected; exact candidate ENV/generation will be required after baseline API termination, before candidate dispatch")
+            limitations.append("Operator supplies exact running generations and controls termination/recovery. API termination does not prove GPU release.")
+        else:
+            record("kubernetes-static-preparation", prepared is not None,
+                   "External Kubernetes configuration inspected. Target identity, live Pods and GPU require runtime verification.")
+        if envs[0].engine.image_digest == envs[1].engine.image_digest:
+            record("image-pair", False, "use different image digests for an update validation")
+        return {"ready": all(c["ok"] for c in checks), "checks": checks, "check_support": check_support,
+                "limitations": limitations}
     docker = Docker("readiness")
     try:
         server = docker.daemon_info(timeout=15)

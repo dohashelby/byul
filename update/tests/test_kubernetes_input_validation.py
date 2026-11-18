@@ -2,25 +2,139 @@
 import json
 import os
 import tomllib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 
 import pytest
 
 from guard.collectors.file import load_environment, load_policy
+from guard.executors.kubernetes_input_matrix import KubernetesMatrixInputValidationExecutor
 from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor, _WithBody, _contract
 from guard.executors.stream_probe import _prepare
 from guard.executors.registry import EXECUTORS
-from guard.models import load_pack, sha256_hex
+from guard.input_matrix_policy import planned
+from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP
-from tests.builders import baseline_pack
+from tests.builders import baseline_pack, evidence
 from tests.test_gpu_a_run_inputs import UPDATE, build
+from tests.test_kubernetes_sampling import World, normal_sampling_inputs
 from tools import gpu_a_run_inputs as inputs
 
 TOKENS = {'model': 'test-model', 'prompt': [0], 'max_tokens': 1}
 CHAT = {'model': 'test-model', 'messages': [{'role': 'user', 'content': 'hello'}], 'max_tokens': 1, 'temperature': 0}
+NORMAL_INPUT_POLICY = {'allowed_endpoints': ['POST /v1/completions', 'POST /v1/chat/completions'],
+                       'allowed_input_formats': ['text', 'token_ids'],
+                       'allowed_input_pairs': ['POST /v1/completions|token_ids', 'POST /v1/completions|text',
+                                               'POST /v1/chat/completions|text'],
+                       'max_input_tokens': 127, 'rejection_codes': ['400', '422']}
 
 
 def _no_kubectl(*args, **kwargs):
     raise AssertionError('no kubectl in contract tests')
+
+
+@pytest.mark.parametrize('version,fault', [('0.30.0', None), ('0.31.0', None), ('0.31.0', 'duplicate'),
+                                           ('0.30.0', 'non-integer'), ('0.30.0', 'owner-changed'),
+                                           ('0.31.0', 'window-mismatch')])
+def test_req09_normal_reuses_only_ids_from_verified_tokenizer(tmp_path, version, fault):
+    from guard.adapters.vllm import VllmAdapter
+    from guard.core.run import _normalize
+    from guard.judges.rule_table import RuleTableJudge
+
+    requests = []
+    private = 'EXAMPLE-private-completion-text'
+    token_ids = [23, 41]
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            requests.append((self.path, self.headers.get('Authorization'), body))
+            if self.path == '/tokenize':
+                token_response = {'count': 2, 'tokens': [True, 41] if fault == 'non-integer' else token_ids,
+                                  'max_model_len': 256 if fault == 'window-mismatch' else 128}
+                raw = json.dumps(token_response).encode()
+                if fault == 'duplicate':
+                    raw = raw[:-1] + b',"count":2}'
+            else:
+                raw = json.dumps({'model': 'fixture-model', 'choices': [{'text': private, 'finish_reason': 'length'}],
+                                  'usage': {'prompt_tokens': 2, 'completion_tokens': 1, 'total_tokens': 3}}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        env, target, _, path = normal_sampling_inputs(tmp_path, version)
+        target['engine']['trusted_url'] = f'http://127.0.0.1:{server.server_port}'
+        target['comparison_config'] = {'launch': {'max_model_len': 128}}
+        path.write_bytes(canonical_json(target))
+        world = World(target)
+        world.actual_probe = True
+        if fault == 'owner-changed':
+            def change_owner(role, pod, after):
+                if role == 'engine' and after:
+                    pod['metadata']['uid'] = 'replacement'
+            world.mutate = change_owner
+        check = load_pack(UPDATE / 'packs/PACK-BASELINE').checks['REQ-09']
+        executor = KubernetesMatrixInputValidationExecutor({'normal_token_input_only': True, 'target': str(path)},
+            runner=world.runner, expected_target_sha256=sha256_hex(path.read_bytes()))
+        executor.validate_policy(check, NORMAL_INPUT_POLICY)
+        draft = executor.run(check, env, NORMAL_INPUT_POLICY, VllmAdapter(), tmp_path / 'work')
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    expected = [('/tokenize', None, {'model': 'fixture-model', 'prompt': 'ping', 'add_special_tokens': False,
+                                     'return_token_strs': False})]
+    if fault is None:
+        expected.append(('/v1/completions', None, {'model': 'fixture-model', 'prompt': token_ids, 'max_tokens': 1}))
+    assert requests == expected and len(world.execs) == len(expected)
+    assert draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.status == (ExecStatus.COMPLETED if fault is None else ExecStatus.ABORTED)
+    assert draft.normal_control.succeeded is (True if fault is None else None)
+    assert all(not item.attempted for item in draft.challenges)
+    raw = draft.artifacts[0].path.read_text()
+    assert private not in raw and '"ping"' not in raw and '[23,41]' not in raw
+    summary = json.loads(raw)
+    assert summary['normal_completion_shape_verified'] is (fault is None)
+    assert summary['api_reported_prompt_tokens'] == (2 if fault is None else None)
+    if fault is None:
+        assert summary['tokenizer']['binding_sha256'] == summary['completion']['binding_sha256']
+    else:
+        assert summary['completion'] is None
+    observations = _normalize(check, draft)['observations']
+    assert not observations['input_matrix_complete']['value'] and not observations['challenge_consumption']['collected']
+    assert observations['input_matrix_planned']['value'] == planned(check, NORMAL_INPUT_POLICY)
+    assert observations['input_endpoints_tested']['value'] == (['POST /v1/completions'] if fault is None else None)
+    sealed = evidence(check_id=check.id, observations=observations, normal=draft.normal_control.model_dump())
+    assessed = RuleTableJudge().judge(check, sealed, check.judge.params, NORMAL_INPUT_POLICY)
+    assert assessed.verdicts['security'] == Verdict.UNKNOWN and assessed.verdicts['functional'] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize('fault', ['unbound', 'foreign-check', 'invalid-option', 'no-approved-pair'])
+def test_req09_normal_rejects_unapproved_scope_before_any_io(tmp_path, fault):
+    env, target, _, path = normal_sampling_inputs(tmp_path, '0.30.0')
+    target['comparison_config'] = {'launch': {'max_model_len': 128}}
+    path.write_bytes(canonical_json(target))
+    pack = load_pack(UPDATE / 'packs/PACK-BASELINE')
+    check = pack.checks['REQ-08' if fault == 'foreign-check' else 'REQ-09']
+    settings = {'target': str(path), 'normal_token_input_only': fault != 'invalid-option'}
+    policy = NORMAL_INPUT_POLICY
+    if fault == 'no-approved-pair':
+        policy = {**policy, 'allowed_input_pairs': ['POST /v1/completions|text', 'POST /v1/chat/completions|text'],
+                  'allowed_input_formats': ['text']}
+    target_sha = None if fault == 'unbound' else sha256_hex(path.read_bytes())
+    executor = KubernetesMatrixInputValidationExecutor(settings, runner=_no_kubectl, expected_target_sha256=target_sha)
+    with pytest.raises(ValueError, match='KUBERNETES_INPUT_NORMAL_(?:POLICY_INVALID|SCOPE_INVALID|TARGET_UNVERIFIED)'):
+        executor.run(check, env, policy, object(), tmp_path / 'work')
 
 
 def transport(tmp_path):

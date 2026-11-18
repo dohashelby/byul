@@ -9,10 +9,13 @@ import re
 
 from guard.core.compare import compare, comparison_differences
 from guard.core.judge import judge_evidence
-from guard.core.select import _in_scope, evaluate_check
-from guard.models import load_pack, weakest_origin
+from guard.core.select import _in_scope, check_policy_value, evaluate_check
+from guard.executors import run_binding
+from guard.models import Ref, load_pack, weakest_origin
+from guard.models.artifacts import model_closure_sha256
 from guard.models.objects import object_from_dict
 from guard.validation_evidence import read_objects, verify_store_files
+from tools.mvp_a_input_preflight import _pairs
 from tools.mvp_versions import versions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,12 +60,22 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of):
         if (execution.started_at is None or execution.finished_at is None
                 or execution.finished_at < execution.started_at):
             blockers.append('ORIGINAL_EXECUTION_TIME_INVALID')
-        if (evd.comparability.model_inventory_sha256 != env.model.inventory_sha256
+        if (evd.comparability.model_inventory_sha256 != model_closure_sha256(env.model)
                 or evd.comparability.gpu != env.runtime.gpu_model or evd.comparability.driver != env.runtime.driver
                 or evd.comparability.cpu is not None
                 or not SHA256.fullmatch(evd.comparability.config_sha256 or '')
                 or not SHA256.fullmatch(evd.comparability.fixture_sha256 or '')):
             blockers.append('ORIGINAL_COMPARABILITY_INCOMPLETE')
+        document = execution.run_binding
+        if document is None:
+            if run_binding.keys_for(check):
+                blockers.append('ORIGINAL_RUN_BINDING_MISSING')
+        else:
+            blockers.extend(run_binding.verify(document, evd))
+            values = document.get('values')
+            if isinstance(values, dict) and run_binding.CURRENT_POLICY_REF in values:
+                if values[run_binding.CURRENT_POLICY_REF] != _dump(policy.ref()):
+                    blockers.append('RUN_BINDING_POLICY_REF_MISMATCH')
     if evd is not None and result is not None and shown is not None and shown.result is not None:
         replay = judge_evidence(check, evd, policy, as_of,
                                 condition_origins=[condition.origin for condition in item.conditions], plan=plan)
@@ -161,18 +174,29 @@ def _verified_rows(original_report, objects, pack, expected):
         differences.append('runtime')
     for check_id in sorted(selected):
         item, check, shown = plan_items[check_id], pack.checks[check_id], report_rows[check_id]
+        applicability, conditions, _ = evaluate_check(check, envs)
         if (not shown.selected or not _in_scope(check_id, policy) or shown.applicability != item.applicability
-                or shown.gaps != item.gaps or check.revision != item.check_revision or check.executor != item.executor):
+                or item.applicability != applicability or item.conditions != conditions or shown.gaps != item.gaps
+                or check.revision != item.check_revision or check.executor != item.executor):
             raise InvalidReport('ORIGINAL_SELECTION_MISMATCH')
+        policy_values = policy.values.get(check_id, {})
+        blockers = []
+        for param in check.policy_params:
+            if param.required or param.key in policy_values:
+                try:
+                    check_policy_value(check_id, param.key, param.type, policy_values.get(param.key))
+                except ValueError:
+                    blockers.append('ORIGINAL_POLICY_VALUE_UNAVAILABLE')
         sides = {side: _verify_side(check, item, evidence.get((check_id, side)), results.get((check_id, side)),
                                     getattr(shown, side), env, policy, plan, report.created_at)
                  for side, env in side_env.items()}
         base_evd, cand_evd = (evidence.get((check_id, side)) for side in SIDES)
         observed_diff = comparison_differences(base_evd.comparability, cand_evd.comparability) if base_evd and cand_evd else []
-        blockers = []
         if all(side['verdicts'] is not None for side in sides.values()):
             for axis, name in (('security', 'comparison'), ('functional', 'functional_comparison')):
-                replay = compare(sides['baseline']['verdicts'][axis], sides['candidate']['verdicts'][axis], not observed_diff)
+                baseline = sides['baseline']['verdicts'][axis] or 'UNKNOWN'
+                candidate = sides['candidate']['verdicts'][axis] or 'UNKNOWN'
+                replay = compare(baseline, candidate, not observed_diff)
                 if getattr(shown, name) != replay:
                     blockers.append('ORIGINAL_RPT_COMPARISON_MISMATCH')
             if shown.comparison_reasons != observed_diff:
@@ -207,11 +231,20 @@ def _verified_rows(original_report, objects, pack, expected):
     return rows, refs, official
 
 
-def review(run_inputs, *, pack, expected):
+def review(run_inputs, *, pack, expected, assignments=None):
     """Aggregate immutable observations without changing strict execution acceptance."""
     active = [check.id for check in pack.active_checks()]
     if len(active) != len(set(active)):
         raise ValueError('ACTIVE_CHECK_IDS_DUPLICATED')
+    assigned = {}
+    if assignments is not None:
+        if type(assignments) is not dict or set(assignments) - set(active):
+            raise ValueError('REPORT_ASSIGNMENTS_INVALID')
+        for check_id, value in assignments.items():
+            ref = Ref.model_validate(value)
+            if ref.kind != 'RPT' or not ref.id or ref.revision < 1 or not SHA256.fullmatch(ref.sha256):
+                raise ValueError('REPORT_ASSIGNMENTS_INVALID')
+            assigned[check_id] = _dump(ref)
     reviews, policies = [], []
     by_check = defaultdict(list)
     for report, objects, original_pack in run_inputs:
@@ -234,9 +267,15 @@ def review(run_inputs, *, pack, expected):
     inventory, unknown, unresolved = {}, [], []
     for check_id in sorted(active):
         candidates = by_check[check_id]
+        all_refs = [row['report'] for row in candidates]
+        assigned_ref = assigned.get(check_id)
+        if assigned_ref is not None:
+            candidates = [row for row in candidates if row['report'] == assigned_ref]
         if len(candidates) != 1:
             status = 'ORIGINAL_ROW_MISSING' if not candidates else 'ORIGINAL_ROW_AMBIGUOUS'
-            inventory[check_id] = {'status': status, 'reports': [row['report'] for row in candidates]}
+            if assigned_ref is not None and not candidates:
+                status = 'ASSIGNED_ORIGINAL_ROW_UNAVAILABLE'
+            inventory[check_id] = {'status': status, 'reports': all_refs}
             unresolved.append(check_id)
             continue
         row, = candidates
@@ -265,6 +304,7 @@ def review(run_inputs, *, pack, expected):
     return {
         'schema': 'guard-mvp-compare-review/1', 'pack_ref': _dump(pack.ref()),
         'policy_ref': policies[0] if exact_policy else None, 'active_checks': len(active), 'reports': reviews,
+        'assigned_reports': assigned,
         'unknown_security_check_ids': unknown, 'unknown_security_count': len(unknown),
         'unknown_security_limit': UNKNOWN_LIMIT, 'unresolved_check_ids': unresolved,
         'comparison_complete': complete, 'unknown_security_limit_met': complete and len(unknown) <= UNKNOWN_LIMIT,
@@ -275,13 +315,14 @@ def review(run_inputs, *, pack, expected):
 def _read_runs(pairs):
     for store, report_path in pairs:
         objects = read_objects(store)
-        yield json.loads(report_path.read_bytes()), objects, verify_store_files(store, objects)
+        yield json.loads(report_path.read_bytes(), object_pairs_hook=_pairs), objects, verify_store_files(store, objects)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', metavar=('RESTORED_STORE', 'ORIGINAL_REPORT'), nargs=2,
                         action='append', type=Path, required=True)
+    parser.add_argument('--assignments', type=Path, help='JSON mapping from check ID to exact original RPT Ref')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
@@ -289,7 +330,10 @@ def main():
         raise ValueError('MVP_ACTIVE_SCOPE_MISMATCH')
     if any(args.output.resolve().is_relative_to(store.resolve()) for store, _ in args.run):
         parser.error('--output must be outside the restored stores')
-    result = review(_read_runs(args.run), pack=pack, expected=versions())
+    assignments = json.loads(args.assignments.read_bytes(), object_pairs_hook=_pairs) if args.assignments else None
+    if args.assignments and type(assignments) is not dict:
+        parser.error('--assignments must contain a JSON object')
+    result = review(_read_runs(args.run), pack=pack, expected=versions(), assignments=assignments)
     with args.output.open('x', encoding='utf-8') as stream:
         json.dump(result, stream, ensure_ascii=False, indent=2)
 

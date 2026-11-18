@@ -4,6 +4,9 @@ import json
 
 import pytest
 
+from guard.executors import run_binding
+from guard.models.artifacts import model_closure_sha256
+from guard.models.objects import object_from_dict
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.update_acceptance import assess_update
 from tests import update_builders as builders
@@ -129,6 +132,60 @@ def test_repeated_original_rows_never_choose_a_result_implicitly():
     assert result['rows']['REQ-01']['status'] == 'ORIGINAL_ROW_AMBIGUOUS'
     assert len(result['rows']['REQ-01']['reports']) == 2
     assert not result['comparison_complete']
+
+
+def test_explicit_exact_original_report_ref_resolves_overlapping_plans():
+    def unfinished(cid, side, raw):
+        if (cid, side) == ('REQ-01', 'candidate'):
+            raw['execution']['status'] = 'NOT_RUN'
+            raw['data_origin'] = 'DECLARED'
+
+    complete = builders.build_pure_update_case()
+    partial = builders.build_pure_update_case(mutate_evidence=unfinished)
+    pack, expected = complete[2], _expected(complete)
+    complete_ref = object_from_dict(complete[0]).ref().model_dump(mode='json')
+    partial_ref = object_from_dict(partial[0]).ref().model_dump(mode='json')
+    cases = [partial, complete]
+    ambiguous = tool.review(cases, pack=pack, expected=expected)
+    assert ambiguous['rows']['REQ-01']['status'] == 'ORIGINAL_ROW_AMBIGUOUS'
+    selected = tool.review(cases, pack=pack, expected=expected, assignments={'REQ-01': complete_ref})
+    assert selected['assigned_reports'] == {'REQ-01': complete_ref}
+    assert selected['policy_ref'] is not None
+    assert selected['rows']['REQ-01']['report'] == complete_ref
+    assert selected['rows']['REQ-01']['status'] == 'MEASURED_ROWS_VERIFIED'
+    assert {entry['refs']['report']['sha256'] for entry in selected['reports']} == {
+        partial_ref['sha256'], complete_ref['sha256']}
+    incomplete = tool.review(cases, pack=pack, expected=expected, assignments={'REQ-01': partial_ref})
+    assert incomplete['rows']['REQ-01']['candidate']['blocking_codes'][0] == 'EXECUTION_NOT_RUN'
+    wrong = {**complete_ref, 'sha256': '0' * 64}
+    missing = tool.review(cases, pack=pack, expected=expected, assignments={'REQ-01': wrong})
+    assert missing['rows']['REQ-01']['status'] == 'ASSIGNED_ORIGINAL_ROW_UNAVAILABLE'
+
+
+def test_product_model_closure_hash_includes_the_tokenizer_identity():
+    case = builders.build_pure_update_case()
+    modified = patch_case(case, 'ENV', lambda env: env['model'].update(tokenizer_revision='SYNTHETIC-tokenizer'))
+    env = next(object_from_dict(obj) for obj in modified[1] if obj['kind'] == 'ENV')
+    closure = model_closure_sha256(env.model)
+    modified = patch_case(modified, 'EVD', lambda evd: evd['comparability'].update(model_inventory_sha256=closure))
+    result = tool.review([modified], pack=case[2], expected=_expected(case))
+    assert result['rows']['REQ-01']['status'] == 'MEASURED_ROWS_VERIFIED'
+
+
+def test_recorded_run_binding_must_match_the_original_evidence_subject():
+    def wrong_binding(cid, side, raw):
+        if (cid, side) != ('REQ-01', 'baseline'):
+            return
+        raw['execution']['run_binding'] = {
+            'schema': run_binding.SCHEMA, 'attempt_id': None, 'check_id': 'REQ-03', 'side': side,
+            'environment_sha256': raw['environment'].sha256,
+        }
+
+    case = builders.build_pure_update_case(mutate_evidence=wrong_binding)
+    reviewed = tool.review([case], pack=case[2], expected=_expected(case))
+    baseline = reviewed['rows']['REQ-01']['baseline']
+    assert baseline['blocking_codes'] == ['RUN_BINDING_SUBJECT_MISMATCH']
+    assert baseline['verdicts'] is None
 
 
 def test_not_applicable_requires_two_original_environment_conditions(monkeypatch):

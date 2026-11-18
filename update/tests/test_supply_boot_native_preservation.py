@@ -39,7 +39,11 @@ def emitted_read(root, patch, session, mismatch):
     world = make_world(root, patch, session=session, path=path, scope_path=scope_path)
     world.run_loader()
     data = packet(world)
-    data['recordings'][0]['capture']['records'][0]['payload']['profile'] = sensor.PROFILE
+    capture = data['recordings'][0]['capture']
+    capture['records'][0]['payload']['profile'] = sensor.PROFILE
+    raw_recording = b''.join(canonical_json(row) + b'\n' for row in capture['records'])
+    (root / 'native-file-read.jsonl').write_bytes(raw_recording)
+    capture['provenance'] = {'capture_sha256': sha256_hex(raw_recording), 'owner_binding_verified': True}
     data['recorded_files_covered'] = False  # No live Kubernetes census in this CPU contract.
     prepared = prepared_for(world)
     candidate, = analyze(data, prepared)['candidates']
@@ -133,7 +137,14 @@ def test_missing_boot_records_keep_actual_native_byte_conflict(tmp_path, monkeyp
     evd, result, reports = product(tmp_path, monkeypatch)
     assert result.verdicts.security.value == 'FAIL'
     assert evd.observations['supply_boot_violations'].collected
-    assert evd.observations['supply_boot_native_consumption'].collected
+    native = evd.observations['supply_boot_native_consumption']
+    assert native.collected
+    assert [role['role'] for role in native.value] == list(contract.ROLES)
+    for role in native.value:
+        row, = role['rows']
+        source = row['source_binding']
+        assert source['recording_sha256'] == sha256_hex((tmp_path / role['role'] / 'native-file-read.jsonl').read_bytes())
+        assert row['mismatch'] is (role['role'] == 'challenge')
     assert not evd.observations['supply_boot_complete'].value
     assert evd.execution.status.value == 'ABORTED' and reports == ['normal', 'challenge']
 

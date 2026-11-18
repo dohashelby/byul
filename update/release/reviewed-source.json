@@ -334,7 +334,7 @@
   "update/src/guard/collectors/updates.py": "d7353451d0630652831e115e243554cf8d2097031c7ebdcf5833f7efa9dbc249",
   "update/src/guard/collectors/worker_security.py": "952ac3904634232cc771c287d403246fde13d92c37efef33956d5dfcb688cff2",
   "update/src/guard/collectors/worker_shard_producer.py": "27bdd63baa80a99071e718a94fe9990d91474f9dfaf940d15f8f0c5730218c0f",
-  "update/src/guard/configuration.py": "d9bfa30fc1414009df998380ebff2ccebfcf5062c4c83428581cf9a2ad3d0eba",
+  "update/src/guard/configuration.py": "341c32c15841fa9072e41ab6e45941beccfb97780ed29c985e15ebc6f1addd5d",
   "update/src/guard/conformance.py": "b2f79356d51827707a4830f18f5398117c55a52611bbc586d67268e5f5dc32da",
   "update/src/guard/core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "update/src/guard/core/aggregate.py": "bda9f20b98a534845370dcedaf51e69eaa158a636887ccaa231ff3be7444999d",

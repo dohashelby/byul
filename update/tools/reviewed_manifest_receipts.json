@@ -805,6 +805,11 @@
       "manifest_sha256": "c445e35985185d8240f95af1d3baff5166c6535b0d137073ad5f990cc373c355",
       "reviewed_by": "Codex / ordinary approved sampling in the owned paired target / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T21:22:29+00:00"
+    },
+    {
+      "manifest_sha256": "4e2b15f97e3c073b5f2c4fc47e872fe559d3652b343d0f53da9aec5f81a14e72",
+      "reviewed_by": "Codex / exact normal sampling target admission and existing stream scope / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T21:24:32+00:00"
     }
   ]
 }

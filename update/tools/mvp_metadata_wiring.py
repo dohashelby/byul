@@ -23,7 +23,7 @@ from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyE
 from guard.models import Environment, Policy, load_pack, utcnow
 from guard.models.artifacts import model_closure_sha256
 from guard.runtime.comparison import execution_conditions
-from guard.runtime.kubernetes_http import KubernetesBindingError, KubernetesHTTP, REQUEST_BINDING_PROFILE
+from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP, REQUEST_BINDING_PROFILE
 from guard.update_validation import _plain_path, reserve_output
 from tools import mvp_live_readiness as readiness
 from tools.j02_run_config import write_config
@@ -207,6 +207,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
+        if check.id == 'REQ-10':
+            config[check.executor]['target'] = target_path
+            try:
+                KubernetesHTTP(target, env, duration=1, runner=_detached_runner, profile=INPUT_VALIDATION_PROFILE)
+            except KubernetesBindingError:
+                return 'NORMAL_SAMPLING_TARGET_UNAVAILABLE'
         if check.id in RECORD_SNAPSHOT_OPTIONS or check.id == 'LIF-04':
             config[check.executor]['target'] = target_path
             run_cfg = dict(record_inputs) if record_inputs is not None else None

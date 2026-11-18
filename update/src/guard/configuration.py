@@ -123,7 +123,7 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {check_id}
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
-                    or raw.get("lab_activation") or raw.get("record_attestation")):
+                    or raw.get("lab_activation") or (check_id == "REQ-10" and raw.get("record_attestation"))):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
         scopes.append(scoped)

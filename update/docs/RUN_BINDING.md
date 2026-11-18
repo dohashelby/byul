@@ -366,6 +366,12 @@ J02의 여러 실행기를 한 설정에 넣어도 기존 baseline 종료·candi
 
 M-A 파일 사전 점검도 공통·쪽별 설정 뒤 `for_check()`를 적용해 제품이 실제로 읽는 점검별 target/prepared를 검사한다. 사전 점검의 결과를 실환경 자격이나 실행 완료로 올리지 않는다.
 
+### 11.5 실행기 자동 선택 (2026-11-16)
+
+배치는 쿠버네티스만 지원한다(2026-11-16 사용자 결정). 그래서 J02 명세에 `executors`를 적지 않으면 `tools/j02_run_config.py`가 J02 점검이 쓰는 실행기 중 양쪽 ENV의 엔진·판본에 쿠버네티스 구현이 등록된 것을 모두 `kubernetes`로 고른다. 한쪽 판본에만 등록된 실행기는 고르지 않는다(양쪽 실행기 집합이 달라지므로). OBS-03 `log_analysis`처럼 원인을 기록한 부재도 고르지 않는다. `--discover`의 target은 고른 실행기 중 target을 받는 구역에 채운다.
+
+명세에 `executors`를 적으면 그 표를 그대로 쓴다. 보고서의 `executors_selected`가 `declared`인지 `kubernetes_auto`인지 남긴다. 자동 선택은 구현 이름만 정한다. 빠진 target·설정·정책 값은 계속 MISSING_INPUT으로 보고하고, 판정이나 실행 자격을 만들지 않는다. `guard update`의 미기재 실행기 처리(NOT_RUN)는 바꾸지 않았다.
+
 ## 12. RB2-J 결정 반영 (2026-11-14)
 
 | 결정 | 반영 |

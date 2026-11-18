@@ -39,7 +39,7 @@ Spec (YAML):
     store: .guard-j02                    # optional, written to guard.toml
     adapter: vllm                        # optional
     approved_supply_identity_sha256: <64 lowercase hex> # approved credential identity metadata, not secret bytes
-    executors: {supply_boot: kubernetes, ...}
+    executors: {supply_boot: kubernetes, ...}   # optional; omit to select Kubernetes automatically
     shared: {<executor>: {...}}          # sections common to both sides
     sides:
       baseline:
@@ -51,6 +51,12 @@ Spec (YAML):
         checks:
           LIF-05: {executor: {...}, run_binding: {...}}
       candidate: {...}
+
+Without `executors`, every executor used by a J02 check whose Kubernetes
+implementation is registered for both sides' engine/version is selected as
+`kubernetes` (2026-11-16 user decision: Kubernetes is the only deployment).
+A declared `executors` table is kept exactly. Selection only names an
+implementation; missing targets, settings or policy values stay reported.
 
 RB3 draft inputs require both sides' ENV model id/revision/inventory SHA to
 agree. Each declared snapshot must reproduce its declared all-scope inventory
@@ -123,14 +129,34 @@ def dumps_toml(data, prefix=()):
     return '\n'.join(part for part in out if part is not None)
 
 
-def build_config(spec, targets=None):
+def kubernetes_executors(pack, environments, checks):
+    """{executor: 'kubernetes'} for J02 executors registered for every given side's engine/version.
+
+    Both sides must be declared: a one-sided selection would give the two
+    sides different executor sets. Checks without an executor and recorded
+    absences (OBS-03 `log_analysis`) are not selected.
+    """
+    from guard.executors import registry
+    if len(environments) != len(SIDES):
+        return {}
+    names = sorted({pack.checks[cid].executor for cid in checks
+                    if cid in pack.checks and pack.checks[cid].executor
+                    and pack.checks[cid].executor not in RECORDED_EXECUTORS})
+    return {name: 'kubernetes' for name in names
+            if all(registry.resolve_executor(name, 'kubernetes', engine=env.engine.name,
+                                             version=env.engine.version) is not None for env in environments)}
+
+
+def build_config(spec, targets=None, executors=None):
     """guard.toml content (dict) from the spec; sides carry their own check tables.
 
     `targets` ({side: path}) from --discover fills `target` of every selected
     executor section that takes one, unless the spec already sets it.
+    `executors` (automatic selection) is used only when the spec declares none.
     """
+    chosen = spec.get('executors') if spec.get('executors') is not None else executors
     config = {'store': spec.get('store', '.guard-j02'), 'adapter': {'name': spec.get('adapter', 'vllm')},
-              'executors': dict(spec.get('executors') or {}), 'update': {'mode': 'external'}}
+              'executors': dict(chosen or {}), 'update': {'mode': 'external'}}
     for name, section in (spec.get('shared') or {}).items():
         config[name] = deepcopy(section)
     sides = {}
@@ -522,8 +548,15 @@ def main(argv=None):
                                          out_dir=args.out / 'cluster' / side)
             targets[side] = path.resolve()
             discovered[side] = {'target': str(path), 'target_sha256': digest}
-    config = build_config(spec, targets)
+    auto = None
+    if spec.get('executors') is None:
+        pack = load_pack(base / spec.get('pack', ROOT / 'packs/PACK-BASELINE'))
+        environments = [load_environment(base / ((spec.get('sides') or {}).get(side) or {})['env'])
+                        for side in SIDES if ((spec.get('sides') or {}).get(side) or {}).get('env')]
+        auto = kubernetes_executors(pack, environments, j02_checks(args.plan))
+    config = build_config(spec, targets, auto)
     result = report(spec, config, plan_file=args.plan, base=base, policy_document=policy_document)
+    result['executors_selected'] = 'declared' if auto is None else 'kubernetes_auto'
     result['web_values_dropped'] = dropped
     result['decided_values'] = decided
     result['rb3_source_gaps'] = rb3_gaps

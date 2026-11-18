@@ -12,6 +12,7 @@ import re
 import time
 
 from guard.models import canonical_json, sha256_hex
+from guard.runtime.comparison import model_request_conditions
 from .content_common import content_request, control_state, json_body, sample_artifact
 from .engine_identity import owned_template_snapshot
 from .http_common import mask
@@ -273,7 +274,7 @@ def collect(executor, ctx, *, kubernetes=False):
     if kubernetes:
         report = ctx.cprobe.report()
         fixture.update(transport_profile=report["profile"], probe_source_sha256=report["probe_source_sha256"],
-                       model_mapping_sha256=sha256_hex(canonical_json(ctx.cprobe.model_mapping)))
+                       model_mapping_sha256=sha256_hex(canonical_json(model_request_conditions(ctx.cprobe.model_mapping))))
     ctx._template_fixture_sha256 = sha256_hex(canonical_json(mask(fixture, ctx.secrets)))
     summary = {
         "profile": PROFILE, "artifact_profile": "template-response-projection/1",
@@ -297,7 +298,7 @@ def collect(executor, ctx, *, kubernetes=False):
     }
     if kubernetes:
         summary["kubernetes"] = report
-        summary["model_mapping_sha256"] = fixture["model_mapping_sha256"]
+        summary["model_mapping_sha256"] = sha256_hex(canonical_json(ctx.cprobe.model_mapping))
         summary["fixture"].update({key: fixture[key] for key in
             ("transport_profile", "probe_source_sha256", "model_mapping_sha256")})
         summary["limitations"].extend([

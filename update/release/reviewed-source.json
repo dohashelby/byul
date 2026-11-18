@@ -505,7 +505,7 @@
   "update/src/guard/executors/supply_boot_contract.py": "23d0c7befe31de52888131b64459d37e3f277480031d7e741902525a33aff697",
   "update/src/guard/executors/template_sandbox.py": "d5c4bef7d348850c99cc0fface02a6097b484a57d86181bcdd0206853bac82a9",
   "update/src/guard/executors/template_source_cpu.py": "5ddc1c753f381566c58f91ddc3a5f0c3c735783c33a915191aea39269c86c66d",
-  "update/src/guard/executors/template_supply_approval.py": "e9336290d842928b6d1b720f2050a6e5cee7818bb9b36ad7a410593552abe5cf",
+  "update/src/guard/executors/template_supply_approval.py": "55c36fd26d8e29eff97734a1a7b09d038473cd12a8daa7cd80721157c0a1f6aa",
   "update/src/guard/executors/template_validation.py": "4e7df5927b86b3eb6f6a2369a9fe5b9a78ff03bd30abb8d097a87f952f7e8419",
   "update/src/guard/executors/unix_ipc.py": "fc3e8d1cde96899c89547397e9c457ca2b56312dc5585d3c8f028af0d3e1fa56",
   "update/src/guard/executors/usage_report.py": "8f26615dd07db2dc1d8f4c23abf9fbaf3226a7a72876b5845fd95934cf37b4db",

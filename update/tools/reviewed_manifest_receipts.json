@@ -750,6 +750,11 @@
       "manifest_sha256": "e9b49900382a369e0ea9b476e5844e8eaa4fa7f60d5d32f4f80ad4a72378759d",
       "reviewed_by": "Codex / external Kubernetes preparation routing; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T11:18:26+00:00"
+    },
+    {
+      "manifest_sha256": "00d25fbc44abd0b61528c2b9bc4afcb6b377626d0c5d0ca186385a1a5d633bcd",
+      "reviewed_by": "Codex / paired passive Kubernetes readiness and template comparison; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T11:30:29+00:00"
     }
   ]
 }

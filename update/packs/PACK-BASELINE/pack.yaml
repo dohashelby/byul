@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 38
+revision: 39
 engines:
 - vllm
 - sglang
@@ -180,9 +180,9 @@ files_sha256:
 - path: checks/REQ-07.yaml
   sha256: a2ffa15726b92d2cfca44392cb556d0eb077afa78f538855ff712078d2614f06
 - path: checks/REQ-08.yaml
-  sha256: 066c20539781dfd7c4ff5f94ef87baf91e58f8088f9fbcab974dda5bf62c7cfa
+  sha256: c579d96c7faadc870b6e34b841150f548f2d148e47738e44522f9180aeb8c71a
 - path: checks/REQ-09.yaml
-  sha256: e64afccd3484b495a607eb603f3acdf340d6cb53c7a3b15de4bbd1553e95cfc3
+  sha256: f29dd34e4322e0eb86ffd30c774b98675db4d462df5d0f821629b274d18120bc
 - path: checks/REQ-10.yaml
   sha256: 7dc4ed98d1ce543311abfc7d2a376c404253e9ee8c74e25ac5c9af86e3537660
 - path: checks/REQ-11.yaml

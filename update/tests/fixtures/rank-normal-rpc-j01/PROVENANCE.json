@@ -1,0 +1,12 @@
+{
+  "session": "J01",
+  "engine": "vllm",
+  "version": "0.30.0",
+  "python": "cpython-3.12.3",
+  "source_manifest_sha256": "8aa0aec5981ab53d8b5eb9aab19485c18ae0466388b6d6ed2172303cbb495e56",
+  "files": {
+    "capture-review.json": "817af8f0f35556b1e99a56cfd8f150ce33fdc1b438c62ef6d023b4b6d47e1584",
+    "calibration-envelope.json": "a8419d726dc0a9cb9b0bd59702a2c3520b763af8cc888b71ecce801aa7bc07fc"
+  },
+  "scope": "Frozen original metadata for host projection regression only. No secret key is included; tests do not reauthenticate source records, register a producer, rerun an engine or claim GPU completion."
+}

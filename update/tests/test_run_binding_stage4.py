@@ -76,9 +76,17 @@ def test_obs06_binds_current_sealed_policy_outside_its_own_values(tmp_path):
             side='single', attempt_id=None, issued_at=utcnow(), run_cfg=run, policy_ref=pol.ref())
 
 
-def test_stage4_migration_reproduces_exact_current_checkdefs_and_old_pack_replays(tmp_path):
+def test_stage4_migration_reproduces_exact_pack38_checkdefs_and_old_pack_replays(tmp_path):
+    # Later input-matrix definitions are not a stage-4 run-binding migration.
+    # Preserve the exact original full comparison against published @38.
+    expected_path=tmp_path/'published-pack38';shutil.copytree(PACK.path,expected_path)
+    published=ROOT/'tests/fixtures/input-matrix-pack38'
+    for path in published.rglob('*.yaml'):
+        shutil.copyfile(path,expected_path/path.relative_to(published))
+    expected=load_pack(expected_path)
+    assert PACK.manifest.revision==39 and expected.ref().sha256=='22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80'
     historical = tmp_path / 'pack37'
-    shutil.copytree(PACK.path, historical)
+    shutil.copytree(expected.path, historical)
     fixture = ROOT / 'tests/fixtures/run-binding-pack37'
     for path in fixture.rglob('*.yaml'):
         shutil.copyfile(path, historical / path.relative_to(fixture))
@@ -87,8 +95,8 @@ def test_stage4_migration_reproduces_exact_current_checkdefs_and_old_pack_replay
     for cid in binding.KEYS_BY_CHECK_4:
         assert 4 not in binding.stages_for(old.checks[cid])
     migrated = binding.migrate_pack(historical, tmp_path / 'pack38', stage=4)
-    assert migrated.manifest.revision == PACK.manifest.revision == 38
-    for cid, check in PACK.checks.items():
+    assert migrated.manifest.revision == expected.manifest.revision == 38
+    for cid, check in expected.checks.items():
         assert migrated.checks[cid].model_dump(mode='json') == check.model_dump(mode='json')
     assert migrated.manifest.review.status.value == 'DRAFT'
     assert old.manifest.revision == load_pack(historical).manifest.revision

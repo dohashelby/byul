@@ -23,7 +23,8 @@ from guard.store import Store
 from tests.builders import completion_response, dummy_ref, environment, policy
 from tests.test_gpu_input_producers import POD, SCOPE, PARAMS, api_rows, crow
 
-PACK = load_pack(Path(__file__).parents[1] / "packs/PACK-BASELINE")
+from tests.published_pack38 import original as published_pack38
+PACK = published_pack38()
 
 
 def make_runner(scope=SCOPE, cases=None, *, v2=False, rejected=(), received_rejections=(), max_id=None):

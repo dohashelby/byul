@@ -13,7 +13,7 @@ from .input_validation import InputValidationExecutor
 
 _SETTINGS = {"target", "kubectl_binary", "request_timeout", "max_duration_seconds", "vocab_size", "vocab_source",
              "max_probe_tokens", "reused_token_ids", "runner_input", "runner_capture", "code_module_root",
-             "code_module_repository", "code_marker_root", "unapproved_revision", "control_image"}
+             "code_module_repository", "code_marker_root", "unapproved_revision", "control_image", "native_input_capture"}
 
 
 class _WithBody:
@@ -42,7 +42,7 @@ def _contract(check, values, cfg, model):
     if request_field_probe.supported(check):
         if check.collection_profile == request_field_probe.REUSED_TOKEN_PROFILE:
             control["return_token_ids"] = True
-            fields[values["reused_token_field"]] = list(cfg["reused_token_ids"])
+            fields = request_field_probe.nested_fields([values["reused_token_field"]], list(cfg["reused_token_ids"]))
         else:
             control = request_field_probe.control_body(control, cfg)
             fields = request_field_probe.nested_fields(values["code_selection_fields"],
@@ -76,7 +76,9 @@ class KubernetesInputValidationExecutor(InputValidationExecutor):
                 raise ValueError
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("KUBERNETES_INPUT_CONFIGURATION_INVALID") from None
-        transport = KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 120),
+        from guard.runtime.kubernetes_native_input import KubernetesNativeInputHTTP
+        transport_type = KubernetesNativeInputHTTP if "native_input_capture" in self.cfg else KubernetesHTTP
+        transport = transport_type(target, env, duration=self.cfg.get("max_duration_seconds", 120),
             binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=INPUT_VALIDATION_PROFILE)
         transport.declare_input_contract(_contract(check, policy_values, self.cfg, request_model(env, target, transport=transport)))
         ctx = Ctx(check=check, env=env, adapter=adapter, target=target, policy_values=policy_values,

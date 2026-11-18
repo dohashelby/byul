@@ -1,8 +1,7 @@
-"""입력→저장→기존 guard 변환 경계. 합성 Pack은 GPU 실측·정본 Pack 37이 아니다."""
+"""입력→저장→기존 guard 변환 경계와 저장소의 정본 팩 연동."""
 from copy import deepcopy
 from datetime import datetime, timezone
 from dataclasses import replace
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -10,7 +9,6 @@ import shutil
 
 from fastapi.testclient import TestClient
 import pytest
-import yaml
 
 from byul_platform.config import Settings
 from byul_platform.contracts import canonical_sha256
@@ -26,16 +24,6 @@ def prepared_client(tmp_path):
     update = tmp_path / "update"
     pack = update / "packs/PACK-BASELINE"
     shutil.copytree(ROOT / "update/packs/PACK-BASELINE", pack)
-    path = pack / "pack.yaml"
-    manifest = yaml.safe_load(path.read_text())
-    manifest["revision"] = 38  # 이 시험 안에서만 사용하는 합성 정의
-    sup = pack / "checks/SUP-08.yaml"
-    check = yaml.safe_load(sup.read_text())
-    check["policy_params"].append({"key": "approved_code_revisions", "type": "list[str]", "required": True})
-    sup.write_text(yaml.safe_dump(check, allow_unicode=True), encoding="utf-8")
-    for item in manifest["files_sha256"]:
-        item["sha256"] = hashlib.sha256((pack / item["path"]).read_bytes()).hexdigest()
-    path.write_text(yaml.safe_dump(manifest, allow_unicode=True), encoding="utf-8")
     profiles = update / "src/guard/adapters/assets"
     profiles.mkdir(parents=True)
     # 명시 비적용과 지원 정보 누락은 다른 상태다.
@@ -77,16 +65,17 @@ def test_missing_pack_preserves_draft_but_cannot_claim_readiness(store_client, t
     assert not preview["pack_available"] and not preview["engine_executed"]
 
 
-def test_backend_rejects_new_pack_override_and_keeps_legacy_revisions(store_client):
+@pytest.mark.parametrize("revision", [33, 38])
+def test_backend_rejects_new_pack_override_and_keeps_legacy_revisions(store_client, revision):
     doc = policy()
-    doc["verification"]["pack"]["revision"] = 33
+    doc["verification"]["pack"]["revision"] = revision
     assert store_client.post("/api/policies", json=doc).status_code == 422
     state = store_client.app.state.byul
     state.policies.append(doc["policy_id"], 1, doc, status="DRAFT", label="1")
     before = store_client.get("/api/policies/mvp-policy/revisions/1").json()
     res = store_client.post("/api/policies", json=doc)
     assert res.status_code == 201
-    assert res.json()["saved"]["document"]["verification"]["pack"]["revision"] == 33
+    assert res.json()["saved"]["document"]["verification"]["pack"]["revision"] == revision
     assert store_client.get("/api/policies/mvp-policy/revisions/1").json() == before
 
 
@@ -204,11 +193,15 @@ def test_explicit_unknown_does_not_become_fixed_mvp_default(prepared_client):
 
 
 def test_pack_is_assigned_by_backend_without_client_catalog(store_client):
+    catalog = store_client.get("/api/inputs/catalog").json()
+    assert catalog["available"]
+    assert {"key": "allowed_input_pairs", "type": "list[str]", "required": True} in catalog["parameters"]["REQ-09"]
+    assert {"key": "reused_field_endpoints", "type": "dict", "required": True} in catalog["parameters"]["REQ-08"]
     doc = policy()
     doc["verification"]["pack"] = {"id": "", "revision": 0}
     response = store_client.post("/api/policies", json=doc)
     assert response.status_code == 201, response.text
-    assert response.json()["saved"]["document"]["verification"]["pack"] == MVP_PACK
+    assert response.json()["saved"]["document"]["verification"]["pack"] == catalog["pack"] == MVP_PACK
 
 
 def test_fixed_policy_file_reuses_exact_values_and_excludes_sensor_hashes(prepared_client, tmp_path):

@@ -19,7 +19,7 @@ from guard.adapters.vllm import CHAT_TEMPLATE_CONTAINER_PATH, CHAT_TEMPLATE_PROF
 from guard.collectors import engine_callbacks
 from guard.collectors.file import load_environment
 from guard.executors import engine_callback_projection as projection
-from guard.models import DataOrigin, Environment, canonical_json, new_id, sha256_hex
+from guard.models import DataOrigin, Environment, canonical_json, load_pack, new_id, sha256_hex
 from guard.runtime.kubernetes_binding import validate_container_binding
 from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesHTTP
 
@@ -299,7 +299,21 @@ def _code_selection_settings(draft):
     return {key: block[key] for key in _CODE_OBSERVATION_KEYS}
 
 
-def http_inputs(check_id, target_value, draft, *, root):
+def _input_matrix_check(check_id, pack_spec):
+    if check_id not in {'REQ-08', 'REQ-09'}:
+        return None
+    from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
+    from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
+
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    ref = pack.ref()
+    check = pack.checks[check_id]
+    if pack_spec == {'id': ref.id, 'revision': ref.revision} and check.collection_profile in {INPUT_MATRIX, REUSED_MATRIX}:
+        return check
+    return None
+
+
+def http_inputs(check_id, target_value, draft, *, root, prepared=None, prepared_uid=None):
     if check_id not in HTTP_CHECKS:
         raise ValueError('RUN_INPUTS_CHECK_UNSUPPORTED')
     executor, settings = HTTP_CHECKS[check_id]
@@ -314,6 +328,26 @@ def http_inputs(check_id, target_value, draft, *, root):
     lines = [f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', f"{executor} = 'kubernetes'",
         '', f'[{executor}]', f"target = '{root / 'target.json'}'"]
     lines += [f"{key} = '{value}'" if type(value) is str else f'{key} = {value}' for key, value in settings.items()]
+    check = _input_matrix_check(check_id, policy['pack'])
+    if check is not None:
+        if prepared is None:
+            raise ValueError('RUN_INPUTS_NATIVE_INPUT_PREPARED_REQUIRED: pass --prepared for this check')
+        from guard.collectors import native_input
+        from guard.executors.registry import build_executor
+
+        prepared = Path(prepared).absolute()
+        manifest, _, _ = native_input.load_prepared(prepared, expected_uid=prepared_uid)
+        if target_value.get('lab') is not True or manifest['image'] != target_value['engine']['image_digest']:
+            raise ValueError('RUN_INPUTS_NATIVE_INPUT_TARGET_MISMATCH')
+        capture = {'prepared_dir': str(prepared), 'prepared_sha256': sha256_hex(native_input.runtime.canonical(manifest))}
+        if prepared_uid is not None:
+            capture['prepared_uid'] = prepared_uid
+        config = {executor: {**settings, 'target': str(root / 'target.json'), 'native_input_capture': capture}}
+        build_executor(executor, 'kubernetes', config).validate_policy(check, policy['values'][check_id])
+        lines.extend(['', f'[{executor}.native_input_capture]'])
+        lines.extend(f'{key} = {json.dumps(value, ensure_ascii=False)}' for key, value in capture.items())
+    elif prepared is not None or prepared_uid is not None:
+        raise ValueError('RUN_INPUTS_NATIVE_INPUT_PREPARED_NOT_APPLICABLE')
     return policy, '\n'.join([*lines, ''])
 
 
@@ -343,6 +377,8 @@ def main(argv=None):
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True); h.add_argument('--env', type=Path, required=True)
     h.add_argument('--target', type=Path, required=True)
     h.add_argument('--policy-draft', type=Path, default=Path('docs/gpu-a/policy-a-draft.yaml'))
+    h.add_argument('--prepared', type=Path, help='Current REQ-08/09 native input capture directory')
+    h.add_argument('--prepared-uid', type=int, help='Owner UID of the capture settings and target reader')
     h.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
     if args.kind == 'check' and args.media_text_after is not None and (args.check != 'REQ-16' or args.cases != 'req16-full'):
@@ -362,9 +398,11 @@ def main(argv=None):
         _write(args.out, value)
         print(json.dumps({'target': str(args.out), 'sha256': sha256_hex(canonical_json(value))}))
     elif args.kind == 'http-check':
-        policy, config = http_inputs(args.check, load(args.target),
-            yaml.safe_load(args.policy_draft.read_text(encoding='utf-8')), root=args.out)
-        _write(args.out / 'target.json', load(args.target))
+        value = load(args.target)
+        policy, config = http_inputs(args.check, value,
+            yaml.safe_load(args.policy_draft.read_text(encoding='utf-8')), root=args.out,
+            prepared=args.prepared, prepared_uid=args.prepared_uid)
+        _write(args.out / 'target.json', value)
         _write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True)); _write(args.out / 'guard.toml', config)
         print(json.dumps({'schema': SCHEMA, 'check': args.check, 'executor': HTTP_CHECKS[args.check][0]}))
     else:

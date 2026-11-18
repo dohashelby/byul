@@ -67,7 +67,7 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
             'key_hex': secrets.token_hex(32)}, sort_keys=True, separators=(',', ':')).encode()
     source = (configured.render_source(profile, **({'request_key_sha256': hashlib.sha256(key_raw).hexdigest()}
         if key_raw is not None else {})) if selected is configured else
-        release_observation.render_source('stream' if profile==release_observation.STREAM_PROFILE else 'profiler',
+        release_observation.render_source(release_observation.variant_for(profile),
             request_key_sha256=hashlib.sha256(key_raw).hexdigest())
         if selected is release_observation else Path(selected.__file__).read_bytes())
     digest = hashlib.sha256(source).hexdigest()
@@ -173,11 +173,11 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
             if hashlib.sha256(raw).hexdigest()!=init_release.ASSETS[filename]:raise ValueError('INITIALIZATION_RELEASE_DEPENDENCY_UNAVAILABLE')
             values[filename]=raw
     elif selected is release_observation:
-        extension=stream_sensor if profile==release_observation.STREAM_PROFILE else profiler_sensor
+        extension=release_observation.extension(profile)
         for filename,module,digest in (('guard_lifecycle_base.py',sensor,release_observation.BASE_SHA256),
             ('guard_lifecycle_release.py',release_sensor,release_observation.RELEASE_SHA256),
             ('guard_lifecycle_extension.py',extension,
-             release_observation.STREAM_SHA256 if extension is stream_sensor else release_observation.PROFILER_SHA256)):
+             release_observation.extension_sha256(profile))):
             raw=Path(module.__file__).read_bytes()
             if hashlib.sha256(raw).hexdigest()!=digest:raise ValueError('LIFECYCLE_OBSERVATION_DEPENDENCY_UNAVAILABLE')
             values[filename]=raw
@@ -325,8 +325,7 @@ def load_prepared(path):
         if manifest["profile"]==release_sensor.PROFILE and name=="guard_lifecycle_base.py" and hashlib.sha256(raw).hexdigest()!=release_sensor.BASE_SHA256:
             raise ValueError("LIFECYCLE_RELEASE_DEPENDENCY_UNAVAILABLE")
         if release_variant:
-            extension_sha=(release_observation.STREAM_SHA256 if manifest['profile']==release_observation.STREAM_PROFILE
-                           else release_observation.PROFILER_SHA256)
+            extension_sha=release_observation.extension_sha256(manifest['profile'])
             expected_variant={'guard_request_binding.py':release_observation.BINDING_SHA256,
                 'guard_lifecycle_base.py':release_observation.BASE_SHA256,
                 'guard_lifecycle_release.py':release_observation.RELEASE_SHA256,
@@ -438,6 +437,8 @@ def validate_binding(env,target,source,prepared):
 
 def validate_session_binding(env,target,source,prepared):
     from guard.adapters.engine_profiles import require
+    if prepared['profile']==release_observation.RANK_PROFILE:
+        require(env.engine.name,env.engine.version,'rank_release_rows')
     if prepared['profile'] in {fault_sensor.PROFILE, rank_sensor.PROFILE, attempt.PROFILE, output_sensor.PROFILE, stream_sensor.PROFILE, online.PROFILE}:
         try:
             require(env.engine.name, env.engine.version, 'native_lifecycle')

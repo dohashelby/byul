@@ -1,12 +1,15 @@
 """REQ-08·09·SUP-08 Kubernetes 전송의 닫힌 요청 계약. EXAMPLE target만 쓰고 kubectl은 부르지 않는다."""
 import json
+import os
+import tomllib
 
 import pytest
 
-from guard.collectors.file import load_environment
-from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor, _WithBody
+from guard.collectors.file import load_environment, load_policy
+from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor, _WithBody, _contract
 from guard.executors.stream_probe import _prepare
 from guard.executors.registry import EXECUTORS
+from guard.models import load_pack, sha256_hex
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP
 from tests.builders import baseline_pack
 from tests.test_gpu_a_run_inputs import UPDATE, build
@@ -66,6 +69,22 @@ def test_field_contract_accepts_only_the_declared_fixture(tmp_path):
             t._input_validation_request(request(body, rid=chat))
 
 
+def test_nested_reused_token_field_reaches_only_its_declared_transport_fixture(tmp_path):
+    check=load_pack(UPDATE/'packs/PACK-BASELINE').checks['REQ-08']
+    # The matrix delegates each selected field to this unchanged child protocol.
+    check=check.model_copy(update={'collection_profile':'reused-token-input-v1'})
+    contract=_contract(check,{'reused_token_field':'kv_transfer_params.prompt_token_ids'},
+        {'reused_token_ids':[5,7]},'test-model')
+    assert contract['fields']=={'kv_transfer_params':{'prompt_token_ids':[5,7]}}
+    t=transport(tmp_path);t.declare_input_contract(contract)
+    rid='func|POST_/v1/chat/completions'
+    body={**contract['control'],**contract['fields']}
+    t._input_validation_request(request(body,rid=rid))
+    for extra in ({'prompt_token_ids':[5,8]}, {'prompt_token_ids':[5,7],'other':'unreviewed'}):
+        with pytest.raises(KubernetesBindingError):
+            t._input_validation_request(request({**body,'kv_transfer_params':extra},rid=rid))
+
+
 @pytest.mark.parametrize('contract', [
     {'path': '/v1/embeddings', 'control': TOKENS, 'prompt_tokens': None, 'fields': {}},
     {'path': '/v1/completions', 'control': {**TOKENS, 'model': 'other'}, 'prompt_tokens': None, 'fields': {}},
@@ -111,11 +130,50 @@ def test_executor_ids_cross_both_request_contracts_and_return_unchanged(tmp_path
 
 
 @pytest.mark.parametrize('check_id', ['REQ-08', 'REQ-09', 'SUP-08'])
-def test_run_inputs_write_kubernetes_input_configs(tmp_path, check_id):
+def test_run_inputs_write_kubernetes_input_configs(tmp_path, monkeypatch, check_id):
     build(tmp_path, 'v2-default')
-    inputs.main(['http-check', '--check', check_id, '--env', str(tmp_path / 'env.json'), '--target', str(tmp_path / 'target.json'),
-        '--policy-draft', str(UPDATE / 'docs/gpu-a/policy-a-draft.yaml'), '--out', str(tmp_path / check_id)])
-    config = (tmp_path / check_id / 'guard.toml').read_text()
+    output = tmp_path / check_id
+    args = ['http-check', '--check', check_id, '--env', str(tmp_path / 'env.json'), '--target', str(tmp_path / 'target.json'),
+            '--policy-draft', str(UPDATE / 'docs/gpu-a/policy-a-draft.yaml'), '--out', str(output)]
+    matrix = check_id in {'REQ-08', 'REQ-09'}
+    if matrix:
+        from guard.collectors import native_input
+        from tools import verify_req10_consumption
+
+        with pytest.raises(ValueError, match='RUN_INPUTS_NATIVE_INPUT_PREPARED_REQUIRED'):
+            inputs.main(args)
+        assert not output.exists()
+        profile, = json.loads(native_input.profiles.PROFILES.read_bytes())['profiles']
+        monkeypatch.setattr(verify_req10_consumption, 'verify', lambda repo: {'reviewed_common_commit': 'a' * 64})
+        prepared = tmp_path / 'native input'
+        manifest = native_input.prepare(prepared, image=profile['image'], repository=UPDATE.parent)
+        args += ['--prepared', str(prepared), '--prepared-uid', str(os.geteuid())]
+        target_path = tmp_path / 'target.json'
+        target = json.loads(target_path.read_bytes())
+        target_path.write_text(json.dumps({**target, 'lab': True}))
+        with pytest.raises(ValueError, match='RUN_INPUTS_NATIVE_INPUT_TARGET_MISMATCH'):
+            inputs.main(args)
+        assert not output.exists()
+        target['lab'] = True
+        target['engine']['image_digest'] = profile['image']
+        target_path.write_text(json.dumps(target))
+
+    inputs.main(args)
+    config = (output / 'guard.toml').read_text()
     assert "input_validation = 'kubernetes'" in config
-    assert ('vocab_size = 151936' in config) is (check_id in {'REQ-08', 'REQ-09'})
+    assert ('vocab_size = 151936' in config) is matrix
     assert ('reused_token_ids' in config) is (check_id == 'REQ-08')
+    settings = tomllib.loads(config)
+    if matrix:
+        assert settings['input_validation']['native_input_capture'] == {
+            'prepared_dir': str(prepared),
+            'prepared_sha256': sha256_hex(native_input.runtime.canonical(manifest)),
+            'prepared_uid': os.geteuid(),
+        }
+        pack = load_pack(UPDATE / 'packs/PACK-BASELINE')
+        policy = load_policy(output / 'policy.yaml', pack)
+        check = pack.checks[check_id]
+        assert all(param.key in policy.values[check_id] for param in check.policy_params if param.required)
+        EXECUTORS['input_validation:kubernetes'](settings).validate_policy(check, policy.values[check_id])
+    else:
+        assert 'native_input_capture' not in settings['input_validation']

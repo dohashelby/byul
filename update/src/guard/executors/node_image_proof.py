@@ -165,13 +165,15 @@ class NodeImageProof:
     def __repr__(self):return '<NodeImageProof>'
 
 
-def collect_local_node_image_proof(binding,node,*,runner=None,kernel=None,proc_reader=None,timeout=30):
+def collect_local_node_image_proof(binding,node,*,runner=None,kernel=None,proc_reader=None,timeout=30,containerd_address=None):
     """Verify CID→named image→content chain→rootfs snapshot on this exact node.
 
     Injected runner/kernel/proc fixtures are CPU transport examples. Callers keep
     that origin. No arbitrary argv or operator-supplied successful booleans are
     accepted as a substitute for these reads.
     """
+    if containerd_address not in (None,'/run/k3s/containerd/containerd.sock'):
+        raise ValueError('NODE_IMAGE_RUNTIME_ENDPOINT_UNSUPPORTED')
     run=runner or capture_pipes;local=kernel_identity()if kernel is None else kernel
     if type(timeout)not in (int,float)or not 0<timeout<=30:raise ValueError('NODE_IMAGE_PROOF_BUDGET_INVALID')
     deadline=time.monotonic()+timeout
@@ -181,7 +183,7 @@ def collect_local_node_image_proof(binding,node,*,runner=None,kernel=None,proc_r
         if not re.fullmatch('[0-9a-f]{64}',cid)or not engine['container_id'].startswith('containerd://'):raise ValueError
         declared=image_digest(engine['image']);reported=image_digest(engine['image_id'])
         if declared is None or reported is None:raise ValueError
-        prefix=['sudo','-n','ctr','-n','k8s.io'];reads=[]
+        prefix=['sudo','-n','ctr',*(['--address',containerd_address]if containerd_address is not None else[]),'-n','k8s.io'];reads=[]
         def pipe(argv,cap=CAP,input_bytes=None):
             remaining=min(5,deadline-time.monotonic())
             if remaining<=0:raise ValueError
@@ -239,7 +241,7 @@ def collect_local_node_image_proof(binding,node,*,runner=None,kernel=None,proc_r
         def mounts():
             with tempfile.TemporaryDirectory(prefix='byul-mounts-proto-')as directory:
                 path=Path(directory)/'read.proto';path.write_text(MOUNTS_PROTO);path.chmod(0o600)
-                response=strict_json(pipe(['sudo','-n',GRPCURL_BINARY,'-plaintext','-unix','-H','containerd-namespace:k8s.io','-import-path',str(directory),'-proto','read.proto','-d',json.dumps({'snapshotter':'overlayfs','key':before['snapshot']},separators=(',',':')),'unix:///run/containerd/containerd.sock','containerd.services.snapshots.v1.Snapshots/Mounts'],cap=262144),limit=262144)
+                response=strict_json(pipe(['sudo','-n',GRPCURL_BINARY,'-plaintext','-unix','-H','containerd-namespace:k8s.io','-import-path',str(directory),'-proto','read.proto','-d',json.dumps({'snapshotter':'overlayfs','key':before['snapshot']},separators=(',',':')),'unix://'+(containerd_address or'/run/containerd/containerd.sock'),'containerd.services.snapshots.v1.Snapshots/Mounts'],cap=262144),limit=262144)
             if type(response)is not dict or set(response)!={'mounts'}or type(response['mounts'])is not list or len(response['mounts'])!=1:raise ValueError
             selected=response['mounts'][0]
             if type(selected)is not dict or set(selected)-{'type','source','target','options'}or selected.get('target','')not in ('','/')or selected.get('type')!='overlay'or selected.get('source')!='overlay'or type(selected.get('options'))is not list:raise ValueError
@@ -258,6 +260,7 @@ def collect_local_node_image_proof(binding,node,*,runner=None,kernel=None,proc_r
             'rootfs_chain_id':chain,'container_projection_sha256':sha(canonical(before)),'snapshot_key_sha256':sha(before['snapshot'].encode()),'task':{k:live[k]for k in ('pid','start_ticks','pid_namespace')},
             'reads':reads,'image_chain_verified':True,'snapshot_chain_verified':True,'live_root_mount_verified':True,'root_mount_identity_sha256':live['root_mount_identity_sha256'],'grpcurl_binary_sha256':GRPCURL_SHA256,'mounts_proto_sha256':sha(MOUNTS_PROTO.encode()),'process_reader_sha256':sha(PROCESS_READER.encode()),'mount_descriptor_sha256':sha(canonical(expected_mount)),'observed_monotonic_ns':time.monotonic_ns(),
             'data_origin':'EXAMPLE'if runner is not None or kernel is not None or proc_reader is not None or binding.get('lab')is True else'DECLARED'}
+        if containerd_address is not None:receipt['runtime_endpoint']=containerd_address
         return NodeImageProof(scope,receipt,_key=_PROOF_KEY)
     except PermissionError:raise ValueError('NODE_IMAGE_READ_PERMISSION_DENIED')from None
     except FileNotFoundError:raise ValueError('NODE_IMAGE_INPUT_MISSING')from None

@@ -29,7 +29,7 @@ def target_file(tmp_path, value=None):
 
 
 def test_pack_37_moves_exactly_the_listed_keys_and_keeps_rules():
-    assert PACK.manifest.revision == 38
+    assert PACK.manifest.revision == 39
     for cid in set().union(*run_binding.STAGES):
         check = PACK.checks[cid]
         keys = (run_binding.KEYS_BY_CHECK.get(cid, ()) + run_binding.KEYS_BY_CHECK_2.get(cid, ())
@@ -210,7 +210,7 @@ def test_pack_migration_is_a_minimal_text_change(tmp_path):
                       lambda m: m.group(1) + sha256(path.read_bytes()).hexdigest(), manifest)
     (seed / 'pack.yaml').write_text(manifest, encoding='utf-8')
     migrated = run_binding.migrate_pack(seed, tmp_path / 'pack36')
-    assert migrated.manifest.revision == PACK.manifest.revision + 1 == 39 and not migrated.reviewed
+    assert migrated.manifest.revision == PACK.manifest.revision + 1 == 40 and not migrated.reviewed
     assert migrated.checks['REQ-12'].revision == PACK.checks['REQ-12'].revision + 1
     assert (tmp_path / 'pack36/checks/REQ-12.yaml').read_text(encoding='utf-8').replace(
         f"revision: {PACK.checks['REQ-12'].revision + 1}\n", f"revision: {PACK.checks['REQ-12'].revision}\n", 1) == \
@@ -229,7 +229,7 @@ def test_policy_migration_tool_keeps_enterprise_values_and_never_overwrites(tmp_
     out, removed = migrate(source, PACK)
     assert removed == {'REQ-12': ['attempt_environment_sha256', 'attempt_target_sha256'], 'LIF-11': ['recovery_target_sha256']}
     assert out['values'] == {'REQ-12': {}, 'LIF-11': {'recovery_validity_start': 'S', 'recovery_branch': 'runtime-failure'}}
-    assert out['pack'] == {'id': 'PACK-BASELINE', 'revision': 38}
+    assert out['pack'] == {'id': 'PACK-BASELINE', 'revision': 39}
     assert out['status'] == 'DRAFT' and out['confirmed_by'] is None and source['status'] == 'CONFIRMED'
     path = tmp_path / 'policy.yaml'
     path.write_text(yaml.safe_dump(source))

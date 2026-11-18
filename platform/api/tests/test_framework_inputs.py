@@ -6,6 +6,7 @@ import copy
 
 from fastapi.testclient import TestClient
 
+from byul_platform.inputs import MVP_PACK
 from byul_platform.routes.documents import environment_snapshot_sha256
 from conftest import EXAMPLES, load_json
 
@@ -53,7 +54,7 @@ def _claim(env: dict) -> dict:
 def _policy() -> dict:
     pol = load_json(EXAMPLES / "policy.json")
     pol["policy_id"] = "fw-policy"
-    pol["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 38}
+    pol["verification"]["pack"] = dict(MVP_PACK)
     pol["status"] = "DRAFT"
     pol["approval"] = None
     pol["framework_values"] = {

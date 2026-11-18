@@ -53,3 +53,4 @@ update/docs/dev-1/ma7-local-materialization-20261113.json
 update/docs/dev-1/req17-split-collection.md
 contracts/**
 platform/api/**
+update/docs/dev-1/mvp-enterprise-policy-20261118.json

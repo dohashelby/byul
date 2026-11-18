@@ -53,7 +53,7 @@ def test_pair_is_current_canonical_inputs_without_fabricated_results(tmp_path, m
     fixture, envs, targets = source(tmp_path, monkeypatch)
     out = tmp_path / 'prepared'
     manifest = tool.prepare(fixture, envs, targets, out, control_image=IMAGE)
-    assert manifest['pack_ref']['revision'] == 38 and manifest['expected_comparison'] == 'REGRESSED'
+    assert manifest['pack_ref']['revision'] == 39 and manifest['expected_comparison'] == 'REGRESSED'
     assert manifest['actual_comparison'] is None and manifest['official'] is False
     assert manifest['data_origin'] == 'DECLARED'
     assert manifest['preflight'] == {'input_contracts_valid': True, 'comparison_conditions_equal': True,
@@ -137,3 +137,33 @@ def test_fixed_fixture_identity_has_unchanged_poc_source_document():
     assert contract['fixture']['source_model'] == SOURCE_MODEL
     assert contract['fixture']['source_revision'] == SOURCE_REVISION
     assert contract['fixture']['code_repository'] == CODE_REPOSITORY
+
+
+def test_original_pack38_remains_supported_by_its_exact_published_ref(tmp_path,monkeypatch):
+    import shutil
+    from guard.models import load_pack
+    fixture,envs,targets=source(tmp_path,monkeypatch)
+    original=tmp_path/'pack38';shutil.copytree(tool.ROOT/'packs/PACK-BASELINE',original)
+    overlay=tool.ROOT/'tests/fixtures/input-matrix-pack38'
+    for path in overlay.rglob('*.yaml'):shutil.copyfile(path,original/path.relative_to(overlay))
+    pack=load_pack(original)
+    assert pack.ref().sha256=='22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80'
+    result=tool.prepare(fixture,envs,targets,tmp_path/'old-prepared',control_image=IMAGE,pack=original)
+    assert result['pack_ref']==pack.ref().model_dump(mode='json')and result['preflight']['engine_executed']is False
+
+
+def test_same_revision_with_changed_definition_cannot_borrow_the_supported_pack_ref(tmp_path,monkeypatch):
+    import shutil
+    from guard.models import load_pack
+    fixture,envs,targets=source(tmp_path,monkeypatch)
+    changed=tmp_path/'changed-pack';shutil.copytree(tool.ROOT/'packs/PACK-BASELINE',changed)
+    file=changed/'checks/SUP-08.yaml';doc=yaml.safe_load(file.read_bytes());doc['limitations'].append('EXAMPLE altered definition')
+    file.write_text(yaml.safe_dump(doc,allow_unicode=True,sort_keys=False));manifest=yaml.safe_load((changed/'pack.yaml').read_bytes())
+    for row in manifest['files_sha256']:
+        if row['path']=='checks/SUP-08.yaml':row['sha256']=sha256_hex(file.read_bytes())
+    (changed/'pack.yaml').write_text(yaml.safe_dump(manifest,allow_unicode=True,sort_keys=False))
+    assert load_pack(changed).manifest.revision==39
+    out=tmp_path/'refused'
+    with pytest.raises(ValueError,match='정본 팩과 SUP-08'):
+        tool.prepare(fixture,envs,targets,out,control_image=IMAGE,pack=changed)
+    assert not out.exists()

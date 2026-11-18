@@ -26,7 +26,8 @@ from tests.run_binding_support import run_table, split
 from tests.builders import completion_response, environment, policy
 
 ROOT = Path(__file__).resolve().parents[1]
-PACK = load_pack(ROOT / "packs/PACK-BASELINE")
+from tests.published_pack38 import original as published_pack38
+PACK = published_pack38()
 FIXTURE_TOKENS = [11, 12, 13]
 CONTROL_TOKENS = [5, 6]
 

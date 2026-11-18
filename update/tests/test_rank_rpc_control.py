@@ -206,3 +206,51 @@ def test_private_file_hmac_mode_symlink_and_duplicates_are_rejected(configured, 
     path.unlink(); path.write_text('{"payload":1,"payload":2}'); path.chmod(0o600)
     with pytest.raises(ValueError, match='RANK_RPC_CONTROL_DUPLICATE'):
         control.read('control-sample.json')
+
+
+def test_control_file_is_invisible_until_complete_atomic_publication(configured,monkeypatch,tmp_path):
+    *_,control,_=configured
+    entered,release=threading.Event(),threading.Event()
+    write=code.os.write;errors=[]
+    def paused(fd,raw):
+        entered.set()
+        assert release.wait(3)
+        return write(fd,raw)
+    def writer():
+        try:control.write('control-publish.json',{'value':1})
+        except BaseException as error:errors.append(error)
+    monkeypatch.setattr(code.os,'write',paused)
+    thread=threading.Thread(target=writer);thread.start()
+    try:
+        assert entered.wait(3)
+        with pytest.raises(FileNotFoundError):control.read('control-publish.json')
+    finally:release.set();thread.join(3)
+    assert not thread.is_alive() and not errors
+    assert control.read('control-publish.json')[0]=={'value':1}
+    assert (tmp_path/'data/control-publish.json').stat().st_mode&0o777==0o600
+
+
+def test_control_publication_never_overwrites_and_keeps_read_identity_stable(configured,monkeypatch,tmp_path):
+    *_,control,_=configured
+    link=code.os.link;observed=[]
+    def observe(*args,**kwargs):
+        link(*args,**kwargs)
+        observed.append(control.read('control-once.json'))
+    monkeypatch.setattr(code.os,'link',observe)
+    control.write('control-once.json',{'value':1})
+    path=tmp_path/'data/control-once.json';before=code.sources._identity(path.stat())
+    assert observed==[control.read('control-once.json')]
+    with pytest.raises(FileExistsError):control.write('control-once.json',{'value':2})
+    assert control.read('control-once.json')[0]=={'value':1}
+    assert code.sources._identity(path.stat())==before
+    assert len(list((tmp_path/'data').glob('.sealed-control-*.bin')))==1
+
+
+def test_partial_control_write_leaves_no_published_or_backing_file(configured,monkeypatch,tmp_path):
+    *_,control,_=configured
+    write=code.os.write
+    monkeypatch.setattr(code.os,'write',lambda fd,raw:write(fd,raw[:len(raw)//2]))
+    with pytest.raises(OSError,match='RANK_RPC_CONTROL_PARTIAL'):
+        control.write('control-partial.json',{'value':1})
+    with pytest.raises(FileNotFoundError):control.read('control-partial.json')
+    assert not list((tmp_path/'data').glob('.sealed-control-*.bin'))

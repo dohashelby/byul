@@ -33,6 +33,8 @@ from .role_route import RoleRouteExecutor
 from .kubernetes_routes import KubernetesDirectRouteExecutor, KubernetesRoleRouteExecutor
 from .credential_exposure import CredentialExposureExecutor
 from .kubernetes_credential_exposure import KubernetesCredentialExposureExecutor
+from .kubernetes_observed_input import KubernetesObservedInputValidationExecutor
+from .kubernetes_input_matrix import KubernetesMatrixInputValidationExecutor
 from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
@@ -115,7 +117,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),
     "credential_exposure:kubernetes": lambda cfg: KubernetesCredentialExposureExecutor(cfg.get("credential_exposure", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "input_validation:real": lambda cfg: InputValidationExecutor(cfg.get("input_validation", {})),
-    "input_validation:kubernetes": lambda cfg: KubernetesInputValidationExecutor(cfg.get("input_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "input_validation:kubernetes": lambda cfg: KubernetesMatrixInputValidationExecutor(cfg.get("input_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
     "sampling_validation:kubernetes": lambda cfg: KubernetesSamplingExecutor(cfg.get("sampling_validation", {}), environ=cfg.get("_runtime_environ")),
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),

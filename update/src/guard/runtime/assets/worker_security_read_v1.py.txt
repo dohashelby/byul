@@ -1,0 +1,79 @@
+"""Read owned worker metadata and verify live process generations; no secret reads."""
+import hashlib,json,os,re,signal,stat,sys,time
+
+def digest(raw):return hashlib.sha256(raw).hexdigest()
+
+def read_at(directory,name,limit,mode=None):
+    fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=directory)
+    try:
+        before=os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or not 0<before.st_size<=limit
+                or mode is not None and stat.S_IMODE(before.st_mode)!=mode):raise ValueError()
+        raw=os.read(fd,limit+1);after=os.fstat(fd);current=os.stat(name,dir_fd=directory,follow_symlinks=False)
+        identity=lambda s:(s.st_dev,s.st_ino,s.st_uid,s.st_mode,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+        if len(raw)!=before.st_size or len({identity(s) for s in (before,after,current)})!=1:raise ValueError()
+        return raw,before
+    finally:os.close(fd)
+
+def live(pid):
+    if type(pid) is not int or not 1<=pid<=2147483647 or pid==os.getpid():raise ValueError()
+    base='/proc/'+str(pid)
+    with open(base+'/stat','rb') as stream:raw=stream.read(8192)
+    with open(base+'/status') as stream:status={k:v.split() for line in stream.read(16384).splitlines()
+        if ':' in line for k,v in [line.split(':',1)] if k in {'Uid','Gid','CapEff'}}
+    with open('/proc/sys/kernel/random/boot_id','rb') as stream:boot=digest(stream.read(4096))
+    with open(base+'/timens_offsets','rb') as stream:offsets=digest(stream.read(4096))
+    with open(base+'/mountinfo','rb') as stream:mountinfo=stream.read(2*1024**2+1)
+    if len(mountinfo)>2*1024**2:raise ValueError()
+    return {'pid':pid,'start_ticks':int(raw[raw.rfind(b')')+2:].split()[19]),
+        'uid_effective':int(status['Uid'][1]),'gid_effective':int(status['Gid'][1]),
+        'cap_eff':status['CapEff'][0].lower(),'pid_namespace_inode':os.stat(base+'/ns/pid').st_ino,
+        'mount_namespace_inode':os.stat(base+'/ns/mnt').st_ino,'boot_sha256':boot,
+        'time_namespace_inode':os.stat(base+'/ns/time').st_ino,'time_offsets_sha256':offsets,'mountinfo_sha256':digest(mountinfo)}
+
+def run(spec):
+    if (set(spec)!={'session','ranks','sensor_sha256','settings_sha256'}
+            or type(spec['session']) is not str or re.fullmatch('[0-9a-f]{32}',spec['session']) is None
+            or type(spec['ranks']) is not list or spec['ranks']!=list(range(len(spec['ranks'])))
+            or not 1<=len(spec['ranks'])<=4 or any(type(r) is not int for r in spec['ranks'])
+            or any(type(spec[k]) is not str or re.fullmatch('[0-9a-f]{64}',spec[k]) is None
+                   for k in ('sensor_sha256','settings_sha256'))):raise ValueError()
+    root=os.open('/guard-worker-security',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    data=directory=None
+    try:
+        for name,key in (('guard_worker_security.py','sensor_sha256'),('settings.json','settings_sha256')):
+            raw,_=read_at(root,name,262144)
+            if digest(raw)!=spec[key]:raise ValueError()
+        data=os.open('data',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=root)
+        directory=os.open(spec['session'],os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=data)
+        owner=os.fstat(directory)
+        if stat.S_IMODE(owner.st_mode)!=0o700:raise ValueError()
+        rows=[]
+        for rank in spec['ranks']:
+            item={'rank':rank,'available':False,'record':None,'record_sha256':None,'diagnostic':'WORKER_RECORD_UNAVAILABLE'}
+            try:
+                try:os.stat('rank-'+str(rank)+'.invalid',dir_fd=directory,follow_symlinks=False)
+                except FileNotFoundError:pass
+                else:raise ValueError()
+                raw,file=read_at(directory,'rank-'+str(rank)+'.json',65536,mode=0o600)
+                record=json.loads(raw);before=live(record['context']['pid'])
+                if (record['context']!=before or record['rank']!=rank or record['session']!=spec['session']
+                        or record['sensor_sha256']!=spec['sensor_sha256'] or record['settings_sha256']!=spec['settings_sha256']
+                        or owner.st_uid!=file.st_uid or file.st_uid!=before['uid_effective']
+                        or before['time_namespace_inode']!=os.stat('/proc/self/ns/time').st_ino
+                        or type(record['finished_ns']) is not int or not 0<=time.monotonic_ns()-record['finished_ns']<=300*10**9
+                        or live(before['pid'])!=before):raise ValueError()
+                try:os.stat('rank-'+str(rank)+'.invalid',dir_fd=directory,follow_symlinks=False)
+                except FileNotFoundError:pass
+                else:raise ValueError()
+                item.update(available=True,record=record,record_sha256=digest(raw),diagnostic=None)
+            except (OSError,ValueError,TypeError,KeyError):pass
+            rows.append(item)
+        return {'schema':'guard-worker-security-live-read/1','rows':rows}
+    finally:
+        for fd in (directory,data,root):
+            if fd is not None:os.close(fd)
+
+if __name__=='__main__':
+    signal.alarm(5)
+    print(json.dumps(run(json.loads(sys.argv[1])),sort_keys=True,separators=(',',':')))

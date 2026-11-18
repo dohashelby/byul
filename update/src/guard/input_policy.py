@@ -37,6 +37,12 @@ class InputContext:
 
 def policy_context(check: CheckDef, values: dict, observations: dict | None = None) -> InputContext | None:
     """None is historical; invalid new contracts cap PASS without raising in judges."""
+    if check.id=='REQ-08'and getattr(check,'collection_profile',None)=='reused-token-input-matrix-v1':
+        from .reused_matrix_policy import context
+        return context(check,values,observations)
+    if check.id=='REQ-09'and getattr(check,'collection_profile',None)=='input-matrix-v1':
+        from .input_matrix_policy import context
+        return context(check,values,observations)
     state = contract_state(check)
     if state == "legacy":
         return None

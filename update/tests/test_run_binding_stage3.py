@@ -60,7 +60,7 @@ def supply_cfg(tmp_path):
 
 
 def test_pack_37_moves_only_stage_3_keys_and_pack_36_definitions_replay():
-    assert PACK.manifest.revision == 38
+    assert PACK.manifest.revision == 39
     for cid, keys in run_binding.KEYS_BY_CHECK_3.items():
         check = PACK.checks[cid]
         assert 3 in run_binding.stages_for(check) and not {p.key for p in check.policy_params} & set(keys)
@@ -199,7 +199,7 @@ def test_policy_migration_stage_3_and_run_config_candidates(tmp_path):
         main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '3'])
     main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '3', '--run-config-out', str(tmp_path / 'rb.yaml')])
     out = yaml.safe_load((tmp_path / 'p.yaml').read_text())
-    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 38 and out['values']['SUP-05'] == {}
+    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 39 and out['values']['SUP-05'] == {}
     assert yaml.safe_load((tmp_path / 'rb.yaml').read_text())['run_binding']['OBS-01']['test_actors']['denied'] == 'd' * 64
 
 

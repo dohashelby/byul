@@ -194,6 +194,8 @@ def collect_kubernetes_process_permissions(ctx):
     })
     functional, normal = kubernetes_process_control(ctx)
     observations.update(functional)
+    from .worker_security_projection import permissions
+    worker_probe,worker_scope=permissions(ctx,record,observations)
     from .kubernetes_gpu_process_observations import collect as collect_passive_gpu_process
     passive = collect_passive_gpu_process(record, ctx.cprobe)
     try:
@@ -201,10 +203,11 @@ def collect_kubernetes_process_permissions(ctx):
     except Exception:
         transport_report = {"diagnostic_codes": ["KUBERNETES_TRANSPORT_REPORT_UNAVAILABLE"]}
     summary = {"profile": "kubernetes-process-permission-consumer-v1", "process_observation": record,
+        "worker_security_probe":worker_probe,"worker_security_scope":worker_scope,
         "passive_gpu_process_observation": passive,
         "reported_process_uids": uids, "reported_capabilities_effective": caps,
         "kubernetes": transport_report,
-        "worker_subject_verified": False, "permission_scan_complete": False,
+        "worker_subject_verified": worker_scope['worker_probe_count']>0, "permission_scan_complete": False,
         "fixture": {"process_profile": record["profile"], "program_sha256": record["program_sha256"],
                     "declared_control": [probe.model_dump(mode="json") for probe in ctx.check.functional_probes]},
         "limitations": ["Container-reported PID/UID/capability facts do not establish whole-worker coverage.",

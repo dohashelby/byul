@@ -1,3 +1,116 @@
+## 2026-11-17 — 메인 세션 LIF11 호스트 GPU PID·장치 참조 수집과 원 증거 연결
+
+- 한 일: 기존 containerd 이미지/task/커널 루트 마운트 증거를 재사용해 host PID1 anchor와 worker PID/NSpid/시작 시각/UID/namespace를 연결했다. NVML의 UUID/minor/사용 PID와 모든 host PID의 장치 FD를 제한 범위에서 대조한다. pidfd 생존 검사, 전후 NVML 조회, 고정 바이너리 bytes/소유권/불변성, PID·FD·출력/시간·시계 검사를 포함했다. 빈 compute 조회의 상속 FD·다른 GPU 작업·PID 재사용·부분 관측을 구분한다. GPU/요청/비밀 내용은 읽지 않는다.
+- 제품 연결: LIF11의 node_gpu_processes opt-in으로 전후 원 packet/선택 GPU 비교가 EVD artifact→RES/RPT→반출/복원에 남는다. 소유자·노드 교체나 뒤늦은 수집 실패 시 이전 관측은 보존하고 완료/전체 회수로 올리지 않는다. 기존 동작·정책·judge·기한·제외는 유지했다. 새 실행기 종류나 의존성·runtime/contracts 변경은 없다.
+- 시험: Linux CPython3.12.3, source7b37 관련/불변식386 통과·기존1 deselected(pytest115.53초·부모116.317초), 최종 구성·변경 조회 거부와 기존 B GPU 부분 관측92 통과(14.44초·부모15.142초). 묶음은 중복되어 합산하지 않는다. 이전 sourceaf48 관련305 통과는 별도 이력이다. 기존 공개 head70c04864의 CI20개는 모두 성공했으나 이 새 소스 전체 통과로 이월하지 않는다.
+- 최종 배포 bytes: Git LF 정규화 전후 차이가 있던 새 runtime source 파일을 LF로 통일했다. 최종 source8dfa30dd의 관련·불변식289 통과·기존1 deselected(pytest20.76초·부모21.577초). source7b37의386/92는 정규화 전 이력이며 합산하지 않는다. 603개 핀은 Git staged bytes까지 대조한다.
+- 보존: 입력 SDK 생산자5c9e6a5c와 제한 범위 등록은 그대로이며, 새 GPU 수집기의 실제 GPU 자격/등록·전체 그룹/GPU 해제·다음 정상 세대는 미완료다. 원래 byul-ma9의 HEADa4c994f6·스테이징 DECISIONS/PROGRESS는 변경하지 않고 공개 PR 사본과 별도 Linux clone/env에서 작업했다. 새 AWS 자원/비용을 발생시키지 않았다.
+- 다음 작업/막힌 것: 새 수집기의 실제 GPU 자격, native rank 탐지·통지·회복과 SUP04·PLT01/04·REQ08/09 전체 관측, 항목별 fresh 입력과69개 원 실행/보고서가 남아 있다. PID/장치 참조 부재를 전체 메모리 회수나 보안 PASS로 표시하지 않는다.
+
+## 2026-11-17 — 정체 해제 누락의 명시적 부분 수집·단일 판본69개 입력 점검
+
+- 한 일: 기존 엄격 RPC 투영은 그대로 유지하며, 통신 정체의 적용 원 사건·queue·HMAC·제품 결합·해제 요청/nonce/기한과 클라이언트가 검증되었지만 원 해제 사건만 없는 경우를 명시적으로 부분 수집할 수 있게 했다. 해제가 없으면 fault_released를 만들지 않는다. 변조·잘못된 해제·다른 장애 종류를 이 경로로 받지 않고, rank 생산자 미등록·원본 불완전·실행 미자격 상태를 유지한다. 새 GPU 실증이나 rank 등록 결과가 아니다.
+- 입력 연결: tools.mvp_live_readiness --side로 작업지시서의 선택된 한 쪽69개를 준비 점검한다. 다른 쪽 입력을 조용히 제외하지 않고 거부하며, 기존 두 쪽138개 동작과 파일 해시/ENV/정책/target 결합을 유지한다. 파일 결합이 유효해도 실제 대상 검증·실행은 false, 결과는 null이다.
+- 시험: Linux CPython3.12.3, sourceb894의 rank 관련/불변식292 통과·기존1 deselected(pytest28.63초·부모29.666초), 최종 잘못된 해제 거부·원 엄격 계약29 통과(6.66초·부모7.583초), 입력 준비 관련/불변식219 통과·기존1 deselected(24.86초·부모26.196초). 묶음은 중복되어 합산하지 않는다. 기존 시험 assert/기대값/제외 조건은 변경하지 않았다. 새 전체 기본 suite는 PR의 정확 head에서 CI로 확인한다.
+- 소스 경계: 고정 소스 변경은 RPC 투영·rank 공통 생산자2파일이다. 기존 입력 SDK의 정확 생산자5c9e6a5c와 제한 범위 등록이 유지되는 거부 경계 시험을 포함했다. 새 랭크 생산자는 여전히 미등록이다.
+- 다음 작업/막힌 것: 새 정체 부분 경로의 실제 GPU 검증, native 탐지·통지·그룹 회복, SUP04·PLT01/04·REQ08/09 전체 관측과69개 실제 입력/실행/원 보고서는 미완료다. 과거 원본·실제 FAIL/UNKNOWN·정책·판정·기한은 보존했다. 기존 GPU 세션은 종료됐고 새 AWS 자원을 만들지 않았다.
+
+## 2026-11-17 — 사용자 요청에 따른 중간 Draft PR 스냅샷
+
+- 범위: vLLM 0.30.0 관측기 구현·현재 요청 연결·실제 GPU 자격 확인까지의 변경을 별도 사본으로 고정한다. 69개 전체 실행과 원본 EVD→RES→RPT는 미완료이며, 이 PR은 진행분 검토용이다. 메인 작업의 브랜치·스테이징·실행 중인 전체 회귀 사본은 변경하지 않는다.
+- 자격: 입력 생산자 `5c9e6a5c`의 HTTP 입력 원 호출/반환/거부 및 현재 요청 연결 범위만 등록했다. 등록 원본 receipt와 실제 SDK bytes를 보존했다. 판정 기준·정책·기존 실패·UNKNOWN·원 시험 기한을 완화하지 않는다.
+- 확인: source4708 입력/등록/불변식221 통과(10.29초, 부모10.977초), sourcee61c rank 관련250 통과(13.64초, 부모14.016초). source4708 전체14,265 통과·실패0·기존34 skip·14 warnings(pytest1921.76초·부모1925.084초), 고정 소스·시험·dependency bytes 유지 확인. 기능 커밋0834e254의 PR CI20개도 통과했다. 이 후속 커밋은 진행 문서만 갱신한다.
+- 실측·정리: 네 장애를 독립 주입했고 지연 재시험의 정상/장애 명령이 모두0으로 종료됐다. rank의 전체 탐지·통지·복구 자격과 등록은 미완료다. 최종 반출1379개 파일의 크기/SHA 대조 후, 새 J02 인스턴스 종료·볼륨/보안그룹 삭제가 2026-11-17 17:27:47 KST에 확인됐다.
+- 다음 작업: SUP04, PLT01/04, LIF08/11, REQ08/09의 전체 관측 범위, 항목별 실제 입력·남은 생산자 자격/등록, 69개 제품 경로 실행과 원본 보고서. 진행 중인 메인 작업에서 계속 다룬다.
+
+## 2026-11-17 — J02 실제 입력 관측기 재자격·제한 범위 등록, 네 장애 주입과 지연 재시험
+
+- 한 일: 사용자 승인 $20·최대2시간의 새 J02에서 정확 이미지·Python3.12.3·OPT125m·TP2를 대조했다. worker 기존 생산자 cf9474e6을 다시 확인했다. native input 정상/거부·8파일15함수 bytes·소스 변조 거부·기록 누락·현재 요청5개 연결을 실제 GPU에서 확인했다. 호스트 root/대상 UID1000 경계와 boot ID 원문/strip 해시 대조를 보수했고 원 실패를 보존했다.
+- 새 자격·등록: delay actor가 정지 중 실제 종료된 원 pidfd를 재개하려다 사실 수집을 잃던 경로를 수정했다. 같은 pidfd의 종료와 정확 generation 오류일 때만 미재개로 남기고 원 적용·클라이언트 사실을 보존한다. alive/다른 오류·source/UID/HMAC 검사는 유지했다. SDK가 바뀌어 새 GPU 검증을 수행했으며 생산자5c9e6a5c를 HTTP 입력 원 호출/반환/거부와 현재 요청 연결 범위로만 등록했다. 원본 receipt의 false 플래그는 수정하지 않았고, 자격 데이터의 정확 bytes/SHA와 검증 반출 SHA를 별도로 묶었다.
+- 장애 실측: 지연·SIGKILL 종료·원 예외·응답 큐 정체를 독립 Pod에서 각각 주입했다. 종료/예외의 UID 경계 수정 후 원 기록을 새 장애 없이 부분 공통 입력으로 변환했다. 정체는 원 CONTROL_STALL과 클라이언트500은 있지만 원 CONTROL_RELEASE가 없어 엄격 변환이 거부했다. 수정 후 새 지연 세대는 정상/장애 명령 모두0, 원 Future timeout과 HTTP500 송신/EOF 및 선택 Pod UID 부재를 확인했다. 인과/전체 rank/탐지/상위 전달/복구 자격·rank 등록은 여전히 미완료다.
+- 시험: Python3.12.3의 rank 관련250 통과·기존1 deselected(pytest13.64초·부모14.016초), 등록·입력·불변식221 통과·기존1 deselected(pytest10.29초·부모10.977초). 외부 실행/정리 도구의 별도 사본98 통과(pytest0.88초·부모1.203초). 최신 source4708 전체 회귀: 14265 passed, 34 skipped, 14 warnings in 1921.76s (0:32:01); 부모 1925.084초. 고정 소스·시험·dependency 유지 여부는 원 summary를 따른다.
+- 반출·정리: 최종 ZIP e3864ce6의1379개 원 파일을 크기/SHA로 검증했다. 새 GPU/볼륨/보안그룹만 종료·삭제 확인했다.
+- 다음 단계/막힌 것: SUP04·PLT01/04·LIF08/11·REQ08/09 전체 관측 범위와69개 실제 binding/등록/원 EVD→RES→RPT가 남아 있다. 기존 실제 FAIL·UNKNOWN·정책·판정·시험 기한은 유지했다. 이 단계는69개 전체 완료·보안 PASS·완료 PR·영상이 아니다.
+
+## 2026-11-17 — 입력 관측·닫힌 원 기록·현재 요청 연결 제품 통합(GPU 미실행)
+
+- 한 일: .30 실제 설치8파일·15함수를 데이터로 고정하고 원 요청/ASGI root→원 validator의 호출·반환·원 예외 위치를 연결했다. 요청/토큰/출력/예외 문구·property는 읽지 않는다. 별도 private package, 기존 sitecustomize 보존, 정확 보조 코드 대조, 닫힘·fsync 후 비덮어쓰기 link 공개와 HMAC/순서/호출 쌍 검증을 연결했다.
+- 실제 입력 연결: opt-in 전송이 새 요청 ID를 명시적으로 선언하고 한 번만 사용한다. 원 전송의 body/path/범위 거부는 그대로 적용한다. 고정 `python -I -S` 읽기로 source assets·live PID/start/UID/namespace를 확인하고 전후 target/시계/원 기록과 현재 요청 구간을 대조한다. 잘못된 기록은 로컬 저장 전에 거부한다. 수집 실패 시 이전 관측을 보존하고 완료/MEASURED를 유지하지 않는다.
+- 시험: source298f217b의 관련·불변식288 통과·기존1 deselected(pytest6.64초·부모6.961초). 최종 sourcef3490244의 원본 보존·변조/세대/시계 거부·독립 private helper 시험57 통과(pytest2.18초·부모2.453초). Python3.12.3, 실제 엔진 import/기동·GPU 실행은0이다. source590의 과거 전체14,186 통과를 새 source 전체 통과로 이월하지 않는다.
+- 전체 회귀: 최종 sourcef3490244에서14,243 통과·실패0·기존34 skip·14 warnings(pytest1021.56초·부모1022.848초). Python3.12.3, 고정596개 소스·시험·dependency bytes가 유지됐다. 원래 tsc에서 실행했고 커널 설정을 바꾸지 않았다. GPU 실행 결과가 아니다.
+- 다음 단계/막힌 것: 현재 source 전체 CPU 회귀 관문은 통과했다. 이 제품 관측은 아직 미등록·미자격 후보이며 원 입력의 실제 소비를 증명하지 않는다. REQ09의 전체 text/chat/token·해당 embedding/mask/offset 범위, REQ08 실제 소비와 LIF08/11·SUP04·PLT01/04 및69개 실제 binding/자격/등록/원 실행은 미완료다. 기업 정책·정본 판정·기존 실패/실측/자원은 변경하지 않았다. 새 GPU 비용 승인도 없다.
+
+## 2026-11-17 — 승인된 WSL 시계 임시 비교·전체 회귀 완료, 원복 확인
+
+- 한 일: 사용자 승인에 따라 `tsc`에서 `hyperv_clocksource_tsc_page`로 임시 전환했다. 부모 EOF/최대 2시간 원복 감시를 유지했고, 시험 종료 후 부모와 guardian·별도 모니터로 원래 `tsc` 복구를 확인했다. 영구 설정·사용자 앱·GPU 자원은 변경하지 않았다.
+- 시험: Python 3.12.3, source590126b3에서 실패 두 경로 관련24 통과(pytest34.87초·부모35.409초), 전체14,186 통과·실패0·기존34 skip·14 warnings(pytest1347.48초·부모1349.143초). 고정588개 소스·시험·dependency bytes와 원 단언·기한·기존 제외 조건을 유지했다. 모니터25,118표본에서 인접 비중첩 wall/monotonic 차이 최대0ns를 관측했다. 과거 실패 원본은 보존하며 TSC 자체가 원인이라고 확정하지 않는다.
+- 입력 관측 초안: 원 예외의 traceback/code 위치로 직접 raise 여부를 구분하되 예외 문구·property·요청 내용은 읽지 않는다. 설치 CodeType·소유 대역과 거부/원복 시험을 포함한 별도 사본94 통과(pytest1.99초·부모2.715초). 제품 통합·실제 엔진 실행·관측기 등록은 아니다.
+- 다음 단계/막힌 것: 전체 CPU 회귀 관문은 통과했으나 69개 실제 GPU 실행은 미완료다. SUP04·PLT01/04·LIF08/11·REQ08/09의 전체 범위와 실제 binding·자격·등록이 남아 있다. J01은 종료됐고 새 GPU 비용 승인은 없다. 새 자원·전체 실행 보고서·완료 PR을 만들지 않았다.
+
+## 2026-11-17 — core 소스 의존성·다음 실증 실행 절차 보완, 전체 회귀 간헐 실패 조사
+
+- 한 일: .30 core의 execute_model은 MP/SchedulerOutput, Future.result는 MP 원본만 요구하도록 판본 데이터를 보수했다. worker의 네 소스 검증·장애 자격은 유지했다. 정확 설치 CodeType을 대역으로 실행한 core/관련72 통과(3.22초·부모3.782초), 추가 ABI72 통과(3.60초·부모4.218초). 현재 source590126b3은 GPU 자격·rank 등록 완료가 아니다.
+- 전체 회귀: 직전5de20378은14,183 통과/실패0/기존34 skip(pytest3513.34초·부모3516.178초). 현재590126b3의 첫 전체는14,185 통과/실패1/기존34 skip(pytest1866.18초·부모1869.246초). 진단을 추가한 후속 전체는14,184 통과/실패2/기존34 skip(pytest1888.34초·부모1891.16초). 고정 소스·시험·dependency bytes는 각 실행 중 유지됐다. keepalive의 원 소켓 재사용은 확인됐지만 wall/monotonic 약509.291ms 불일치로100ms 시계 관문이 올바르게 거부했음을 원 packet으로 확인했다. TSC 자체가 원인인지는 미확정이다. egress attachment 사례는 별도22개 직접 시험에서 통과했으나 전체 실행 실패 원인은 미확정이다. 원 단언·기한은 AST 대조로 보존했고, 실패 시 원 packet/stderr·EVD만 추가 출력한다. 원본 실패/JUnit/로그를 유지하며 전체 통과·수정 완료로 표시하지 않는다.
+- 다음 실증 준비: 정상 TP2 원 반환과 native Future/HTTP EOF 사전검사, UID1000·새 Pod 네 장애, 운영자 삭제 전 socket/SHM·GPU 메타데이터, 생성 기록 기반 조기 실패 정리와 API UID 삭제 조건을 별도 초안으로 만들었다. 제품 결합 파일은 닫힘·fchown/fsync 후 비덮어쓰기 link로 공개한다. 별도 소스 사본의 실제 파일 경쟁/소유 stub 자식·대역 API/승인·소스·예산·소유권 거부62 통과(1.34초·부모1.776초). 생성 스크립트의 GPU/Kubernetes/AWS 실행 결과가 아니다.
+- 현재 한계:69개 factory 존재와 정책5개 런타임 규칙을 확인했으나 새 전체 실행의 항목별 실제 binding은0개다. LIF08/11·PLT01/04·REQ08/09·SUP04의 알려진 범위 공백과 나머지 입력 결합을 유지한다. J01 worker 생산자 cf9474e6의 자격·제한된 원 PASS/FAIL/UNKNOWN은 보존하고 전체 소스 자격으로 확대하지 않는다. 별도 J02 제어기는 미승인·미실행이며 AWS 조회 인증이 만료됐다. 새 비용·GPU 생성·완료 PR은 하지 않았다.
+- 입력 관측 초안: 실제 .30 설치 소스13지점을 코드 실행 없이 검토했다. HTTP/ASGI 요청 지문을 원 길이·토큰 validator 반환/예외에 결합하는 별도 초안을 작성했고, 내용/property/예외 문구 trap·동시/스레드·닫힌 root·다른 중첩 요청 거부와 실제 설치 CodeType/소유 대역 시험을 보완했다. 원복 준비를 포함한 별도 사본86 통과(1.14초·부모1.599초)이며 제품 통합·GPU 실측·등록으로 표시하지 않는다. WSL 공통 시계 소스 임시 비교는 부모 EOF/만료 원복과 외부 값 보존·source 불일치 거부를 준비했지만 사용자의 별도 승인을 기다린다. 실제 커널 시계는 변경하지 않았다.
+
+## 2026-11-16 — 소유 namespace 자원·지연 Future·원 HTTP 전달 관측 보완(실제 GPU 미실행)
+
+- 한 일: PID/start/namespace가 결합된 socket·공유메모리 FD와 mmap 참조를 읽고, 선택 FD가 사라져도 다른 프로세스의 잔존 참조를 보존한다. 관측자 자신의 FD 디렉터리를 닫기 전에 stat하도록 보수했다. LIF11의 `namespace_resources=true` 경로는 고정 stdlib 프로그램·원 Pod/CID/restart·시계·닫힌 수집을 요구하고 증거 artifact에 원 packet/비교를 남긴다. 전체 GPU/그룹 회수는 계속 false다.
+- 원 RPC: 비동기 RPC가 반환한 실제 Future에 약한 참조만 두고 원 요청 HMAC·원 호출·객체·세대를 연결한다. Future.result의 원 반환/예외를 보존하며 메시지/출력 원문은 읽지 않는다. native ASGI 두 원 send 함수의 정확 설치 bytes/body를 고정해 응답 시작·최종 body 송신 반환과 actor EOF를 별도로 대조한다. 부분 송신 사실은 보존하고 장애 인과·탐지·복구·그룹 자격을 추정하지 않는다. 현재 rank/common 생산자는 미등록이다.
+- 시험: namespace 관련106 통과(source b107,55.76초·부모56.418초), 제품 EVD→RES→RPT/export/restore 4 통과(source e181,5.55초·부모5.831초), 추가 ABI44 통과(7.15초·부모7.399초). Future/관련108 통과(source a561,9.66초·부모9.928초), 닫힌 snapshot 변조9 통과(1.27초·부모1.482초). 현재 source5de20378의 native HTTP/관련122 통과(5.10초·부모5.421초), 추가 ABI138 통과(11.24초·부모11.657초). 일부 묶음은 중복이며 합산하지 않는다. 실제 엔진/GPU 시험 수로 세지 않는다.
+- 전체 회귀 미완료: a561 원 실행은94%에서 F/E 이후 WSL 종료로 상세/JUnit/부모 요약이 남지 않았다. 소스·시험·runtime/contracts dependency bytes가 유지됐음을 재확인했고 원 로그 SHA와 interruption 기록을 보존했다. 당시 C:119MB를 관측했으나 종료 원인은 미확정이다. 전체 통과를 주장하지 않으며 현재 소스에서 worker1로 다시 실행한다. 시험/단언/기한/기존 제외 조건은 완화하지 않는다.
+- 다음 단계/막힌 것: 실제 네 장애와 새 원 관측 자격·정확 등록, native 탐지와 전체 kernel/GPU 회수·다음 정상 세대, SUP04 전체 공급물/변경 관문, PLT01 전체 권한, REQ08 실제 재사용·REQ09 선언된 text/chat/token 범위와69개 실제 결합·실행·보고서가 남아 있다. J01 원본과 종료·반출 증거는 유지하며 새 GPU 승인은 없다. 영상/.31 비교/자동 병합/완료 PR은 현재 결과에 포함하지 않는다.
+
+## 2026-11-16 — 선택 응답 큐의 통신 정체 경로와 PID 1 감독자
+
+- 한 일: .30 설치 원본 `WorkerProc.enqueue_output`와 `MessageQueue.enqueue`를 고정하고 동기 응답 게시의 원 부모 frame/object·요청 HMAC·동일 queue/SHM 결합을 구현했다. 출력 인자나 shared-memory 내용은 읽지 않는다. 새 ARM/target /3은 사전 제품 결합과 정상 대조의 queue object/커널 SHM 지문을 요구한다. READY와 별개의 CONTROL_STALL 원 사건을 요구하고, 덮어쓰지 않는 별도 release 파일과 원 사건으로 해제를 확인한다. SIGSTOP 지연과 통신 정체를 구분한다.
+- 시험: source36b1d754의 관련450 통과·기존1 deselected(pytest26.87초·부모27.512초), 격리 자식의 원 제어/공통 변환을 포함한 별도16 통과(2.39초·부모2.822초, 앞 묶음과 일부 중복), 설치 bytes/함수 고정2 통과(0.19초·부모0.404초), 추가 ABI3.12.8 79 통과(2.67초·부모3.027초). 원문/값 접근 trap·잘못된 queue/제품 결합·source ack 누락/변조·READY만의 활성화 거부를 확인했다. 공통 입력은 계속 미등록/불완전이며 탐지·상위 전달·복구를 추정하지 않는다.
+- 관측 유지: worker 사망으로 engine PID 1이 끝나 수집기까지 죽는 것을 피하도록 소유 lab의 engine child를 보유하는 `tools/owned_engine_holder.py`를 추가했다. source/PodUID/CID/restart 결합 후 한 번만 기동하고 자동 재기동·live worker 신호·자원 제거를 하지 않는다. 시험 소유 stub 자식만 사용한12 통과(0.81초·부모1.567초); GPU는 실행하지 않았다. 새 준비 스크립트는 holder 원 bytes의 별도 SHA와 검토한 `--no-async-scheduling`을 고정한다.
+- 다음 단계/미완료: 실제 GPU의 새 qualification·등록·4종 장애, 원 탐지/상위 전달, 전체 kernel/GPU 자원 회수·재기동과 나머지69개 실행을 계속한다. 새 source를 GPU 실측으로 표시하지 않는다. J01 종료·보존 원본과 비용 경계, 영상/.31 비교/자동 merge 제외는 그대로다.
+
+## 2026-11-16 — J01 실측 반출·정리와 최신 main 관측 프로필 충돌 보수
+
+- 한 일: main `a4c994f6`까지 fast-forward하고 기존 staged/unstaged 작업과 두 backup stash를 보존했다. 최신 기준 stream /33과 .30 rank /33의 신원 충돌을 실제 전체 회귀로 확인했다. 새 rank는 /34로 분리하고 중복 profile/schema 로딩을 거부한다. 기존 /33 stream과 J01 원본은 바꾸지 않는다.
+- 정상 대조: 실제 반출 메타데이터를 회귀 fixture로 보존하고 선언된 TP worker 각각의 원 RPC CALL/RETURN·부모 frame/object·요청 HMAC·PID/start·시각을 대조한다. 새 GPU 준비는 이 대조를 명시적으로 요구한다. Python RPC 반환과 GPU 완료·그룹 인증·장애 탐지·복구를 구분하며 후자는 계속 미확인이다.
+- 테스트 결과: 통합 소스 ce78fa63 전체 14,015 passed / 8 failed / 기존34 skipped, pytest1173.25초·부모1175.131초. 여덟 실패는 /33 충돌 경로다. 보수한 f43fcf14 직접475 passed·기존1 deselected(29.92초), 추가 ABI3.12.8 73 passed(1.94초·부모2.591초). 이번 보수 뒤 전체 suite를 새로 통과했다고 표시하지 않는다. worker 등록 소스 cf9474e6는 그대로다.
+- 실제 GPU: J01 고정 .30/Python3.12.3 worker 정상·부정·누락·자산/이미지 source 불일치 확인과 정확 등록을 마쳤다. 실제 RPT `RPT-01M7J081BJFVQJHR4S9SYYBP7C`는 선택3개(PLT01 FAIL / PLT04 PASS / SUP04 UNKNOWN), 나머지66개 미선정이며 EXAMPLE/비공식이다. 실제1초 SIGSTOP/SIGCONT와 HTTP200은 반출했으나 공통 rank 입력은 미지원·불완전이고 네 장애/탐지/상위 전달/복구 완료가 아니다.
+- 자원/반출: 최종 ZIP451파일의 모든 member SHA 검증과 native bundle84파일 복원을 마쳤다. 신규 인스턴스는 11:28:20Z 종료, 신규 EBS·SG 부재를 API로 재확인했다(최대97.72분). $6 예비분 포함 보수적 추산은 $17.12이며 확정 청구액이 아니다. 기존 자원은 변경하지 않았다. [실제 범위](docs/gpu-j01-20261116/session-outcome.json).
+- 다음 단계/미완료: SUP04 전체 공급물/변경 관문, PLT01 전체 권한, LIF08 네 장애, LIF11 전체 회수, REQ08 실제 재사용·REQ09 전체 선언 입력 범위와 나머지 실제 입력·등록을 계속 구현한다. J01 승인은 종료한 세션에 한정되며 새 예산을 재사용하지 않는다. 69개 전체 실행·완료 PR은 아직 없고 현재 범위에 영상/.31 비교/자동 병합은 없다.
+
+## 2026-11-16 — .30 새 실증 전 회귀 완료, 실측·전체69는 미완료
+
+- 소스 목록 bb8f21253c0878c03b113d2c415f2d9c06d48b4be98bc730c3841a421e16e422에서 전체 13,897 통과·실패0·기존34 skip. pytest 1078.14초, 부모 경과 1079.746초. 시험 중 소스 목록은 유지됐다.
+- 소유 신호 해제의 실제 자식 시험에서 설정 시간과 임대 기한을 분리했다. 실제 pidfd 신호·세대·복구 단언과 제품 기한 거부를 유지했다.
+- 제어/원 관측 JSON을 작성 중 먼저 읽는 경쟁을 고쳤다. 완성된 비공개 파일을 원자적·비덮어쓰기 link로 공개하고, read-side HMAC·모드·inode/ctime 검사는 유지했다. 관련 직접224 통과(45.09초).
+- 새 자원 생성 전 기존 J00 종료/반출 상태, 새 제어기 소유권 경계4건, 정확한 스크립트·소스·전체 회귀를 확인했다. 실제 worker 정상/부정/누락/소스 불일치 및 TP2 RPC 정상 연결을 새 GPU에서 확인할 준비다. 자격 확인 전 등록하지 않는다.
+- 69개 실행기 연결과 정책 형식 점검은 실제 전체 실행 완료가 아니다. SUP04 전체 변경 관문, LIF08 네 장애/전체 rank, LIF11 전체 회수, REQ09 전체 입력 범위와 실제 항목별 입력/등록·원본 보고서는 미완료다. 영상·.31 비교·자동 merge 없이 .30 실제 검증과 완료 후 PR 범위를 유지한다.
+
+## 2026-11-16 — 0.30.0 단독 실증 경로 보완 중 (미완료)
+
+- 현재 소스 기준 main `4f60e9ea`와 사용자 작업을 보존했다. .30 실제 설치 소스에서 MP/core의 12개 함수 행을 두 ABI로 검토하고, /33의 준비→기록 검증→제한된 rank 수집과 자원 회수 프로필을 연결했다. 네 장애 능동 주입·전체 회수 완료를 뜻하지 않는다.
+- REQ-09는 고정 .30 GPU 이미지에서 확보한 설치 소스의 토큰 범위/길이 거부 형식을 추가했다. REQ-08의 실제 `kv_transfer_params.prompt_token_ids` 분기에 맞춰 중첩 요청 계약을 고쳤다. 기존 정책 V1은 보존하고 위임 범위의 V2를 별도 준비했다.
+- SUP-04는 k3s containerd의 실제 이미지→snapshot→kernel root 관계를 선택 수집한다. 패키지/entrypoint 변경·배포 관문 전체는 아직 미완료다.
+- PLT-01/04에는 exact `Worker.load_model` 성공 뒤 해당 worker에서 실행하는 이름/권한/무해 sentinel/자격 후보 open 관측기를 추가했다. 비밀 내용은 읽지 않는다. source·PID/start ticks·namespace·mountinfo·재로딩·실제 준비 자산을 대조하며 미등록 기록은 worker 판정 관측으로 승격하지 않는다. 등록 목록은 아직 비어 있다.
+- 회귀: 이전 유효 전체는 13,800 통과·9 실패·기존34 skip이며 원인은 보수했다. 현재 직접 묶음은 Python3.12.3 117 통과(4.26초), Python3.12.8 68 통과(1.73초). 새 전체 회귀를 시작한다. 단위/소스 검토를 GPU 실측으로 표시하지 않는다.
+- 새 GPU 자원은 아직 생성하지 않았다. 새 $20·최대2시간 승인은 유효하며, 전체 실행·관측기 자격/등록·69개 원본 EVD/RES/RPT 및 검증 반출은 미완료다. 현재 범위는 영상/0.31 비교 없이 .30 실증·보고서이며, 완료 뒤 PR 공개가 승인됐다.
+
+## 2026-11-16 — 승인된 J00 실제 GPU 자격 확인·원제품 실행 녹화
+
+- 사용자 신규 승인: 서울 g6.12xlarge 1대, 총 $20·최대2시간. 실제 세션은 04:00:05Z 시작했고 95분 노드 종료/100분 독립 감시를 설정했다. 기존 자원은 변경하지 않았다. 증거 반출 후 04:40Z경 신규 자원의 종료·삭제를 요청했고 OS 종료 대기에 대해 강제 종료를 추가했다. **04:49:04Z 신규 인스턴스 종료·새 EBS/보안그룹 삭제를 API로 확인했다**(약49분). 독립 감시의 보수적 예산 추산은 약$11.59이며 실제 청구 확정값이 아니다. 최종 자원 상태는 워크스페이스 `live-mvp69-20261116/live-session.json`에 보존한다.
+- 실제 확인: 고정 vLLM0.7.0 V1/0.30.0 V1 각각 OPT125m 정상 추론 HTTP200. 실제 설치 V1 모듈의 별도 프로세스 exact file/function-body 검사는 기준4개·후보1개 일치했다. 엔진 소유 요청/worker/group 전체 자격이나 producer 등록은 미완료다. 설치 vllm/uvicorn 소스615/2726파일을 반출하고 원 엔진 inventory와 모든 SHA를 대조했다.
+- 원제품 실행: 실제 ENV/POL/Pod 세대를 결합한 `prepare-update` 뒤 SUP-04·PLT-01·PLT-04 양쪽 수집기6회를 실행해 `RPT-01M7HA9CZ0RADGKWP3ZZE1BZWV`를 생성했다. `guard verify` OK, native bundle88파일 검증·복원 완료. 정책 범위는3개, 나머지66개는 미선정이며 세 점검 모두 보안 UNKNOWN이다. Kubernetes lab 경로의 EXAMPLE/비공식 표시는 유지했다.
+- 한계: SUP-04는 runtime image/RepoDigest 관계 미확보로 점검 내 정상 대조·변경 challenge 미실행, PLT-01은 sentinel/권한 거부 challenge 미실행이다. 독립 정상 추론이나 수집기 COMPLETED를 점검 전체 PASS로 대체하지 않았다. 레지스트리21쪽 외에도 양쪽 request_input_checks/기준 sampling 등 상세 가용성이 닫혀 있다.
+- 남은 준비: 능동 경로21쪽은 기준19/후보2이며 서로 다른19개 점검이다. 각 쪽에 실제 source SHA·AST 함수/인자 목록·기존 사례 계획·정확한 다음 개발 과제·자격 관문을 연결했다(`live21-preparation/`). 전체 실행 가능이나 등록 완료를 주장하지 않는다. 실행 중 AWS 원본 상태 모니터와 새 RPT를 읽는 플랫폼 화면을 무자막2편으로 녹화했다. **69개 전체 실증은 아직 미완료다.**
+
+## 2026-11-16 — 실제 69개 시연 준비·기동 준비 11건 보수
+
+- 한 일: main3aab9c8c 기준 `/31`·`/32` private 기동 의존성의 오래된 `vllm_rank_ipc_sources.py` SHA를 정확 현재 bytes로 갱신했다. 헬퍼 변경 의미와 `_bytes`·`_codes`·`_function` 소비를 대조했고 검사를 완화하지 않았다. 소스572파일 목록과 사용자 결정5의 검토 영수증을 갱신했다. 69개/138쪽 전체 입력 색인·정확 파일/정책/target/실행 결합·판본별 구현을 점검하는 `tools.mvp_live_readiness`와 직접 시험을 추가했다.
+- 테스트 결과: 기동/프로파일러 직접36 passed(1.98초·부모2.669초), CPython3.12.8 관련170 passed(15.46초), 입력 준비 직접44 passed(14.03초). Linux CPython3.12.3 전체는13773 passed/기존34 skipped/실패0(pytest1023.07초·부모1026.256초). engine/docker/network 기본 제외·기존 assert·기대값은 유지했다. 로컬 결과이며 새 CI는 미실행이다.
+- 다음 단계: 사용자 위임으로 선택한 정책178개 결정과 실행별5개 실제 결합 규칙을 소유한 격리 MVP 환경에 적용하고, 새 GPU 자격 확인 뒤 현재 ENV/target/세션을 조립한다. 실제 제품 EVD→RES→RPT와 원본 보고서 화면을 촬영한다. [전체 준비 경계](docs/dev-1/mvp-live-readiness.md).
+- 막힌 것: 현재 실환경138쪽은 미결합, 능동 구현은 기준19쪽·후보2쪽 닫힘, SUP-03은 관측 전용이다. 사례309개·정책 선택·전체 시험 통과를 실제69개 관측 완료로 세지 않는다. 새 GPU 비용·운영 자원은 아직 만들지 않았다.
+
 ## 2026-11-16 — 보고서 FAIL·UNKNOWN 판정 이유 표시
 
 - 한 일: 사용자 요청으로 RPT 쪽 결과 `SideResult`에 선택 필드 `reasons`를 더했다. FAIL·UNKNOWN 축이 있으면 RES.reasons 원문을 그대로 옮기고 PASS·NOT_APPLICABLE 축 이름으로 시작하는 이유만 뺀다. 없으면 직렬화에서 빠져 기존 RPT 해시는 같다. 판정·팩·규칙 의미는 바꾸지 않았고 엔진·판본 문구를 두지 않았다. 공용 계약 `verification-result` 0.2 `sides.<side>.reasons`(선택)를 제안 반영했고(contracts/README 변경 이력), platform 변환·화면 자료 `ReportSide.reasons`·점검 상세의 "판정 이유" 목록·생성 타입 두 파일을 맞췄다. 제품 파일 두 개의 셸 SHA-256으로 소스 목록과 검토 행을 갱신했다.
@@ -3169,3 +3282,85 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 실패 원인과 보수: (1) profiler 15건 — 0.7.0 `_handle_client_request`는 `EngineCoreProc`에 정의돼 있는데 관측 지점을 `EngineCore.`로 적어 정확 소스에서 함수를 찾지 못했다. 지점 이름을 `EngineCoreProc._handle_client_request`로 고쳤다(시험 도우미·설계 문서 포함). (2) graph 7건 — `base.attrs()`가 dict가 아닌 `Fields`(`.get`만 제공)를 반환하는데 snapshot이 `state['…']`로 읽어 예외가 났고 CALL·종결 필드가 비었다. `.get()`으로 바꿨다. 시험·단언·기대값은 바꾸지 않았다.
 - 테스트 결과: 로컬 Python/pytest는 실행하지 않았다. 소스 목록은 셸 SHA·jq로 다시 만들었고(같은 방법으로 main 목록을 바이트 단위로 재현함) Linux CI 결과를 기다린다.
 - 다음 단계: 새 head의 update-default·observer 3.12.8 job 확인.
+## 2026-11-17 — 크레딧 사전 중단 배포·실제 자동 종료, PLT04 공급 설정/worker 이름 연결
+
+- 한 일: 사용자 요청에 따라 전용 실행 역할·IAM 만료 기한·1분 예약 Lambda 감시를 실제 배포했다. AWS API 잔액 $12.23, $5 준비금, 세션 최대 $6/45분, 관측 실패/설정 불일치 시 래치 차단, 활성 예약액·경과 비용·세션 기한 확인을 적용한다. 감시 자체는 24시간 이하 기한 뒤 차단·소유 자원 정리 후 꺼진다. root·다른 역할·계정 전체의 과금 차단을 주장하지 않는다.
+- 실제 확인: 전용 제한 역할의 저비용 t3.micro 1대가 2분 기한 뒤 예약 감시에 의해 종료됐다. 12:30:13 UTC 원 SSM 상태에 종료 이유, 12:31:12 UTC에 보안그룹 삭제가 남았고 EC2 종료·소유 EBS/보안그룹 0개를 재조회했다. 별도 노드 4분 종료 예약보다 먼저 동작했다. IAM 미래 시각 시뮬레이션에서 생성/시작/디스크/스냅샷/명령 5종 명시적 Deny를 확인했다. 시험용 Lambda도 삭제했다. 크레딧 소진 분기는 모의 시험이며 실제 잔액을 소진한 시험이 아니다. 새 GPU는 만들지 않았다.
+- 관측 구현: PLT04 provider_inventory opt-in으로 정확 소유 Pod의 전후 env/valueFrom/envFrom·마운트/Secret/ConfigMap/projected token/CSI 선언을 제한 투영한다. 비밀 값·command·volumeAttributes·Secret/ConfigMap 내용·IMDS/SDK 요청은 읽지 않는다. 기존 등록 worker 소스/target/prepared/current PID/namespace를 대조해 환경 이름의 양성 존재를 연결한다. 뒤늦은 소유자/선언 변경은 첫 관측을 보존하되 전체 범위로 올리지 않는다. 이름 일치는 값 동일성·상속 원인·provider 사용/권한의 증명이 아니다.
+- 시험: 최종 source34cd2fbb/605핀, Linux CPython3.12.3 관련/제품/worker/불변식275 통과·기존1 deselected(pytest18.14초·부모18.513초). 최초 두 시험 묶음의 새 CLI 시험 인자 오류(run의 pack, report/export 옵션)는 원 실패 로그를 보존하고 수정했다. 최종 시험은 EVD→RES→RPT→반출/복원과 기존 UNKNOWN/EXAMPLE 유지, 비밀 값 미수집·변경/누락 거부를 포함한다. 기존 assert/기대값/정책/judge·제외는 완화하지 않았다. 새 정확 head 전체 suite는 PR Linux CI에서 별도로 확인한다.
+- 경계/다음 작업: 기존 worker/input 생산자 bytes·제한 등록을 유지했다. 새 공급 설정 inventory와 호스트 GPU 수집기의 실제 GPU 자격·전체 provider/상속 범위, SUP04·PLT01·LIF08/11·REQ08/09 남은 범위, fresh69개 입력·전체 실제 실행/보고서는 미완료다. 모의 시험과 CPU canary를 GPU 완료로 세지 않는다. runtime/contracts·원 dirty checkout은 변경하지 않았다.
+## 2026-11-18 — 명시적 입력 범위와 원본 함수 연결, 비용 제한 실행 경로
+
+- 한 일: REQ09의 확정된 두 API·text/token_ids 정책을 축소하지 않고 지원되는 세 조합을 명시했다. 조합마다 정상/시험/정상 요청을 실행하며 token 범위·길이의 원래 raise 명령 위치와 현재 HMAC 요청을 별도 투영으로 연결한다. REQ08은 기존 chat의 최상위 필드를 보존하고 중첩 재사용 필드를 추가했다. 같은 요청의 원본 renderer·재사용 함수·입력 처리/검증 반환과 대조 응답의 토큰 HMAC을 함께 요구한다. 정상/fixture 동일·대조 변경·누락·미등록은 확정하지 않는다. 팩39와 위임 정책 V2에 새 범위를 기록했고 V1 값은 보존했다.
+- 자격 경계: 기존 입력 SDK5c9e6a5c·worker cf9474e6 등록은 유지한다. 원 거부 투영·재사용 투영·호스트 GPU census의 별도 자격 레지스트리는 비어 있다. 모의 자격 자료는 시험 임시 디렉터리에만 쓰며 실제 GPU 등록·GPU 토큰 메모리 관측·69개 완료로 올리지 않는다.
+- 실험 기반: 비용 제한 역할 아래에서만 EC2/SSM을 실행하는 Lambda runner와 삭제할 수 없는 단일 세션 lock을 구현했다. fresh credit/lease·이미지·암호화 자동 삭제 디스크·단가 상한·기한·script/source SHA를 검사한다. 실제 배포는 runner/lock 권한까지이며 신규 GPU는 생성하지 않았다. 엔진이 종료돼도 소유 실험의 수집 위치를 유지할 Python-module 감독 도구를 추가했다. pidfd로 자기 자식만 종료하고, 이전 그룹의 잔존·불완전 inventory는 재기동을 거부한다. 강제 종료 요청과 자연 종료를 구분하며 자동 회복/전체 회수로 선언하지 않는다.
+- 시험: Linux CPython3.12.3, 최종 source24775838 관련/등록 실행기/CLI/EVD→RES→RPT→반출·복원/감독 도구/불변식284 통과·기존1 deselected(pytest20.68초·부모21.574초). 앞선 source1d3fd2bc 관련299 통과·기존1 deselected(16.63초·부모17.082초)는 별도 이력이며 합산하지 않는다. 그 소스의 전체 회귀는 별도 동결 사본에서 진행 중이다. 새 최종 소스 전체 통과로 이월하지 않는다. 기존 assert·기대값·기한·제외는 완화하지 않았고, 기존 단일 필드 transport 시험에는 matrix가 위임하는 원 child profile을 명시했다.
+- 팩 이행 보수: 전체 회귀에서38 고정 준비 도구/시험의 실패가 확인돼 SUP08 입력 도구가 정확한 원38/새39 Ref만 받도록 했다. 과거37→38 이행은 원 Git blob3개와 기존 manifest 해시로 복원해77개 정의 전체 비교를 유지한다. 현행 revision 기대값은39(한 단계 추가 이행은40)로 명시했다. 사전 점검은 같은 등록 factory·per-check 설정·실행 결합값의 정책 검사를 외부 IO 없이 수행한다. source24775838의 관련/감독 도구/AWS 모의/불변식352 통과·기존1 deselected(pytest19.61초·부모19.936초), 최종 정확 Ref/변경 정의 거부/입력 정책/CI 경로44 통과(4.48초·부모5.287초). 앞선 관련229개 중228 통과·CI 경로 목록 불일치1 실패는 원 로그로 남겼고 목록 동기화 후 재검증했다. 기존 보안 기대값·기한·기존 제외는 유지했다.
+- 비용 상태: 2026-11-18 00:23 KST Billing GetCredits의 EC2 적용 가능 추정액$12.23, 예비$5·새 세션 최대$6/45분을 유지한다. 00:24 KST 보호 상태는 정상·예약 활성·보호 범위 활성 인스턴스0/EBS0GiB/SG0이었다. root/다른 역할/다른 서비스의 계정 전체 지출 상한이나 최종 청구액0을 보장하지 않는다.
+- 다음 단계/막힌 것: 새 감독 도구의 실제 엔진 연결, SUP04 package/entrypoint/mounted code/gate·PLT01 전체 권한/장치/거부·PLT04 실제 provider/상속·LIF08 원 탐지/통지/회복·LIF11 전체 자원/새 정상 세대·fresh69개 입력이 남아 있다. 전체 실행·원 보고서·새 GPU 자격 등록은 미완료다. 준비 묶음이 갖춰지기 전에 잔여 크레딧으로 GPU를 만들지 않는다.
+
+## 2026-11-18 — 입력 팩 이행의 전체 회귀 실패 보수
+
+- 원 실패: 이전 동결 source1d3fd2bc 전체는14396 통과·124 실패·41 오류·기존34 skip/19 deselected(pytest1967.62초·부모1971.113초)로 종료됐다. head943751e6 CI도 플랫폼의 이전 정의 hash, 기존 예제 팩 Ref, 과거 단일 입력 사례와 새 matrix 계약 연결, collector의 runtime 직접 참조에서 실패했다. 원 로그·JUnit·CI job 로그를 저장하고 통과로 표시하지 않는다.
+- 보수: 현행 예제/개발 정책을39로 연결하고 두 override를 정본 정의와 일치시켰다. 플랫폼의37개 항목 중 REQ08/09 두 링크의 정의 revision/SHA만 갱신했다. 과거 단일 입력의 native/common 판정 시험은 원본38의 정확 전체 Ref로 복원해 동일 기대값·발송/정규화/저장/보고 경계를 재생한다. 새 matrix의 정본 실행기/CLI/보고 시험은 현39를 직접 사용한다. runtime/contracts와 기존 보안 기대값·기한·제외는 변경하지 않았다.
+- 수집 경계: 두 새 자격 helper에서 runtime 직접 import를 제거하고 제한된 순수 JSON 판독을 사용한다. UTF8·중복 키·32768 bytes·깊이64·비유한 수를 검사하고, 자격 source SHA에 판독기를 포함한다. 레지스트리는 여전히 비어 있으며 실제 GPU 등록은 없다.
+- 확인: source2b4c073e/622핀, Linux CPython3.12.3 관련/모든 기존 실패의 연결 경로/과거 판정 재생/불변식499 통과·기존1 deselected(pytest117.74초·부모118.101초). 플랫폼 체크리스트 연결6 통과·기존1warning(0.22초·부모0.928초). sourceb27dce4c의 선행390개 중388통과·JSON 깊이/누락 override2실패도 원 로그로 보존하고 보수했다. 전체 CI는 후속 정확 head에서 다시 확인한다. 신규 GPU를 생성하지 않았다.
+
+## 2026-11-18 — 감독 도구의 긴 제어 디렉터리 경로 보수
+
+- 원 실패: cccc77e1의 두 Linux 기본 CI는 같은 Unix 소켓 경로 길이 오류로 각각14615통과·1실패·기존34skip였다(pytest619.03/706.78초, 부모619.944/708.463초). 실패 원본은 보존했다.
+- 보수: 소유자 전용 디렉터리를 O_DIRECTORY/O_NOFOLLOW로 열고 전후 inode·권한을 검증한 뒤 보유 FD의 짧은 /proc/self/fd 경로에 소켓을 만든다. 전역 cwd나 공개 임시 경로는 사용하지 않는다. 클라이언트도 같은 디렉터리 검증과 기존 HMAC/nonce 검사를 유지한다. 원 시험에 긴 경로 사례를 추가하고 디렉터리 교체·심볼릭 링크·공개 권한 거부를 확인했다.
+- 확인: source2b4c073e는 변경하지 않았다. Python3.12.3 감독 도구·불변식151통과·기존1deselected(pytest6.57초·부모7.092초). 전체 CI는 새 head에서 확인한다. 01:35 KST 추정 크레딧12.23달러, 보호 범위 활성 인스턴스/EBS/보안그룹0개·보호 예약 활성이다. GPU 자격과69개 실제 실행은 여전히 미완료다.
+
+## 2026-11-18 — 별도 원본 응답 대기 관측·닫힌 반출 검증 후보
+
+- 한 일: 등록된 IPC/native SDK를 수정하지 않고 별도 source trace·private namespace 확장·HMAC 파일 sink·준비/반출 검증 도구를 추가했다. 정확 CPython/이미지/파일·함수·명령 위치를 확인하고 같은 Future/요청의 원 reader FD·직접 cause·native error→Future 전파를 구분한다. 이전 Future를 먼저 drain하는 경우는 현재 요청으로 승격하지 않는다. 원 응답·예외 메시지는 읽지 않으며 출력 값은 반환 동작만 보존한다. debugger/profiler·관측 실패·변조·누락·다른 세대·부모 frame 혼입은 완전한 graph를 만들지 않는다.
+- 자격 경계: 별도 bootstrap은 원 sitecustomize를 먼저 실행하며 기존 private SDK 경로에 새 module 위치만 더한다. 준비 도구는 원 SDK bytes·키를 바꾸지 않는다. 새 서명 검증/원본4지점 graph는 파일과 소스 연결의 근거이며, GPU 장애 인과·HTTP 상위 전달·그룹 회복·자원 회수·생산자 등록을 선언하지 않는다. 실제 GPU 자격과 제품의 전체 인과 연결은 남아 있다.
+- 시험: source3dd6fc9b/627핀, Linux CPython3.12.3 서명/소스 graph·원 RPC/Future/IPC·아키텍처/불변식260통과·기존1deselected(pytest9.72초·부모10.255초). 이후 시험만 추가한 같은 source의 준비/원 SDK·native 수집/부트스트랩·불변식245통과·기존1deselected(pytest21.62초·부모22.215초). 합산하지 않는다. 초기 새 시험의 문법 오류와 존재하지 않는 selector로 끝난 무실행 로그도 보존했다. 기존 assert/기대값/기한·제외는 완화하지 않았다.
+- 전체 CI 이력: 부모4f43acae(source2b4c073e)의20개 검사 성공. 두 기본 job은 각각14618통과·기존34skip(pytest830.97/959.52초, 부모832.324/960.887초). 이 결과를 새3dd6 소스의 전체 성공으로 이월하지 않는다. 새 head의 CI를 별도로 확인한다.
+- 다음 단계: 새 실제 GPU 자격/등록·LIF08 상위 통지/그룹 회복·LIF11 전체 자원/새 정상 세대, SUP04/PLT01/PLT04 남은 범위와fresh69개 입력·실행·RPT. GPU는 새로 생성하지 않았으며$5준비금·최대$6/45분 제한을 유지한다.
+
+## 2026-11-18 — 선택 응답 정지와 reader timeout의 원본 연결 후보
+
+- 한 일: 두 원본 검증기를 직접 호출하는 별도 link-stall 도구를 추가했다. 같은 private session·이미지·키/준비 SHA·현재 요청/Future·실제 reader/sender 공유 메모리 FD가 맞고 정지 적용 뒤 원 예외/cause가 Future까지 전달되며 해제·만료·취소 전일 때만 제한된 연결 사실을 남긴다. HTTP500이나 JSON 성공 표시만으로 만들지 않는다. reader의 실제 timeout scalar만 정수 ns로 투영하며 엔진의 시간 설정은 변경하지 않는다. 다른 fault 종류·상위 HTTP 인과·그룹 회복·등록은 여전히 False다.
+- 시험: source95c4b603/628핀, Python3.12.3 서명·source graph/link·기존 stall/physical fault·기존 SDK 자격·아키텍처/불변식295통과·기존1deselected(pytest20.74초·부모21.543초). EXAMPLE 메타데이터와 실제 stdlib Future/서명 파일의 단위 검증이며 실제 GPU 자격이나 판정 완료로 올리지 않는다. 다른 채널·요청·Future/시계·누락·해제/만료·관측 gap·0/미상 timeout을 거부한다. 원 함수/예외와 기존 보안 기대값·기한/제외를 유지한다.
+- 이전 head CI: d798b5ee/source3dd6fc9b의20개 검사 성공. 두 기본 job 각각14661통과·기존34skip(pytest653.31/656.66초·부모654.302/657.586초). source95c4의 전체 성공으로 이월하지 않는다.
+- 입력 점검: 현재 팩39의69개에는176개 확정 정책 값과5개 실행 시 실자료로 채울 규칙이 있다(정책 항목이 있는 점검49개). enterprise 미확정 키는 없지만 sealed ENV/target/per-check 실행 파일은 아직 연결 전이다. SUP03은 security pass/fail 규칙이 비어 있는 추가 미완료 경로임을 확인했다. 실행 횟수만으로69개 판정 완료를 만들지 않는다.
+- 비용: 02:15 KST 추정 크레딧12.23달러, 보호 범위 활성 EC2/EBS/SG0개·예약 활성. 새 GPU는 만들지 않았다. 신규 관측 GPU 자격·등록·69개 실제 실행/원 RPT는 계속 미완료다.
+
+## 2026-11-18 — 워커 예외 처리·실패 응답·원본 오류 연결과 소유 종료 자식 회수
+
+- 한 일: 같은 관측기에 원 Worker RPC·enqueue_output·writer의 별도3지점 graph를 추가했다. 현재 요청과 원 wrapper의 worker 객체/rank·kernel queue FD·오류 객체의 base-slot HMAC·상태 Enum만 읽고 model output·오류 메시지/tuple payload는 읽지 않는다. 같은 오류의 처리와 실제 실패 응답 게시를 Future/reader graph와 구분한다. 정확 소스의 RAISE 명령 위치까지 확인하는 link-exception을 추가했고, 원 장애/응답 파일 검증을 모두 통과한 경우만 후보 사실을 반환한다. 다른 RPC/객체·rank·채널·세대·시계·단순 RuntimeError·만료/순서 오류를 거부한다. 서로 다른 프로세스의 writer/reader 반환 사이에 불필요한 선후 관계를 만들지 않는다. 등록/상위 전달/그룹 회복/전체69개 완료는 False로 유지한다.
+- 감독 도구: standalone 프로세스에서만 child-subreaper를 설정하고 원래 값을 복구한다. 자신의 보유 session/group에 속한 입양된 종료 자식만 PIDFD로 전후 신원을 대조하고 회수한다. Popen 관리 root·다른 session의 자식·살아 있는 자식은 회수/신호 대상이 아니다. 살아 있는 잔존 자식은 새 기동을 계속 막고, 회수 기록의 최근8건·전체 수/해시와 불완전 진단을 남긴다. 이 동작은 엔진 자동 회복이나 전체 자원 회수 판정이 아니다.
+- 검증: sourcef5992c7d/628핀·검토 기록 동결 뒤 Python3.12.3 최종 관련/기존 RPC·물리 장애·기존 SDK 자격·감독 도구/실제 입양 자식·아키텍처/불변식346통과·기존1deselected(pytest23.29초·부모24.083초). 같은 source의 앞선319통과(20.24초·부모20.985초), 이전8c64794a의270통과(13.67초·부모14.411초)는 별도 이력이며 합산하지 않는다. 최초319 실행은 검토 기록 완료와 수집 시작이 겹쳐 최종 근거로 사용하지 않고 동결 뒤 다시 확인했다. 모의 자료·stdlib 실제 프로세스/Future 결과를 GPU 자격으로 올리지 않는다. 기존 보안 기대값·기한·제외를 바꾸지 않았다.
+- CI 이력: a948eac3/source95c4b603의20개 검사 성공, 두 기본 job 각각14692통과·기존34skip(pytest926.87/892.24초·부모928.245/893.896초). 새 f599 source의 전체 결과로 이월하지 않는다. 원본 로그/소스 별 구분을 유지한다.
+- 현재 경계: 실제 GPU 자격/등록·제품의 능동 fault/recovery 연결, SUP03/04·PLT01/04 남은 범위·fresh69개 ENV/target/config 결합·전체 실행과 원 RPT는 아직 남아 있다. 69개 중 정책 항목이 있는49개에서176개 확정 값/5개 실자료 규칙을 다시 확인했으며 정책/ENV를 조작해 판정 완료로 만들지 않았다. 신규 GPU는 만들지 않았다.
+
+## 2026-11-18 — 관측 중 종료·중단 전파 보수
+
+- 검토 중 새 trace callback의 BaseException 격리가 관측 도중 발생한 SystemExit/KeyboardInterrupt/GeneratorExit까지 삼킬 수 있음을 확인했다. 일반 관측 오류는 고정 gap으로 격리하되 종료·중단은 원 객체 그대로 전파한다. gap 기록 중 새 종료가 발생해도 무시하지 않으며, 부분 frame 상태는 정리한다. 기존 SDK bytes는 변경하지 않았다.
+- source4dc2e02e/628핀과 검토 기록 동결 뒤 Python3.12.3 원 객체/종료 전파·gap 기록 실패·원 응답/워커 연결·실제 종료 자식·기존 RPC/물리 장애/SDK 자격·아키텍처/불변식351통과·기존1deselected(pytest22.63초·부모23.368초). 모의 종료 예외와 실제 stdlib 프로세스 시험이며 GPU 실증은 아니다. 기존 기대값·정책·판정 기한·제외를 완화하지 않았다.
+- GPU 준비 점검: 과거 J02 controller는20달러/2시간을 고정 검사하며 오래된 source overlay를 설치하므로 실행하지 않는다. 새 실행에는 승인 범위의 credit-guarded runner와 현재 source/입력 묶음을 사용해야 한다. 신규 GPU·69개 실제 실행/원 RPT·새 관측기 실제 등록은 아직 수행하지 않았다.
+
+## 2026-11-18 — 선택 파일의 커널 읽기·PIDFD 귀속 후보
+
+- 한 일: 기존 등록 SDK를 바꾸지 않고 stdlib fanotify CLASS_NOTIF/REPORT_PIDFD 기반의 별도 선택 inode 관측과 source-pinned node 수집 경로를 추가했다. file content·경로 원문을 출력하지 않고, 읽기/열기/exec-open 사건을 구분한다. kernel이 준 PIDFD·실제 시작/namespace/UID·선택 파일의 전후 metadata를 대조하고 다른 Pod/관측기 자신의 접근은 배제한다. permission event·무제한 queue·target 신호/기동은 사용하지 않는다. retained inode와 현재 path가 모두 일치해야 안정된 선택으로 남긴다.
+- 자격 경계: opaque 기존 containerd task proof의 초기 신원과 프로그램/입력/원본 packet SHA·시간 구간을 연결한다. mmap/cache 소비·parser 수락·전체 공급물 inventory·관측 전후 root mount의 독립 대조·실제 GPU 자격/등록은 아직 주장하지 않는다. syscall 거부·오래된/종료 PID·변경 파일·큐 넘침·관측 한도는 공백이며 SUP03 판정 규칙을 결과에 맞춰 바꾸지 않는다.
+- 시험: sourcec7c24bb0/631핀·검토 기록 동결 뒤 Linux CPython3.12.3 새 FD/PIDFD·inode/세대/시계·기존 node/GPU source·불변식284통과·기존1deselected(pytest7.19초·부모7.751초). 같은 source의 node image·아키텍처/경계·기존 SDK 자격/소스 gate 통합155통과(10.74초·부모11.367초). 별도 실행이므로 합산하지 않는다. 실제 소유 stdlib 자식/FD와 모의 kernel packet 결과이며 실제 fanotify/GPU 자격으로 올리지 않는다. 기존 기대값·제외·정책 기한을 변경하지 않았다.
+- 비용/다음 단계: AWS CLI 인증 만료로 최신 크레딧/guard 재조회가 실패했다. 새 로그인 절차를 유지하며 새 GPU는 생성하지 않았다. 현재 head1be96bfc의20개 CI 검사 성공(두 기본 job 각각14722통과·기존34skip)을 이 새 source에 이월하지 않는다. GPU 자격·전체69개 실행/원 RPT는 계속 미완료다.
+
+## 2026-11-18 — 파일 읽기의 host/container PID 대조와 전후 root mount 연결
+
+- 한 일: kernel PIDFD fdinfo의 NSpid와 살아 있는 proc status의 namespace PID chain을 대조해 host PID와 container PID를 함께 보존한다. 원 worker/RPC 관측과 후속 연결할 때 pid 숫자만 바꾸는 방식으로 대체하지 않는다. anchor와 UID가 같은 namespace의 선택 inode만 현재 관측 범위이며 이 한계를 명시한다.
+- 제품 수집 연결: 기존 lifecycle reader의 정확 소유 API와 opaque containerd task/image/snapshot/root mount proof를 전후 다시 읽는다. sampling 두 지점의 동일 신원을 확인할 뿐 연속 mount 불변성을 주장하지 않는다. 후속 proof/owner 확인이 실패해도 먼저 수집한 packet과 receipt는 보존하며 complete로 올리지 않는다. 기존 등록 SDK와 판정 규칙은 변경하지 않았다.
+- 검증: sourcefb2fb32d/631핀·검토 기록 동결 뒤 Python3.12.3 관련·node/GPU 원 source·전후 image/root mount·아키텍처/불변식458통과·기존1deselected(pytest21.30초·부모22.159초). 앞선 sourcec7c24bb0의284통과 및 통합155통과는 별도 원본이며 합산/이월하지 않는다. WSL6.18.33.2의 새 private PID/mount namespace·임시 공개 fixture에서 실제 kernel ACCESS+PIDFD/NSpid, 다른 namespace 배제, 파일 변경, 종료 PID의4개 개발 사례를 확인하고 소유 자식을 회수했다. 엔진/GPU는 실행하지 않았고 자격/등록으로 올리지 않았다. 전체69 실행/RPT는 미완료다. 신규 GPU는 생성하지 않았다.
+
+- 커널 개발 시험 재현: 비특권 준비 도구는631핀/현재 검토 receipt·고정 canary body를 확인하고 새 private output만 생성한다. root 실행은 준비와 분리되며 생성 프로그램은 자기 임시 파일/namespace/자식만 사용한다. GPU/엔진/등록/전체69 완료는 항상 False다. 준비 도구 거부·무실행 경계와 원 커널 사례를 최종 확인했다.
+- 준비 도구 최초200통과(9.37초·부모10.056초) 뒤 파일 경로로 직접 실행할 때 tools namespace가 없어 실패한 CLI 원본을 확인했다. script/module의 표준 상대 import를 구분하고 두 실제 CLI 진입점을 추가해 최종 재검증한다. 실패 시 출력/자원은 생성되지 않았다.
+- 최종 준비/직접 script·module CLI·source gate·아키텍처/불변식202통과·기존1deselected(pytest10.87초·부모11.622초), sourcefb2fb32d는 유지했다. 공식 준비 도구가 만든 정확 프로그램4804ec17을 WSL root의 새 private namespace/공개 fixture에서 실행해4개 실제 kernel 사례를 다시 확인하고 새 자식2개 모두 회수했다. 원본은 docs/evidence/file-access-wsl-kernel-20261118.json에 보존했다. 부모9c30bd52/sourcec7c24bb0 CI20개 성공, 두 기본 job 각각14792통과/기존34skip(pytest628.67/896.27초·부모629.554/897.762초). 새 head 전체 CI는 별도로 확인한다. GPU 자격·등록·69개 실제 원 RPT는 여전히 미완료다.
+
+## 2026-11-18 — #292 검토 후속
+
+- 팩 39를 플랫폼 정책 입력과 GPU 기본 정책에 연결했다. REQ-08·09 입력 조립기는 대상 이미지용 관측 준비물의 해시를 확인한다.
+- EventBridge 대상 등록이 확인된 뒤 새 감시를 활성화하고 초기 Lambda를 호출한다. REQ-09는 사례별 응답을 판정 규칙에 넘긴다.
+- 팩 연동, 감시 등록 실패, 입력 조립, 혼합 응답 판정의 회귀를 #292 Linux CI에서 검증한다. 이번 작업의 AWS와 GPU 검증은 모의 입력을 사용한다.

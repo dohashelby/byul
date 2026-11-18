@@ -1,0 +1,70 @@
+{
+  "schema": "byul-owned-mvp-policy-amendment/1",
+  "id": "POLICY-MVP69-20261118-V2",
+  "status": "CONFIRMED",
+  "authority": {
+    "delegated_by": "user",
+    "instruction": "너가 알아서 확정해줘",
+    "continued_instruction": "크레딧 상한 안에서 0.30.0의 69개 전체 실제 실행과 보고서까지 완료",
+    "decided_by": "Codex under explicit user delegation",
+    "decided_at": "2026-11-17T15:25:01.797623+00:00"
+  },
+  "scope": "Only the owned isolated vLLM 0.30.0 lab; no external enterprise acceptance is asserted.",
+  "base_document": {
+    "path": "docs/dev-1/mvp-enterprise-policy-20261116.json",
+    "id": "POLICY-MVP69-20261116-V1",
+    "file_sha256": "d5f3ac268727908542dade4edd3eba7ac9af0aed654295eda4055c3e7ea9d2ab",
+    "canonical_document_sha256": "cdd4ab51197a85c01b69e1084647eb0819ceb4bd71011a474ab952a9150eb3b0"
+  },
+  "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 39,
+    "sha256": "f0b5e643361e6a0ba21fa09ecdd0f385c9b430a342882e480d4b69c1a23e97dd"
+  },
+  "inheritance": "Preserve every prior confirmed value and runtime-binding rule. Add explicit input pairs and reused-field paths without reducing prior scope.",
+  "decisions": [
+    {
+      "check_id": "REQ-09",
+      "key": "allowed_input_pairs",
+      "type": "list[str]",
+      "required": true,
+      "value": [
+        "POST /v1/completions|token_ids",
+        "POST /v1/completions|text",
+        "POST /v1/chat/completions|text"
+      ],
+      "decision_state": "USER_DELEGATED_POLICY_DESIGN",
+      "basis": "Explicit supported protocol combinations; unsupported chat token-list content is not treated as a valid normal input."
+    },
+    {
+      "check_id": "REQ-08",
+      "key": "reused_token_fields",
+      "type": "list[str]",
+      "required": true,
+      "value": [
+        "prompt_token_ids",
+        "kv_transfer_params.prompt_token_ids"
+      ],
+      "decision_state": "USER_DELEGATED_POLICY_DESIGN",
+      "basis": "Preserve the original primary field and add the nested reuse path found in the fixed installed source."
+    },
+    {
+      "check_id": "REQ-08",
+      "key": "reused_field_endpoints",
+      "type": "dict",
+      "required": true,
+      "value": {
+        "prompt_token_ids": "POST /v1/chat/completions",
+        "kv_transfer_params.prompt_token_ids": "POST /v1/chat/completions"
+      },
+      "decision_state": "USER_DELEGATED_POLICY_DESIGN",
+      "basis": "Keep the existing chat control and select its nested renderer reuse path; do not infer a completion reuse path."
+    }
+  ],
+  "runtime_identity_fabricated": false,
+  "observed_values_used_to_relax_policy": false,
+  "source_projection_registered": false,
+  "engine_executed": false,
+  "whole69_complete": false
+}

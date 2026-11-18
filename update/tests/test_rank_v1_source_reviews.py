@@ -41,7 +41,9 @@ def module_body(tmp_path, side, name):
         cls_name, method = point.split('.')
         if cls_name not in vars(module):
             vars(module)[cls_name] = type(cls_name, (), {'__module__': name})
-        fn = types.FunctionType(codes[point], vars(module), method)
+        assert all(name == '__class__' for name in codes[point].co_freevars)
+        closure = tuple(types.CellType(vars(module)[cls_name]) for name in codes[point].co_freevars) or None
+        fn = types.FunctionType(codes[point], vars(module), method, closure=closure)
         if codes[point].co_varnames[:1] != ('self',):
             fn = staticmethod(fn)
         setattr(vars(module)[cls_name], method, fn)
@@ -277,3 +279,19 @@ def test_new_source_review_does_not_change_existing_active_profile_selection():
     for row in json.loads(sources.V1_REVIEWS.read_bytes())['profiles']:
         assert not row['observer_installed'] and not row['engine_group_verified'] and not row['producer_registered']
         assert all('hooks' not in spec for spec in row['sources'].values())
+
+
+def test_current_candidate_super_class_cell_must_match_exact_selected_owner(tmp_path):
+    name='vllm.v1.executor.multiproc_executor'
+    module,row,spec=module_body(tmp_path,'candidate',name)
+    point='FutureWrapper.__init__'
+    assert point in spec['functions']
+    original=sources._function(module,point)
+    assert original.__code__.co_freevars==('__class__',)
+    assert original.__closure__[0].cell_contents is module.FutureWrapper
+    foreign=type('FutureWrapper',(),{'__module__':name})
+    replacement=types.FunctionType(original.__code__,vars(module),original.__name__,
+        closure=(types.CellType(foreign),))
+    module.FutureWrapper.__init__=replacement
+    with pytest.raises(ValueError,match='RANK_V1_SOURCE_UNAVAILABLE'):
+        sources.qualify_current_v1(module,image=row['image'])

@@ -1,10 +1,11 @@
-"""Exact 0.30.0 /25 base plus unchanged stream or profiler observation code.
+"""Exact 0.30.0 /25 base plus unchanged stream, profiler or rank observation code.
 
 The variant is fixed by the rendered source. All three private dependencies are
 verified before execution; neither the original /12 nor /15 sensor is edited.
 """
 from __future__ import annotations
 
+from abc import ABCMeta
 import hashlib
 import hmac
 import os
@@ -16,12 +17,24 @@ import types
 
 STREAM_PROFILE = 'vllm-native-lifecycle-metadata/29'
 PROFILER_PROFILE = 'vllm-native-lifecycle-metadata/30'
+# /33 belongs to the independently merged baseline stream composition.
+# J01's unregistered /33 rank recordings remain preserved with their original
+# source snapshot; new preparations use a distinct identity and need qualification.
+RANK_PROFILE = 'vllm-native-lifecycle-metadata/34'
 PROFILES = {'stream': (STREAM_PROFILE, 'guard-native-lifecycle-events/29'),
-            'profiler': (PROFILER_PROFILE, 'guard-native-lifecycle-events/30')}
+            'profiler': (PROFILER_PROFILE, 'guard-native-lifecycle-events/30'),
+            'rank': (RANK_PROFILE, 'guard-native-lifecycle-events/34')}
 BASE_SHA256 = 'e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39'
 RELEASE_SHA256 = '0b8a824f5347b37c8c78f1064f1ab1722c931539a4fa1a96ad1404b077f98a46'
 STREAM_SHA256 = 'c224517c891bf73b2eb1be20d55edfc95416d7938175932ba2bb9fa1ec31b93c'
 PROFILER_SHA256 = '97f920da0ca9ab9ed41b814ab0e08b3af99833cb3a680686c9ffc07d552e1291'
+RANK_SHA256 = '133c317a59ba1d1a1a4bdbcc6710823b7e7b0382e6e39a2a580d346881fb04e0'
+# Reviewed offline on Linux x86_64 using the unchanged /13 code-contract
+# function. This is ABI/source review, not an installed producer qualification.
+RANK_RUNTIME_CODE_CONTRACTS = {
+    'cpython-3.12.3': '76c5d6932a22838fbcd8c49a39f98e6170b1b7591b2f2b11d860f996874de972',
+    'cpython-3.12.8': '31c2a7bf9d0b72322e731905a7d373d595957c638245ecef2b16dd70cc109ad3',
+}
 BINDING_SHA256 = '0d490e63317f0344d26f1bd237a63dab7dc26cdf7768fedbe86742cd8d149846'
 KEY_SHA256 = None  # Rendered source replaces this assignment with a literal.
 PROFILER_ROWS = {
@@ -29,8 +42,28 @@ PROFILER_ROWS = {
     'vllm.v1.worker.gpu_worker': '6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347',
     'vllm.entrypoints.serve.profile.api_router': 'b943c3a2201134e2d0b38bfa86d00e8b5685f5be6a54f6c7178dee784c1b78e5',
 }
+RANK_ROWS = {
+    'vllm.v1.executor.multiproc_executor': '3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a',
+    'vllm.v1.engine.core': '268bf40534a853812867ae8e80040f190983cb364b41182b55969aace20c93f5',
+}
 VARIANT = None  # Rendered source replaces this assignment with a literal.
 _BASE = None
+
+
+def variant_for(profile):
+    matches=[name for name,row in PROFILES.items() if row[0]==profile]
+    if len(matches)!=1:raise ValueError('LIFECYCLE_OBSERVATION_VARIANT_UNAVAILABLE')
+    return matches[0]
+
+
+def extension(profile):
+    from . import vllm_stream_buffer_sensor,vllm_profiler_sensor,vllm_rank_failure_sensor
+    return {'stream':vllm_stream_buffer_sensor,'profiler':vllm_profiler_sensor,
+            'rank':vllm_rank_failure_sensor}[variant_for(profile)]
+
+
+def extension_sha256(profile):
+    return {'stream':STREAM_SHA256,'profiler':PROFILER_SHA256,'rank':RANK_SHA256}[variant_for(profile)]
 
 
 def render_source(variant, *, request_key_sha256):
@@ -88,7 +121,7 @@ def _private_base():
                    _read('guard_lifecycle_base.py', BASE_SHA256))
     release = _module('_guard_observation_release', 'guard_lifecycle_release.py',
                       _read('guard_lifecycle_release.py', RELEASE_SHA256))
-    dependency = STREAM_SHA256 if VARIANT == 'stream' else PROFILER_SHA256
+    dependency = {'stream':STREAM_SHA256,'profiler':PROFILER_SHA256,'rank':RANK_SHA256}[VARIANT]
     extension = _module('_guard_observation_extension', 'guard_lifecycle_extension.py',
                         _read('guard_lifecycle_extension.py', dependency))
     binding = _module('_guard_observation_key_reader', 'guard_request_binding.py',
@@ -99,6 +132,14 @@ def _private_base():
         if set(extension.SOURCE_ADDITIONS) != set(PROFILER_ROWS):
             raise ValueError('PROFILER_RELEASE_ROWS_UNAVAILABLE')
         extension.SOURCE_ADDITIONS = dict(PROFILER_ROWS)
+    elif VARIANT == 'rank':
+        if set(extension.SOURCES)!=set(RANK_ROWS) or set(extension.SOURCE_ADDITIONS)!={extension.MP}:
+            raise ValueError('RANK_RELEASE_ROWS_UNAVAILABLE')
+        extension.SOURCE_ADDITIONS={extension.MP:RANK_ROWS[extension.MP]}
+        extension.SOURCES=dict(RANK_ROWS)
+        if sys.platform!='linux' or os.name!='posix' or os.uname().machine!='x86_64':
+            raise ValueError('RANK_RELEASE_RUNTIME_UNAVAILABLE')
+        extension.RUNTIME_CODE_CONTRACTS=dict(RANK_RUNTIME_CODE_CONTRACTS)
     extension.configure(base)
     parent = base.Observer
     def digest(domain, value):
@@ -107,7 +148,7 @@ def _private_base():
         return hmac.new(key, b'guard-native-request-binding/1\0' + domain.encode() + b'\0'
             + value.encode('utf-8', 'surrogatepass'), hashlib.sha256).hexdigest()
     def header(scope):
-        allowed = {'/v1/completions'} if VARIANT == 'stream' else {
+        allowed = {'/v1/completions'} if VARIANT in {'stream','rank'} else {
             '/v1/completions', '/start_profile', '/stop_profile'}
         if type(scope) is not dict or scope.get('type') != 'http' or scope.get('path') not in allowed:
             return None
@@ -119,7 +160,8 @@ def _private_base():
             return None
         return hmac.new(key, b'guard-native-request-binding/1\0asgi-header\0' + values[0], hashlib.sha256).hexdigest()
     request_fields = frozenset({'request_sha256', 'external_request_sha256', 'selected_request_id_sha256'})
-    request_lists = frozenset({'observed_request_sha256', 'selected_scheduled_sha256', 'selected_finished_sha256'})
+    request_lists = frozenset({'observed_request_sha256', 'selected_scheduled_sha256', 'selected_finished_sha256',
+                               'native_request_sha256'})
     def relay(value, context):
         # These are the base observer's request-ID fields only. Model, source,
         # file, object and invocation hashes retain their original meaning.
@@ -152,6 +194,24 @@ def _private_base():
                 result[name] = item
         return result
     class PrivateObserver(parent):
+        def instrument(self, module):
+            if VARIANT=='rank' and vars(module).get('__name__') in extension.TARGETS:
+                for cls_name,methods in extension.TARGETS[vars(module)['__name__']].items():
+                    cls=vars(module).get(cls_name)
+                    if type(cls) not in (type,ABCMeta):
+                        raise ValueError('RANK_RELEASE_CLASS_UNAVAILABLE')
+                    for name in methods:
+                        fn=vars(cls).get(name)
+                        if type(fn) is not types.FunctionType or fn.__globals__ is not vars(module):
+                            raise ValueError('RANK_RELEASE_CALLABLE_UNAVAILABLE')
+                        if fn.__code__.co_freevars:
+                            if (fn.__code__.co_freevars!=('__class__',) or fn.__closure__ is None
+                                    or len(fn.__closure__)!=1 or fn.__closure__[0].cell_contents is not cls):
+                                raise ValueError('RANK_RELEASE_CLASS_CELL_UNAVAILABLE')
+                        elif fn.__closure__ is not None:
+                            raise ValueError('RANK_RELEASE_CLASS_CELL_UNAVAILABLE')
+            return super().instrument(module)
+
         def __init__(self, config, config_sha):
             if config['session'] != session:
                 raise ValueError('REQUEST_BINDING_KEY_SESSION_MISMATCH')
@@ -167,7 +227,7 @@ def _private_base():
             if event == 'ASGI':
                 context = self.selection_context()
                 payload = {**payload, 'request_sha256': context.get('request') if context else None}
-            elif event in {'NATIVE', 'SELECTION'}:
+            elif event in {'NATIVE', 'SELECTION', 'RANK_FAILURE'}:
                 try: payload = relay(payload, self.selection_context())
                 except (TypeError, ValueError):
                     self.disabled_pid = os.getpid()

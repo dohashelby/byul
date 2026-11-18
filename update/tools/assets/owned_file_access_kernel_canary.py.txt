@@ -1,0 +1,86 @@
+
+import tempfile,subprocess,select,time,os,json,hashlib
+from pathlib import Path
+from datetime import datetime,timezone
+probe=__byul_probe_file_access
+selected=__byul_selected_file_access
+OUT=Path(__file__).resolve().parent
+assert os.geteuid()==0
+CHILD='import sys,os;print("READY",flush=True)\nfor line in sys.stdin:\n if line.strip()=="EXIT":break\n with open(line.strip(),"rb")as f:f.read(1)\n print("READ",flush=True)'
+def line(child):
+ if not select.select([child.stdout],[],[],5)[0]:raise RuntimeError('CANARY_CHILD_NO_ACK')
+ return child.stdout.readline().strip()
+def child(*,isolated):
+ args=['/usr/bin/python3.12','-I','-S','-c',CHILD]
+ if isolated:args=['/usr/bin/unshare','--pid','--fork','--kill-child=SIGKILL','--mount-proc',*args]
+ value=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+ children.append(value)
+ if line(value)!='READY':raise RuntimeError('CANARY_CHILD_NOT_READY')
+ if isolated:
+  raw=selected.read_small('/proc/'+str(value.pid)+'/task/'+str(value.pid)+'/children',4096).split()
+  if len(raw)!=1 or not raw[0].isdigit():raise RuntimeError('CANARY_OWNED_CHILD_ID_UNAVAILABLE')
+  pid=int(raw[0])
+ else:pid=value.pid
+ return value,pid
+def stop(value):
+ if value.poll()is None:
+  try:value.stdin.write('EXIT\n');value.stdin.flush()
+  except BrokenPipeError:pass
+  try:value.wait(timeout=5)
+  except subprocess.TimeoutExpired:value.terminate();value.wait(timeout=5)
+ value.stdin.close();value.stdout.close()
+def read(value,path):
+ value.stdin.write(str(path)+'\n');value.stdin.flush()
+ if line(value)!='READ':raise RuntimeError('CANARY_READ_NO_ACK')
+def drain(reader, predicate):
+ deadline=time.monotonic()+3
+ while time.monotonic()<deadline:
+  if select.select([reader.fd],[],[],.1)[0]:reader.drain()
+  if predicate():return
+ raise RuntimeError('CANARY_NOTIFICATION_UNOBSERVED')
+def scope(path,pid):return {'schema':probe.SELECTION_SCHEMA,'anchor':selected.context(pid),'files':[{'id':'a'*64,'path':str(path),'identity':probe.file_identity(path.stat())}]}
+result={'schema':'byul-owned-file-access-real-kernel-development/1','checked_at':datetime.now(timezone.utc).isoformat(),'source_manifest_sha256':SOURCE_MANIFEST_SHA256,'kernel_release':os.uname().release,'uid':os.geteuid(),'engine_executed':False,'actual_gpu_source_qualified':False,'producer_registered':False,'whole69_complete':False,'new_aws_resources_created':False,'packets':{},'cases':{}}
+children=[];readers=[]
+try:
+ with tempfile.TemporaryDirectory(prefix='byul-file-access-kernel-')as name:
+  root=Path(name).resolve();assert root.parent==Path('/tmp')and root.name.startswith('byul-file-access-kernel-')
+  path=root/'public-fixture';path.write_bytes(b'BYUL_PUBLIC_KERNEL_CANARY')
+  inside,pid=child(isolated=True)
+  outside,other=child(isolated=False)
+  selection=scope(path,pid);reader=probe.NotificationReader(selection).open();readers.append(reader)
+  assert selection['anchor']['pid_namespace']!=selected.context(os.getpid())['pid_namespace']
+  read(inside,path);drain(reader,lambda:any(e['accessed']for e in reader.events))
+  read(outside,path);drain(reader,lambda:reader.ignored>0)
+  packet=reader.finish(capture_closed=False)
+  assert any(e['namespace_pids']==[pid,1]and e['process']['pid']==pid and e['accessed']and e['kernel_pidfd_verified']for e in packet['events'])
+  assert not packet['diagnostic_codes']and packet['anchor_and_file_pins_stable']
+  result['packets']['positive_and_outside_namespace']=packet
+  result['cases']['actual_kernel_access_with_host_and_inner_pid']=True
+  result['cases']['another_namespace_read_not_attributed']=True
+  path.write_bytes(b'BYUL_PUBLIC_CHANGED_FIXTURE');read(inside,path)
+  drain(reader,lambda:'FILE_ACCESS_FILE_CHANGED'in reader.gaps)
+  changed=reader.finish(capture_closed=True)
+  assert not changed['anchor_and_file_pins_stable']and 'FILE_ACCESS_ANCHOR_OR_FILE_CHANGED'in changed['diagnostic_codes']
+  result['packets']['changed_file']=changed;result['cases']['changed_file_not_rebound']=True
+  reader.close();readers.remove(reader)
+  reader=probe.NotificationReader(scope(path,pid)).open();readers.append(reader)
+  read(inside,path);stop(inside)
+  drain(reader,lambda:bool(reader.gaps))
+  exited=reader.finish(capture_closed=True)
+  assert not exited['events']and not exited['anchor_and_file_pins_stable']
+  result['packets']['exited_process']=exited;result['cases']['exited_process_not_attributed']=True
+ result['development_cases_passed']=True
+except Exception as error:
+ result['development_cases_passed']=False;result['failure_type']=type(error).__name__
+ # Public probe diagnostics are fixed codes; arbitrary exception text/paths stay out.
+ if type(error)is ValueError and str(error).startswith('FILE_ACCESS_'):result['probe_diagnostic']=str(error)
+finally:
+ for reader in readers:reader.close()
+ for value in children:stop(value)
+ result['created_child_count']=len(children)
+ result['new_children_reaped']=all(v.poll()is not None for v in children)
+ result['finished_at']=datetime.now(timezone.utc).isoformat()
+ result['canary_program_sha256']=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+ (OUT/'result.json').write_text(json.dumps(result,indent=2)+'\n')
+ print(json.dumps({k:v for k,v in result.items()if k!='packets'}),flush=True)
+raise SystemExit(0 if result['development_cases_passed']else 2)

@@ -31,7 +31,7 @@ from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
 
 class KubernetesContainerConfigExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name="container_config"
-    version="0.2.0"
+    version="0.3.0"
     requires_roles=False
     requires_route_scope=False
     functional_via="engine"
@@ -63,8 +63,15 @@ class KubernetesContainerConfigExecutor(LifecycleCommonInputConsumer, HttpCheckE
     def run(self,check,env,policy_values,adapter,workdir):
         self.validate_policy(check,policy_values)
         try:
-            if set(self.cfg)-{"target","kubectl_binary","max_duration_seconds"} or adapter is None:
+            if (set(self.cfg)-{"target","kubectl_binary","max_duration_seconds","node_image_verification","worker_prepared"}
+                    or adapter is None
+                    or self.cfg.get("node_image_verification") not in (None,"local-containerd-v1","local-k3s-containerd-v1")
+                    or self.cfg.get("node_image_verification") is not None and check.id!="SUP-04"):
                 raise ValueError
+            if 'worker_prepared' in self.cfg:
+                from guard.collectors.worker_security import load_prepared
+                if check.id not in {'PLT-01','PLT-04'}:raise ValueError
+                load_prepared(self.cfg['worker_prepared'])
             with Path(self.cfg["target"]).open("rb") as stream:
                 target=strict_json(stream.read(65537),limit=65536)
             if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target))!=self._expected_target_sha256:
@@ -76,6 +83,7 @@ class KubernetesContainerConfigExecutor(LifecycleCommonInputConsumer, HttpCheckE
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,
             timeout=3.0,allow_mutating=False,keys={},secrets=[],cprobe=transport,
             workdir=workdir,started=utcnow())
+        if 'worker_prepared' in self.cfg:ctx._worker_security_prepared=self.cfg['worker_prepared']
         draft=self._finish(ctx)
         draft.cleanup_errors.extend(transport.report()["cleanup_errors"])
         # Source provenance can only lower the existing draft, including an
@@ -84,12 +92,18 @@ class KubernetesContainerConfigExecutor(LifecycleCommonInputConsumer, HttpCheckE
         origins=[draft.data_origin,DataOrigin(transport.process_observation_origin)]
         if hasattr(ctx,"_kubernetes_process_data_origin"):
             origins.append(DataOrigin(ctx._kubernetes_process_data_origin))
+        if hasattr(ctx,"_kubernetes_image_data_origin"):
+            origins.append(DataOrigin(ctx._kubernetes_image_data_origin))
         draft.data_origin=min(origins,key=lambda origin:ORIGIN_STRENGTH[origin])
         return draft
 
     def collect(self,ctx):
         if ctx.check.id=="PLT-01":
             return collect_kubernetes_process_permissions(ctx)
+        if self.cfg.get("node_image_verification") is not None:
+            from .kubernetes_image_approval import collect
+            return collect(ctx,containerd_address=('/run/k3s/containerd/containerd.sock'
+                if self.cfg['node_image_verification']=='local-k3s-containerd-v1' else None))
         snapshots=[]
         for _ in range(2):
             try:snapshots.append(ctx.cprobe.snapshot())

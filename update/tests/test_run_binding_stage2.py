@@ -219,7 +219,7 @@ def test_policy_migration_stage_2_and_run_config_candidates(tmp_path):
         main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '2'])
     main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '2', '--run-config-out', str(tmp_path / 'rb.yaml')])
     out = yaml.safe_load((tmp_path / 'p.yaml').read_text())
-    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 38
+    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 39
     assert out['values']['LIF-12'] == {} and out['values']['REQ-02'] == {}
     written = yaml.safe_load((tmp_path / 'rb.yaml').read_text())
     assert written['status'] == 'DRAFT' and written['run_binding']['OBS-01'] == {'record_session': SESSION}

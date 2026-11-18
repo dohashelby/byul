@@ -125,14 +125,14 @@ def parse_recording(raw, prepared):
     is_online = prepared["profile"] == online.PROFILE
     is_output = prepared["profile"] == output_sensor.PROFILE
     is_stream = prepared["profile"] in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE,baseline_stream.PROFILE}
-    is_rank = prepared["profile"]in {fault_sensor.PROFILE,rank_sensor.PROFILE}
+    is_rank = prepared["profile"]in {fault_sensor.PROFILE,rank_sensor.PROFILE,release_observation.RANK_PROFILE}
     is_read = prepared["profile"] == read_sensor.PROFILE
     is_worker_startup = prepared["profile"] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_mapping = prepared["profile"] in {mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_weight = prepared["profile"] in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_profiler = prepared["profile"] in {profiler_sensor.PROFILE,release_observation.PROFILER_PROFILE}
     base_profile = (release_sensor.PROFILE if prepared['profile'] in {release_observation.STREAM_PROFILE,
-        release_observation.PROFILER_PROFILE} else baseline_stream.BASE_PROFILE
+        release_observation.PROFILER_PROFILE,release_observation.RANK_PROFILE} else baseline_stream.BASE_PROFILE
         if prepared['profile'] == baseline_stream.PROFILE else prepared['profile'])
     is_init = prepared["profile"] in {init_release.PROFILE,init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_attempt = prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
@@ -201,6 +201,7 @@ def parse_recording(raw, prepared):
     if is_rank:
         keys=keys|rank_metadata.FIELDS
         words=words|{"RANK_FAILURE",rank_sensor.EVENT_SCHEMA,*rank_sensor.POINTS,*rank_sensor.SOURCES,*rank_sensor.RUNTIME_CODE_CONTRACTS,
+            *(release_observation.RANK_RUNTIME_CODE_CONTRACTS if prepared['profile']==release_observation.RANK_PROFILE else {}),
             "executor","future","worker","core","execute_model","PENDING","RUNNING","FINISHED","CANCELLED","CANCELLED_AND_NOTIFIED",
             "none","value","timeout","exception","base-exception","negative","zero","positive"}
     if is_profiler:
@@ -380,7 +381,10 @@ def parse_recording(raw, prepared):
             if payload['observation_ns']>row['monotonic_ns']or payload['clock_context']!={k:header['context'][k]for k in ('boot_sha256','time_namespace','time_offsets_sha256')}:
                 raise ValueError('FAULT_CONTROL_CLOCK_INVALID')
         if row['event']=='RANK_FAILURE':
-            fault_metadata.validate_rank(payload)if is_fault else rank_metadata.validate_sample(payload)
+            fault_metadata.validate_rank(payload)if is_fault else rank_metadata.validate_sample(payload,
+                source_contracts=profiles.source_hashes(prepared['profile']),
+                runtime_contracts=release_observation.RANK_RUNTIME_CODE_CONTRACTS
+                    if prepared['profile']==release_observation.RANK_PROFILE else None)
             if not is_rank or payload['source_verified'] and payload['source_module'] not in ready:
                 raise ValueError('RANK_FAILURE_SOURCE_PROVENANCE_UNAVAILABLE')
             if payload['operation_finished_ns'] is not None and payload['operation_finished_ns']>row['monotonic_ns']:

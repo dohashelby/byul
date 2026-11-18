@@ -1,0 +1,90 @@
+{
+  "schema": "byul-mvp030-gpu-session-outcome/1",
+  "session": "J01",
+  "engine": "vllm",
+  "version": "0.30.0",
+  "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+  "python": "cpython-3.12.3",
+  "actual_source_manifest_sha256": "8aa0aec5981ab53d8b5eb9aab19485c18ae0466388b6d6ed2172303cbb495e56",
+  "selected_checks": 3,
+  "unselected_checks": 66,
+  "original_report_id": "RPT-01M7J081BJFVQJHR4S9SYYBP7C",
+  "original_report_sha256": "a694eda6513dc6770dc2241020d5ce8d2be75b8689663bc24e32b0998b2bb60f",
+  "report_official": false,
+  "report_data_origin": "EXAMPLE",
+  "security": {
+    "PLT-01": "FAIL",
+    "PLT-04": "PASS",
+    "SUP-04": "UNKNOWN"
+  },
+  "functional": {
+    "PLT-01": "UNKNOWN",
+    "PLT-04": "PASS",
+    "SUP-04": "UNKNOWN"
+  },
+  "verdict_scope": {
+    "PLT-01": "Observed exec-writable mount violations retained; whole permission scope incomplete.",
+    "PLT-04": "Explicit forbidden environment/mount names and two declared credential-candidate paths on selected TP workers only.",
+    "SUP-04": "Live local k3s containerd image ancestry and normal HTTP acquired; full package/entrypoint/mutation scope incomplete; canonical pass rules empty."
+  },
+  "worker_observer": {
+    "actual_gpu_qualified": true,
+    "registered": true,
+    "source_sha256": "cf9474e6c8fc05ba8830db00be62441e874f48aa443b12b754fb680af6f8f975",
+    "scope": "Selected owned TP worker security metadata/open/sentinel probes",
+    "producer_authenticated": false
+  },
+  "rank": {
+    "physical_faults_exercised": [
+      "delay"
+    ],
+    "hold_ms": 1000,
+    "client_status": 200,
+    "all_four_faults_complete": false,
+    "common_input_supported": false,
+    "common_input_complete": false,
+    "registered": false,
+    "detection_upper_delivery_recovery_verified": false
+  },
+  "verified_export": {
+    "file": "worker-qualification.zip",
+    "bytes": 1510604,
+    "sha256": "d7a4afe763490722b6646811a90acc5c07125a02381401f293e6106fc7572e7e",
+    "exported_files": 451,
+    "all69_executed": false,
+    "verified_files": 451,
+    "all_member_hashes_verified": true
+  },
+  "cleanup": {
+    "checked_at": "2026-11-16T11:29:08.849537+00:00",
+    "instance_id": "i-03fb2c20b251917db",
+    "instance_state": "terminated",
+    "new_volume_absent": true,
+    "new_security_group_absent": true,
+    "started_at": "2026-11-16T09:50:37.462945+00:00",
+    "terminated_confirmed_at": "2026-11-16T11:28:20.865697+00:00",
+    "duration_hours_upper_bound": 1.6287229866666666,
+    "actual_invoice_known": false,
+    "existing_resources_modified": false
+  },
+  "cost": {
+    "approved_cap_usd": 20,
+    "max_hours": 2,
+    "conservative_estimate_usd_including_six_dollar_reserve": 17.12,
+    "actual_invoice_known": false,
+    "session_budget_closed": true
+  },
+  "all69_executed": false,
+  "all69_complete": false,
+  "video_in_current_scope": false,
+  "completion_pr_published": false,
+  "latest_development_source": {
+    "base_commit": "a4c994f6f127e2f9593a1d41244d1535fa9b7126",
+    "manifest_sha256": "f43fcf14dbee66b1a512b10c4647c63e537b1c5e3eababb8590168abed709cd4",
+    "reviewed_at": "2026-11-16T11:48:40.801348+00:00",
+    "gpu_executed_for_this_manifest": false,
+    "whole69_gpu_qualified": false,
+    "scope_note": "The preserved worker-security producer registration is independently tied to cf9474e6 source and J01 actual evidence; it is not qualification of this entire manifest."
+  },
+  "updated_at": "2026-11-16T11:52:23.537241+00:00"
+}

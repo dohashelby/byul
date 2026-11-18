@@ -19,7 +19,7 @@ DEPENDENCIES = {
     'vllm_slot_mask': ('guard_worker_readiness_support.py', '659d615f133cdc96ef54163678753a60e6b8ee51aa0e78e0560e0d308f7f50da'),
     'vllm_worker_readiness': ('guard_worker_readiness_callback.py', 'a583d32f31d74def618256557ee9e7aee801d5fe1ff55e27b6221d7f2420a965'),
     'vllm_worker_generation_contract': ('guard_worker_generation_contract.py', 'f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a'),
-    'vllm_rank_ipc_sources': ('guard_startup_sources.py', 'd54a79846796d78dcfebb59e21627781e2ffee02ca97f1d041d79f7a9e4c9648'),
+    'vllm_rank_ipc_sources': ('guard_startup_sources.py', '13b5ada83342bf3959d8d7c6e1c6e76b1bb407e0954e7e545aaa9142d30b67cd'),
     'vllm_worker_startup_contract': ('guard_worker_startup_contract.py', '6788df2f4c6f04f46e681eb5eab48631e2ba037754d26166bb02341e4b592950'),
     'vllm_baseline_startup': ('guard_baseline_startup.py', 'eae41581ae04d9edf571c458824840f0d8877ef31bf79e08d218116a588ec842'),
 }

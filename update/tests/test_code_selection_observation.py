@@ -211,7 +211,7 @@ def test_derived_pack_judges_observed_module_selection(code_pack, state, verdict
 
 def test_baseline_pack_is_untouched(code_pack):
     base = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert base.checks["SUP-08"].revision == 5 and base.manifest.revision == 38
+    assert base.checks["SUP-08"].revision == 5 and base.manifest.revision == 39
     assert {k: deepcopy(v.model_dump()) for k, v in base.checks.items() if k != "SUP-08"} == \
            {k: deepcopy(v.model_dump()) for k, v in code_pack.checks.items() if k != "SUP-08"}
 
@@ -354,7 +354,7 @@ def inputs_keys():
     return inputs._CODE_OBSERVATION_KEYS
 
 
-@pytest.mark.parametrize("version,available", [("0.7.0", False), ("0.30.0", False), ("0.31.0", True)])
+@pytest.mark.parametrize("version,available", [("0.7.0", False), ("0.30.0", True), ("0.31.0", True)])
 def test_request_input_checks_stay_on_reviewed_release(version, available):
     assert engine_profiles.supports("vllm", version, "request_input_checks") is available
 
@@ -364,11 +364,15 @@ def test_request_input_checks_stay_on_reviewed_release(version, available):
                 "allowed_input_formats": ["token_ids"]}),
 ])
 @pytest.mark.parametrize("version", ["0.7.0", "0.30.0"])
-def test_old_release_row_does_not_open_other_input_checks(tmp_path, check_id, values, version):
+def test_old_release_row_does_not_open_other_input_checks(tmp_path, check_id, values, version,monkeypatch):
     from guard.collectors.file import load_environment
     from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor
     from tests.builders import baseline_pack
     from tests.test_gpu_a_run_inputs import build
+    # The historical native_input row alone still grants no token/length
+    # probing. .30's independently reviewed input-source row is tested apart.
+    monkeypatch.setattr(engine_profiles,'PROFILES',tuple(p for p in engine_profiles.PROFILES
+        if p.id!='vllm-request-input-release-source/1'))
 
     def no_kubectl(*args, **kwargs):
         raise AssertionError("gate must reject before kubectl")

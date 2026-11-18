@@ -42,8 +42,18 @@ V6_SCHEMA = "guard-native-lifecycle-events/6"
 V7_PROFILE = "vllm-native-lifecycle-metadata/7"
 V7_SCHEMA = "guard-native-lifecycle-events/7"
 SCHEMAS = {fault_sensor.PROFILE:fault_sensor.SCHEMA,sglang_sensor.PROFILE:sglang_sensor.SCHEMA,termination_sensor.PROFILE:termination_sensor.SCHEMA,endpoint_sensor.PROFILE:endpoint_sensor.SCHEMA,generation_sensor.PROFILE:generation_sensor.SCHEMA,joint_sensor.PROFILE:joint_sensor.SCHEMA,startup_sensor.PROFILE:startup_sensor.SCHEMA,mapping_sensor.PROFILE:mapping_sensor.SCHEMA,read_sensor.PROFILE:read_sensor.SCHEMA,weight_sensor.PROFILE:weight_sensor.SCHEMA,profiler_sensor.PROFILE:profiler_sensor.SCHEMA,init_sensor.PROFILE:init_sensor.SCHEMA,rank_sensor.PROFILE: rank_sensor.SCHEMA, stream_sensor.PROFILE: stream_sensor.SCHEMA, output_sensor.PROFILE: output_sensor.SCHEMA, sensor.PROFILE: sensor.SCHEMA, online.PROFILE: online.SCHEMA, attempt.PROFILE: attempt.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA, V6_PROFILE: V6_SCHEMA, V7_PROFILE: V7_SCHEMA, release_sensor.PROFILE: release_sensor.SCHEMA, init_release.PROFILE: init_release.SCHEMA}
-SCHEMAS.update({profile: row['schema'] for profile, row in configured.ROWS.items()})
-SCHEMAS.update({profile: schema for profile, schema in release_observation.PROFILES.values()})
+def _add_profile_schemas(target, rows):
+    # Profile identity chooses source bytes, parser rules and engine binding.
+    # Reject collisions before any of those dispatchers can select a different
+    # provider for the same identity. A dict update would hide this ambiguity.
+    for profile, schema in rows:
+        if profile in target or schema in target.values():
+            raise ValueError('LIFECYCLE_PROFILE_IDENTITY_COLLISION')
+        target[profile] = schema
+
+
+_add_profile_schemas(SCHEMAS, ((profile, row['schema']) for profile, row in configured.ROWS.items()))
+_add_profile_schemas(SCHEMAS, release_observation.PROFILES.values())
 # Exact previously shipped LF/CRLF source spellings; no normalization on input.
 LEGACY_ASSETS = {
     (31143, "50143b5cf54aa8f5bbcfef769c286f65c971e0acd2caa111c625583f4baec3de"),
@@ -460,6 +470,7 @@ def asset_supported(profile, raw, *, request_key_sha256=None):
 
 
 def source_hashes(profile):
+    if profile==release_observation.RANK_PROFILE:return {**release_sensor.source_rows(sensor.SOURCE_SHA),**release_observation.RANK_ROWS}
     if profile==release_observation.STREAM_PROFILE:return {**release_sensor.source_rows(sensor.SOURCE_SHA),**stream_sensor.SOURCE_ADDITIONS}
     if profile==release_observation.PROFILER_PROFILE:return {**release_sensor.source_rows(sensor.SOURCE_SHA),**release_observation.PROFILER_ROWS}
     if configured.contains(profile):return {module: row['sha256'] for module, row in configured.row(profile)['sources'].items()}

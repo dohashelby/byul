@@ -1,0 +1,64 @@
+"""Read only mount metadata in an already selected owned container."""
+import hashlib,json,os,re,signal,sys
+
+SCHEMA='guard-process-mount-observations/1'
+
+def read(path,limit):
+    with open(path,'rb') as stream:raw=stream.read(limit+1)
+    if len(raw)>limit:raise ValueError('bounded read')
+    return raw
+
+def identity(pid):
+    raw=read('/proc/'+str(pid)+'/stat',8192).decode('utf-8','strict')
+    return (int(raw[raw.rfind(')')+2:].split()[19]),os.stat('/proc/'+str(pid)+'/ns/mnt').st_ino)
+
+def mountpoints(pid):
+    raw=read('/proc/'+str(pid)+'/mountinfo',262144)
+    points=set()
+    for line in raw.decode('utf-8','strict').splitlines():
+        left,separator,_=line.partition(' - ');fields=left.split()
+        if not separator or len(fields)<6:raise ValueError('mount framing')
+        value=re.sub(r'\\([0-7]{3})',lambda m:chr(int(m[1],8)),fields[4])
+        if not value.startswith('/') or '\x00' in value:raise ValueError('mount path')
+        points.add(value)
+    if not points:raise ValueError('empty mounts')
+    return points,hashlib.sha256(raw).hexdigest()
+
+def under(path,base):return path==base or path.startswith(base.rstrip('/')+'/')
+
+def capture(spec):
+    own=os.stat('/proc/self/ns/mnt').st_ino;rows=[]
+    for expected in spec['processes']:
+        row={'pid':expected['pid'],'start_ticks':expected['start_ticks'],
+            'mount_namespace_inode':expected['mount_namespace_inode'],'stable':False,
+            'matches':[],'mountinfo_sha256':None,'diagnostic':'MOUNT_CAPTURE_UNAVAILABLE'}
+        try:
+            pid=expected['pid'];before=identity(pid)
+            if before!=(expected['start_ticks'],expected['mount_namespace_inode']) or before[1]!=own:raise ValueError('scope')
+            points,digest=mountpoints(pid)
+            declared={path:os.path.realpath(path) for path in spec['declared_mount_paths']}
+            banned={path:os.path.realpath(path) for path in spec['forbidden_mount_paths']}
+            matches=[{'policy_path':ban,'mount_path':path} for ban,base in banned.items()
+                for path,actual in declared.items() if actual in points and (under(actual,base) or under(base,actual))]
+            after_points,after_digest=mountpoints(pid)
+            if (identity(pid)!=before or points!=after_points or digest!=after_digest
+                    or declared!={p:os.path.realpath(p) for p in declared}
+                    or banned!={p:os.path.realpath(p) for p in banned}):raise ValueError('changed scope')
+            row.update(stable=True,matches=matches,mountinfo_sha256=digest,diagnostic=None)
+        except (OSError,ValueError,UnicodeError,IndexError):pass
+        rows.append(row)
+    return {'schema':SCHEMA,'scope':'selected-container-mount-metadata-only','rows':rows}
+
+if __name__=='__main__':
+    if hasattr(signal,'alarm'):signal.alarm(5)
+    spec=json.loads(sys.argv[1])
+    if (type(spec) is not dict or set(spec)!={'processes','declared_mount_paths','forbidden_mount_paths'}
+            or type(spec['processes']) is not list or not 1<=len(spec['processes'])<=8
+            or any(type(x) is not list or len(x)>128 for x in (spec['declared_mount_paths'],spec['forbidden_mount_paths']))):raise SystemExit(64)
+    for row in spec['processes']:
+        if (type(row) is not dict or set(row)!={'pid','start_ticks','mount_namespace_inode'}
+                or any(type(v) is not int or not 0<v<2**63 for v in row.values())):raise SystemExit(64)
+    for path in spec['declared_mount_paths']+spec['forbidden_mount_paths']:
+        if (type(path) is not str or not path.startswith('/') or len(path.encode())>512
+                or any(ord(c)<32 or ord(c)==127 for c in path) or '..' in path.split('/')):raise SystemExit(64)
+    print(json.dumps(capture(spec),sort_keys=True,separators=(',',':')))

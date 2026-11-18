@@ -75,3 +75,12 @@ def test_unreviewed_release_and_other_engines_gain_nothing():
     for executor in ENGINE_BOUND:
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='EXAMPLE-future') is None
         assert resolve_executor(executor, 'kubernetes', engine='sglang', version='0.30.0') is None
+
+
+def test_rank_release_rows_open_bounded_source_collection_without_runtime_qualification():
+    for executor in ('rank_failure','resource_recovery'):
+        assert resolve_executor(executor,'kubernetes',engine='vllm',version='0.30.0') is not None
+        support=engine_profiles.resolve('vllm','0.30.0',engine_profiles.executor_feature(executor))
+        assert support.profile=='vllm-rank-release-source/1' and not support.runtime_qualified
+        assert get_provider('vllm').executor_gap('0.30.0',executor) is None
+        assert resolve_executor(executor,'kubernetes',engine='vllm',version='0.7.0') is None

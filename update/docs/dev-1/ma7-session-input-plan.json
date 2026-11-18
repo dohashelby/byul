@@ -2107,6 +2107,16 @@
           "key": "rejection_codes",
           "required": true,
           "type": "list[str]"
+        },
+        {
+          "key": "reused_token_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "reused_field_endpoints",
+          "required": true,
+          "type": "dict"
         }
       ],
       "question": "미리 만든 토큰 ID를 재사용하는 입력도 필요한 검사를 거치는가?",
@@ -2157,6 +2167,11 @@
         },
         {
           "key": "allowed_input_formats",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_input_pairs",
           "required": true,
           "type": "list[str]"
         }
@@ -3352,8 +3367,8 @@
   "planned_pack_ref": {
     "id": "PACK-BASELINE",
     "kind": "PACK",
-    "revision": 38,
-    "sha256": "22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80"
+    "revision": 39,
+    "sha256": "f0b5e643361e6a0ba21fa09ecdd0f385c9b430a342882e480d4b69c1a23e97dd"
   },
   "planned_pack_source": {
     "available_on_main": false,

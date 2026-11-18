@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from guard.executors import registry
+from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
 from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, update_allowed_checks
 from guard.models import (
@@ -127,6 +127,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
     if plan.mode == Mode.update:
         allowed_checks = update_allowed_checks(cfg.requested if cfg.requested is not None else cfg.raw, pack)
         validate_update_run_config(cfg)
+    passive_hop = passive_api_hop.validate_run_scope(pack, plan, cfg, allowed_checks)
 
     plan_ref = plan.ref()
     pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
@@ -141,6 +142,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
     }
 
     out: list[Evidence] = []
+    source_refs = {}
     for item in plan.items:
         if not item.selected:
             continue  # INV-10
@@ -175,7 +177,9 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             )
             side_cfg.attempt_id = cfg.attempt_id
             evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,
-                           policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks)
+                           policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks,
+                           passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
+                           source_ref=source_refs.get(side))
             try:
                 store.put(evd)
             except Exception:
@@ -189,11 +193,13 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                     stream.flush(); os.fsync(stream.fileno())
                 raise
             out.append(evd)
+            if passive_hop and check.id == passive_api_hop.SOURCE_CHECK and evd.execution.status == ExecStatus.COMPLETED:
+                source_refs[side] = evd.ref()
     return out
 
 
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
-             policy_validity=(None, None), *, allowed_checks=None) -> Evidence:
+             policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -215,6 +221,34 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         raw = for_check(cfg.raw, item.executor, check.id)  # [check_config.<CHECK>] (RB2-S)
     except ValueError:
         return stopped(ExecStatus.NOT_RUN, "CHECK_CONFIG_INVALID")
+    if passive_hop:
+        if source_ref is None:
+            return stopped(ExecStatus.NOT_RUN, "PASSIVE_API_HOP_SOURCE_NOT_COLLECTED")
+        try:
+            passive_api_hop.validate_policy(check, policy_values)
+            target = passive_api_hop.read_target(raw[item.executor]["target"], env)
+            hashes = raw.get("_kubernetes_target_sha256_by_executor")
+            expected = hashes.get(item.executor) if type(hashes) is dict else None
+            draft = passive_api_hop.draft_passive_api_hop(
+                store, plan_ref=plan.ref(), side=common["side"], attempt_id=cfg.attempt_id,
+                source_ref=source_ref, target=target, expected_target_sha256=expected,
+            )
+        except passive_api_hop.PassiveApiHopUnavailable as exc:
+            return stopped(ExecStatus.NOT_RUN, str(exc))
+        binding = passive_api_hop.execution_binding(
+            draft, side=common["side"], environment_ref=env.ref(), attempt_id=cfg.attempt_id)
+        return Evidence(
+            **{**common, "refs": [*common["refs"], source_ref]},
+            data_origin=draft.data_origin,
+            execution=Execution(
+                status=draft.status, adapter=adapter_info, attempt_id=cfg.attempt_id,
+                executor=ExecutorInfo(name=item.executor, version=passive_api_hop.VERSION,
+                                      config_sha256=sha256_hex(canonical_json(draft.config))),
+                started_at=draft.started_at, finished_at=draft.finished_at, run_binding=binding,
+            ),
+            comparability=draft.comparability,
+            **_normalize(check, draft),
+        ).seal()
     from guard.executors import run_binding
     if run_binding.keys_for(check):
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.

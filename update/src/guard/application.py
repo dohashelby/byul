@@ -16,6 +16,7 @@ from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
 from guard.core.select import select
+from guard.executors import passive_api_hop
 from guard.collectors.change import read_change, resolve_plan, save_change
 from guard.core.change_selection import build_context
 from guard.models import ExecStatus, Mode, Side, utcnow
@@ -209,6 +210,8 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                             as_of=as_of) if chg is not None or previous is not None else None
     plan = (select(pack, envs, policy, change=chg, mode=Mode.update, context=context)
             if context is not None else select(pack, envs, policy, mode=Mode.update))
+    passive_api_hop.validate_scope(pack, side_cfgs.values(), allowed_checks, plan=plan,
+                                  explicitly_requested=passive_api_hop.requested(cfg))
     target_paths, target_snapshots = {}, {}
     if mode == "external" and allowed_checks is not None:
         selected = {item.check_id: item.executor for item in plan.items if item.selected and item.check_id in allowed_checks}
@@ -366,6 +369,8 @@ def _managed_diagnostic_reference(docker, folder: Path, keys: dict, side: str) -
 
 def _validation_inputs(env, cfg: dict):
     """One managed engine, using the same launch contract as update."""
+    if passive_api_hop.requested(cfg):
+        raise ValueError("PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID")
     effective = deepcopy(cfg)
     options = effective.get("validation", {})
     if type(options) is not dict or type(options.get("credential_canary", False)) is not bool:
@@ -514,6 +519,9 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         selected = [item for item in plan.items if item.selected]
         if not selected:
             raise ValueError("policy selected no checks")
+        passive_hop = not single and passive_api_hop.validate_scope(
+            pack, prepared[1].values(), allowed_checks, plan=plan,
+            explicitly_requested=passive_api_hop.requested(cfg))
         executable = selected if allowed_checks is None else [item for item in selected if item.check_id in allowed_checks]
         if allowed_checks is not None and len(executable) != len(selected):
             record("execution-scope", False,
@@ -521,13 +529,17 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         for (side, c), env in zip(prepared[1].items(), envs):
             check_support.extend({"side": side, **row} for row in assess_check_support(
                 pack, env, policy, c, selected_check_ids=[item.check_id for item in selected],
-                managed=prepared[0] == "managed", allowed_checks=allowed_checks))
+                managed=prepared[0] == "managed", allowed_checks=allowed_checks, passive_hop=passive_hop))
         support_by_key = {(row["side"], row["check_id"]): row for row in check_support}
         for item in executable:
             if item.gaps:
                 raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
             for side, c in prepared[1].items():
                 selected_env = envs[0] if side in {'single', 'baseline'} else envs[-1]
+                if passive_hop and item.check_id == passive_api_hop.CHECK:
+                    passive_api_hop.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
+                    passive_api_hop.read_target(c[item.executor]["target"], selected_env)
+                    continue
                 factory = registry.resolve_executor(item.executor, c.get("executors", {}).get(item.executor, ""), engine=selected_env.engine.name, version=selected_env.engine.version)
                 kube=(c.get("executors",{}).get(item.executor)=="kubernetes" and prepared[0]=="external")
                 if factory is None or c.get("executors", {}).get(item.executor) != "real" and not kube:

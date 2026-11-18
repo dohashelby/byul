@@ -201,6 +201,55 @@ def test_missing_shared_policy_blocks_both_container_checks_without_filling_valu
     assert checks['PLT-01']['sides']['baseline'] == 'SHARED_CONTAINER_CHECK_INPUT_UNAVAILABLE'
 
 
+def test_opt_in_plt08_seals_the_same_plt01_target_in_prebound_and_staged_inputs(tmp_path, monkeypatch, sources):
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {**original.values, 'PLT-08': {'plaintext_forbidden': True}}
+    _write(policy_path, original.model_copy(update={'values': values}).seal().to_dict())
+    store = tmp_path / 'store'
+    default, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store)
+    assert 'PLT-08' not in default['update']['allowed_checks']
+    assert 'api_transport' not in default['executors']
+
+    output, fresh = tmp_path / 'passive-wiring', tmp_path / 'fresh-target.json'
+    args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store), '--output', str(output),
+            '--passive-plt08', '--candidate-target-after-baseline', str(fresh)]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            args.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', args)
+    tool.main()
+    prebound = tomllib.loads((output / 'preliminary-guard.toml').read_text())
+    assert prebound['check_config']['PLT-08'] == {'passive_from_plt01': True}
+    assert {'PLT-01', 'PLT-08'} <= set(prebound['update']['allowed_checks'])
+    assert 'PLT-09' not in prebound['update']['allowed_checks']
+    for side, settings in prebound['sides'].items():
+        assert settings['api_transport'] == settings['container_config'] == {'target': str(sides[side]['target'])}
+    readiness = json.loads((output / 'readiness.json').read_bytes())
+    rows = [row for row in readiness['rows'] if row['check_id'] == 'PLT-08']
+    assert len(rows) == 2
+    for row in rows:
+        assert row['file_binding_valid'] and row['executor_policy_valid']
+        assert 'SAME_ATTEMPT_PLT01_CONTROL_REQUIRED' in row['blocking_codes']
+        assert not row['ready_for_execution'] and not row['engine_executed']
+
+    staged = tomllib.loads((output / 'guard.toml').read_text())
+    target = json.loads(sides['candidate']['target'].read_bytes())
+    for number, role in enumerate(('engine', 'probe'), 100):
+        target['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        target['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, target)
+    env = tool.Environment.model_validate_json(sides['candidate']['environment'].read_bytes())
+    hashes = tool.revalidate_candidate(staged, env, readiness['candidate_handoff']['preliminary_target'])
+    assert hashes['api_transport'] == hashes['container_config'] == sha256_hex(canonical_json(target))
+
+    values.pop('PLT-01')
+    _write(policy_path, original.model_copy(update={'values': values}).seal().to_dict())
+    blocked, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=store, passive_plt08=True)
+    assert 'api_transport' not in blocked['executors']
+    assert set(decisions['PLT-08']['sides'].values()) == {'PASSIVE_API_HOP_SOURCE_NOT_ADMITTED'}
+
+
 def test_local_metadata_scope_pins_public_update_targets_and_withholds_shared_siblings(tmp_path, monkeypatch, sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())

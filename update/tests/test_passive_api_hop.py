@@ -5,11 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from guard import application
 from guard.core.execution_recipe import bind_recipe
 from guard.core.judge import judge_evidence
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
-from guard.executors import passive_api_hop as subject
+from guard.executors import passive_api_hop as subject, registry, run_binding
 from guard.executors.kubernetes_container_config import KubernetesContainerConfigExecutor
 from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex
 from guard.models.objects import Operator
@@ -179,3 +180,109 @@ def test_passive_draft_refuses_non_product_or_stale_sealed_source(original, muta
     with pytest.raises(subject.PassiveApiHopUnavailable, match='PASSIVE_API_HOP_SOURCE_SCOPE_UNVERIFIED'):
         subject.draft_passive_api_hop(Store.read_only(store.root), **{**scope, 'source_ref': alternate.ref()})
     assert len(world.packets) == world.process_reads == 1
+
+
+@pytest.fixture
+def passive_update(tmp_path, paired_original, monkeypatch):
+    store, source, _, _ = paired_original[Side.baseline]
+    prior = store.resolve(source.plan)
+    envs = [store.resolve(ref) for ref in prior.inputs.environments]
+    pol = store.resolve(prior.inputs.policy)
+    pol = pol.model_copy(update={'revision': pol.revision + 1,
+        'scope': pol.scope.model_copy(update={'include': ['PLT-01', 'PLT-08', 'PLT-09']})}).seal()
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    config = {
+        'adapter': {'name': 'vllm'},
+        'update': {'mode': 'external', 'allowed_checks': ['PLT-01', 'PLT-08']},
+        'executors': {'container_config': 'kubernetes', 'api_transport': 'kubernetes'},
+        'check_config': {'PLT-08': {'passive_from_plt01': True}},
+        'sides': {side.value: {name: {'target': str(tmp_path / (side.value + '.json'))}
+                              for name in ('container_config', 'api_transport')} for side in paired_original},
+    }
+
+    def active_factory(_cfg):
+        pytest.fail('Passive preparation or execution dispatched the active API transport factory')
+
+    monkeypatch.setitem(registry.EXECUTORS, 'api_transport:kubernetes', active_factory)
+    return store, pack, envs, pol, config, prior
+
+
+def test_product_update_projects_only_the_newly_committed_side_controls(tmp_path, passive_update, paired_original):
+    store, pack, envs, pol, config, prior = passive_update
+    prepared = application.update_readiness(pack, envs, pol, config)
+    assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
+    support = [row for row in prepared['check_support'] if row['check_id'] == 'PLT-08']
+    assert len(support) == 2 and all(row['profile_available'] and not row['runtime_qualified'] for row in support)
+    report, _ = application.execute_update(store, pack, envs, pol, config, tmp_path / 'update', T0)
+    by_id = {row.check_id: row for row in report.by_check}
+    for side, (_, old_source, scope, world) in paired_original.items():
+        rows = {cid: store.resolve(store.resolve(getattr(by_id[cid], side.value).result).evidence)
+                for cid in ('PLT-01', 'PLT-08', 'PLT-09')}
+        source, derived = rows['PLT-01'], rows['PLT-08']
+        assert source.plan == derived.plan != prior.ref() and source.ref() != old_source.ref()
+        assert derived.execution.attempt_id == source.execution.attempt_id != old_source.execution.attempt_id
+        assert derived.execution.status == ExecStatus.COMPLETED
+        assert derived.data_origin == source.data_origin == DataOrigin.EXAMPLE
+        assert derived.comparability == source.comparability
+        assert derived.refs == [derived.plan, derived.environment, source.ref()]
+        assert not derived.artifacts and not derived.normal_control.attempted
+        assert not any(challenge.attempted for challenge in derived.challenges)
+        binding = derived.execution.run_binding
+        assert run_binding.verify(binding, derived) == []
+        values = binding['values']
+        assert values == {'profile': subject.PROFILE, 'source_evidence': source.ref().model_dump(mode='json'),
+                          'target_sha256': scope['expected_target_sha256'],
+                          'source_artifact_sha256': source.artifacts[0].sha256}
+        assert binding['files'] == {key: values[key] for key in ('target_sha256', 'source_artifact_sha256')}
+        assert not derived.observations['forbidden_plaintext_successes'].collected
+        assert not derived.observations['api_transport_scope_complete'].value
+        assert getattr(by_id['PLT-08'], side.value).security.value == 'UNKNOWN'
+        assert rows['PLT-09'].execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
+        assert len(world.packets) == world.process_reads == 2
+        body = json.dumps(derived.to_dict())
+        assert scope['target']['engine']['trusted_url'] not in body and PRIVATE not in body
+
+
+def test_product_update_withholds_projection_if_source_has_not_been_committed(passive_update, paired_original):
+    store, pack, envs, pol, config, _ = passive_update
+    normal_order = select(pack, envs, pol, mode='update')
+    projected_first = normal_order.model_copy(update={
+        'items': [normal_order.item('PLT-08'), *(item for item in normal_order.items if item.check_id != 'PLT-08')],
+    })
+    plan = bind_recipe(projected_first, config, envs)
+    store.put_many([pol, plan])
+    run_cfg = application.run_config(config)
+    for side, (_, _, scope, _) in paired_original.items():
+        run_cfg.side_configs[side.value].raw['_kubernetes_target_sha256_by_executor'] = {
+            'api_transport': scope['expected_target_sha256'],
+        }
+    for evd in run_plan(store, pack, plan, run_cfg):
+        if evd.check_id == 'PLT-08':
+            assert evd.execution.status == ExecStatus.NOT_RUN
+            assert evd.execution.abort_reason == 'PASSIVE_API_HOP_SOURCE_NOT_COLLECTED'
+            assert evd.refs == [plan.ref(), evd.environment]
+        elif evd.check_id == 'PLT-01':
+            assert evd.execution.status == ExecStatus.COMPLETED
+
+
+def test_product_update_rejects_scope_or_recipe_runtime_fallback(passive_update):
+    store, pack, envs, pol, config, _ = passive_update
+    extra = deepcopy(config)
+    extra['update']['allowed_checks'].append('PLT-09')
+    readiness = application.update_readiness(pack, envs, pol, extra)
+    assert next(row for row in readiness['checks'] if row['check'] == 'inputs')['detail'] == (
+        'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
+
+    plan = bind_recipe(select(pack, envs, pol, mode='update'), config, envs)
+    store.put_many([pol, plan])
+    run_cfg = application.run_config(config)
+    for side in run_cfg.side_configs.values():
+        side.raw.pop('check_config')
+    with pytest.raises(subject.PassiveApiHopUnavailable, match='PASSIVE_API_HOP_CONFIGURATION_INVALID'):
+        run_plan(store, pack, plan, run_cfg)
+    assert not store.find_latest('EVD', lambda row: row.plan == plan.ref())
+
+    audit = bind_recipe(select(pack, envs[:1], pol, mode='audit'), config, envs[:1])
+    store.put(audit)
+    with pytest.raises(subject.PassiveApiHopUnavailable, match='PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, audit, application.run_config(config))

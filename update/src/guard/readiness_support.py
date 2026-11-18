@@ -15,7 +15,7 @@ from guard.automation_policy import (string_list, validate_log_integrity_policy,
                                      validate_request_binding_policy, validate_template_policy)
 from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, for_check
 from guard.core.select import check_policy_value
-from guard.executors import ipc_trust_scope, log_collection_gap, registry, request_field_probe, run_binding
+from guard.executors import ipc_trust_scope, log_collection_gap, passive_api_hop, registry, request_field_probe, run_binding
 from guard.executors.request_binding import SUPPORTED_POLICY as BINDING_POLICY
 from guard.executors.log_integrity_parser import PROFILE as LOG_PROFILE, TRUSTED_FIELDS
 from guard.executors.response_content import OPTIONS as RETURN_OPTIONS
@@ -94,7 +94,7 @@ def _policy_shape(check, values, *, kubernetes_template=False):
 
 
 def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: Iterable[str],
-                         managed: bool = True, allowed_checks=None) -> list[dict]:
+                         managed: bool = True, allowed_checks=None, passive_hop: bool = False) -> list[dict]:
     """Describe each selected check without rejecting or rewriting its policy.
 
     The caller supplies the effective configuration for one side. Input shape,
@@ -156,6 +156,18 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             continue
         row["policy_valid"] = True
         if scoped_out:
+            continue
+        if passive_hop and check_id == passive_api_hop.CHECK:
+            row["scope"] = "passive evidence from the same side's owned PLT-01 normal control"
+            row["limitations"].append("the deployed caller path, TLS, IPC, TP and per-hop policy remain unverified")
+            try:
+                passive_api_hop.validate_policy(check, values)
+            except passive_api_hop.PassiveApiHopUnavailable as exc:
+                row["policy_valid"] = False
+                row["reasons"].append(str(exc))
+            else:
+                row.update(code_available=True, profile_available=True, policy_supported=True)
+                row["reasons"].append("requires the exact committed PLT-01 control in this execution attempt")
             continue
         selected_factory = (registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
                             if implementation == "real" or kube else None)

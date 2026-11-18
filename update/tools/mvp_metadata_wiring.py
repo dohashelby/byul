@@ -13,7 +13,7 @@ from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, update_allowed_c
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
-from guard.executors import registry, template_supply_approval as template_supply
+from guard.executors import passive_api_hop, registry, template_supply_approval as template_supply
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
@@ -29,8 +29,9 @@ from tools.mvp_versions import versions
 
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
                    'SUP-03': 'template_validation', 'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
-                   'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc'}
-CHECKS = tuple(CHECK_EXECUTORS)
+                   'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc',
+                   passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
+CHECKS = tuple(cid for cid in CHECK_EXECUTORS if cid != passive_api_hop.CHECK)
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
@@ -88,6 +89,7 @@ def revalidate_candidate(config, env, preliminary_ref):
             raise ValueError('METADATA_STAGED_EXECUTION_SCOPE_INVALID')
     elif (type(allowed) is not list or any(type(cid) is not str or cid not in CHECK_EXECUTORS for cid in allowed)
           or len(set(allowed)) != len(allowed) or {CHECK_EXECUTORS[cid] for cid in allowed} != set(executors)
+          or (passive_api_hop.CHECK in allowed and passive_api_hop.SOURCE_CHECK not in allowed)
           or any(config.get('check_config', {}).get(cid) != {CHECK_OPTIONS[cid]: True}
                  for cid in allowed if cid in CHECK_OPTIONS)):
         raise ValueError('METADATA_STAGED_EXECUTION_SCOPE_INVALID')
@@ -123,6 +125,12 @@ def _check_reason(check, env, target, transport, values, *, policy):
         return 'MVP_POLICY_VALUE_MISSING'
     if check.executor != CHECK_EXECUTORS[check.id]:
         return 'METADATA_EXECUTOR_UNAVAILABLE'
+    if check.id == passive_api_hop.CHECK:
+        try:
+            passive_api_hop.validate_policy(check, values)
+        except passive_api_hop.PassiveApiHopUnavailable as exc:
+            return str(exc)
+        return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
         executor = registry.build_executor(check.executor, 'kubernetes', config,
@@ -154,7 +162,7 @@ def _check_reason(check, env, target, transport, values, *, policy):
     return None
 
 
-def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None):
+def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None, passive_plt08=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -186,7 +194,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config = {'store': str(Path(store).absolute()), 'adapter': {'name': base.engine.name},
               'update': {'mode': 'external'}, 'executors': {}, 'sides': {side: {} for side in sides}}
     candidates = {}
-    for check_id in CHECKS:
+    check_ids = (*CHECKS, passive_api_hop.CHECK) if passive_plt08 else CHECKS
+    for check_id in check_ids:
         check = pack.checks[check_id]
         values = policy.values.get(check_id) or {}
         reasons = {side: _check_reason(check, env, target, transport, values, policy=policy)
@@ -199,6 +208,11 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             if entry['configuration_enabled']:
                 entry['configuration_enabled'] = False
                 entry['sides'] = dict.fromkeys(sides, 'SHARED_CONTAINER_CHECK_INPUT_UNAVAILABLE')
+    passive = candidates.get(passive_api_hop.CHECK)
+    if passive and not candidates[passive_api_hop.SOURCE_CHECK]['configuration_enabled']:
+        passive['configuration_enabled'] = False
+        passive['sides'] = {side: reason or 'PASSIVE_API_HOP_SOURCE_NOT_ADMITTED'
+                            for side, reason in passive['sides'].items()}
     bindings = []
     for check_id, decision in candidates.items():
         if not decision['configuration_enabled']:
@@ -214,7 +228,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             config.setdefault('check_config', {})[check_id] = {CHECK_OPTIONS[check_id]: True}
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
-    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06')
+    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06', passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if CHECK_EXECUTORS[cid] in config['executors']]
     if anchors:
         plan = select(pack, [base, candidate], policy, mode='update')
@@ -245,6 +259,8 @@ def main():
     parser.add_argument('--store', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--node-image-verification', choices=NODE_IMAGE_PROFILES)
+    parser.add_argument('--passive-plt08', action='store_true',
+                        help='Project PLT-08 from the exact same-attempt PLT-01 normal control')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
                         help='Unpublished target path for the operator-managed second phase')
     args = parser.parse_args()
@@ -252,7 +268,7 @@ def main():
               for side in readiness.SIDES}
     pack = load_pack(readiness.ROOT / 'packs/PACK-BASELINE')
     config, bindings, checks = assemble(inputs, args.policy, pack=pack, store=args.store,
-                                        node_image_verification=args.node_image_verification)
+                                        node_image_verification=args.node_image_verification, passive_plt08=args.passive_plt08)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

@@ -21,7 +21,7 @@ from guard.collectors import native_input_rejection_qualification, reused_input_
 from guard.collectors.file import load_environment, load_policy
 from guard.configuration import for_check, merge_config
 from guard.core.select import _in_scope, check_policy_value
-from guard.executors import registry, run_binding
+from guard.executors import passive_api_hop, registry, run_binding
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
 from guard.models import load_pack
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
@@ -126,6 +126,11 @@ def _inspect(source, check, pack, issued_at):
     allowed = update_allowed_checks(config, pack)
     if allowed is not None and check.id not in allowed:
         raise ValueError(UPDATE_CHECK_OUTSIDE_SCOPE)
+    passive_hop = check.id == passive_api_hop.CHECK and passive_api_hop.validate_scope(
+        pack, (merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES), allowed,
+        explicitly_requested=passive_api_hop.requested(config))
+    if passive_hop and not _in_scope(passive_api_hop.SOURCE_CHECK, policy):
+        raise ValueError('PASSIVE_API_HOP_SOURCE_NOT_ADMITTED')
     config = merge_config(config, config.get('sides', {}).get(source['side'], {}))
     config = for_check(config, check.executor, check.id)
     implementation = config.get('executors', {}).get(check.executor)
@@ -148,18 +153,22 @@ def _inspect(source, check, pack, issued_at):
         if target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
         target_state = (target, raw_target, identity)
-    binding, effective = run_binding.effective_values(check, cfg, env, values,
-        side=source['side'], attempt_id='mvp-offline-readiness', issued_at=issued_at,
-        valid_from=policy.valid_from, valid_until=policy.valid_until,
-        run_cfg=run_binding.run_config(config, check.id), policy_ref=policy.ref())
-    # Use the same factory, per-check config and effective run values as run.
-    # This invokes only its admission checks, never run/collect or a target.
-    try:
-        executor = registry.build_executor(check.executor, implementation, config,
-            engine=env.engine.name, version=env.engine.version)
-        executor.validate_policy(check, effective)
-    except (ValueError, TypeError, KeyError):
-        raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
+    if passive_hop:
+        passive_api_hop.validate_policy(check, values)
+        passive_api_hop.validate_target(target_data, env)
+        binding = None  # The source evidence belongs to a future run attempt.
+    else:
+        binding, effective = run_binding.effective_values(check, cfg, env, values,
+            side=source['side'], attempt_id='mvp-offline-readiness', issued_at=issued_at,
+            valid_from=policy.valid_from, valid_until=policy.valid_until,
+            run_cfg=run_binding.run_config(config, check.id), policy_ref=policy.ref())
+        # Use the same executor configuration and policy validation as runtime.
+        try:
+            executor = registry.build_executor(check.executor, implementation, config,
+                engine=env.engine.name, version=env.engine.version)
+            executor.validate_policy(check, effective)
+        except (ValueError, TypeError, KeyError):
+            raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
     if requires_native_matrix:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
@@ -171,6 +180,8 @@ def _inspect(source, check, pack, issued_at):
         if after != target_state[1] or current != target_state[2]:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
     blockers = ['LIVE_EXECUTOR_PREFLIGHT_REQUIRED']
+    if passive_hop:
+        blockers.append('SAME_ATTEMPT_PLT01_CONTROL_REQUIRED')
     if env.data_origin.value == 'EXAMPLE':
         blockers.append('EXAMPLE_ENV_NOT_ACTUAL')
     return {'file_binding_valid': True, 'executor_policy_valid': True, 'environment_ref': env.ref().model_dump(mode='json'),

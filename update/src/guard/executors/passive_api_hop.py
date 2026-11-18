@@ -1,9 +1,11 @@
 """PLT-08 read-only projection of the same attempt's sealed PLT-01 control."""
 from datetime import datetime
 import os
+from pathlib import Path
 import re
 import stat
 
+from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, for_check, merge_config
 from guard.models import DataOrigin, Environment, Evidence, ExecStatus, Kind, Mode, Plan, Policy, Side, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_functional import LOGICAL_ID, PROFILE as CONTROL_PROFILE, WIRE_ID
@@ -11,8 +13,15 @@ from guard.runtime.kubernetes_http import KubernetesBindingError, REQUEST_BINDIN
 from guard.runtime.kubernetes_process import PROFILE as PROCESS_PROFILE, SOURCE_SHA256 as PROCESS_SOURCE_SHA256
 from guard.store import IntegrityError
 from .base import EvidenceDraft
+from .run_binding import SCHEMA_2, _stamp
 
 PROFILE = 'passive-owned-api-hop-v1'
+VERSION = '0.1.0+passive-api-hop'
+CHECK = 'PLT-08'
+SOURCE_CHECK = 'PLT-01'
+EXECUTOR = 'api_transport'
+OPTION = KUBERNETES_BOUND_CHECK_OPTIONS[CHECK]
+_TARGET_BYTES = 65536
 _PRODUCER = 'kubernetes-process-permission-consumer-v1'
 # Exact stream-probe wrapper dispatched by the PLT-01 producer. A wire source
 # change requires review before its receipts qualify for this projection.
@@ -27,6 +36,116 @@ class PassiveApiHopUnavailable(ValueError):
 def _require(condition, code):
     if not condition:
         raise PassiveApiHopUnavailable(code)
+
+
+def _options(raw):
+    checks = raw.get('check_config')
+    values = checks.get(CHECK) if type(checks) is dict else None
+    return values if type(values) is dict else {}
+
+
+def requested(raw):
+    if type(raw) is not dict:
+        return False
+    section = raw.get(EXECUTOR)
+    # Catch the misplaced option too so a malformed request cannot dispatch
+    # the active collector as a fallback.
+    return OPTION in _options(raw) or type(section) is dict and OPTION in section
+
+
+def validate_scope(pack, configurations, allowed_checks, *, plan=None, explicitly_requested=False):
+    """Admit only the exact two-sided, explicitly scoped product path."""
+    configurations = tuple(configurations)
+    if not explicitly_requested and not any(requested(raw) for raw in configurations):
+        return False
+    required = {CHECK, SOURCE_CHECK}
+    _require(len(configurations) == 2 and allowed_checks is not None and required <= allowed_checks
+             and {cid for cid in allowed_checks if pack.checks[cid].executor == EXECUTOR} == {CHECK},
+             'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
+    if plan is not None:
+        _require(plan.mode == Mode.update and required <= {item.check_id for item in plan.items if item.selected},
+                 'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
+    for raw in configurations:
+        code = 'PASSIVE_API_HOP_CONFIGURATION_INVALID'
+        _require(type(raw) is dict, code)
+        update, executors = raw.get('update', {}), raw.get('executors', {})
+        section = raw.get(EXECUTOR)
+        producer = for_check(raw, 'container_config', SOURCE_CHECK).get('container_config')
+        opts = _options(raw)
+        _require(type(update) is dict and update.get('mode', 'external') == 'external'
+                 and type(executors) is dict and executors.get(EXECUTOR) == 'kubernetes'
+                 and executors.get('container_config') == 'kubernetes'
+                 and set(opts) == {OPTION} and opts[OPTION] is True
+                 and type(section) is dict and set(section) == {'target'}
+                 and type(producer) is dict and isinstance(section['target'], (str, Path))
+                 and producer.get('target') == section['target'], code)
+    return True
+
+
+def validate_run_scope(pack, plan, config, allowed_checks):
+    """Compare the execution's effective routes with the recipe inputs."""
+    raw = (config.requested if config.requested is not None else config.raw) or {}
+    sides = raw.get('sides', {})
+    declared_sides = tuple(sides.get(side.value, {}) for side in (Side.baseline, Side.candidate)) if type(sides) is dict else ()
+    effective = tuple(config.side_configs.get(side.value, config) for side in (Side.baseline, Side.candidate))
+    if not (requested(raw) or any(type(side) is dict and requested(side) for side in declared_sides)
+            or any(requested(side.raw) for side in effective)):
+        return False
+    _require(plan.mode == Mode.update, 'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
+    declarations = tuple(merge_config(raw, side) for side in declared_sides)
+    code = 'PASSIVE_API_HOP_CONFIGURATION_INVALID'
+    validate_scope(pack, declarations, allowed_checks, plan=plan, explicitly_requested=True)
+    validate_scope(pack, (side.raw for side in effective), allowed_checks, plan=plan, explicitly_requested=True)
+    for declared, actual in zip(declarations, effective):
+        _require(actual.raw[EXECUTOR] == declared[EXECUTOR]
+                 and all(actual.executors.get(name) == 'kubernetes' for name in (EXECUTOR, 'container_config')),
+                 code)
+    return True
+
+
+def validate_policy(check, values):
+    _require(check.id == CHECK and check.executor == EXECUTOR
+             and getattr(check, 'collection_profile', None) == 'explicit-owned-api-plaintext-v1'
+             and type(values) is dict and set(values) == {'plaintext_forbidden'}
+             and type(values['plaintext_forbidden']) is bool,
+             'PASSIVE_API_HOP_POLICY_UNVERIFIED')
+
+
+def read_target(path, env):
+    """Read the selected target declaration without invoking Kubernetes."""
+    code = 'PASSIVE_API_HOP_TARGET_UNVERIFIED'
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
+        with os.fdopen(descriptor, 'rb') as stream:
+            metadata = os.fstat(stream.fileno())
+            _require(stat.S_ISREG(metadata.st_mode) and 0 < metadata.st_size <= _TARGET_BYTES, code)
+            raw = stream.read(_TARGET_BYTES + 1)
+        _require(len(raw) == metadata.st_size, code)
+        target = strict_json(raw, limit=_TARGET_BYTES)
+    except (OSError, TypeError, ValueError):
+        raise PassiveApiHopUnavailable(code) from None
+    validate_target(target, env)
+    return target
+
+
+def validate_target(target, env):
+    code = 'PASSIVE_API_HOP_TARGET_UNVERIFIED'
+    _require(type(target) is dict and target.get('lab') is False
+             and target.get('schema') == 'guard-kubernetes-request-binding-target/1'
+             and target.get('environment_ref') == env.ref().model_dump(mode='json'), code)
+    try:
+        return _validate(target, env)
+    except (AttributeError, KeyError, KubernetesBindingError, TypeError, ValueError):
+        raise PassiveApiHopUnavailable(code) from None
+
+
+def execution_binding(draft, *, side, environment_ref, attempt_id):
+    trial, = draft.observations['api_transport_trials'].value
+    files = {key: trial[key] for key in ('source_artifact_sha256', 'target_sha256')}
+    return {'schema': SCHEMA_2, 'check_id': CHECK, 'side': side.value, 'attempt_id': attempt_id,
+            'environment_sha256': environment_ref.sha256, 'files': files, 'validity': None,
+            'issued_at': _stamp(draft.started_at),
+            'values': {'profile': PROFILE, 'source_evidence': trial['source_evidence'], **files}}
 
 
 def _source(store, plan_ref, side, attempt_id, source_ref):
@@ -119,10 +238,9 @@ def _verified_projection(store, *, plan_ref, side, attempt_id, source_ref, targe
     try:
         source, env, prohibited = _source(store, plan_ref, side, attempt_id, source_ref)
         target_sha256 = sha256_hex(canonical_json(target))
-        _require(type(expected_target_sha256) is str and target_sha256 == expected_target_sha256
-                 and target.get('lab') is False and target.get('schema') == 'guard-kubernetes-request-binding-target/1'
-                 and target.get('environment_ref') == env.ref().model_dump(mode='json'), 'PASSIVE_API_HOP_TARGET_UNVERIFIED')
-        binding, _ = _validate(target, env)
+        _require(type(expected_target_sha256) is str and target_sha256 == expected_target_sha256,
+                 'PASSIVE_API_HOP_TARGET_UNVERIFIED')
+        binding, _ = validate_target(target, env)
         summary, digest = _read_summary(store, source)
         first, last = _bound_request(summary, source, binding, target_sha256)
     except PassiveApiHopUnavailable:

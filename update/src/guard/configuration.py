@@ -14,6 +14,7 @@ UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
 KUBERNETES_BOUND_CHECK_OPTIONS = {
     "OBS-04": "local_observation_only",
     "PLT-06": "worker_trust_metadata_only",
+    "PLT-08": "passive_from_plt01",
 }
 
 

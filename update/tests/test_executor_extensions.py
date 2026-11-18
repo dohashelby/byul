@@ -333,6 +333,19 @@ def test_plt09_segment_mismatch_is_rejected_before_any_probe(tmp_path):
     assert evd.execution.status.value == "ABORTED" and docker.calls == []
 
 
+@pytest.mark.parametrize("duplicate_name", ["engine-collector", "collector-sink"])
+def test_plt09_requires_one_configured_sender_per_policy_segment(tmp_path, duplicate_name):
+    docker = HelperDocker([])
+    names = ["engine-collector", "collector-sink"]
+    values = {"record_transport_segments": names, "record_tls_required_segments": names}
+    segments = [SEGMENT, {**SEGMENT, "name": "collector-sink", "container": "collector"},
+                {**SEGMENT, "name": duplicate_name, "container": "other"}]
+    evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), values,
+                           extra_cfg={"record_segments": segments})
+    assert evd.execution.status.value == "ABORTED" and docker.calls == []
+    assert result.verdicts.security.value == "UNKNOWN"
+
+
 def test_plt09_later_segment_error_keeps_the_earlier_failure(tmp_path):
     second = {**SEGMENT, "name": "collector-sink", "container": "collector"}
     values = {"record_transport_segments": ["engine-collector", "collector-sink"], "record_tls_required_segments": ["engine-collector", "collector-sink"]}

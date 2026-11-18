@@ -2,7 +2,10 @@
 from copy import deepcopy
 from datetime import datetime,timedelta,timezone
 from decimal import Decimal
+import hashlib
 import json
+from pathlib import Path
+from unittest.mock import Mock
 import pytest
 from tools import aws_credit_guard as g
 from tools import aws_credit_guard_deploy as deploy
@@ -155,3 +158,57 @@ def test_failed_iam_renewal_never_produces_a_healthy_state_or_cleanup_claim():
     cloud=Denied();cloud.instances=[instance()]
     with pytest.raises(PermissionError):run(cloud)
     assert cloud.state is None and not any(c[0]=='terminate_instances'for c in cloud.calls)
+
+
+@pytest.mark.parametrize('target_result, installed', [
+    ({'FailedEntryCount': 0, 'FailedEntries': []}, True),
+    ({'FailedEntryCount': 1, 'FailedEntries': [{'TargetId': 'OwnedCreditGuard', 'ErrorCode': 'InternalException'}]}, False),
+    ({}, False),
+])
+def test_deploy_requires_target_registration_before_initial_invocation(tmp_path, target_result, installed):
+    cfg = config()
+    cfg['monitor_deadline_at'] = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    arn = f"arn:aws:lambda:{cfg['region']}:{cfg['account_id']}:function:{cfg['guard_id']}"
+    role = f"arn:aws:iam::{cfg['account_id']}:role/EXAMPLE"
+    infra = {'image_ids': ['ami-EXAMPLE'], 'subnet_id': 'subnet-EXAMPLE', 'vpc_id': 'vpc-EXAMPLE',
+             'instance_role_arn': role, 'instance_profile_arn': role.replace(':role/', ':instance-profile/')}
+    responses = {
+        ('sts', 'get-caller-identity'): {'Account': cfg['account_id']},
+        ('freetier', 'get-account-plan-state'): Cloud().get_account_plan_state(),
+        ('iam', 'get-role'): None,
+        ('iam', 'create-role'): {'Role': {'Arn': role}},
+        ('logs', 'describe-log-groups'): {'logGroups': []},
+        ('lambda', 'get-function'): None,
+        ('lambda', 'create-function'): {'FunctionArn': arn},
+        ('events', 'describe-rule'): None,
+        ('events', 'put-rule'): {'RuleArn': f"arn:aws:events:{cfg['region']}:{cfg['account_id']}:rule/{cfg['guard_id']}"},
+        ('events', 'put-targets'): target_result,
+    }
+
+    def call(service, operation, *args, **kwargs):
+        if (service, operation) == ('lambda', 'invoke'):
+            Path(args[-1]).write_text(json.dumps({
+                'schema': g.SCHEMA, 'blocked': False,
+                'source_sha256': hashlib.sha256(Path(g.__file__).read_bytes()).hexdigest(),
+            }))
+        return responses.get((service, operation), {})
+
+    api = Mock(output=tmp_path)
+    api.call.side_effect = call
+    api.document.side_effect = lambda name, value: 'file://' + str(tmp_path / name)
+    if installed:
+        assert deploy.deploy(api, cfg, infra)['installed_schedule'] == 'rate(1 minute)'
+        assert (tmp_path / 'deployment.json').is_file()
+    else:
+        with pytest.raises(RuntimeError, match='CREDIT_GUARD_SCHEDULE_TARGET_UNVERIFIED'):
+            deploy.deploy(api, cfg, infra)
+        assert not (tmp_path / 'deployment.json').exists()
+    operations = [call.args[:2] for call in api.call.call_args_list]
+    assert ('events', 'put-targets') in operations
+    assert (('events', 'enable-rule') in operations) is installed
+    assert (('lambda', 'invoke') in operations) is installed
+    rule_args = api.call.call_args_list[operations.index(('events', 'put-rule'))].args
+    assert rule_args[rule_args.index('--state') + 1] == 'DISABLED'
+    if installed:
+        assert (operations.index(('events', 'put-targets')) < operations.index(('events', 'enable-rule'))
+                < operations.index(('lambda', 'invoke')))

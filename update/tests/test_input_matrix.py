@@ -131,14 +131,15 @@ def test_matrix_admission_stops_before_target_or_network_io(damage):
     with pytest.raises(ValueError):executor.validate(check,p,cfg)
 
 
-@pytest.mark.parametrize('registered',[False,True])
-def test_all_explicit_pairs_flow_through_registered_class_and_real_evd_report_export(tmp_path,monkeypatch,registered):
+@pytest.mark.parametrize('registered, chat_rejection', [(False, 400), (True, 400), (True, 422), (True, 413)])
+def test_all_explicit_pairs_flow_through_registered_class_and_real_evd_report_export(
+        tmp_path, monkeypatch, registered, chat_rejection):
     """EXAMPLE IO boundary plus real policy, class, CLI, Store and report."""
     from pathlib import Path
-    import hashlib,shutil,yaml
+    import hashlib
     from typer.testing import CliRunner
     from guard.cli import app
-    from guard.models import canonical_json,load_pack,sha256_hex
+    from guard.models import canonical_json,load_pack
     from guard.store import Store
     from guard.runtime import kubernetes_http
     from guard.collectors import native_input
@@ -173,7 +174,8 @@ def test_all_explicit_pairs_flow_through_registered_class_and_real_evd_report_ex
         calls.append((request['url'],deepcopy(request['body'])))
         body=request['body'];is_chat='messages'in body;prompt=body['messages'][0]['content']if is_chat else body['prompt']
         valid=prompt in([0],'hello')
-        if not valid:return {'outcome':400,'body':'{"error":{"type":"EXAMPLE"}}'}
+        if not valid:
+            return {'outcome': chat_rejection if is_chat else 400, 'body': '{"error":{"type":"EXAMPLE"}}'}
         choice={'index':0,'finish_reason':'length'}
         choice.update({'message':{'role':'assistant','content':'EXAMPLE'}}if is_chat else{'text':'EXAMPLE'})
         return {'outcome':200,'body':json.dumps({'id':'EXAMPLE-response','model':ctx.cprobe.api_model,
@@ -185,12 +187,8 @@ def test_all_explicit_pairs_flow_through_registered_class_and_real_evd_report_ex
         return {'projection':{'cases':{key:{'original_rejection_observed':True,'normal_returns_observed':True}for key in fixture['cases']}},
             'qualification':{'registered':registered,'whole69_complete':False},'current_fixture_links_verified':True,'diagnostic_codes':[]}
     monkeypatch.setattr(executor,'source_facts',example_source)
-    original=baseline_pack();packdir=tmp_path/'pack';shutil.copytree(original.path,packdir)
-    check=definition();path=packdir/'checks/REQ-09.yaml';path.write_text(yaml.safe_dump(check.model_dump(mode='json'),allow_unicode=True,sort_keys=False))
-    manifest=yaml.safe_load((packdir/'pack.yaml').read_bytes());manifest['revision']+=100
-    for item in manifest['files_sha256']:
-        if item['path']=='checks/REQ-09.yaml':item['sha256']=sha256_hex(path.read_bytes())
-    (packdir/'pack.yaml').write_text(yaml.safe_dump(manifest,allow_unicode=True,sort_keys=False));pack=load_pack(packdir)
+    packdir = Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE'
+    pack = load_pack(packdir)
     pol=policy(pack.ref(),scope={'include':['REQ-09']},values={'REQ-09':values()})
     for name,obj in [('environment',env.to_dict()),('policy',pol.to_dict()),('target',target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(obj))
@@ -209,8 +207,13 @@ def test_all_explicit_pairs_flow_through_registered_class_and_real_evd_report_ex
     assert len(calls)==11 and len(evd.observations['input_matrix_cases'].value)==4
     assert evd.observations['input_endpoints_tested'].value==values()['allowed_endpoints']
     assert evd.observations['input_formats_tested'].value==values()['allowed_input_formats']
-    assert evd.observations['input_matrix_complete'].value is registered
-    assert res.verdicts.security.value==('PASS'if registered else'UNKNOWN')
+    complete = registered and str(chat_rejection) in values()['rejection_codes']
+    assert evd.observations['input_matrix_complete'].value is complete
+    assert res.verdicts.security.value == ('PASS' if complete else 'UNKNOWN')
+    outcomes = evd.observations['challenge_outcomes'].value
+    assert outcomes['POST /v1/completions|token_ids|length'] == '400'
+    assert outcomes['POST /v1/completions|text|length'] == '400'
+    assert outcomes['POST /v1/chat/completions|text|length'] == str(chat_rejection)
     assert evd.observations['challenge_consumption'].value=={'token_id':'unknown','length':'unknown'}
     assert sum(a.name.endswith('native_input_capture.json')for a in evd.artifacts)==3
     cli(['evidence','export','--store',tmp_path/'store','--output',tmp_path/'bundle.zip'])

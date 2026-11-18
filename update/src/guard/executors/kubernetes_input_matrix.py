@@ -187,18 +187,22 @@ class KubernetesMatrixInputValidationExecutor(KubernetesObservedInputValidationE
         expected=planned(ctx.check,ctx.policy_values)
         complete=(len(rows)==len(expected)and [r['case_id']for r in rows]==expected
             and all(r['rejection_state']=='verified'for r in rows)and not self._matrix_cleanup)
-        outcomes={};rejections={}
-        for kind in('token_id','length'):
-            selected=[r for r in rows if r['case']==kind]
-            values={r['outcome']for r in selected}
-            outcomes[kind]=next(iter(values))if len(values)==1 and None not in values else'mixed-or-unavailable'
-            rejections[kind]='verified'if selected and all(r['rejection_state']=='verified'for r in selected)else'unverified'
+        kinds = ('token_id', 'length')
+        outcomes = {row['case_id']: row['outcome'] or 'unavailable' for row in rows}
+        rejections = {row['case_id']: row['rejection_state'] for row in rows}
+        # The pack requires both kind keys. Use the first planned case for
+        # each key and include every case in the existing all_in rules.
+        for kind in kinds:
+            cases = [row for row in rows if row['case'] == kind]
+            outcomes[kind] = outcomes[cases[0]['case_id']] if cases else 'unavailable'
+            rejections[kind] = ('verified' if cases and all(row['rejection_state'] == 'verified' for row in cases)
+                                else 'unverified')
         observations={'challenge_outcomes':outcomes,'accepted_challenges':[r['case_id']for r in rows
             if type(r['outcome'])is str and r['outcome'].isdigit()and 200<=int(r['outcome'])<300],
-            'challenges_planned':['token_id','length'],'functional_probes_planned':control_plan,'functional_probe_results':controls,
+            'challenges_planned':list(kinds),'functional_probes_planned':control_plan,'functional_probe_results':controls,
             'input_endpoints_tested':[p for p in ctx.policy_values['allowed_endpoints']if p in endpoints],
             'input_formats_tested':[p for p in ctx.policy_values['allowed_input_formats']if p in formats],
-            'challenge_rejection_results':rejections,'challenge_consumption':{k:'unknown'for k in outcomes},
+            'challenge_rejection_results':rejections,'challenge_consumption':dict.fromkeys(kinds, 'unknown'),
             'confirmed_input_violations':[],'input_matrix_planned':expected,'input_matrix_cases':rows,'input_matrix_complete':complete}
         normal={'attempted':attempted>0,'succeeded':bool(control_plan)and set(control_plan)==set(controls)
             and all(v=='pass'for v in controls.values()),'detail':'Actual controls before and after every explicitly permitted endpoint/format boundary case.'}

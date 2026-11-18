@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from byul_platform.config import Settings
 from byul_platform.contracts import canonical_sha256
 from byul_platform.diff import json_diff
+from byul_platform.inputs import MVP_PACK
 from byul_platform.main import create_app
 from byul_platform.sources.update import rpt_to_verification_result
 from byul_platform.store import FileDocumentStore, RevisionExists
@@ -101,7 +102,7 @@ def _env() -> dict:
 def _policy() -> dict:
     pol = load_json(EXAMPLES / "policy.json")
     pol["policy_id"] = "corp-policy"
-    pol["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 38}
+    pol["verification"]["pack"] = dict(MVP_PACK)
     pol["status"] = "DRAFT"
     pol["approval"] = None
     return pol

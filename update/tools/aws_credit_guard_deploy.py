@@ -140,8 +140,10 @@ def deploy(api,cfg,infra):
     if existing_rule:
         rule_tags=api.call('events','list-tags-for-resource','--resource-arn',existing_rule['Arn'])
         assert any(t['Key']==guard.TAG and t['Value']==cfg['guard_id']for t in rule_tags['Tags']),'Unowned schedule refused'
+    # Keep an existing watch active and install a new target before enabling a new watch.
+    state = 'ENABLED' if existing_rule and existing_rule.get('State') == 'ENABLED' else 'DISABLED'
     rule=api.call('events','put-rule','--name',cfg['guard_id'],'--schedule-expression','rate(1 minute)',
-        '--state','ENABLED','--tags',json.dumps([{'Key':guard.TAG,'Value':cfg['guard_id']}]))
+        '--state',state,'--tags',json.dumps([{'Key':guard.TAG,'Value':cfg['guard_id']}]))
     try:api.call('lambda','add-permission','--function-name',cfg['guard_id'],'--statement-id','OwnedCreditSchedule',
         '--action','lambda:InvokeFunction','--principal','events.amazonaws.com','--source-arn',rule['RuleArn'])
     except RuntimeError as e:
@@ -149,8 +151,13 @@ def deploy(api,cfg,infra):
         policy=json.loads(api.call('lambda','get-policy','--function-name',cfg['guard_id'])['Policy'])
         row,=[s for s in policy['Statement']if s['Sid']=='OwnedCreditSchedule']
         assert row['Condition']['ArnLike']['AWS:SourceArn']==rule['RuleArn']
-    api.call('events','put-targets','--rule',cfg['guard_id'],'--targets',json.dumps([{
+    target_result = api.call('events','put-targets','--rule',cfg['guard_id'],'--targets',json.dumps([{
         'Id':'OwnedCreditGuard','Arn':arn,'RetryPolicy':{'MaximumEventAgeInSeconds':60,'MaximumRetryAttempts':0}}]))
+    failed_count = target_result.get('FailedEntryCount') if type(target_result) is dict else None
+    if type(failed_count) is not int or failed_count != 0 or target_result.get('FailedEntries'):
+        raise RuntimeError('CREDIT_GUARD_SCHEDULE_TARGET_UNVERIFIED')
+    if state == 'DISABLED':
+        api.call('events', 'enable-rule', '--name', cfg['guard_id'])
     response_file=api.output/'initial-invocation.json'
     invoke=api.call('lambda','invoke','--function-name',cfg['guard_id'],'--payload','fileb://'+str(Path(api.document('event.json',{}).removeprefix('file://'))),str(response_file))
     assert not invoke.get('FunctionError'),response_file.read_text()[:1600]

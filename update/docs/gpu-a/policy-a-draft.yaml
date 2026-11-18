@@ -12,11 +12,19 @@ values:
     reused_token_field: prompt_token_ids
     reused_token_allowed: false
     rejection_codes: ['400', '422']
+    reused_token_fields: [prompt_token_ids, kv_transfer_params.prompt_token_ids]
+    reused_field_endpoints:
+      prompt_token_ids: POST /v1/chat/completions
+      kv_transfer_params.prompt_token_ids: POST /v1/chat/completions
   REQ-09:
     max_input_tokens: 127
     rejection_codes: ['400', '413', '422']
-    allowed_endpoints: ['POST /v1/completions']
-    allowed_input_formats: [token_ids]
+    allowed_endpoints: ['POST /v1/completions', 'POST /v1/chat/completions']
+    allowed_input_formats: [token_ids, text]
+    allowed_input_pairs:
+    - POST /v1/completions|token_ids
+    - POST /v1/completions|text
+    - POST /v1/chat/completions|text
   REQ-10:
     allowed_sampling_options: [temperature, top_p, min_tokens]
     rejection_codes: ['400', '422']

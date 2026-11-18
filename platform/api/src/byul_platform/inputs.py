@@ -8,7 +8,7 @@ from pathlib import Path
 from .input_models import InputBinding, InputCatalog, InputVersion, PolicyInputPreview
 from .store import InvalidDocId
 
-MVP_PACK = {"id": "PACK-BASELINE", "revision": 38}  # 2026-11-14 RB·RB2, 2026-11-15 RB3: 실행 결합값·실행 준비값·생산자 소스·발급자 사건은 정책이 아니라 guard run이 계산한다
+MVP_PACK = {"id": "PACK-BASELINE", "revision": 39}  # 실행 결합값은 정책이 아니라 guard run이 계산한다.
 # 의미가 같은 필드만 연결한다. 역할표→호출자 목록, 응답 옵션→응답 필드는 추정하지 않는다.
 _GROUPS = {
     "1.2": {"REQ-01": ["allowed_callers"], "REQ-03": ["general_allowed_kinds"]},

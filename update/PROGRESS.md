@@ -3358,3 +3358,9 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 커널 개발 시험 재현: 비특권 준비 도구는631핀/현재 검토 receipt·고정 canary body를 확인하고 새 private output만 생성한다. root 실행은 준비와 분리되며 생성 프로그램은 자기 임시 파일/namespace/자식만 사용한다. GPU/엔진/등록/전체69 완료는 항상 False다. 준비 도구 거부·무실행 경계와 원 커널 사례를 최종 확인했다.
 - 준비 도구 최초200통과(9.37초·부모10.056초) 뒤 파일 경로로 직접 실행할 때 tools namespace가 없어 실패한 CLI 원본을 확인했다. script/module의 표준 상대 import를 구분하고 두 실제 CLI 진입점을 추가해 최종 재검증한다. 실패 시 출력/자원은 생성되지 않았다.
 - 최종 준비/직접 script·module CLI·source gate·아키텍처/불변식202통과·기존1deselected(pytest10.87초·부모11.622초), sourcefb2fb32d는 유지했다. 공식 준비 도구가 만든 정확 프로그램4804ec17을 WSL root의 새 private namespace/공개 fixture에서 실행해4개 실제 kernel 사례를 다시 확인하고 새 자식2개 모두 회수했다. 원본은 docs/evidence/file-access-wsl-kernel-20261118.json에 보존했다. 부모9c30bd52/sourcec7c24bb0 CI20개 성공, 두 기본 job 각각14792통과/기존34skip(pytest628.67/896.27초·부모629.554/897.762초). 새 head 전체 CI는 별도로 확인한다. GPU 자격·등록·69개 실제 원 RPT는 여전히 미완료다.
+
+## 2026-11-18 — #292 검토 후속
+
+- 팩 39를 플랫폼 정책 입력과 GPU 기본 정책에 연결했다. REQ-08·09 입력 조립기는 대상 이미지용 관측 준비물의 해시를 확인한다.
+- EventBridge 대상 등록이 확인된 뒤 새 감시를 활성화하고 초기 Lambda를 호출한다. REQ-09는 사례별 응답을 판정 규칙에 넘긴다.
+- 팩 연동, 감시 등록 실패, 입력 조립, 혼합 응답 판정의 회귀를 #292 Linux CI에서 검증한다. 이번 작업의 AWS와 GPU 검증은 모의 입력을 사용한다.

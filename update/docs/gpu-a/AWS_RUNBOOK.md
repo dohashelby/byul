@@ -128,6 +128,7 @@ PLT-01·04 process-device-provider는 소유 Pod 바인딩을 확인한 뒤 노�
 ## 2026-11-03 후속 실행과 남은 경계
 - **G-A3:** `input_validation:kubernetes`를 구현하고 REQ-08·09·SUP-08을 실제 서버에서 실행했습니다. `python -m tools.gpu_a_run_inputs http-check --check <ID> --env <env.json> --target <target.json> --out <새 폴더>`로 REQ-08·09·10·SUP-03·08 입력을 만듭니다. SUP-03은 `v2-template` 세대를 먼저 준비합니다. select → run → judge → report는 기존 CLI 그대로입니다.
 - input validation은 선언한 한 endpoint·정상 body·유한 token 배열·정확한 추가 필드 fixture만 받습니다. 실행기 어댑터는 공백 있는 원 ID를 전송용 ID로 변환하고 응답에서 복원합니다. 고정 `stream_probe.py`와 다른 전송 프로파일의 허용 범위는 바꾸지 않았습니다.
+- 팩 39의 REQ-08·09는 선언한 모든 입력 조합을 실행합니다. `http-check`에 대상 격리 lab 이미지와 일치하는 native input 준비 디렉터리를 `--prepared`로 지정합니다. 준비 설정의 소유자와 대상 관측 UID가 실행 사용자의 UID와 다르면 `--prepared-uid`를 함께 지정합니다. 조립기는 준비 파일과 이미지가 일치할 때 해당 manifest 해시를 실행 설정에 기록합니다.
 - **REQ-16:** Qwen2-VL-2B-Instruct를 준비한 G-A4 후속에서 `req16-full` 23사례로 네 문맥을 한 실행에서 관측했습니다. media의 공유 텍스트 접두를 위반으로 읽는 투영 한계와 실제 이미지 블록 재사용 미관측을 원자료 분석에 남겼습니다. 기존 판정은 보존합니다.
 - **큰 모델의 lab 가중치 공간:** 현재 렌더러의 `guard-weights` 상한은 4Gi입니다. 위 VL 시험 Pod는 측정 완료 39초 뒤 이 상한 초과로 Evicted됐습니다. 멀티모달 변형 재실행 전 모델 파일 합계와 변형 공간을 확인하고, 상한을 명시·검증할 렌더 입력 및 새 환경 기록을 준비해야 합니다. 0.5B용 4Gi 설정을 큰 모델에 그대로 사용하지 않습니다.
 

@@ -725,6 +725,11 @@
       "manifest_sha256": "fb2fb32d871979f7feef1854d24bd74053f4fe4176222cb8692b8d0420363d1e",
       "reviewed_by": "Codex / exact original rejection sites and separate GPU census qualification; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-17T19:13:04.779492+00:00"
+    },
+    {
+      "manifest_sha256": "1e3f4814cb277be7aefc77a0dc02cf94ca9ee1f538509e7b468c555e36db6cf3",
+      "reviewed_by": "Codex / REQ-09 per-case outcomes; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T06:36:44+00:00"
     }
   ]
 }

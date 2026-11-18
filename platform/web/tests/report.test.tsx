@@ -86,10 +86,10 @@ describe("검증 보고서 화면", () => {
     expect(drawer.getByRole("tabpanel").textContent).toContain("raw-value");
   });
 
-  it("SUP-08 판본과 판정 변화 및 확인된 로드 근거를 표시한다", () => {
+  it.each(["REGRESSED", "NOT_COMPARABLE"] as const)("SUP-08의 로드 근거와 비교 상태를 표시한다 (%s)", (comparison) => {
     mockApi({});
     const row = check("SUP-08", {
-      headline: "FAIL", comparison: "REGRESSED",
+      headline: "FAIL", comparison,
       candidate: { ...side("FAIL"), finding: {
         code: "forbidden_code_revision_imported", field: "mm_processor_kwargs.code_revision", revision: "recorded-revision",
       } },
@@ -102,9 +102,17 @@ describe("검증 보고서 화면", () => {
     const drawer = within(screen.getByLabelText("상세"));
     expect(within(drawer.getByText("기준 · vLLM 0.7.0").parentElement!).getByText("보안 충족")).toBeTruthy();
     expect(within(drawer.getByText("후보 · vLLM 0.30.0").parentElement!).getByText("보안 미충족")).toBeTruthy();
-    expect(drawer.getByText(/보안 충족 → 미충족/)).toBeTruthy();
+    const heading = comparison === "REGRESSED"
+      ? "기준은 보안 충족, 후보에서는 요청에 지정한 코드가 로드됨"
+      : "요청에 지정한 코드가 실제로 로드됨";
+    expect(drawer.getByRole("heading", { name: heading })).toBeTruthy();
+    if (comparison === "NOT_COMPARABLE") expect(drawer.getByText(/비교 조건을 충족하지 못했으며/)).toBeTruthy();
+    const details = drawer.getByText("상세 근거").closest("details")!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain("recorded-revision");
+    expect(drawer.getByText(/기준 vLLM 0.7.0은 보안 충족으로 기록됐습니다/)).toBeTruthy();
     expect(screen.getByText("두 판본에 모두 기록된 보안 판정 중 1건이 달라졌습니다.")).toBeTruthy();
-    expect(drawer.getByText(/새 로드 기록과 저장된 모듈의 해시가 일치했습니다/)).toBeTruthy();
+    expect(drawer.getByText(/로드 기록과 저장된 모듈의 해시가 일치했습니다/)).toBeTruthy();
   });
 
   it("단일 보고서에서도 누락과 미확인 관측을 표시한다", () => {

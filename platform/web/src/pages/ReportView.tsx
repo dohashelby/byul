@@ -186,6 +186,11 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
   const update = report.mode === "update";
   const sides: SideKey[] = update ? ["baseline", "candidate"] : ["single"];
   const present = sides.filter((key) => c[key]);
+  const candidateImport = update && c.candidate?.finding?.code === "forbidden_code_revision_imported";
+  const baselinePass = c.baseline?.security === "PASS";
+  const summarizesComparison = candidateImport && baselinePass && c.comparison === "REGRESSED"
+    && c.baseline?.functional === c.candidate?.functional
+    && c.baseline?.performance === c.candidate?.performance;
   return (
     <DetailPanel
       title={<span className="mono">{c.check_id}</span>}
@@ -208,19 +213,24 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                     </div>
                   ))}
                 </div>
-                {update && <p>{comparisonText(c)}</p>}
+                {update && !summarizesComparison && <p>{comparisonText(c)}</p>}
               </section>
               {present.some((key) => c[key]?.finding) && (
                 <section>
-                  <h4>확인된 근거</h4>
+                  <h4>{summarizesComparison ? "기준은 보안 충족, 후보에서는 요청에 지정한 코드가 로드됨" : "요청에 지정한 코드가 실제로 로드됨"}</h4>
                   {present.map((key) => {
                     const finding = c[key]?.finding;
                     return finding?.code === "forbidden_code_revision_imported" && (
-                      <p key={key}>
-                        {SIDE_LABEL[key]}에서 정책으로 금지한 코드 판본 선택이 반영되었습니다.
-                        요청 필드 <code>{finding.field}</code>에 제출된 판본 <code>{finding.revision}</code>의 모듈이
-                        실제로 로드됐으며, 새 로드 기록과 저장된 모듈의 해시가 일치했습니다.
-                      </p>
+                      <div key={key}>
+                        <p>
+                          정책은 요청을 보낸 사람이 서버에서 사용할 코드 버전을 지정하는 것을 금지합니다.
+                          {SIDE_LABEL[key]} {`${report.targets?.[key] ? targetLabel(report, key) : "서버"}에서`}
+                          시험 요청에 지정된 버전의 코드가 실제로 로드됐습니다.
+                        </p>
+                        <p>
+                          요청 직후 생긴 로드 기록을 해당 코드 파일과 대조했습니다. 로드 기록과 저장된 모듈의 해시가 일치했습니다.
+                        </p>
+                      </div>
                     );
                   })}
                 </section>
@@ -240,6 +250,9 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                           {unverified.length > 0 && <p>{SIDE_LABEL[key]}에서 추가 확인이 필요한 관측은 {unverified.join(", ")}입니다.</p>}
                         </div>
                       );
+                    }
+                    if (key === "baseline" && candidateImport && baselinePass && !side.finding) {
+                      return <p key={key}>기준 {report.targets?.baseline ? `${targetLabel(report, "baseline")}은` : "판본은"} 보안 충족으로 기록됐습니다. 이 보고서에는 그 판정의 세부 관측 기록이 없습니다.</p>;
                     }
                     if (!side.finding) return <p key={key}>{SIDE_LABEL[key]}의 세부 판정 근거를 설명할 수 있는 관측 기록이 없습니다.</p>;
                     return null;
@@ -268,6 +281,12 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                       <h4>{SIDE_LABEL[key]}</h4>
                       {side.result_id && <p className="mono">RES · {side.result_id}@{side.result_revision}</p>}
                       {side.evidence_ref && <p className="mono">EVD · {side.evidence_ref.id}@{side.evidence_ref.revision}</p>}
+                      {side.finding?.code === "forbidden_code_revision_imported" && (
+                        <KeyValue items={[
+                          ["요청 필드", <code>{side.finding.field}</code>],
+                          ["요청에 지정된 코드 판본", <code>{side.finding.revision}</code>],
+                        ]} />
+                      )}
                       {side.reasons.length > 0 && <JsonView value={side.reasons} />}
                       {!!side.missing_observations?.length && <JsonView value={side.missing_observations} />}
                     </div>

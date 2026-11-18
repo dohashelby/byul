@@ -17,6 +17,6 @@ def release_profile(version):
 def http_profile(version, image):
     """정확한 판본·이미지 쌍의 HTTP 검토 데이터. 후보는 실행·거부 증명이 아니다."""
     row = release_profile(version)
-    if row is None or image not in row['images']:
+    if row is None or image not in row['images'] or 'http' not in row:
         return None
     return {**row['http'], 'pin_status': row['pin_status']}

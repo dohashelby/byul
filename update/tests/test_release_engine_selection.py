@@ -11,7 +11,7 @@ from guard.adapters.vllm_release_profiles import release_profile
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.comparison import execution_conditions
 from tests.test_gpu_a_run_inputs import deployed
-from tests.test_ma6_release_profiles import pair
+from tests.test_ma6_release_profiles import historical_versions, pair
 from tools import gpu_a_aws_lab as lab
 from tools import gpu_a_run_inputs as inputs
 
@@ -26,17 +26,19 @@ def render(version, image, **kwargs):
 
 
 def test_selected_engine_is_separate_from_upstream_default_and_image_qualification():
-    for role, version, image in pair():
+    historical = historical_versions()['baseline']
+    cases = pair() + [(historical['role'], historical['version'], historical['image'])]
+    for _, version, image in cases:
         profile = release_profile(version)
         raw, _, record = render(version, image, release_launch=True)
         deployment, _ = yaml.safe_load_all(raw)
         env = deployment['spec']['template']['spec']['containers'][0]['env']
-        assert profile['launch']['default_engine'] == ('V0' if role == '기준 판본' else 'V1')
+        assert profile['launch']['default_engine'] == ('V0' if version == '0.7.0' else 'V1')
         assert record['launch']['engine'] == profile['launch']['engine'] == 'V1'
         assert record['launch']['env'] == profile['launch']['env']
         assert all({'name': k, 'value': v} in env for k, v in record['launch']['env'].items())
         assert profile['pin_status'] == 'candidate_pin'
-        if role == '기준 판본':
+        if version == '0.7.0':
             assert record['launch']['env'] == {'VLLM_USE_V1': '1'}
 
 
@@ -64,7 +66,8 @@ def test_future_engine_selection_and_rejected_options_need_only_profile_data(mon
 
 
 def test_engine_selection_cannot_leak_to_another_image_or_conflicting_generation(monkeypatch):
-    _, version, image = pair()[0]
+    historical = historical_versions()['baseline']
+    version, image = historical['version'], historical['image']
     _, _, record = render(version, image[:-64] + 'f' * 64)
     assert record['launch']['env'] == {} and record['launch']['engine'] is None
     generation = deepcopy(lab.GENERATIONS['v2-default'])
@@ -81,23 +84,25 @@ def test_engine_selection_cannot_leak_to_another_image_or_conflicting_generation
     ('v1-producers-kv', 'AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED'),
     ('v2-producers', 'AWS_RELEASE_LAUNCH_ENV_UNSUPPORTED'),
 ])
-def test_baseline_v1_does_not_render_unsupported_generations(generation, error):
-    _, version, image = pair()[0]
+def test_initial_v1_does_not_render_unsupported_generations(generation, error):
+    historical = historical_versions()['baseline']
+    version, image = historical['version'], historical['image']
     with pytest.raises(ValueError, match=error):
         render(version, image, generation=generation)
 
 
 def test_v1_selection_does_not_inherit_v0_observation_gaps_or_unknown_approvals():
-    _, version, _ = pair()[0]
-    profile = release_profile(version)
-    for executor, gap in profile['executor_gaps'].items():
-        assert gap['cause'] not in {'V0_OBSERVER_NOT_IMPLEMENTED', 'V0_TARGET_TABLE_ABSENT', 'APPROVED_UNKNOWN'}, executor
-        assert 'V0' not in (gap.get('next') or ''), executor
+    for _, version, _ in pair():
+        profile = release_profile(version)
+        for executor, gap in profile.get('executor_gaps', {}).items():
+            assert gap['cause'] not in {'V0_OBSERVER_NOT_IMPLEMENTED', 'V0_TARGET_TABLE_ABSENT', 'APPROVED_UNKNOWN'}, executor
+            assert 'V0' not in (gap.get('next') or ''), executor
 
 
 @pytest.mark.parametrize('damage', ['missing', 'wrong-value', 'duplicate', 'value-from'])
 def test_engine_env_must_match_the_observed_pod_declaration(tmp_path, damage):
-    _, version, image = pair()[0]
+    historical = historical_versions()['baseline']
+    version, image = historical['version'], historical['image']
     pods, record = deployed(tmp_path, 'v2-default', engine_version=version, engine_image=image)
     env = inputs.environment(record, gpu_model='EXAMPLE-GPU', driver='EXAMPLE', data_origin='EXAMPLE')
     namespace = json.loads((tmp_path / 'namespace.json').read_text())

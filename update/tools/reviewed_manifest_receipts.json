@@ -730,6 +730,11 @@
       "manifest_sha256": "1e3f4814cb277be7aefc77a0dc02cf94ca9ee1f538509e7b468c555e36db6cf3",
       "reviewed_by": "Codex / REQ-09 per-case outcomes; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T06:36:44+00:00"
+    },
+    {
+      "manifest_sha256": "3f88c4dbfca9c266a2a6ff83f62138816a3cb2b5f2690790779e4b1b41c91d9d",
+      "reviewed_by": "Codex / pinned vLLM 0.31.0 GPU launch metadata and HTTP lookup boundary; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T07:50:51+00:00"
     }
   ]
 }

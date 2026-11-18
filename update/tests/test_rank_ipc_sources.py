@@ -112,13 +112,13 @@ def test_changed_source_body_or_binding_is_rejected(tmp_path, monkeypatch, chang
     assert module.calls == []
 
 
-def test_profile_covers_each_exact_mvp_image_without_registering_it():
-    from tools.mvp_versions import versions
+def test_profile_preserves_historical_ipc_images_without_registering_them():
+    from tests.test_ma6_release_profiles import historical_versions
 
     data = json.loads(sources.PROFILES.read_bytes())
     assert data['schema'] == 'guard-rank-ipc-source-candidates/1'
     assert len(data['profiles']) == 2
-    assert {row['image'] for row in data['profiles']} == {row['image'] for row in versions().values()}
+    assert {row['image'] for row in data['profiles']} == {row['image'] for row in historical_versions().values()}
     assert {row['id'] for row in data['profiles']} == {'v0-task-queue', 'v1-shm-broadcast'}
     for row in data['profiles']:
         assert row['pin_status'] == 'candidate_pin'

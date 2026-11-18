@@ -9,14 +9,16 @@ import subprocess
 import pytest
 
 from guard.models import canonical_json
+from tests.test_ma6_release_profiles import historical_versions
 from tools import mvp_a_rank_input_plan as tool, rank_ipc_candidates as ipc
 from tools.mvp_versions import versions
 
 
 @pytest.fixture
-def inputs(tmp_path):
+def inputs(tmp_path, monkeypatch):
     rows = []; reviewed = None
-    for side, profile in versions().items():
+    monkeypatch.setattr(tool, 'versions', historical_versions)
+    for side, profile in historical_versions().items():
         for kind in ('delay', 'exception', 'death'):
             path = tmp_path / (side + '-' + kind)
             manifest = ipc.prepare(path, image=profile['image']); reviewed = manifest['source_manifest_sha256']
@@ -30,6 +32,15 @@ def inputs(tmp_path):
         **{k: False for k in tool.FALSE_FIELDS}}
     source = tmp_path / 'rank-preparation.json'; source.write_bytes(canonical_json(document))
     return source, document
+
+
+def test_historical_prepared_rank_inputs_cannot_be_used_for_current_pair(inputs, tmp_path, monkeypatch):
+    source, _ = inputs
+    monkeypatch.setattr(tool, 'versions', versions)
+    output = tmp_path / 'rejected'
+    with pytest.raises(ValueError, match='MA7_RANK_PREPARED_MISMATCH'):
+        tool.prepare(source, output)
+    assert not output.exists()
 
 
 def test_six_file_verified_candidates_join_j01_without_replacing_existing_rows(inputs, tmp_path, monkeypatch):

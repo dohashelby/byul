@@ -321,6 +321,33 @@
           "next": "M-B4"
         }
       }
+    },
+    {
+      "role": "후보 판본",
+      "version": "0.31.0",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+        "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
+      ],
+      "pin_status": "candidate_pin",
+      "launch": {
+        "command": [
+          "/usr/local/bin/vllm-nonroot-entrypoint.sh"
+        ],
+        "model_argument": "positional",
+        "default_engine": "V1",
+        "engine": "V1",
+        "env": {}
+      },
+      "qualification": "기동 데이터는 aws-handoff-20261026 및 docs/gpu-a/ENVIRONMENT.md의 amd64 이미지 고정과 과거 GPU 기동 기록을 근거로 한다. 새 실행의 설치 파일·제품 증거·생산자 자격은 별도 확인한다.",
+      "check_launch_args": {
+        "REQ-16": [
+          "--enable-prefix-caching"
+        ],
+        "REQ-17": [
+          "--enable-prefix-caching"
+        ]
+      }
     }
   ]
 }

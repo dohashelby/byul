@@ -19,7 +19,6 @@ from guard.adapters import vllm_rank_v1_worker_runtime as runtime
 from guard.adapters import vllm_rank_v1_worker_capture as capture
 from guard.adapters.vllm_rank_ipc_capture import canonical
 from tools import rank_v1_worker_inputs as inputs
-from tools.mvp_versions import versions
 from tests.test_rank_v1_source_reviews import module_body, EndLoop, reviewed
 from tests.test_fresh_request_binding import make_world, program, run_request, recording, SECRET
 from tests.test_lifecycle_capture import external  # noqa: F401
@@ -37,7 +36,7 @@ class Opaque:
 def world(external, monkeypatch):  # noqa: F811
     fresh = make_world(external)
     prepared = external / 'worker'
-    manifest = inputs.prepare(prepared, image=versions()['baseline']['image'], fresh_prepared=fresh.folder)
+    manifest = inputs.prepare(prepared, image=reviewed('baseline')['image'], fresh_prepared=fresh.folder)
     settings = json.loads((prepared / 'settings.json').read_bytes())
     key = bytes.fromhex(settings['key'])
     modules = {}
@@ -308,7 +307,7 @@ def test_sdk_code_freeze_and_private_key_reader_use_actual_unchanged_sources(ext
     fresh = external / 'fresh'
     original = lifecycle.prepare_assets(fresh, inputs.ROOT.parent, profile='vllm-native-lifecycle-metadata/28')
     prepared = external / 'worker'
-    manifest = inputs.prepare(prepared, image=versions()['baseline']['image'], fresh_prepared=fresh)
+    manifest = inputs.prepare(prepared, image=reviewed('baseline')['image'], fresh_prepared=fresh)
     value = json.loads((prepared / 'settings.json').read_bytes())
     monkeypatch.setattr(runtime.common, 'ROOT', prepared)
     monkeypatch.setattr(runtime, 'ROOT', prepared)
@@ -326,7 +325,7 @@ def test_isolated_stdlib_sdk_installation_has_no_fault_control_or_engine_import(
     fresh = external / 'fresh'
     lifecycle.prepare_assets(fresh, inputs.ROOT.parent, profile='vllm-native-lifecycle-metadata/28')
     prepared = external / 'worker'
-    inputs.prepare(prepared, image=versions()['baseline']['image'], fresh_prepared=fresh)
+    inputs.prepare(prepared, image=reviewed('baseline')['image'], fresh_prepared=fresh)
     code = '''import sys,os,importlib,importlib.util,json,types
 from pathlib import Path
 root,fresh=map(Path,sys.argv[1:])

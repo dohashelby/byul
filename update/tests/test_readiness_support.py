@@ -312,22 +312,29 @@ def test_kubernetes_obs03_reports_the_partial_policy_scope(pack):
     assert "normal engine" in " ".join(row["reasons"])
 
 
-def test_exact_declared_policy_shapes_do_not_require_unrelated_executor_fields(pack):
+def test_exact_declared_policy_shapes_do_not_require_unrelated_executor_fields():
     import json
     from pathlib import Path
 
+    from guard.models import load_pack
+
     root = Path(__file__).resolve().parents[1]
-    document = json.loads((root / "docs/dev-1/mvp-enterprise-policy-20261116.json").read_bytes())
+    pack = load_pack(root / "packs/PACK-BASELINE")
+    docs = root / "docs/dev-1"
     check_ids = ("OBS-11", "PLT-06", "SUP-08", "REQ-08")
     values = {cid: {} for cid in check_ids}
-    for row in document["decisions"]:
-        if row["check_id"] in values:
-            values[row["check_id"]][row["key"]] = row["value"]
+    for name in ("mvp-enterprise-policy-20261116.json", "mvp-enterprise-policy-20261118.json"):
+        document = json.loads((docs / name).read_bytes())
+        for row in document["decisions"]:
+            if row["check_id"] in values and row["decision_state"] != "USER_DELEGATED_RUNTIME_RULE":
+                values[row["check_id"]][row["key"]] = row["value"]
     env, _, _ = declared_inputs(pack)
     pol = policy(pack.ref(), values=values)
     rows = assess_check_support(pack, env, pol, {}, selected_check_ids=check_ids, managed=False)
-    assert all(row["policy_valid"] is True and row["runtime_qualified"] is False for row in rows)
-    assert "a source-bound collection session input is required" in rows[0]["reasons"]
+    assert [row["check_id"] for row in rows] == list(check_ids)
+    for row in rows:
+        assert row["policy_valid"] is True and row["runtime_qualified"] is False, (row["check_id"], row["reasons"])
+    assert "a source-bound collection session input is required" in rows[0]["reasons"], rows[0]
     pol.values["OBS-11"]["collection_deadline_ms"] = {}
     row, = assess_check_support(pack, env, pol, {}, selected_check_ids=["OBS-11"], managed=False)
     assert row["policy_valid"] is False

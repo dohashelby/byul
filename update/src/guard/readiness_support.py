@@ -269,6 +269,14 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["limitations"].append("actual response fields and private-context behavior remain unobserved; model instruction quality is outside this check")
         elif executor == "log_analysis":
             branches = set(values.get("required_branches", []))
+            if kube:
+                row["scope"] = "owned engine Pod normal inference and correlated structured stdout fields"
+                row["status"] = "UNKNOWN"
+                row["reasons"].append("owned Pod identity, structured log format and request correlation require runtime collection")
+                row["limitations"].append("one normal engine control; gateway logs, error and exception-dump branches require separate evidence")
+                if set(values.get("required_sources", [])) - {"engine"} or branches - {"normal"}:
+                    unsupported("required source or branch coverage exceeds the normal engine log collector", policy_scope=True)
+                continue
             if not LOG_REQUIRED_BRANCHES <= branches or branches - LOG_SUPPORTED_BRANCHES:
                 unsupported("valid branch policy exceeds the required normal/error/exception-dump and supported debug/trace profile", policy_scope=True)
             if set(values.get("forbidden_marker_contexts", [])) - LOG_MARKER_CONTEXTS:

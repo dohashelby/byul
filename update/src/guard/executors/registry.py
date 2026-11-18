@@ -42,6 +42,7 @@ from .kubernetes_input_validation import KubernetesInputValidationExecutor
 from .response_content import ResponseContentExecutor
 from .kubernetes_response_content import KubernetesResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
+from .kubernetes_log_analysis import KubernetesLogAnalysisExecutor
 from .template_validation import TemplateValidationExecutor
 from .kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from .request_binding import RequestBindingExecutor
@@ -123,6 +124,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),
     "response_content:kubernetes": lambda cfg: KubernetesResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
+    "log_analysis:kubernetes": lambda cfg: KubernetesLogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:kubernetes": lambda cfg: KubernetesTemplateSupplyExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "template_validation:source-cpu": lambda cfg: TemplateSourceCPUExecutor(cfg.get("template_validation", {})),

@@ -755,6 +755,11 @@
       "manifest_sha256": "00d25fbc44abd0b61528c2b9bc4afcb6b377626d0c5d0ca186385a1a5d633bcd",
       "reviewed_by": "Codex / paired passive Kubernetes readiness and template comparison; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T11:30:29+00:00"
+    },
+    {
+      "manifest_sha256": "6c15c874d4f6fe2665c36a5a3deee59ddf5fdb3e62260588616819af6ef89c25",
+      "reviewed_by": "Codex / bounded owned Pod normal log observation; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T13:41:49+00:00"
     }
   ]
 }

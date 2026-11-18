@@ -280,6 +280,16 @@ def log_executor(cfg):
     return executor
 
 
+def test_kubernetes_obs03_reports_the_partial_policy_scope(pack):
+    env, pol, _ = log_inputs(pack)
+    cfg = {"adapter": {"name": "vllm"}, "executors": {"log_analysis": "kubernetes"}}
+    row, = assess_check_support(pack, env, pol, cfg, selected_check_ids=["OBS-03"], managed=False)
+    assert row["code_available"] is True and row["policy_valid"] is True
+    assert row["policy_supported"] is False and row["runtime_qualified"] is False
+    assert row["status"] == "UNSUPPORTED"
+    assert "normal engine" in " ".join(row["reasons"])
+
+
 @pytest.mark.parametrize(("key", "value"), [
     ("required_branches", ["normal", "error", "exception_dump", "audit"]),
     ("required_branches", ["normal", "error"]),

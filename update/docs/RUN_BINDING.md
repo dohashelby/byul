@@ -368,7 +368,7 @@ M-A 파일 사전 점검도 공통·쪽별 설정 뒤 `for_check()`를 적용해
 
 ### 11.5 실행기 자동 선택 (2026-11-16)
 
-배치는 쿠버네티스만 지원한다(2026-11-16 사용자 결정). 그래서 J02 명세에 `executors`를 적지 않으면 `tools/j02_run_config.py`가 J02 점검이 쓰는 실행기 중 양쪽 ENV의 엔진·판본에 쿠버네티스 구현이 등록된 것을 모두 `kubernetes`로 고른다. 한쪽 판본에만 등록된 실행기는 고르지 않는다(양쪽 실행기 집합이 달라지므로). OBS-03 `log_analysis`처럼 원인을 기록한 부재도 고르지 않는다. `--discover`의 target은 고른 실행기 중 target을 받는 구역에 채운다.
+배치는 쿠버네티스만 지원한다(2026-11-16 사용자 결정). J02 명세에 `executors`를 적지 않으면 `tools/j02_run_config.py`가 양쪽 ENV의 엔진·판본에 등록된 J02 실행기를 `kubernetes`로 고른다. OBS-03의 정상 엔진 로그 관측은 `log_analysis = "kubernetes"`를 명시해야 한다. `--discover`의 target은 고른 실행기 중 target을 받는 구역에 채운다.
 
 명세에 `executors`를 적으면 그 표를 그대로 쓴다. 보고서의 `executors_selected`가 `declared`인지 `kubernetes_auto`인지 남긴다. 자동 선택은 구현 이름만 정한다. 빠진 target·설정·정책 값은 계속 MISSING_INPUT으로 보고하고, 판정이나 실행 자격을 만들지 않는다. `guard update`의 미기재 실행기 처리(NOT_RUN)는 바꾸지 않았다.
 
@@ -379,7 +379,7 @@ M-A 파일 사전 점검도 공통·쪽별 설정 뒤 `for_check()`를 적용해
 | J1 "웹 초안 값 사용" | `--web-values FILE`: 웹 DRAFT 값(`j02-web-input/verification-values.json`)을 팩 36 정책 입력(`policy.yaml`)으로 바꾼다. 상태 DRAFT·확인자 없음, `data_origin: DECLARED`(웹 입력값), 결과는 official=false다. 팩 36이 결합으로 가져간 키와 선언하지 않는 키는 빼고 `web_values_dropped`에 적는다(실제 파일: PLT-07 `subject_scope`, PLT-08 `api_hop_scope`·`api_port`). 값을 더하지 않는다. |
 | J2 "kubectl get으로 자동" | `--discover`: 쪽마다 `kubectl --context C get namespace NS -o json`과 `kubectl --context C -n NS get pods -l guard.run=<run_id>,byul.a/generation=<generation> -o json`만 실행한다(argv 검사로 get 외 동사·exec·`--raw` 거부). 엔진·probe Pod가 하나씩이어야 하고, 기존 target 생성기(`gpu_a_run_inputs.target`)로 그 쪽 target을 만든 뒤 스냅샷과 함께 `cluster/<side>/`에 남긴다. target 경로는 단일 `target`을 받는 선택 실행기 칸에 넣는다(`supply_boot`·`lifecycle_transition`·`observation_state`는 역할별·세대별 칸이라 제외, 명시 값은 덮어쓰지 않음). ENV·target·prepared 해시는 1단계 결합이 실행 때 계산한다. |
 | J3 "넣는다" | REQ-02, OBS-01·06·11, PLT-07·12를 J02 범위에 그대로 두고 보고한다. 입력이 없으면 실행에서 UNKNOWN 증거가 남는다. |
-| J4 "원인 적고 UNKNOWN" | OBS-03은 실행기 구현을 고르지 않는다(`log_analysis`는 target을 받지 않게 제외). 보고서 상태 `UNKNOWN_RECORDED`, 원인 `KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT`. `guard run`에서는 "executor not configured" `NOT_RUN`→UNKNOWN이다. |
+| J4 "원인 적고 UNKNOWN" | 당시 Kubernetes 구현 부재를 `UNKNOWN_RECORDED`와 `KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT`로 기록했다. 현재 지원 판본에서 `log_analysis`를 생략하면 `MISSING_INPUT`과 `EXECUTOR_EXPLICIT_OPT_IN_REQUIRED`를 기록한다. 명시한 Kubernetes 구현은 정상 엔진 로그를 수집하고 나머지 정책 범위를 공백으로 남긴다. |
 
 ### 12.1 실제 웹 값으로 본 J02 공백 (테스트용 ENV, `--discover` 없이)
 

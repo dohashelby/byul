@@ -133,14 +133,18 @@ def test_discover_reads_the_run_pods_and_builds_the_side_target(tmp_path):
     assert config['sides']['baseline'] == {'direct_route': {'target': str(path)}}
 
 
-def test_obs03_keeps_no_executor_and_records_the_cause(tmp_path):
+@pytest.mark.parametrize('version', ('0.30.0', '0.31.0'))
+def test_obs03_requires_explicit_selection_and_accepts_its_kubernetes_target(tmp_path, version):
     from guard.models import load_pack
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
-    env = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'm', 'revision': 'r'})
+    env = environment(engine={'name': 'vllm', 'version': version}, model={'id': 'm', 'revision': 'r'})
     row = tool._row(pack, 'OBS-03', 'baseline', {'executors': {}}, env, {})
-    assert row['status'] == 'UNKNOWN_RECORDED' and row['reasons'] == ['KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT']
-    config = tool.build_config({'executors': {'log_analysis': 'kubernetes'}}, {'baseline': tmp_path / 't.json'})
-    assert 'log_analysis' not in config['sides']['baseline']
+    assert row['status'] == 'MISSING_INPUT' and row['reasons'] == ['EXECUTOR_EXPLICIT_OPT_IN_REQUIRED']
+    assert row['kubernetes_registered'] is True
+    targets = {'baseline': tmp_path / 't.json'}
+    config = tool.build_config({'executors': {'log_analysis': 'kubernetes'}}, targets)
+    assert config['sides']['baseline']['log_analysis']['target'] == str(targets['baseline'])
+    assert tool.build_config({'executors': {'log_analysis': 'real'}}, targets)['sides']['baseline'] == {}
 
 
 def test_req05_decision_fills_only_missing_values_from_the_one_model():
@@ -278,10 +282,11 @@ def test_without_declared_executors_selects_common_kubernetes_registrations(tmp_
          if name and registry.resolve_executor(name, 'kubernetes', engine='vllm', version=version) is not None}
         for version in versions
     ]
-    assert set(selected) == supported[0].intersection(supported[1]) - tool.RECORDED_EXECUTORS
+    assert set(selected) == supported[0].intersection(supported[1]) - tool.EXPLICIT_KUBERNETES_EXECUTORS
     assert 'log_analysis' not in selected
     rows = {(r['side'], r['check_id']): r for r in result['rows']}
-    assert rows['baseline', 'OBS-03']['status'] == 'UNKNOWN_RECORDED'
+    assert rows['baseline', 'OBS-03']['reasons'] == ['EXECUTOR_EXPLICIT_OPT_IN_REQUIRED']
+    assert rows['baseline', 'OBS-03']['status'] == 'MISSING_INPUT'
     # Selecting never fills a verdict: no row becomes READY_STATIC without its inputs.
     assert result['counts'].get('READY_STATIC', 0) < len(result['rows'])
 

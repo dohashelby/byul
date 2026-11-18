@@ -2,6 +2,7 @@
 import builtins
 import io
 import json
+import os
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -15,7 +16,7 @@ from guard.executors.kubernetes_lifecycle_capture import KubernetesCaptureError
 from guard.executors.owned_capture import _FILE_READER, MAX_BYTES
 from guard.executors.registry import EXECUTORS
 from guard.executors.usage_report import SETTINGS, _READER
-from guard.models import ExecStatus, canonical_json, load_pack, sha256_hex
+from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex
 from guard.runtime.kubernetes_http import KubernetesBindingError, KubernetesHTTP
 from tests.builders import T0, evidence, policy
 from tests.test_model_preparation_integration import FullWorld, full_inputs
@@ -91,25 +92,34 @@ def test_local_reader_projects_only_optouts_and_regular_file_metadata(tmp_path, 
     missing = tmp_path / 'missing.json'
     alias = tmp_path / 'link.json'
     alias.symlink_to(normal)
+    raced = tmp_path / 'raced.json'
+    raced.write_text(PRIVATE, encoding='utf-8')
     fake_proc = {'/proc/1/environ': b'VLLM_NO_USAGE_STATS=1\0DO_NOT_TRACK=1\0VLLM_USAGE_STATS_SERVER=' + PRIVATE.encode(),
                  '/proc/1/stat': b'1 (engine) ' + b'0 ' * 19 + b'88'}
     original_open = builtins.open
+    original_os_open = os.open
 
     def owned_proc(path, *args, **kwargs):
         if path in fake_proc:
             return io.BytesIO(fake_proc[path])
         return original_open(path, *args, **kwargs)
 
+    def race_after_stat(path, *args, **kwargs):
+        if path == raced.name:
+            raced.unlink()
+        return original_os_open(path, *args, **kwargs)
+
     with monkeypatch.context() as patch:
         patch.setattr(builtins, 'open', owned_proc)
-        patch.setattr(sys, 'argv', ['reader', ','.join(module._OPTOUT_SETTINGS), *map(str, (normal, missing, alias))])
+        patch.setattr(os, 'open', race_after_stat)
+        patch.setattr(sys, 'argv', ['reader', ','.join(module._OPTOUT_SETTINGS), *map(str, (normal, missing, alias, raced))])
         exec(compile(module._LOCAL_READER, 'local usage reader', 'exec'), {})
     output = capsys.readouterr().out
     assert PRIVATE not in output
-    rows = module._local_snapshot_value(json.loads(output), list(map(str, (normal, missing, alias))))
+    rows = module._local_snapshot_value(json.loads(output), list(map(str, (normal, missing, alias, raced))))
     assert rows['settings'] == {'VLLM_NO_USAGE_STATS': True, 'DO_NOT_TRACK': True}
     assert rows['process_start_ticks'] == 88
-    assert [row['exists'] for row in rows['files']] == [True, False, None]
+    assert [row['exists'] for row in rows['files']] == [True, False, None, None]
 
 
 class LocalUsageWorld(FullWorld):
@@ -207,3 +217,24 @@ def test_local_usage_rejects_non_admitted_configuration_before_kubectl(tmp_path,
     with pytest.raises(ValueError, match='KUBERNETES_USAGE_CONFIGURATION_INVALID'):
         executor.run(check, env, values, VllmAdapter(), tmp_path / 'work')
     assert not calls
+
+
+@pytest.mark.parametrize('mode,origin', [('absent', DataOrigin.MEASURED), ('all-unreadable', DataOrigin.DECLARED)])
+def test_declared_environment_preserves_actual_bound_capture_origin(tmp_path, monkeypatch, mode, origin):
+    from guard.executors import kubernetes_lifecycle_capture
+    from guard.runtime import kubernetes_http
+
+    env, target = full_inputs()
+    env = env.model_copy(update={'data_origin': DataOrigin.DECLARED}).seal()
+    target.update(lab=False, environment_ref=env.ref().model_dump(mode='json'))
+    target['model_mapping']['environment_ref'] = target['environment_ref']
+    world = LocalUsageWorld(target, mode)
+    monkeypatch.setattr(kubernetes_lifecycle_capture, 'capture_pipes', world.runner)
+    monkeypatch.setattr(kubernetes_http, 'capture_pipes', world.runner)
+    target_path = tmp_path / 'target.json'
+    target_path.write_bytes(canonical_json(target))
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    cfg = {'target': str(target_path), 'local_observation_only': True, 'usage_wait_seconds': 0}
+    draft = module.KubernetesUsageReportExecutor(cfg, expected_target_sha256=sha256_hex(canonical_json(target))).run(
+        pack.checks['OBS-04'], env, LOCAL_VALUES, VllmAdapter(), tmp_path / 'work')
+    assert draft.data_origin == origin

@@ -35,12 +35,14 @@ def file_metadata(path):
     row = dict(path=path, exists=None, readable=False)
     parts = path.lstrip('/').split('/')
     directory = os.open('/', os.O_DIRECTORY | os.O_RDONLY)
+    file_found = False
     try:
         for name in parts[:-1]:
             child = os.open(name, os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory)
             os.close(directory)
             directory = child
         metadata = os.stat(parts[-1], dir_fd=directory, follow_symlinks=False)
+        file_found = True
         if not stat.S_ISREG(metadata.st_mode):
             return row
         fd = os.open(parts[-1], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory)
@@ -55,9 +57,12 @@ def file_metadata(path):
                 return row
             if len(raw) > limit or len(raw) != end.st_size:
                 return row
+        current = os.stat(parts[-1], dir_fd=directory, follow_symlinks=False)
+        if (current.st_dev, current.st_ino, current.st_ctime_ns) != (end.st_dev, end.st_ino, end.st_ctime_ns):
+            return row
         return dict(path=path, exists=True, readable=True, bytes=len(raw), lines=raw.count(b'\n'), sha256=hashlib.sha256(raw).hexdigest())
     except FileNotFoundError:
-        return dict(path=path, exists=False, readable=True)
+        return row if file_found else dict(path=path, exists=False, readable=True)
     except OSError:
         return row
     finally:
@@ -220,7 +225,7 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         draft.cleanup_errors.extend(transport_report["cleanup_errors"])
         if local:
             draft.cleanup_errors.extend(ctx._usage_local_cleanup)
-            ceiling = min((draft.data_origin, env.data_origin, DataOrigin(transport.process_observation_origin)),
+            ceiling = min((draft.data_origin, DataOrigin(transport.process_observation_origin)),
                           key=ORIGIN_STRENGTH.get)
             if draft.status != ExecStatus.COMPLETED or transport_report["collection_gap"] or draft.cleanup_errors:
                 draft.status = ExecStatus.ABORTED

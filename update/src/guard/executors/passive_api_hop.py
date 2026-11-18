@@ -4,12 +4,13 @@ import os
 import re
 import stat
 
-from guard.models import DataOrigin, Environment, Evidence, ExecStatus, Kind, Mode, Plan, Policy, Side, canonical_json, sha256_hex
+from guard.models import DataOrigin, Environment, Evidence, ExecStatus, Kind, Mode, Plan, Policy, Side, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_functional import LOGICAL_ID, PROFILE as CONTROL_PROFILE, WIRE_ID
 from guard.runtime.kubernetes_http import KubernetesBindingError, REQUEST_BINDING_PROFILE, _validate
 from guard.runtime.kubernetes_process import PROFILE as PROCESS_PROFILE, SOURCE_SHA256 as PROCESS_SOURCE_SHA256
 from guard.store import IntegrityError
+from .base import EvidenceDraft
 
 PROFILE = 'passive-owned-api-hop-v1'
 _PRODUCER = 'kubernetes-process-permission-consumer-v1'
@@ -114,14 +115,7 @@ def _bound_request(summary, source, binding, target_sha256):
     return first, last
 
 
-def read_passive_api_hop(store, *, plan_ref, side, attempt_id, source_ref, target, expected_target_sha256):
-    """Read exact original control and return PLT-08 observations without dispatch.
-
-    The caller supplies the active run's trusted references and verified target
-    hash, not the latest matching object. Preserve the source reference as an
-    evidence dependency. Global plaintext policy is recorded as context; the
-    selected probe hop has no scoped enforcement decision in this projection.
-    """
+def _verified_projection(store, *, plan_ref, side, attempt_id, source_ref, target, expected_target_sha256):
     try:
         source, env, prohibited = _source(store, plan_ref, side, attempt_id, source_ref)
         target_sha256 = sha256_hex(canonical_json(target))
@@ -143,8 +137,35 @@ def read_passive_api_hop(store, *, plan_ref, side, attempt_id, source_ref, targe
              'outcome': 200, 'capture_complete': True, 'owner_binding_verified_before_after': True,
              'started_at': first.isoformat(), 'finished_at': last.isoformat(), 'global_plaintext_forbidden': prohibited,
              'hop_policy_adjudicated': False, 'deployed_caller_path_verified': False}
-    return {
+    return source, {
         'api_transport_trials': {'value': [trial], 'collected': True},
         'forbidden_plaintext_successes': {'value': None, 'collected': False},
         'api_transport_scope_complete': {'value': False, 'collected': True},
     }
+
+
+def read_passive_api_hop(store, *, plan_ref, side, attempt_id, source_ref, target, expected_target_sha256):
+    """Read exact original control and return PLT-08 observations without dispatch."""
+    _, observations = _verified_projection(store, plan_ref=plan_ref, side=side, attempt_id=attempt_id,
+        source_ref=source_ref, target=target, expected_target_sha256=expected_target_sha256)
+    return observations
+
+
+def draft_passive_api_hop(store, *, plan_ref, side, attempt_id, source_ref, target, expected_target_sha256):
+    """Project the active attempt's previously committed normal control into a draft.
+
+    The caller supplies the exact PLT-01 Ref from the active attempt and adds
+    that Ref to the destination EVD's immutable refs before sealing it. The
+    draft's grade and comparison conditions describe the original acquisition.
+    The timestamps describe this local projection; it does not run a control.
+    """
+    started_at = utcnow()
+    source, observations = _verified_projection(store, plan_ref=plan_ref, side=side, attempt_id=attempt_id,
+        source_ref=source_ref, target=target, expected_target_sha256=expected_target_sha256)
+    return EvidenceDraft(
+        status=ExecStatus.COMPLETED, data_origin=source.data_origin,
+        normal_control={'attempted': False, 'succeeded': None,
+                        'detail': 'Reused a verified normal control from the same attempt without sending a request.'},
+        observations=observations, comparability=source.comparability.model_copy(deep=True),
+        config={'profile': PROFILE, 'source_check_id': 'PLT-01'}, started_at=started_at, finished_at=utcnow(),
+    )

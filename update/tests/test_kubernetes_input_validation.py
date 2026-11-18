@@ -8,8 +8,8 @@ import threading
 import pytest
 
 from guard.collectors.file import load_environment, load_policy
-from guard.executors.kubernetes_input_matrix import KubernetesMatrixInputValidationExecutor
 from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor, _WithBody, _contract
+from guard.executors.kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
 from guard.executors.stream_probe import _prepare
 from guard.executors.registry import EXECUTORS
 from guard.input_matrix_policy import planned
@@ -83,7 +83,7 @@ def test_req09_normal_reuses_only_ids_from_verified_tokenizer(tmp_path, version,
                     pod['metadata']['uid'] = 'replacement'
             world.mutate = change_owner
         check = load_pack(UPDATE / 'packs/PACK-BASELINE').checks['REQ-09']
-        executor = KubernetesMatrixInputValidationExecutor({'normal_token_input_only': True, 'target': str(path)},
+        executor = KubernetesNormalTokenInputExecutor({'normal_token_input_only': True, 'target': str(path)},
             runner=world.runner, expected_target_sha256=sha256_hex(path.read_bytes()))
         executor.validate_policy(check, NORMAL_INPUT_POLICY)
         draft = executor.run(check, env, NORMAL_INPUT_POLICY, VllmAdapter(), tmp_path / 'work')
@@ -119,7 +119,7 @@ def test_req09_normal_reuses_only_ids_from_verified_tokenizer(tmp_path, version,
     assert assessed.verdicts['security'] == Verdict.UNKNOWN and assessed.verdicts['functional'] == Verdict.UNKNOWN
 
 
-@pytest.mark.parametrize('fault', ['unbound', 'foreign-check', 'invalid-option', 'no-approved-pair'])
+@pytest.mark.parametrize('fault', ['unbound', 'foreign-check', 'missing-option', 'invalid-option', 'no-approved-pair'])
 def test_req09_normal_rejects_unapproved_scope_before_any_io(tmp_path, fault):
     env, target, _, path = normal_sampling_inputs(tmp_path, '0.30.0')
     target['comparison_config'] = {'launch': {'max_model_len': 128}}
@@ -127,12 +127,14 @@ def test_req09_normal_rejects_unapproved_scope_before_any_io(tmp_path, fault):
     pack = load_pack(UPDATE / 'packs/PACK-BASELINE')
     check = pack.checks['REQ-08' if fault == 'foreign-check' else 'REQ-09']
     settings = {'target': str(path), 'normal_token_input_only': fault != 'invalid-option'}
+    if fault == 'missing-option':
+        settings.pop('normal_token_input_only')
     policy = NORMAL_INPUT_POLICY
     if fault == 'no-approved-pair':
         policy = {**policy, 'allowed_input_pairs': ['POST /v1/completions|text', 'POST /v1/chat/completions|text'],
                   'allowed_input_formats': ['text']}
     target_sha = None if fault == 'unbound' else sha256_hex(path.read_bytes())
-    executor = KubernetesMatrixInputValidationExecutor(settings, runner=_no_kubectl, expected_target_sha256=target_sha)
+    executor = KubernetesNormalTokenInputExecutor(settings, runner=_no_kubectl, expected_target_sha256=target_sha)
     with pytest.raises(ValueError, match='KUBERNETES_INPUT_NORMAL_(?:POLICY_INVALID|SCOPE_INVALID|TARGET_UNVERIFIED)'):
         executor.run(check, env, policy, object(), tmp_path / 'work')
 

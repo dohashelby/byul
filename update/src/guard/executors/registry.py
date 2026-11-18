@@ -23,6 +23,7 @@ from guard.adapters.base import EngineAdapter
 from guard.adapters.fake import FakeAdapter
 from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
+from guard.configuration import NORMAL_TOKEN_INPUT_OPTION
 
 from .base import Executor
 from .container_config import ContainerConfigExecutor
@@ -39,6 +40,7 @@ from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
 from .kubernetes_input_validation import KubernetesInputValidationExecutor
+from .kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
 from .response_content import ResponseContentExecutor
 from .kubernetes_response_content import KubernetesResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
@@ -200,11 +202,17 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
     factory = resolve_executor(executor, impl, engine=engine, version=version)
     if factory is None:
         raise ValueError('EXECUTOR_UNAVAILABLE')
+    if impl == "kubernetes" and '_kubernetes_target_sha256_by_executor' in cfg:
+        # A mixed update also has collectors with their own targets and
+        # generations. Only the explicitly bound executors receive its hash.
+        cfg = {**cfg, '_kubernetes_target_sha256': cfg['_kubernetes_target_sha256_by_executor'].get(executor)}
+    if executor == "input_validation":
+        settings = cfg.get(executor)
+        if type(settings) is dict and NORMAL_TOKEN_INPUT_OPTION in settings:
+            if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
+                raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
+            return KubernetesNormalTokenInputExecutor(
+                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if impl == "kubernetes":
-        if '_kubernetes_target_sha256_by_executor' in cfg:
-            # A mixed update also has collectors with their own targets and
-            # generations. Only the HTTP executors verified by the transition
-            # receive its selected target hash.
-            cfg = {**cfg, '_kubernetes_target_sha256': cfg['_kubernetes_target_sha256_by_executor'].get(executor)}
         factory = activated(factory) if executor in ACTIVATED else attested(factory)
     return factory(cfg)

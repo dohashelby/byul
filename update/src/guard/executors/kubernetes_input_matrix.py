@@ -12,7 +12,7 @@ from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE
 from guard.runtime.kubernetes_input_matrix import KubernetesInputMatrixHTTP
 from .base import EvidenceDraft,DraftArtifact
-from .kubernetes_input_validation import NORMAL_OPTION, _WithBody
+from .kubernetes_input_validation import _WithBody
 from .kubernetes_observed_input import KubernetesObservedInputValidationExecutor
 from .http_common import Ctx,HttpCheckExecutor,request_model,incomplete_artifact_capture
 from .content_common import bounded_probe,control_state,sample_artifact,append_artifact,record_content
@@ -72,8 +72,6 @@ def _capture_class():
 
 class KubernetesMatrixInputValidationExecutor(KubernetesObservedInputValidationExecutor):
     def validate_policy(self,check,values):
-        if NORMAL_OPTION in self.cfg:
-            return super().validate_policy(check, values)
         if check.id=='REQ-08'and getattr(check,'collection_profile',None)=='reused-token-input-matrix-v1':
             from .kubernetes_reused_input_matrix import validate as validate_reused
             validate_reused(check,values,self.cfg);return
@@ -82,8 +80,6 @@ class KubernetesMatrixInputValidationExecutor(KubernetesObservedInputValidationE
         return super().validate_policy(check,values)
 
     def run(self,check,env,policy_values,adapter,workdir):
-        if NORMAL_OPTION in self.cfg:
-            return super().run(check, env, policy_values, adapter, workdir)
         if check.id=='REQ-08'and getattr(check,'collection_profile',None)=='reused-token-input-matrix-v1':
             from .kubernetes_reused_input_matrix import run
             return run(self,check,env,policy_values,adapter,workdir)

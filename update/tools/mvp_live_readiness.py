@@ -23,7 +23,7 @@ from guard.configuration import (NORMAL_TOKEN_INPUT_OPTION, bounded_metadata_sco
                                  normal_token_input_requested)
 from guard.core.select import _in_scope, check_policy_value
 from guard.executors import passive_api_hop, registry, run_binding
-from guard.executors.kubernetes_input_validation import normal_input_transports
+from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
 from guard.models import load_pack
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX

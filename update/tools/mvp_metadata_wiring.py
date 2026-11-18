@@ -16,9 +16,9 @@ from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
 from guard.executors import passive_api_hop, registry, run_binding, template_supply_approval as template_supply
 from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snapshot_owner
-from guard.executors.kubernetes_input_validation import normal_input_transports
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
+from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from guard.models import Environment, Policy, load_pack, utcnow

@@ -349,7 +349,7 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
 
 
 def test_req09_pair_checks_owned_targets_and_withholds_legacy_siblings(tmp_path, sources, monkeypatch):
-    from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor
+    from guard.executors.kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
 
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())
@@ -409,7 +409,7 @@ def test_req09_pair_checks_owned_targets_and_withholds_legacy_siblings(tmp_path,
         return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
                              normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
 
-    monkeypatch.setattr(KubernetesInputValidationExecutor, '_run_normal', fixture_normal)
+    monkeypatch.setattr(KubernetesNormalTokenInputExecutor, 'run', fixture_normal)
     report, _ = application.execute_update(Store(store), pack, envs, pol, cfg, tmp_path / 'prebound', utcnow())
     assert seen == set(pinned)
     assert next(row for row in report.by_check if row.check_id == 'REQ-09').selected
@@ -428,6 +428,7 @@ def test_req09_pair_checks_owned_targets_and_withholds_legacy_siblings(tmp_path,
         {**for_check(merged, 'input_validation', 'REQ-09'),
          '_kubernetes_target_sha256_by_executor': {'input_validation': expected}},
         engine=envs[1].engine.name, version=envs[1].engine.version)
+    assert type(executor) is KubernetesNormalTokenInputExecutor
     assert executor._expected_target_sha256 == expected
     current['comparison_config']['launch']['max_model_len'] = True
     _write(fresh, current)
@@ -441,11 +442,23 @@ def test_req09_pair_checks_owned_targets_and_withholds_legacy_siblings(tmp_path,
 
 def test_req09_rejects_mixed_legacy_dispatch_before_any_executor(tmp_path, sources, monkeypatch):
     from guard.core.run import run_plan
+    from guard.executors.kubernetes_input_matrix import KubernetesMatrixInputValidationExecutor
+    from guard.executors.kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
     from guard.store.packs import put_pack
 
     pack, sides, policy_path = sources
     pol = tool.Policy.model_validate_json(policy_path.read_bytes())
     envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    settings = {'target': str(sides['baseline']['target'])}
+    engine, version = envs[0].engine.name, envs[0].engine.version
+    legacy = registry.build_executor('input_validation', 'kubernetes', {'input_validation': settings},
+                                     engine=engine, version=version)
+    opted_out = registry.build_executor('input_validation', 'kubernetes',
+        {'input_validation': {**settings, 'normal_token_input_only': False}}, engine=engine, version=version)
+    assert type(legacy) is KubernetesMatrixInputValidationExecutor
+    assert type(opted_out) is KubernetesNormalTokenInputExecutor
+    with pytest.raises(ValueError, match='KUBERNETES_INPUT_NORMAL_SCOPE_INVALID'):
+        opted_out.validate_configuration(pack.checks['REQ-09'])
     base = {'executors': {'input_validation': 'kubernetes'}, 'update': {'allowed_checks': ['REQ-09']},
             'sides': {side: {'input_validation': {'target': str(entry['target'])}} for side, entry in sides.items()}}
 

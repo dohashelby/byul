@@ -820,6 +820,11 @@
       "manifest_sha256": "4eb5858787eed47532bdadd4339b43ab32c44f2822049d361e33f6191e407af2",
       "reviewed_by": "Codex / owned normal token input pair and explicit scope / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T22:43:02+00:00"
+    },
+    {
+      "manifest_sha256": "c87917f34eade2bb4c29cb2d01eaa500eebe886aceebb39ec9758a9cbea2d3ce",
+      "reviewed_by": "Codex / isolated normal token observer and native producer preservation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T23:09:21+00:00"
     }
   ]
 }

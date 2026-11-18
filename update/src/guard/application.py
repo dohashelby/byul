@@ -12,8 +12,8 @@ import secrets
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
 from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
-                                 bounded_metadata_scopes, for_check, normal_token_input_requested,
-                                 update_allowed_checks)
+                                 NORMAL_TOKEN_INPUT_OPTION, bounded_metadata_scopes, for_check,
+                                 normal_token_input_requested, update_allowed_checks)
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
@@ -188,7 +188,7 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, normal_token_
                 from guard.executors.kubernetes_gateway_observation import snapshot_owner
                 snapshot_owner(target, binding)
             if normal_token_input:
-                from guard.executors.kubernetes_input_validation import normal_input_transports
+                from guard.executors.kubernetes_normal_token_input import normal_input_transports
                 normal_input_transports(target, env, duration=1)
             return sha256_hex(canonical_json(target))
     except (KeyError, TypeError, ValueError, KubernetesBindingError):
@@ -573,15 +573,19 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     passive_api_hop.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
                     passive_api_hop.read_target(c[item.executor]["target"], selected_env)
                     continue
-                factory = registry.resolve_executor(item.executor, c.get("executors", {}).get(item.executor, ""), engine=selected_env.engine.name, version=selected_env.engine.version)
-                kube=(c.get("executors",{}).get(item.executor)=="kubernetes" and prepared[0]=="external")
-                if factory is None or c.get("executors", {}).get(item.executor) != "real" and not kube:
+                implementation = c.get("executors", {}).get(item.executor, "")
+                factory = registry.resolve_executor(item.executor, implementation,
+                    engine=selected_env.engine.name, version=selected_env.engine.version)
+                kube = implementation == "kubernetes" and prepared[0] == "external"
+                if factory is None or implementation != "real" and not kube:
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 settings = c.get(item.executor, {})
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
+                normal_token_input = (item.check_id == "REQ-09" and type(settings) is dict
+                                      and NORMAL_TOKEN_INPUT_OPTION in settings)
                 if kube and option and type(settings) is dict and settings.get(option) is True:
                     path = Path(settings["target"])
                     if not path.is_file() or path.is_symlink():
@@ -589,8 +593,10 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     with path.open("rb") as stream:
                         _scoped_target_sha256(stream.read(65537), selected_env,
                             gateway_snapshot=settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True,
-                            normal_token_input=item.check_id == "REQ-09")
-                executor = factory(c)
+                            normal_token_input=normal_token_input)
+                executor = (registry.build_executor(item.executor, implementation, c,
+                                engine=selected_env.engine.name, version=selected_env.engine.version)
+                            if normal_token_input else factory(c))
                 support = support_by_key[side, item.check_id]
                 # These collectors distinguish a valid policy outside their
                 # bounded profile from malformed input. Still validate launch

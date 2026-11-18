@@ -830,6 +830,11 @@
       "manifest_sha256": "0b015206c9e91cfc99887919ca9b433218e27c1942de8faa715eec650c6d96ca",
       "reviewed_by": "Codex / paired normal serving readiness and REQ09/10 comparison / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T23:45:25+00:00"
+    },
+    {
+      "manifest_sha256": "fc67cf9c81a6f4c65003c529327f199f73efafca18a826b3adbf884accc4cdf1",
+      "reviewed_by": "Codex / paired normal LIF03 timing and LIF04 co-execution / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T23:59:10+00:00"
     }
   ]
 }

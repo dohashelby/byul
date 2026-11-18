@@ -134,6 +134,23 @@ def test_snapshot_keeps_only_the_prespecified_original_final(ordinary_gateway_re
     assert "EXAMPLE-PRIVATE" not in json.dumps(result)
 
 
+def test_archived_gateway_final_without_selected_run_cannot_be_adopted():
+    from pathlib import Path
+
+    fixture = Path(__file__).resolve().parents[2] / "runtime/tests/fixtures/aws-request-detail-20261106.json"
+    originals = json.loads(fixture.read_bytes())["gateway_records"]
+    final, = (row for row in originals if row["phase"] == "final")
+    assert final["decision"]["result"] == "ALLOWED" and final["run_id"] is None
+    raw = b"".join(canonical_json(row) + b"\n" for row in originals)
+    source = {"environment": final["environment"], "target_id": final["target_id"],
+              "runtime_policy_sha256": final["policy"]["sha256"],
+              "request_sha256": sha256_hex(final["request_id"].encode())}
+    values = {"observation_session": final["observation_session_id"],
+              "observation_allowed_actor_sha256": module.principal_sha256(final["auth"]["principal_id"])}
+    with pytest.raises(ValueError, match="^GATEWAY_AUDIT_FINAL_NOT_UNIQUE$"):
+        module.snapshot_record(raw, source=source, values=values, run_id="current-owned-run")
+
+
 def test_canonical_snapshot_reads_one_owned_file_without_http(tmp_path, monkeypatch, ordinary_gateway_record):
     from datetime import timedelta
     from guard.core.run import _normalize

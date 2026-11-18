@@ -176,6 +176,19 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
         row['code_available'] = True
+        if kube and check_id in {'OBS-01', 'PLT-02'}:
+            effective = for_check(cfg, executor, check_id).get(executor, {})
+            setting = 'record_snapshot_only' if check_id == 'OBS-01' else 'protected_path_metadata_only'
+            if type(effective) is dict and effective.get(setting) is True:
+                if check_id == 'OBS-01':
+                    row["scope"] = "owned audit record snapshot for the selected producer, actor hashes and session"
+                    row["limitations"].append("independent event triggering, record delivery and timing remain unverified")
+                else:
+                    row["scope"] = "approved IPC path presence and mode in the owned Pod mount namespace"
+                    row["limitations"].append("no IPC connections, process-to-socket attribution or whole-access verdict")
+                row["profile_available"] = True
+                row["reasons"].append("the exact target and policy inputs must pass static preparation")
+                continue
         if executor == 'engine_sensor':
             selected_executor = selected_factory(for_check(cfg, executor, check.id))
             describe = getattr(selected_executor, 'support', None)

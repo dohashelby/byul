@@ -37,8 +37,8 @@ def collect(ctx):
     mapping = [{'marker': marker, 'processes': items} for marker, items in sorted(groups.items())]
     missing = sorted(set(markers) - set(groups))
     cleanup = list(record['cleanup_errors'])
-    ctx._worker_trust_metadata_cleanup = cleanup
-    ctx._worker_trust_metadata_gap = not mapping or bool(cleanup)
+    ctx._ipc_metadata_cleanup = cleanup
+    ctx._ipc_metadata_gap = not mapping or bool(cleanup)
     diagnostics = list(record['diagnostic_codes'])
     if missing:
         diagnostics.append('WORKER_TRUST_MARKERS_NOT_OBSERVED')

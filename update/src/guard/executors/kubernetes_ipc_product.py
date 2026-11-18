@@ -7,6 +7,7 @@ from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sh
 from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
+from . import kubernetes_ipc_metadata as path_metadata
 from . import kubernetes_worker_trust as worker_trust
 from .kubernetes_unix_ipc import collect_kubernetes_unix_ipc,validate_inputs,VERSION
 
@@ -23,8 +24,11 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
         self.worker_metadata='worker_trust_metadata_only' in self.cfg
+        self.path_metadata='protected_path_metadata_only' in self.cfg
         if self.worker_metadata:
             self.version=worker_trust.VERSION
+        elif self.path_metadata:
+            self.version=path_metadata.VERSION
 
     def validate_policy(self,check,values):
         if self.worker_metadata:
@@ -32,6 +36,11 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
                     or self.b_common_inputs is not None):
                 raise ValueError('KUBERNETES_WORKER_TRUST_METADATA_CONFIGURATION_INVALID')
             return worker_trust.validate_policy(check,values)
+        if self.path_metadata:
+            if (self.cfg['protected_path_metadata_only'] is not True or set(self.cfg) - path_metadata.CONFIG_KEYS
+                    or self.b_common_inputs is not None):
+                raise ValueError('KUBERNETES_IPC_PATH_METADATA_CONFIGURATION_INVALID')
+            return path_metadata.validate_policy(check, values)
         try:
             validate_inputs(check,values,actor_specs=self.cfg['actor_specs'],connect_timeout=self.cfg['connect_timeout'],
                 total_timeout=self.cfg['total_timeout'])
@@ -39,16 +48,17 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
 
     def run(self,check,env,policy_values,adapter,workdir):
         self.validate_policy(check,policy_values)
+        metadata_only = self.worker_metadata or self.path_metadata
         try:
             duration=self.cfg.get('max_duration_seconds',120)
-            minimum=0 if self.worker_metadata else self.cfg['total_timeout']+2+NORMAL_TIMEOUT
-            if ((not self.worker_metadata and set(self.cfg)-CONFIG_KEYS) or adapter is None
+            minimum=0 if metadata_only else self.cfg['total_timeout']+2+NORMAL_TIMEOUT
+            if ((not metadata_only and set(self.cfg)-CONFIG_KEYS) or adapter is None
                     or type(duration) not in (int,float) or not math.isfinite(duration) or not minimum<duration<=300
                     or not supports(env.engine.name, env.engine.version, 'unix_ipc')
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            expected_lab=not self.worker_metadata
-            if (target.get('lab') is not expected_lab or self.worker_metadata and self.expected_target is None
+            expected_lab=not metadata_only
+            if (target.get('lab') is not expected_lab or metadata_only and self.expected_target is None
                     or self.expected_target is not None
                     and sha256_hex(canonical_json(target))!=self.expected_target):raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None
@@ -61,6 +71,8 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
     def collect(self,ctx):
         if self.worker_metadata:
             return worker_trust.collect(ctx)
+        if self.path_metadata:
+            return path_metadata.collect(ctx)
         observations,normal,challenges,summary=collect_kubernetes_unix_ipc(ctx,actor_specs=self.cfg['actor_specs'],
             connect_timeout=self.cfg['connect_timeout'],total_timeout=self.cfg['total_timeout'])
         report=summary['kubernetes'];cleanup=list(getattr(ctx,'_kubernetes_ipc_cleanup_errors',[]))
@@ -71,11 +83,13 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
 
     def _finish(self,ctx):
         draft=super()._finish(ctx)
-        if self.worker_metadata:
-            draft.cleanup_errors.extend(ctx._worker_trust_metadata_cleanup)
-            if ctx._worker_trust_metadata_gap:
+        if self.worker_metadata or self.path_metadata:
+            draft.cleanup_errors.extend(ctx._ipc_metadata_cleanup)
+            if ctx._ipc_metadata_gap:
                 draft.status=ExecStatus.ABORTED
-                draft.abort_reason=draft.abort_reason or 'KUBERNETES_WORKER_TRUST_METADATA_UNAVAILABLE'
+                reason = ('KUBERNETES_WORKER_TRUST_METADATA_UNAVAILABLE' if self.worker_metadata
+                          else 'KUBERNETES_IPC_PATH_METADATA_UNAVAILABLE')
+                draft.abort_reason=draft.abort_reason or reason
             ceiling=getattr(ctx,'_kubernetes_process_data_origin',DataOrigin.DECLARED)
             if draft.status != ExecStatus.COMPLETED:
                 ceiling=min(ceiling,DataOrigin.DECLARED,key=ORIGIN_STRENGTH.get)

@@ -378,7 +378,7 @@ def producer_sha256(path) -> str:
     if type(path) is not str or not path:
         raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE')
     try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+        fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
     except OSError:
         raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE') from None
     info = os.fstat(fd)

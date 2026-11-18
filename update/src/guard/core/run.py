@@ -13,7 +13,8 @@ from typing import Any
 
 from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
-from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, update_allowed_checks
+from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, UPDATE_CHECK_OUTSIDE_SCOPE, merge_config,
+                                 observation_snapshot_scope, update_allowed_checks)
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -123,10 +124,17 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
     policy = store.resolve(plan.inputs.policy)
+    requested = cfg.requested if cfg.requested is not None else cfg.raw
     allowed_checks = None
     if plan.mode == Mode.update:
-        allowed_checks = update_allowed_checks(cfg.requested if cfg.requested is not None else cfg.raw, pack)
+        allowed_checks = update_allowed_checks(requested, pack)
         validate_update_run_config(cfg)
+        for side in (Side.baseline, Side.candidate):
+            actual = observation_snapshot_scope(cfg.side_configs.get(side.value, cfg).raw, allowed_checks)
+            expected = observation_snapshot_scope(merge_config(requested, requested.get("sides", {}).get(side.value, {})),
+                                                  allowed_checks)
+            if actual != expected:
+                raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")
     passive_hop = passive_api_hop.validate_run_scope(pack, plan, cfg, allowed_checks)
 
     plan_ref = plan.ref()
@@ -221,6 +229,16 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         raw = for_check(cfg.raw, item.executor, check.id)  # [check_config.<CHECK>] (RB2-S)
     except ValueError:
         return stopped(ExecStatus.NOT_RUN, "CHECK_CONFIG_INVALID")
+    option = KUBERNETES_BOUND_CHECK_OPTIONS.get(check.id)
+    check_hashes = (raw or {}).get("_kubernetes_target_sha256_by_check")
+    section = (raw or {}).get(item.executor)
+    if (option and type(section) is dict and section.get(option) is True
+            and type(check_hashes) is dict and check.id in check_hashes):
+        # The public paired update derives this pin from the recipe's own
+        # snapshot. Share the normal factory interface with staged launches.
+        key = "_kubernetes_target_sha256_by_executor"
+        hashes = raw.get(key)
+        raw = {**raw, key: {**(hashes if type(hashes) is dict else {}), item.executor: check_hashes[check.id]}}
     if passive_hop:
         if source_ref is None:
             return stopped(ExecStatus.NOT_RUN, "PASSIVE_API_HOP_SOURCE_NOT_COLLECTED")

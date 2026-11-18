@@ -11,7 +11,7 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, for_check, update_allowed_checks
+from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, for_check, observation_snapshot_scope, update_allowed_checks
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
@@ -144,32 +144,36 @@ def _bounded_kubernetes_targets(raw, selected):
         if type(effective) is not dict or effective.get(option) is not True:
             continue
         target = effective.get("target")
-        paths[name] = Path(target) if isinstance(target, (str, Path)) else None
+        paths[check_id] = Path(target) if isinstance(target, (str, Path)) else None
     return paths
 
 
 def _pin_prebound_kubernetes_targets(raw, env, paths, target_snapshots):
     """Derive bounded target identity from the recipe's exact captured bytes."""
-    from guard.models import canonical_json, sha256_hex
-    from guard.runtime.bounded import strict_json
-    from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
-
-    key = "_kubernetes_target_sha256_by_executor"
-    hashes = raw.get(key)
-    if type(hashes) is not dict:
-        hashes = raw[key] = {}
-    for name, path in paths.items():
-        hashes.pop(name, None)
+    hashes = raw["_kubernetes_target_sha256_by_check"] = dict.fromkeys(paths)
+    for check_id, path in paths.items():
         content = target_snapshots.get(path)
         if content is None:
             continue
         try:
-            target = strict_json(content, limit=65536)
-            validate_target_binding(target, env)
-            if target["lab"] is False:
-                hashes[name] = sha256_hex(canonical_json(target))
-        except (KeyError, TypeError, ValueError, KubernetesBindingError):
+            hashes[check_id] = _scoped_target_sha256(content, env)
+        except ValueError:
             continue  # The scoped executor will withhold dispatch without a verified hash.
+
+
+def _scoped_target_sha256(content, env):
+    from guard.models import canonical_json, sha256_hex
+    from guard.runtime.bounded import strict_json
+    from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
+
+    try:
+        target = strict_json(content, limit=65536)
+        validate_target_binding(target, env)
+        if target["lab"] is False and target.get("environment_ref") == env.ref().model_dump(mode="json"):
+            return sha256_hex(canonical_json(target))
+    except (KeyError, TypeError, ValueError, KubernetesBindingError):
+        pass
+    raise ValueError("KUBERNETES_SCOPED_TARGET_INVALID")
 
 
 def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
@@ -192,6 +196,8 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
     validate_policy_time(policy)
     mode, side_cfgs, managed = prepared
     allowed_checks = update_allowed_checks(cfg, pack)
+    for settings in side_cfgs.values():
+        observation_snapshot_scope(settings, allowed_checks)
     change_input = read_change(change, pack, store)
     previous = resolve_plan(store, previous_plan)
     if change_input is not None or previous is not None:
@@ -509,6 +515,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             prepared = ("managed", {"single": effective}, {"single": managed})
         else:
             prepared = update_inputs(envs, execution_config)
+            for settings in prepared[1].values():
+                observation_snapshot_scope(settings, allowed_checks)
         option_group = "validation" if single else "update"
         if any(c.get(option_group, {}).get("credential_canary", False) for c in prepared[1].values()) and policy.status.value != "DRAFT":
             raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
@@ -547,6 +555,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
+                settings = c.get(item.executor, {})
+                option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
+                if kube and option and type(settings) is dict and settings.get(option) is True:
+                    path = Path(settings["target"])
+                    if not path.is_file() or path.is_symlink():
+                        raise ValueError("KUBERNETES_SCOPED_TARGET_INVALID")
+                    with path.open("rb") as stream:
+                        _scoped_target_sha256(stream.read(65537), selected_env)
                 executor = factory(c)
                 support = support_by_key[side, item.check_id]
                 # These collectors distinguish a valid policy outside their

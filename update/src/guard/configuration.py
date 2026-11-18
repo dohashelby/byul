@@ -12,7 +12,9 @@ def merge_config(base, override):
 CHECK_CONFIG = "check_config"
 UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
 KUBERNETES_BOUND_CHECK_OPTIONS = {
+    "OBS-01": "record_snapshot_only",
     "OBS-04": "local_observation_only",
+    "PLT-02": "protected_path_metadata_only",
     "PLT-06": "worker_trust_metadata_only",
     "PLT-08": "passive_from_plt01",
 }
@@ -66,3 +68,22 @@ def for_check(raw, executor, check_id):
     out = dict(raw)
     out[executor] = merge_config(section, entry)
     return out
+
+
+def observation_snapshot_scope(raw, allowed_checks):
+    """Return the scoped OBS-01 settings and technical binding when requested."""
+    name, check_id = "required_event_record", "OBS-01"
+    option = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
+    overlays = raw.get(CHECK_CONFIG)
+    overlay = overlays.get(check_id) if type(overlays) is dict else None
+    if not any(type(settings) is dict and option in settings for settings in (raw.get(name), overlay)):
+        return None
+    settings = for_check(raw, name, check_id).get(name, {})
+    if (allowed_checks is None or check_id not in allowed_checks or "PLT-12" in allowed_checks
+            or raw.get("update", {}).get("mode", "external") != "external"
+            or raw.get("executors", {}).get(name) != "kubernetes"
+            or raw.get("record_attestation") or raw.get("lab_activation")
+            or settings.get(option) is not True):
+        raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")
+    bindings = raw.get("run_binding")
+    return settings, bindings.get(check_id) if type(bindings) is dict else None

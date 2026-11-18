@@ -15,7 +15,8 @@ from guard.executors import registry
 from guard.executors.container_config import collect_kubernetes_process_permissions, read_kubernetes_process_observations
 from guard.executors.http_common import Ctx
 from guard.executors.kubernetes_credential_exposure import KubernetesCredentialExposureExecutor
-from guard.models import ExecStatus, Verdict, canonical_json, sha256_hex
+from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
+from guard.models import ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
 from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
 from guard.runtime.kubernetes_process import SCHEMA, SOURCE_SHA256
 from guard.store import Store
@@ -128,6 +129,44 @@ def context(tmp_path, *, kind="normal", mode=None, normal_mode=None):
               policy_values=PERMISSION_VALUES, timeout=1, allow_mutating=False, keys={}, secrets=[],
               cprobe=transport, workdir=tmp_path, started=T0)
     return ctx, world
+
+
+def test_approved_ipc_path_metadata_uses_owned_reader_without_any_connection(tmp_path, monkeypatch):
+    ctx, world = context(tmp_path)
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    check = pack.checks['PLT-02']
+    protected = '/run/fixture/engine.sock'
+    values = {'protected_unix_paths': [protected], 'allowed_ipc_uids': ['1000']}
+    target_path = tmp_path / 'target.json'
+    target_path.write_bytes(canonical_json(ctx.target))
+    target_hash = sha256_hex(target_path.read_bytes())
+
+    def limited_runner(argv, **kwargs):
+        if 'exec' in argv:
+            assert json.loads(kwargs['input_bytes']) == {'candidate_paths': [protected]}
+        return world.runner(argv, **kwargs)
+
+    def wrong_lane(*args, **kwargs):
+        pytest.fail('A connection collector selected the protected-path metadata path')
+
+    monkeypatch.setattr('guard.executors.kubernetes_ipc_product.collect_kubernetes_unix_ipc', wrong_lane)
+    config = {'target': str(target_path), 'protected_path_metadata_only': True}
+    executor = KubernetesIPCProductExecutor(config, runner=limited_runner, expected_target_sha256=target_hash)
+    draft = executor.run(check, ctx.env, values, ctx.adapter, tmp_path / 'work')
+    assert draft.status == ExecStatus.COMPLETED and draft.data_origin.value == 'EXAMPLE'
+    assert world.process_reads == 1 and not world.packets
+    row, = draft.observations['unix_ipc_trials'].value
+    assert row['path_sha256'] == sha256_hex(protected.encode()) and row['state'] == 'absent_in_reader_namespace'
+    assert row['access_tested'] is False and not draft.normal_control.attempted
+    assert not draft.observations['unix_ipc_violations'].collected
+    assert draft.observations['ipc_scope_complete'].value is False
+    summary = draft.artifacts[0].path.read_text()
+    assert protected not in summary and PRIVATE not in summary
+
+    invalid = KubernetesIPCProductExecutor(config, runner=limited_runner, expected_target_sha256='f' * 64)
+    with pytest.raises(ValueError, match='KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'):
+        invalid.run(check, ctx.env, values, ctx.adapter, tmp_path / 'wrong-target')
+    assert world.process_reads == 1
 
 
 @pytest.mark.parametrize("kind,expected", [("normal", Verdict.UNKNOWN), ("root", Verdict.FAIL),

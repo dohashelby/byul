@@ -341,6 +341,93 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
         _write(target_path, {'schema': 'replaced-source-fixture'})
         application._pin_prebound_kubernetes_targets(cfg, envs[0], paths, snapshots)
         assert reads == [target_path]
-    assert cfg['_kubernetes_target_sha256_by_executor'] == {
-        'boundary_egress': sha256_hex(canonical_json(json.loads(original_bytes)))}
+    assert cfg['_kubernetes_target_sha256_by_check'] == {
+        'OBS-04': sha256_hex(canonical_json(json.loads(original_bytes)))}
     assert configuration_sha256(cfg, envs) != expected_recipe
+
+
+def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources):
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {'OBS-01': {'observation_required_events': ['ACCESS_ALLOWED', 'ACCESS_DENIED'],
+                         'observation_required_fields': ['actor_sha256', 'target_sha256', 'run_sha256', 'policy_sha256'],
+                         'observation_max_delay_ms': 5000}}
+    pol = original.model_copy(update={'values': values,
+        'scope': original.scope.model_copy(update={'include': ['OBS-01', 'PLT-12']})}).seal()
+    _write(policy_path, pol.to_dict())
+    obs_bindings = {}
+    for number, side in enumerate(sides, 1):
+        producer = tmp_path / f'{side}-approved-producer.py'
+        producer.write_text(f'# producer fixture for {side}\n')
+        obs_bindings[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
+                              'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64}}
+    cfg, _, decisions = tool.assemble(
+        sides, policy_path, pack=pack, store=tmp_path / 'store', observation_run_bindings=obs_bindings)
+    assert cfg['update']['allowed_checks'] == ['OBS-01']
+    assert cfg['check_config'] == {'OBS-01': {'record_snapshot_only': True}}
+    assert cfg['executors'] == {'required_event_record': 'kubernetes'}
+    assert decisions['OBS-01']['shared_executor_checks']['PLT-12']['baseline']['expected_if_invoked'] == 'NOT_RUN'
+    for side in sides:
+        assert cfg['sides'][side]['run_binding'] == {'OBS-01': obs_bindings[side]}
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    bad_scope = deepcopy(cfg)
+    bad_scope['update']['allowed_checks'].append('PLT-12')
+    invalid = application.update_readiness(pack, envs, pol, bad_scope)
+    assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == (
+        'OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID')
+    fresh = tmp_path / 'fresh-record-target.json'
+    staged = tool.staged_config(cfg, fresh)
+    assert staged['sides']['candidate']['run_binding'] == cfg['sides']['candidate']['run_binding']
+    assert staged['sides']['candidate']['required_event_record']['target'] == str(fresh)
+    _, pointer = tool._source(sides['candidate']['target'])
+    target = json.loads(sides['candidate']['target'].read_bytes())
+    for number, role in enumerate(('engine', 'probe'), 100):
+        target['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        target['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, target)
+    assert tool.revalidate_candidate(staged, envs[1], pointer) == {
+        'required_event_record': sha256_hex(canonical_json(target))}
+    recipe = configuration_sha256(staged, envs)
+    Path(obs_bindings['candidate']['record_producer']).write_text('# changed producer bytes\n')
+    assert configuration_sha256(staged, envs) != recipe
+
+
+def test_shared_ipc_checks_keep_distinct_recipe_pinned_targets(tmp_path, monkeypatch, sources):
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {'PLT-02': {'protected_unix_paths': ['/run/fixture/engine.sock'], 'allowed_ipc_uids': ['1000']}}
+    approved = json.loads((tool.readiness.ROOT / 'docs/dev-1/mvp-enterprise-policy-20261116.json').read_bytes())
+    values['PLT-06'] = {row['key']: row['value'] for row in approved['decisions'] if row['check_id'] == 'PLT-06'}
+    pol = original.model_copy(update={'values': values,
+        'scope': original.scope.model_copy(update={'include': ['PLT-02', 'PLT-06']})}).seal()
+    _write(policy_path, pol.to_dict())
+    cfg, _, _ = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', protected_ipc_metadata=True)
+    assert set(cfg['update']['allowed_checks']) == {'PLT-02', 'PLT-06'}
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    expected = {}
+    for side, env in zip(sides, envs):
+        target = json.loads(sides[side]['target'].read_bytes())
+        expected['PLT-06', env.id] = sha256_hex(canonical_json(target))
+        target['kubernetes']['engine']['pod_uid'] = '00000000-0000-0000-0000-000000000157'
+        alternate = _write(tmp_path / f'{side}-ipc-target.json', target)
+        expected['PLT-02', env.id] = sha256_hex(canonical_json(target))
+        cfg['sides'][side]['check_config'] = {'PLT-02': {'target': str(alternate)}}
+
+    class Example:
+        name, version = 'unix_ipc', '1'
+
+        def __init__(self, raw):
+            self.target_hash = raw['_kubernetes_target_sha256']
+
+        def run(self, check, env, *_args):
+            assert self.target_hash == expected.pop((check.id, env.id))
+            return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                                 normal_control={'attempted': False, 'succeeded': None})
+
+    monkeypatch.setitem(registry.EXECUTORS, 'unix_ipc:kubernetes', Example)
+    store = Store(tmp_path / 'store')
+    application.execute_update(store, pack, envs, pol, cfg, tmp_path / 'update', utcnow())
+    assert not expected
+    assert all(row.execution.status == ExecStatus.COMPLETED for row in store.iter_kind('EVD'))

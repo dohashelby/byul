@@ -45,6 +45,10 @@ class KubernetesSupplyBootExecutor:
         if check.id not in contract.CHECK_PROFILES or getattr(check, "collection_profile", None) != contract.CHECK_PROFILES[check.id]:
             raise ValueError("SUPPLY_BOOT_PROFILE_UNSUPPORTED")
         contract.normalize_policy(check.id, values)
+        if check.id == "SUP-05" and any(
+                values[f"supply_normal_{kind}_sha256"] == values[f"supply_challenge_{kind}_sha256"]
+                for kind in ("target", "prepared")):
+            raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
 
     def keys(self):
         return {}
@@ -64,17 +68,23 @@ class KubernetesSupplyBootExecutor:
             raise ValueError
         return target, prepared, digest
 
-    def _collect_role(self, check, env, values, role):
+    def _load_available(self, env, values, role):
+        try:
+            return self._load(env, values, role)
+        except (KeyError, TypeError, ValueError, OSError, RuntimeError):
+            return None
+
+    def _collect_role(self, check, env, values, role, *, role_inputs=None):
         """역할 하나의 세션. 입력·연결 오류는 진단 코드로만 남기고 앞선 역할을 지우지 않는다."""
         from guard.collectors import native_model_file_reads
         row = {"role": role, "collected": False, "sealed": False, "record_sha256": None, "owner_binding_verified": False,
                "native_files_covered": False, "diagnostic_codes": []}
         result = {"row": row, "packet": None, "native": None, "evaluated": None}
-        try:
-            target, prepared, digest = self._load(env, values, role)
-        except (KeyError, TypeError, ValueError, OSError, RuntimeError):
+        loaded = self._load_available(env, values, role) if role_inputs is None else role_inputs[role]
+        if loaded is None:
             row["diagnostic_codes"].append("SUPPLY_BOOT_INPUT_UNAVAILABLE")
             return result
+        target, prepared, digest = loaded
         if "worker_shard_input" in self.cfg[role]:
             from .common_consumption import load_input, worker_shards
             try:
@@ -159,7 +169,15 @@ class KubernetesSupplyBootExecutor:
         begin, end = contract.normalize_policy(check.id, policy_values)
         if not begin <= started <= end:
             raise ValueError("SUPPLY_BOOT_POLICY_WINDOW_EXPIRED")
-        collected = {role: self._collect_role(check, env, policy_values, role) for role in contract.ROLES}
+        if check.id == "SUP-05":
+            role_inputs = {role: self._load_available(env, policy_values, role) for role in contract.ROLES}
+            normal, challenge = (role_inputs[role] for role in contract.ROLES)
+            if normal is not None and challenge is not None and normal[1]["session"] == challenge[1]["session"]:
+                raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
+            collected = {role: self._collect_role(check, env, policy_values, role, role_inputs=role_inputs)
+                         for role in contract.ROLES}
+        else:
+            collected = {role: self._collect_role(check, env, policy_values, role) for role in contract.ROLES}
         return self._draft(check, env, policy_values, workdir, started, collected)
 
     def _project(self, check, collected):

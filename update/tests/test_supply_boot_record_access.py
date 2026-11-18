@@ -59,7 +59,7 @@ class FakeRoles:
 
     def __init__(self, monkeypatch, parts):
         self.calls = []
-        def collect(executor, check, env, values, role):
+        def collect(executor, check, env, values, role, *, role_inputs=None):
             self.calls.append(role)
             part = parts[role]
             if isinstance(part, Exception):
@@ -532,6 +532,42 @@ def test_collect_role_record_failure_still_collects_native(tmp_path, monkeypatch
                                     "missing": [], "declared_scope": {}})
     part_ = executor._collect_role(PACK.checks["SUP-05"], env, values, "normal")
     assert part_["row"]["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"] and part_["native"] is not None
+
+
+@pytest.mark.parametrize("shared_input", ["target", "prepared", "session"])
+def test_sup05_rejects_reused_role_identity_before_collection(tmp_path, monkeypatch, shared_input):
+    env = environment(model={"id": "test"})
+    executor, values, _ = role_inputs(tmp_path, monkeypatch, "SUP-05", env)
+    challenge_target = {"lab": True}
+    if shared_input != "target":
+        challenge_target["example_role"] = "challenge"
+    target_path = tmp_path / "challenge-target.json"
+    target_path.write_bytes(canonical_json(challenge_target))
+    executor.cfg["challenge"] = {"target": str(target_path), "prepared": "q"}
+    prepared = {"p": {"session": "a" * 32}, "q": {"session": "b" * 32}}
+    if shared_input == "prepared":
+        prepared["q"] = dict(prepared["p"])
+    elif shared_input == "session":
+        prepared["q"] = {"session": "a" * 32, "example_role": "challenge"}
+    values.update(supply_challenge_target_sha256=sha256_hex(canonical_json(challenge_target)),
+                  supply_challenge_prepared_sha256=sha256_hex(canonical_json(prepared["q"])))
+    workdir = tmp_path / "evidence"
+    calls = []
+
+    def load(path):
+        calls.append(("load", path))
+        return prepared[path]
+
+    def reader(*args, **kwargs):
+        calls.append(("reader", None))
+        raise AssertionError("Duplicate role input must be rejected before collection")
+
+    monkeypatch.setattr("guard.collectors.lifecycle.load_prepared", load)
+    monkeypatch.setattr(boot, "SupplyBootReader", reader)
+    with pytest.raises(ValueError, match="^SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED$"):
+        executor.run(PACK.checks["SUP-05"], env, values, None, workdir)
+    assert calls == ([("load", "p"), ("load", "q")] if shared_input == "session" else [])
+    assert not workdir.exists()
 
 
 @pytest.mark.parametrize("hash_model_bytes", [True, False])

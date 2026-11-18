@@ -192,6 +192,7 @@ def test_real_native_mismatch_output_becomes_a_violation(tmp_path, monkeypatch):
 VALUES = {"supply_stage_budget_ms": {"fetch": 10}, "supply_stage_budget_bytes": {"fetch": 10}, "supply_total_budget_ms": 10,
           "supply_max_attempts": 2, "supply_max_fetch_bytes": 10, "supply_allowed_objects": ["a"], "supply_allowed_identities": ["i"],
           "supply_allowed_readers": ["safetensors"]}
+SUP07_CACHE_PATH_SHA256 = sha256_hex(b"/test-cache/compiled-artifact")
 RECORD_CASES = [
     ("LIF-01", {"stage": "fetch", "elapsed_ms": 99, "peak_bytes": 1, "stopped": False, "temporary_cleaned": True},
      {"stage": "fetch", "elapsed_ms": 1, "peak_bytes": 1, "stopped": False, "temporary_cleaned": True}, "stage_budget_exceeded_without_stop"),
@@ -199,8 +200,9 @@ RECORD_CASES = [
      {"stage": "fetch", "elapsed_ms": 99, "peak_bytes": 99, "stopped": True, "temporary_cleaned": True}, "temporary_resources_left"),
     ("PLT-03", {"object_sha256": "b", "identity_sha256": "i", "outcome": "allowed"},
      {"object_sha256": "b", "identity_sha256": "i", "outcome": "denied"}, "unapproved_object_fetched"),
-    ("SUP-07", {"path_sha256": "p", "writer_allowed": False, "modified": True, "consumed": True, "verified_before_use": False},
-     {"path_sha256": "p", "writer_allowed": False, "modified": True, "consumed": False, "verified_before_use": False}, "tampered_cache_consumed"),
+    ("SUP-07", {"path_sha256": SUP07_CACHE_PATH_SHA256, "writer_allowed": False, "modified": True, "consumed": True, "verified_before_use": False},
+     {"path_sha256": SUP07_CACHE_PATH_SHA256, "writer_allowed": False, "modified": True, "consumed": False, "verified_before_use": False},
+     "tampered_cache_consumed"),
     ("SUP-15", {"path_sha256": "p", "relevant_change": True, "reused": True, "compatibility_verified": False},
      {"path_sha256": "p", "relevant_change": True, "reused": True, "compatibility_verified": True}, "incompatible_cache_reused"),
     ("SUP-12", {"fixture_sha256": "f", "format": "pt", "reader": "pickle", "outcome": "loaded", "fallback": True, "side_effects": []},

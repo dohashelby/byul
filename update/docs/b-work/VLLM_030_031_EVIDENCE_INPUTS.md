@@ -23,3 +23,11 @@
 | OBS-11 | 필수 기록 ID와 수집·탐지·경보 기한, 허용 시계 오차, ENV·세션과 묶인 원본 사건 및 정상 도착, 공백 표시·경보·의존 판정·정상 복귀 시각. | 현재 상태 파일은 원본 생산자 인증과 독립 트리거를 확정하지 않는다. 시계 오차가 음수인 행 및 사건보다 앞선 도착·경보·공백 시각은 정상 또는 기한 충족 근거에서 제외하도록 검토한다. [팩](../../packs/PACK-BASELINE/checks/OBS-11.yaml) [시간·기한 계산](../../src/guard/executors/log_collection_gap.py) [Kubernetes 실행기](../../src/guard/executors/kubernetes_log_integrity.py) |
 
 기존 정책 승인 범위는 0.30.0 소유 lab이다. A는 두 판본의 승인 범위와 증거 생산자를 확정하고, B는 정확 Ref와 해당 범위 자료를 받아 판정 및 비교를 검토한다. [기존 정책 기록](../dev-1/mvp-enterprise-policy-20261118.json)
+
+## 실행과 검토의 범위
+
+두 판본에 동일한 모델·토폴로지의 ENV 쌍과 하나의 정확 POL Ref를 결합한다. 점검별 설정은 양쪽의 `[sides.<side>.check_config.<ID>]`에서 조정한다. `guard prepare-update`는 POL이 선정한 모든 점검을 양쪽에서 확인한다. 실행기를 비활성화한 점검은 준비 불가로 표시되고 제품 실행에서 `NOT_RUN`으로 남을 수 있다. 다른 토폴로지를 별도 계획으로 나눠야 하면 각 계획의 승인된 선정 범위와 실측 의미를 먼저 결정한다. [제품 계획 조립](../../src/guard/application.py) [실행기 선택](../../src/guard/core/run.py)
+
+`tools.mvp_live_readiness`의 `ACTUAL_INPUT_FILES_MISSING`에는 A가 승인·관측한 ENV·POL·target의 정확 Ref와 bytes 해시, B가 조립한 점검별 설정과 입력 파일 색인이 필요하다. 파일 결합 실패는 B가 재현하고, 소스 프로파일이나 생산자 등록이 필요한 경우 A에게 정확한 이행 범위를 보낸다. `LIVE_EXECUTOR_PREFLIGHT_REQUIRED`는 A가 현장에서 확인하고 원본을 보존한다. [오프라인 입력 검사](../../tools/mvp_live_readiness.py)
+
+복원한 각 저장소와 원본 `report.json`을 `tools.mvp_compare_review --run <복원 저장소> <원본 RPT>`로 전달한다. `--run`을 반복해 여러 원본을 확인하고, 동일 점검에 둘 이상의 원본이 있으면 `--assignments`의 JSON에서 해당 점검을 선택한 원본의 정확한 RPT Ref(`kind`, `id`, `revision`, `sha256`)에 대응시킨다. 각 원본의 POL Ref, 선택한 행의 EVD·RES·RPT Ref, 보안 `UNKNOWN` 쪽 및 비교 공백을 함께 남긴다. [복원 검토 도구](../../tools/mvp_compare_review.py)

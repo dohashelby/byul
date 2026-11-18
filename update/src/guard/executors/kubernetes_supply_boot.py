@@ -123,7 +123,21 @@ class KubernetesSupplyBootExecutor:
                 captured = capture_session(reader, target, container=engine["container"], image=engine["image"], prepared=prepared,
                     owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)
                 row["native_files_covered"] = captured["recorded_files_covered"]
-                result["native"] = contract.native_consumption(native_model_file_reads.analyze(captured, prepared))
+                analysis = native_model_file_reads.analyze(captured, prepared)
+                native = contract.native_consumption(analysis)
+                if check.id == "SUP-05":
+                    native["source_binding"] = {"session": prepared["session"], "target_sha256": digest,
+                        "prepared_sha256": values[f"supply_{role}_prepared_sha256"],
+                        "declared_scope": analysis["declared_scope"]}
+                    for projection, candidate in zip(native["rows"], analysis["candidates"], strict=True):
+                        source = captured["recordings"][candidate["recording"]]["capture"]["provenance"]
+                        projection["source_binding"] = {"recording_sha256": source["capture_sha256"],
+                            "recording_owner_binding_verified": source["owner_binding_verified"],
+                            "process_start_ticks": candidate["start_ticks"], "root_event": candidate["root_event"],
+                            "source_events": candidate["source_events"], "hash_status": candidate["hash_status"],
+                            "reference_sha256": candidate["reference_sha256"],
+                            "read_return_sha256": candidate["read_return_bytes_sha256"]}
+                result["native"] = native
             except Exception:
                 row["diagnostic_codes"].append("SUPPLY_BOOT_NATIVE_UNAVAILABLE")
         try:

@@ -506,7 +506,8 @@ def test_collect_role_reads_record_and_native_through_real_binding(tmp_path, mon
     FakeReader.raw = canonical_json(packet)
     monkeypatch.setattr(boot, "capture_session", lambda *a, **k: {"recorded_files_covered": True})
     monkeypatch.setattr("guard.collectors.native_model_file_reads.analyze",
-        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0, "missing": []})
+        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0,
+                                    "missing": [], "declared_scope": {}})
     part_ = executor._collect_role(PACK.checks["SUP-05"], env, values, "normal")
     assert part_["row"]["collected"] and part_["row"]["sealed"] and part_["row"]["native_files_covered"]
     assert part_["native"]["rows"] == [] and part_["cleanup"] == "SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"
@@ -527,9 +528,57 @@ def test_collect_role_record_failure_still_collects_native(tmp_path, monkeypatch
     monkeypatch.setattr(FakeReader, "fail_read", True)
     monkeypatch.setattr(boot, "capture_session", lambda *a, **k: {"recorded_files_covered": True})
     monkeypatch.setattr("guard.collectors.native_model_file_reads.analyze",
-        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0, "missing": []})
+        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0,
+                                    "missing": [], "declared_scope": {}})
     part_ = executor._collect_role(PACK.checks["SUP-05"], env, values, "normal")
     assert part_["row"]["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"] and part_["native"] is not None
+
+
+@pytest.mark.parametrize("hash_model_bytes", [True, False])
+def test_sup05_sealed_observation_keeps_source_and_reference_binding(tmp_path, monkeypatch, hash_model_bytes):
+    from guard.collectors.model_read_scope import validate_binding
+    from guard.core.run import _normalize
+
+    env = environment(model={"id": "test", "revision": "pinned", "inventory_sha256": "f" * 64})
+    executor, values, digest = role_inputs(tmp_path, monkeypatch, "SUP-05", env)
+    data, prepared, world = read_fixture(tmp_path, monkeypatch, scope_change=lambda scope: scope.update(
+        environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
+        model_sha256=sha256_hex(env.model.id.encode()), revision_sha256=sha256_hex(env.model.revision.encode()),
+        inventory_sha256=env.model.inventory_sha256, hash_model_bytes=hash_model_bytes))
+    validate_binding(prepared, env, {"lab": True})
+    capture = data["recordings"][0]["capture"]
+    recording_sha256 = sha256_hex(canonical_json(capture["records"]))
+    capture["provenance"] = {"capture_sha256": recording_sha256, "owner_binding_verified": True,
+                             "owner": {"private_detail": "EXAMPLE-PRIVATE-OWNER-METADATA"}}
+    data["recorded_files_covered"] = True
+    values["supply_normal_prepared_sha256"] = sha256_hex(canonical_json(prepared))
+    monkeypatch.setattr("guard.collectors.lifecycle.load_prepared", lambda path: prepared)
+    monkeypatch.setattr(boot, "capture_session", lambda *a, **k: data)
+    monkeypatch.setattr(FakeReader, "raw", canonical_json(good_packet(env.ref().model_dump(mode="json"), digest, "SUP-05")),
+                        raising=False)
+    check = PACK.checks["SUP-05"]
+    draft = executor.run(check, env, values, None, tmp_path / "evidence")
+    observed = _normalize(check, draft)["observations"]
+    native, = observed["supply_boot_native_consumption"]["value"]
+    row, = native["rows"]
+    source = row["source_binding"]
+
+    assert native["role"] == "normal" and native["source_binding"] == {
+        "session": prepared["session"], "target_sha256": digest,
+        "prepared_sha256": values["supply_normal_prepared_sha256"], "declared_scope": analyze(data, prepared)["declared_scope"]}
+    assert source["recording_sha256"] == recording_sha256 and source["recording_owner_binding_verified"] is True
+    assert source["process_start_ticks"] == capture["records"][0]["payload"]["context"]["start_ticks"]
+    assert [capture["records"][seq]["payload"]["phase"] for _, seq in source["source_events"]] == [
+        "OPEN_RETURN", "READ_RETURN", "CLOSE_RETURN"]
+    assert source["reference_sha256"] == prepared["model_read_scope"]["files"][0]["reference_sha256"]
+    assert source["read_return_sha256"] == (source["reference_sha256"] if hash_model_bytes else None)
+    assert source["hash_status"] == ("complete" if hash_model_bytes else "disabled")
+    assert observed["supply_boot_record_authenticated"]["value"] is False
+    assert observed["supply_boot_complete"]["value"] is False
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    summary = (tmp_path / "evidence" / "supply_boot_summary.json").read_text()
+    assert json.loads(summary)["native"] == [native]
+    assert str(world.path) not in summary and "EXAMPLE-PRIVATE-OWNER-METADATA" not in summary
 
 
 @pytest.mark.parametrize("condition", ["valid", "bad_type", "duplicate_stage", "unverified_owner"])

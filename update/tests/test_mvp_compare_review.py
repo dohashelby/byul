@@ -53,6 +53,9 @@ def test_original_unknown_security_is_counted_once_per_id_across_sides_and_repla
     assert result['rows']['REQ-01']['baseline']['evidence'] == strict['checks']['REQ-01']['baseline']['evidence']
     assert result['rows']['REQ-02']['status'] == 'ORIGINAL_ROW_MISSING'
     assert result['comparison_complete'] is result['unknown_security_limit_met'] is False
+    assert not result['paired_execution_complete']
+    assert 'REQ-02' in result['execution_coverage']['candidate']['unverified']
+    assert 'REQ-02' not in result['execution_coverage']['candidate']['not_run']
     assert {path: path.read_bytes() for path in restored.rglob('*') if path.is_file()} == before
 
 
@@ -154,6 +157,10 @@ def test_unfinished_execution_retains_exact_refs_as_an_unresolved_side(status):
     assert 'EXECUTION_' + status in row['baseline']['blocking_codes']
     assert row['baseline']['verdicts'] is None
     assert row['candidate']['verdicts']['security'] == 'PASS'
+    assert row['baseline']['execution_status'] == status
+    assert result['execution_coverage']['baseline'][status.lower()] == ['REQ-01']
+    assert 'REQ-01' in result['execution_coverage']['candidate']['verified_measured']
+    assert not result['paired_execution_complete']
 
 
 def test_repeated_original_rows_never_choose_a_result_implicitly():

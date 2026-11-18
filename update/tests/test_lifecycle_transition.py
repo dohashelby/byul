@@ -207,6 +207,28 @@ def test_external_scalar_approval_cannot_cover_other_generation_targets(monkeypa
     assert not log
 
 
+def test_lif05_normalization_keeps_observed_request_facts_and_transition_gaps(monkeypatch, tmp_path):
+    from guard.core.run import _normalize
+    from guard.models import load_pack
+
+    executor, env, _ = harness(monkeypatch)
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    definition = pack.checks['LIF-05']
+    draft = executor.run(definition, env, policy(), None, tmp_path)
+    observed = _normalize(definition, draft)['observations']
+    row, = observed['activation_steps']['value']
+    assert row['step'] == 'passive-scheduled-redeployment-observation'
+    assert len(row['trials']) == 5 and all('transport' not in trial for trial in row['trials'])
+    assert row['request_generation_bindings'] == draft.observations['transition_request_generation_bindings'].value
+    assert row['request_generation_bindings']
+    assert row['request_configuration_facts']
+    assert row['request_configuration_conflict_candidates']
+    assert not row['transition_activation_verified'] and not row['actual_consumption_verified']
+    assert 'drain_and_external_admission_gate_unverified' in observed['activation_missing']['value']
+    assert observed['activation_violations']['value'] == []
+    assert observed['activation_scope_complete']['value'] is False
+
+
 @pytest.mark.parametrize('failure', ['cleanup', 'recovery', 'replacement'])
 def test_later_error_keeps_independent_facts_and_other_generation(monkeypatch, tmp_path, failure):
     executor, env, log = harness(monkeypatch, failure=failure)

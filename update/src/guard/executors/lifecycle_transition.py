@@ -429,6 +429,22 @@ class LifecycleTransitionExecutor:
             'transition_trials': trials, 'transition_missing': sorted(set(missing)),
             'transition_inflight_task_schedule_overlap': overlap, 'transition_scope_complete': False,
             'transition_actual_consumption_verified': False}
+        if check.id == 'LIF-05':
+            trial_fields = ('case_id', 'generation', 'request_id_sha256', 'started_at', 'finished_at', 'normal_shape_verified')
+            observations.update(
+                activation_steps=[{
+                    'step': 'passive-scheduled-redeployment-observation',
+                    'trials': [{key: trial[key] for key in trial_fields} for trial in trials],
+                    'request_generation_bindings': projection['request_generation_bindings'],
+                    'request_configuration_facts': projection['request_configuration_facts'],
+                    'request_configuration_conflict_candidates': projection['request_configuration_conflicts'],
+                    'transition_activation_verified': False,
+                    'actual_consumption_verified': False,
+                }],
+                activation_missing=observations['transition_missing'],
+                activation_violations=[],
+                activation_scope_complete=False,
+            )
         summary = {'profile': check.collection_profile, 'manifest': manifest, 'samples': samples,
             'observations': observations, 'engine_started': False, 'transition_control_implemented': False,
             'producer_authenticated': False, 'whole_run_coverage_verified': False}

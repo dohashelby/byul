@@ -65,14 +65,15 @@ def evaluate(packet, values):
             continue
         for row in selected:
             start = row["event_at_ms"]
-            if row["clock_uncertainty_ms"] > values["max_clock_uncertainty_ms"][record]:
+            observed = (row["arrived_at_ms"], row["gap_marked_at_ms"], row["alert_at_ms"])
+            if (not 0 <= row["clock_uncertainty_ms"] <= values["max_clock_uncertainty_ms"][record]
+                    or any(timestamp is not None and timestamp < start for timestamp in observed)):
                 unverified.append(record)
                 continue
-            arrived = row["arrived_at_ms"]
+            arrived, marked, alerted = observed
             if arrived is not None and arrived - start <= values["collection_deadline_ms"][record]:
                 normal.append(record)
                 continue
-            marked, alerted = row["gap_marked_at_ms"], row["alert_at_ms"]
             if marked is None or marked - start > values["detection_deadline_ms"][record]:
                 violations.append({"record": record, "reason": "gap_not_marked_in_time"})
             if alerted is None or alerted - start > values["alert_deadline_ms"][record]:

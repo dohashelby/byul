@@ -15,11 +15,17 @@ import tomllib
 
 import yaml
 
+from guard.adapters import vllm_native_input_profiles, vllm_native_input_rejection
+from guard.collectors import native_input, native_input_qualification
+from guard.collectors import native_input_rejection_qualification, reused_input_qualification
 from guard.collectors.file import load_environment, load_policy
 from guard.configuration import for_check, merge_config
 from guard.core.select import _in_scope, check_policy_value
 from guard.executors import registry, run_binding
+from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
 from guard.models import load_pack
+from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
+from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
 from tools.mvp_a_input_preflight import _code, _pairs, _read
 from tools.mvp_versions import versions
 
@@ -30,6 +36,56 @@ SIDES = ('baseline', 'candidate')
 
 def template(pack):
     return {'schema': SCHEMA, 'pack_ref': pack.ref().model_dump(mode='json'), 'inputs': []}
+
+
+def _native_matrix_blockers(expected, profile):
+    identity = expected['engine'], expected['version'], expected['image']
+    blockers = []
+    try:
+        vllm_native_input_profiles.select(expected['image'])
+    except ValueError:
+        blockers.append('NATIVE_INPUT_PROFILE_UNAVAILABLE')
+    # Both matrix collectors use the original validation source pins. Each
+    # projection still requires its own receipt for the exact image and source.
+    try:
+        vllm_native_input_rejection.profile(*identity)
+    except (OSError, ValueError, TypeError, KeyError):
+        blockers.append('NATIVE_REJECTION_PROFILE_UNAVAILABLE')
+    if profile == INPUT_MATRIX:
+        qualifier, prefix = native_input_rejection_qualification, 'NATIVE_REJECTION_PROJECTION'
+    else:
+        qualifier, prefix = reused_input_qualification, 'REUSED_INPUT_PROJECTION'
+    for registry_, name in ((native_input_qualification, 'NATIVE_INPUT_CAPTURE'), (qualifier, prefix)):
+        try:
+            if registry_.status(*identity)['registered'] is not True:
+                blockers.append(name + '_GPU_UNQUALIFIED')
+        except (OSError, ValueError, TypeError, KeyError):
+            blockers.append(name + '_QUALIFICATION_INVALID')
+    return blockers
+
+
+def _check_native_prepared(spec, target, env):
+    if (type(spec) is not dict or set(spec) - {'prepared_dir', 'prepared_sha256', 'prepared_uid'}
+            or type(spec.get('prepared_dir')) is not str or not spec['prepared_dir']
+            or not native_input._sha(spec.get('prepared_sha256'))
+            or ('prepared_uid' in spec and type(spec['prepared_uid']) is not int)):
+        raise ValueError('NATIVE_INPUT_CAPTURE_SETTINGS_INVALID')
+    if target.get('lab') is not True:
+        raise ValueError('NATIVE_INPUT_CAPTURE_TARGET_MISMATCH')
+    try:
+        validate_target_binding(target, env)
+    except KubernetesBindingError:
+        raise ValueError('NATIVE_INPUT_CAPTURE_TARGET_MISMATCH') from None
+    try:
+        manifest, _, _ = native_input.load_prepared(
+            Path(spec['prepared_dir']).absolute(), expected_uid=spec.get('prepared_uid'))
+    except FileNotFoundError:
+        raise ValueError('NATIVE_INPUT_PREPARED_MISSING') from None
+    except (OSError, ValueError, TypeError, KeyError):
+        raise ValueError('NATIVE_INPUT_PREPARED_INVALID') from None
+    if (manifest['image'] != env.engine.image_digest
+            or sha256(native_input.runtime.canonical(manifest)).hexdigest() != spec['prepared_sha256']):
+        raise ValueError('NATIVE_INPUT_CAPTURE_BINDING_CHANGED')
 
 
 def _inspect(source, check, pack, issued_at):
@@ -71,6 +127,9 @@ def _inspect(source, check, pack, issued_at):
     implementation = config.get('executors', {}).get(check.executor)
     if implementation not in ('real', 'kubernetes'):
         raise ValueError('MVP_ACTIVE_EXECUTOR_REQUIRED')
+    requires_native_matrix = getattr(check, 'collection_profile', None) in (INPUT_MATRIX, REUSED_MATRIX)
+    if requires_native_matrix and implementation != 'kubernetes':
+        raise ValueError('NATIVE_INPUT_KUBERNETES_REQUIRED')
     if registry.resolve_executor(check.executor, implementation, engine=env.engine.name,
                                  version=env.engine.version) is None:
         raise ValueError('MVP_EXECUTOR_UNAVAILABLE')
@@ -97,6 +156,8 @@ def _inspect(source, check, pack, issued_at):
         executor.validate_policy(check, effective)
     except (ValueError, TypeError, KeyError):
         raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
+    if requires_native_matrix:
+        _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
         after, current = _read(source[role]['path'])
         if current != identity or after != files[role]:
@@ -143,9 +204,12 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
     for cid, check in sorted(active.items()):
         rules = (check.judge.params if check.judge else {})
         security_rules = bool(rules.get('pass_when_all') or rules.get('fail_when_any'))
+        collection_profile = getattr(check, 'collection_profile', None)
+        requires_native_matrix = collection_profile in (INPUT_MATRIX, REUSED_MATRIX)
+        active_implementations = ('kubernetes',) if requires_native_matrix else ('real', 'kubernetes')
         for selected_side in selected_sides:
             expected = expected_versions[selected_side]
-            implementations = [impl for impl in ('real', 'kubernetes') if registry.resolve_executor(
+            implementations = [impl for impl in active_implementations if registry.resolve_executor(
                 check.executor, impl, engine=expected['engine'], version=expected['version']) is not None]
             row = {'check_id': cid, 'side': selected_side, 'executor': check.executor,
                    'security_rules_present': security_rules, 'available_implementations': implementations,
@@ -161,6 +225,8 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
                     row.update(_inspect(sources[cid, selected_side], check, pack, now))
                 except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as error:
                     row['blocking_codes'] = [_code(error)]
+            if requires_native_matrix:
+                row['blocking_codes'].extend(_native_matrix_blockers(expected, collection_profile))
             if not implementations:
                 row['blocking_codes'].append('CURRENT_EXECUTOR_UNAVAILABLE')
             if not security_rules:

@@ -1,0 +1,342 @@
+"""Review the security UNKNOWN limit from original saved update RPTs and stores."""
+from __future__ import annotations
+
+import argparse
+from collections import defaultdict
+import json
+from pathlib import Path
+import re
+
+from guard.core.compare import compare, comparison_differences
+from guard.core.judge import judge_evidence
+from guard.core.select import _in_scope, check_policy_value, evaluate_check
+from guard.executors import run_binding
+from guard.models import Ref, load_pack, weakest_origin
+from guard.models.artifacts import model_closure_sha256
+from guard.models.objects import object_from_dict
+from guard.validation_evidence import read_objects, verify_store_files
+from tools.mvp_a_input_preflight import _pairs
+from tools.mvp_versions import versions
+
+ROOT = Path(__file__).resolve().parents[1]
+SIDES = ('baseline', 'candidate')
+UNKNOWN_LIMIT = 6
+SHA256 = re.compile(r'[0-9a-f]{64}')
+
+
+def _key(ref):
+    return ref.kind, ref.id, ref.revision, ref.sha256
+
+
+def _dump(ref):
+    return ref.model_dump(mode='json')
+
+
+class InvalidReport(ValueError):
+    pass
+
+
+def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of):
+    side = {'environment': _dump(env.ref()), 'evidence': _dump(evd.ref()) if evd else None,
+            'result': _dump(result.ref()) if result else None, 'verdicts': None, 'blocking_codes': []}
+    blockers = side['blocking_codes']
+    if evd is None:
+        blockers.append('ORIGINAL_EVIDENCE_MISSING')
+    if result is None:
+        blockers.append('ORIGINAL_RESULT_MISSING')
+    if shown is None or shown.result is None:
+        blockers.append('ORIGINAL_RPT_SIDE_MISSING')
+    if evd is not None:
+        execution = evd.execution
+        if execution.status != 'COMPLETED':
+            blockers.append(f'EXECUTION_{execution.status.value}')
+        if evd.data_origin != 'MEASURED' or execution.operator is not None or execution.override_reason:
+            blockers.append('AUTOMATED_MEASUREMENT_REQUIRED')
+        if (not evd.artifacts or any(artifact.bytes < 1 for artifact in evd.artifacts)
+                or execution.executor is None or execution.executor.name != check.executor
+                or execution.adapter is None or execution.adapter.name != env.engine.name
+                or not SHA256.fullmatch(execution.executor.config_sha256)):
+            blockers.append('ORIGINAL_EXECUTOR_OR_ARTIFACTS_INVALID')
+        if (execution.started_at is None or execution.finished_at is None
+                or execution.finished_at < execution.started_at):
+            blockers.append('ORIGINAL_EXECUTION_TIME_INVALID')
+        if (evd.comparability.model_inventory_sha256 != model_closure_sha256(env.model)
+                or evd.comparability.gpu != env.runtime.gpu_model or evd.comparability.driver != env.runtime.driver
+                or evd.comparability.cpu is not None
+                or not SHA256.fullmatch(evd.comparability.config_sha256 or '')
+                or not SHA256.fullmatch(evd.comparability.fixture_sha256 or '')):
+            blockers.append('ORIGINAL_COMPARABILITY_INCOMPLETE')
+        document = execution.run_binding
+        if document is None:
+            if run_binding.keys_for(check):
+                blockers.append('ORIGINAL_RUN_BINDING_MISSING')
+        else:
+            blockers.extend(run_binding.verify(document, evd))
+            values = document.get('values')
+            if isinstance(values, dict) and run_binding.CURRENT_POLICY_REF in values:
+                if values[run_binding.CURRENT_POLICY_REF] != _dump(policy.ref()):
+                    blockers.append('RUN_BINDING_POLICY_REF_MISMATCH')
+    if evd is not None and result is not None and shown is not None and shown.result is not None:
+        replay = judge_evidence(check, evd, policy, as_of,
+                                condition_origins=[condition.origin for condition in item.conditions], plan=plan)
+        if (result.evidence != evd.ref() or {_key(ref) for ref in result.refs} != {_key(ref) for ref in replay.refs}
+                or shown.result != result.ref() or shown.verification_level != result.verification_level
+                or any(getattr(shown, axis) != getattr(result.verdicts, axis)
+                       for axis in ('security', 'functional', 'performance'))
+                or any(getattr(result, key) != getattr(replay, key)
+                       for key in ('judge', 'verdicts', 'verification_level', 'data_origin', 'missing_observations'))):
+            blockers.append('ORIGINAL_RESULT_REPLAY_MISMATCH')
+        if not blockers:
+            side['verdicts'] = result.verdicts.model_dump(mode='json')
+    if evd is not None and (evd.execution.cleanup_errors
+                            or evd.execution.status == 'COMPLETED' and evd.execution.abort_reason):
+        blockers.append('EXECUTION_OR_CLEANUP_UNRESOLVED')
+    return side
+
+
+def _verified_rows(original_report, objects, pack, expected):
+    parsed = list(map(object_from_dict, objects))
+    by_ref = {_key(obj.ref()): obj for obj in parsed}
+    if len(by_ref) != len(parsed) or any(not obj.hash_ok() for obj in parsed):
+        raise InvalidReport('INVALID_OR_DUPLICATE_STORED_OBJECT')
+
+    def resolve(ref):
+        if ref.kind == 'PACK' and ref == pack.ref():
+            return pack
+        return by_ref[_key(ref)]
+
+    report = object_from_dict(original_report)
+    if report.kind != 'RPT' or report.mode != 'update' or resolve(report.ref()).to_dict() != original_report:
+        raise InvalidReport('ORIGINAL_RPT_MISMATCH')
+    manifest = {_key(ref) for ref in report.inputs_manifest}
+    if len(manifest) != len(report.inputs_manifest) or manifest != {_key(ref) for ref in report.refs}:
+        raise InvalidReport('ORIGINAL_RPT_MANIFEST_MISMATCH')
+    inputs = [resolve(ref) for ref in report.inputs_manifest]
+    plan, = [obj for obj in inputs if getattr(obj, 'kind', None) == 'PLAN']
+    if (plan.mode != 'update' or plan.inputs.pack != pack.ref() or len(plan.inputs.environments) != 2
+            or plan.inputs.environments[0] == plan.inputs.environments[1]):
+        raise InvalidReport('ORIGINAL_PLAN_SCOPE_MISMATCH')
+    policy = resolve(plan.inputs.policy)
+    envs = [resolve(ref) for ref in plan.inputs.environments]
+    plan_inputs = [pack.ref(), policy.ref(), *plan.inputs.environments]
+    if plan.inputs.change:
+        resolve(plan.inputs.change)
+        plan_inputs.append(plan.inputs.change)
+    if (policy.kind != 'POL' or policy.pack != pack.ref() or plan.inputs.previous_plan is not None
+            or {_key(ref) for ref in plan.refs} != {_key(ref) for ref in plan_inputs}
+            or {_key(ref) for ref in report.inputs_manifest if ref.kind not in {'EVD', 'RES'}}
+            != {_key(ref) for ref in [*plan_inputs, plan.ref()]}):
+        raise InvalidReport('ORIGINAL_PLAN_INPUTS_MISMATCH')
+    for side, env in zip(SIDES, envs, strict=True):
+        engine = expected[side]
+        if env.kind != 'ENV' or (env.engine.name, env.engine.version, env.engine.image_digest) != (
+                engine['engine'], engine['version'], engine['image']):
+            raise InvalidReport('ENGINE_PAIR_MISMATCH')
+        runtime = env.runtime
+        if (env.data_origin == 'EXAMPLE' or not env.model.id or not env.model.revision
+                or not SHA256.fullmatch(env.model.inventory_sha256 or '')
+                or not runtime.gpu_count or not runtime.gpu_model or not runtime.driver or runtime.cpu is not None
+                or (runtime.tp_size or 0) * (runtime.pp_size or 1) * (runtime.dp_size or 1) != runtime.gpu_count):
+            raise InvalidReport('ORIGINAL_GPU_ENVIRONMENT_REQUIRED')
+
+    origins = [obj.data_origin for obj in inputs if getattr(obj, 'kind', None) in {'ENV', 'POL', 'PLAN', 'EVD', 'RES'}]
+    official = policy.status == 'CONFIRMED' and pack.reviewed and 'EXAMPLE' not in origins
+    if (report.official != official or report.data_origin != weakest_origin(origins)
+            or report.policy_status != policy.status or report.pack_review_status != ('REVIEWED' if pack.reviewed else 'DRAFT')):
+        raise InvalidReport('ORIGINAL_RPT_PROVENANCE_MISMATCH')
+
+    plan_items = {item.check_id: item for item in plan.items}
+    report_rows = {row.check_id: row for row in report.by_check}
+    if (len(plan_items) != len(plan.items) or set(plan_items) != set(pack.checks)
+            or len(report_rows) != len(report.by_check) or set(report_rows) != {c.id for c in pack.active_checks()}):
+        raise InvalidReport('ORIGINAL_CHECK_ROWS_MISMATCH')
+    side_env = dict(zip(SIDES, envs, strict=True))
+    selected = {cid for cid, item in plan_items.items() if item.selected}
+    evidence, results = {}, {}
+    for obj in inputs:
+        kind = getattr(obj, 'kind', None)
+        if kind in {'EVD', 'RES'}:
+            pair = obj.check_id, obj.side.value
+            table = evidence if kind == 'EVD' else results
+            if pair in table or pair[0] not in selected or pair[1] not in side_env:
+                raise InvalidReport('ORIGINAL_SIDE_REFS_AMBIGUOUS')
+            if kind == 'EVD':
+                env_ref = side_env[pair[1]].ref()
+                if (obj.plan != plan.ref() or obj.environment != env_ref
+                        or {_key(ref) for ref in obj.refs} != {_key(plan.ref()), _key(env_ref)}):
+                    raise InvalidReport('ORIGINAL_EVIDENCE_BINDING_MISMATCH')
+            table[pair] = obj
+    rows = {}
+    base, cand = envs
+    model_keys = ('id', 'revision', 'inventory_sha256', 'tokenizer_revision', 'components')
+    differences = ['model.' + key for key in model_keys if getattr(base.model, key) != getattr(cand.model, key)]
+    if base.runtime != cand.runtime:
+        differences.append('runtime')
+    for check_id in sorted(selected):
+        item, check, shown = plan_items[check_id], pack.checks[check_id], report_rows[check_id]
+        applicability, conditions, _ = evaluate_check(check, envs)
+        if (not shown.selected or not _in_scope(check_id, policy) or shown.applicability != item.applicability
+                or item.applicability != applicability or item.conditions != conditions or shown.gaps != item.gaps
+                or check.revision != item.check_revision or check.executor != item.executor):
+            raise InvalidReport('ORIGINAL_SELECTION_MISMATCH')
+        policy_values = policy.values.get(check_id, {})
+        blockers = []
+        for param in check.policy_params:
+            if param.required or param.key in policy_values:
+                try:
+                    check_policy_value(check_id, param.key, param.type, policy_values.get(param.key))
+                except ValueError:
+                    blockers.append('ORIGINAL_POLICY_VALUE_UNAVAILABLE')
+        sides = {side: _verify_side(check, item, evidence.get((check_id, side)), results.get((check_id, side)),
+                                    getattr(shown, side), env, policy, plan, report.created_at)
+                 for side, env in side_env.items()}
+        base_evd, cand_evd = (evidence.get((check_id, side)) for side in SIDES)
+        observed_diff = comparison_differences(base_evd.comparability, cand_evd.comparability) if base_evd and cand_evd else []
+        if all(side['verdicts'] is not None for side in sides.values()):
+            for axis, name in (('security', 'comparison'), ('functional', 'functional_comparison')):
+                baseline = sides['baseline']['verdicts'][axis] or 'UNKNOWN'
+                candidate = sides['candidate']['verdicts'][axis] or 'UNKNOWN'
+                replay = compare(baseline, candidate, not observed_diff)
+                if getattr(shown, name) != replay:
+                    blockers.append('ORIGINAL_RPT_COMPARISON_MISMATCH')
+            if shown.comparison_reasons != observed_diff:
+                blockers.append('ORIGINAL_RPT_COMPARISON_REASONS_MISMATCH')
+        rows[check_id] = {
+            'selected': True,
+            'comparison': shown.comparison, 'functional_comparison': shown.functional_comparison,
+            'comparison_reasons': [*observed_diff, *differences],
+            'applicability': item.applicability.value, 'selection_gaps': [gap.value for gap in item.gaps],
+            'blocking_codes': list(dict.fromkeys(blockers)), **sides,
+        }
+    for item in plan.items:
+        if item.not_selected_reason != 'NOT_APPLICABLE' or item.check_id not in pack.checks:
+            continue
+        check = pack.checks[item.check_id]
+        row = report_rows.get(item.check_id)
+        if (row is None or row.selected or row.applicability != 'NOT_APPLICABLE' or row.gaps
+                or row.baseline is not None or row.candidate is not None or row.single is not None
+                or item.applicability != 'NOT_APPLICABLE' or item.gaps or item.check_revision != check.revision
+                or item.executor != check.executor or not _in_scope(item.check_id, policy)):
+            continue
+        evaluations = [evaluate_check(check, [env]) for env in envs]
+        if (item.conditions == [condition for _, conditions, _ in evaluations for condition in conditions]
+                and all(applicability == 'NOT_APPLICABLE'
+                        and any(c.result == 'FALSE' and c.origin in ('MEASURED', 'DECLARED') for c in conditions)
+                        for applicability, conditions, _ in evaluations)):
+            rows[item.check_id] = {'selected': False, 'applicability': 'NOT_APPLICABLE', **{
+                side: {'environment': _dump(side_env[side].ref()),
+                       'conditions': [{'fact': c.fact, 'origin': c.origin, 'result': c.result} for c in conditions]}
+                for side, (_, conditions, _) in zip(SIDES, evaluations, strict=True)}}
+    refs = {'pack': _dump(pack.ref()), 'policy': _dump(policy.ref()), 'plan': _dump(plan.ref()), 'report': _dump(report.ref())}
+    return rows, refs, official
+
+
+def review(run_inputs, *, pack, expected, assignments=None):
+    """Aggregate immutable observations without changing strict execution acceptance."""
+    active = [check.id for check in pack.active_checks()]
+    if len(active) != len(set(active)):
+        raise ValueError('ACTIVE_CHECK_IDS_DUPLICATED')
+    assigned = {}
+    if assignments is not None:
+        if type(assignments) is not dict or set(assignments) - set(active):
+            raise ValueError('REPORT_ASSIGNMENTS_INVALID')
+        for check_id, value in assignments.items():
+            ref = Ref.model_validate(value)
+            if ref.kind != 'RPT' or not ref.id or ref.revision < 1 or not SHA256.fullmatch(ref.sha256):
+                raise ValueError('REPORT_ASSIGNMENTS_INVALID')
+            assigned[check_id] = _dump(ref)
+    reviews, policies = [], []
+    by_check = defaultdict(list)
+    for report, objects, original_pack in run_inputs:
+        if original_pack.ref() != pack.ref():
+            reviews.append({'verified': False, 'reason': 'PACK_REF_MISMATCH'})
+            continue
+        try:
+            rows, refs, official = _verified_rows(report, objects, pack, expected)
+        except InvalidReport as error:
+            reviews.append({'verified': False, 'reason': str(error)})
+            continue
+        except (ValueError, KeyError, TypeError, AttributeError):
+            reviews.append({'verified': False, 'reason': 'EVIDENCE_CONTRACT_INVALID'})
+            continue
+        policies.append(refs['policy'])
+        reviews.append({'verified': True, 'official': official, 'refs': refs})
+        for check_id, row in rows.items():
+            by_check[check_id].append({**row, 'report': refs['report']})
+
+    inventory, unknown, unresolved = {}, [], []
+    for check_id in sorted(active):
+        candidates = by_check[check_id]
+        all_refs = [row['report'] for row in candidates]
+        assigned_ref = assigned.get(check_id)
+        if assigned_ref is not None:
+            candidates = [row for row in candidates if row['report'] == assigned_ref]
+        if len(candidates) != 1:
+            status = 'ORIGINAL_ROW_MISSING' if not candidates else 'ORIGINAL_ROW_AMBIGUOUS'
+            if assigned_ref is not None and not candidates:
+                status = 'ASSIGNED_ORIGINAL_ROW_UNAVAILABLE'
+            inventory[check_id] = {'status': status, 'reports': all_refs}
+            unresolved.append(check_id)
+            continue
+        row, = candidates
+        if not row['selected']:
+            inventory[check_id] = {'status': 'SELECTION_VERIFIED', **row}
+            continue
+        unknown_sides = [side for side in SIDES if (row[side]['verdicts'] or {}).get('security') == 'UNKNOWN']
+        if unknown_sides:
+            unknown.append(check_id)
+        blockers = row['blocking_codes']
+        if any(row[side]['blocking_codes'] for side in SIDES):
+            blockers.append('ORIGINAL_SIDE_UNRESOLVED')
+        if row['comparison_reasons'] or 'NOT_COMPARABLE' in (row['comparison'], row['functional_comparison']):
+            blockers.append('COMPARISON_UNRESOLVED')
+        if row['applicability'] != 'APPLICABLE' or row['selection_gaps']:
+            blockers.append('SELECTION_UNRESOLVED')
+        if blockers:
+            unresolved.append(check_id)
+        status = 'ORIGINAL_ROW_UNRESOLVED' if blockers else 'MEASURED_ROWS_VERIFIED'
+        inventory[check_id] = {'status': status, **row,
+                               'security_unknown_sides': unknown_sides, 'blocking_codes': blockers}
+
+    exact_policy = bool(policies) and all(policy == policies[0] for policy in policies)
+    verified_inputs = bool(reviews) and all(report['verified'] for report in reviews)
+    complete = not unresolved and exact_policy and verified_inputs
+    return {
+        'schema': 'guard-mvp-compare-review/1', 'pack_ref': _dump(pack.ref()),
+        'policy_ref': policies[0] if exact_policy else None, 'active_checks': len(active), 'reports': reviews,
+        'assigned_reports': assigned,
+        'unknown_security_check_ids': unknown, 'unknown_security_count': len(unknown),
+        'unknown_security_limit': UNKNOWN_LIMIT, 'unresolved_check_ids': unresolved,
+        'comparison_complete': complete, 'unknown_security_limit_met': complete and len(unknown) <= UNKNOWN_LIMIT,
+        'all_reports_official': verified_inputs and all(report['official'] for report in reviews), 'rows': inventory,
+    }
+
+
+def _read_runs(pairs):
+    for store, report_path in pairs:
+        objects = read_objects(store)
+        yield json.loads(report_path.read_bytes(), object_pairs_hook=_pairs), objects, verify_store_files(store, objects)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--run', metavar=('RESTORED_STORE', 'ORIGINAL_REPORT'), nargs=2,
+                        action='append', type=Path, required=True)
+    parser.add_argument('--assignments', type=Path, help='JSON mapping from check ID to exact original RPT Ref')
+    parser.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args()
+    pack = load_pack(ROOT / 'packs/PACK-BASELINE')
+    if len(pack.active_checks()) != 69:
+        raise ValueError('MVP_ACTIVE_SCOPE_MISMATCH')
+    if any(args.output.resolve().is_relative_to(store.resolve()) for store, _ in args.run):
+        parser.error('--output must be outside the restored stores')
+    assignments = json.loads(args.assignments.read_bytes(), object_pairs_hook=_pairs) if args.assignments else None
+    if args.assignments and type(assignments) is not dict:
+        parser.error('--assignments must contain a JSON object')
+    result = review(_read_runs(args.run), pack=pack, expected=versions(), assignments=assignments)
+    with args.output.open('x', encoding='utf-8') as stream:
+        json.dump(result, stream, ensure_ascii=False, indent=2)
+
+
+if __name__ == '__main__':
+    main()

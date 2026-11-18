@@ -39,7 +39,7 @@ STATE_SCHEMA = "runtime-alert-state/1.0"
 MAX_PENDING = 200
 MAX_KEYS = 500
 GATEWAY_FAILURES_BEFORE_ALERT = 2
-SUSPICIOUS_EXEC = {"outside_allowlist", "suspect_binary", "exec_from_cache"}
+SUSPICIOUS_EXEC = {"deny_attempted", "outside_allowlist", "suspect_binary", "exec_from_cache"}
 BAD_HEALTH = {"stale", "error"}
 # A character-class check also accepts credentials, Pod names and addresses.
 # Only known protocol vocabulary may leave the host, including in generic JSON.
@@ -321,7 +321,11 @@ def observation_alerts(response: dict[str, Any], source: str, cursor, total_befo
                 _alert(
                     f"tetragon_{cls}_{'blocked' if blocked else 'detected'}",
                     "critical" if blocked else "warning",
-                    f"Tetragon {name} {'차단' if blocked else '탐지'}",
+                    (
+                        "Tetragon 실행 차단 시도"
+                        if cls == "exec" and blocked
+                        else f"Tetragon {name} {'차단' if blocked else '탐지'}"
+                    ),
                     count=len(group),
                     details={
                         "rule_ids": dict(Counter(_code(i.get("rule_id"), RULE_IDS) for i in group).most_common(10)),

@@ -246,7 +246,7 @@ def test_not_applicable_requires_two_original_environment_conditions(monkeypatch
     assert result['rows']['REQ-03']['status'] == 'ORIGINAL_ROW_MISSING'
 
 
-@pytest.mark.parametrize('damage', [None, 'different-rpt-original', 'changed-digest', 'changed-trial'])
+@pytest.mark.parametrize('damage', [None, 'different-rpt-original', 'changed-digest', 'changed-trial', 'malformed-ref', 'changed-files'])
 def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_path, monkeypatch, damage):
     originals = paired_controls(tmp_path, monkeypatch, review_fixture=True)
     pack_path = tool.ROOT / 'packs/PACK-BASELINE'
@@ -265,10 +265,15 @@ def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_pat
                 trial['source_artifact_sha256'] = values['source_artifact_sha256']
             elif damage == 'changed-trial':
                 trial['hop_policy_adjudicated'] = True
+            elif damage == 'malformed-ref':
+                values['source_evidence'] = {'kind': 'EVD', 'id': source.id, 'revision': []}
+        files = {key: values[key] for key in ('target_sha256', 'source_artifact_sha256')}
+        if side == 'baseline' and damage == 'changed-files':
+            files['target_sha256'] = '0' * 64
         binding = {'schema': run_binding.SCHEMA_2, 'check_id': 'PLT-08', 'side': side.value,
                    'attempt_id': scope['attempt_id'], 'environment_sha256': source.environment.sha256,
-                   'files': {}, 'validity': None, 'issued_at': draft.started_at.isoformat(), 'values': values}
-        execution = Execution(status=draft.status, executor={'name': 'api_transport', 'version': passive_api_hop.PROFILE,
+                   'files': files, 'validity': None, 'issued_at': draft.started_at.isoformat(), 'values': values}
+        execution = Execution(status=draft.status, executor={'name': 'api_transport', 'version': '0.1.0+passive-api-hop',
                               'config_sha256': sha256_hex(canonical_json(draft.config))}, adapter=source.execution.adapter,
                               started_at=draft.started_at, finished_at=draft.finished_at,
                               attempt_id=scope['attempt_id'], run_binding=binding)
@@ -288,6 +293,10 @@ def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_pat
     restore_bundle(bundle, restored)
     runs = list(tool._read_runs([(restored, report_path)], include_artifact_store=True))
     result = tool.review(runs, pack=pack, expected=_expected(runs[0][:3]))
+    if damage == 'malformed-ref':
+        assert result['reports'] == [{'verified': False, 'reason': 'ORIGINAL_EVIDENCE_BINDING_MISMATCH'}]
+        assert result['rows']['PLT-08']['status'] == 'ORIGINAL_ROW_MISSING'
+        return
     assert result['reports'][0]['verified']
     row = result['rows']['PLT-08']
     assert row['candidate']['verdicts']['security'] == 'UNKNOWN'

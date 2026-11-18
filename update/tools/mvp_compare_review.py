@@ -51,6 +51,8 @@ def _verify_passive_hop(evd, source, env, policy, plan, artifact_store, values):
     if (artifact_store is None or source is None or evd.artifacts
             or set(values) != {'profile', 'source_evidence', 'source_artifact_sha256', 'target_sha256'}
             or evd.execution.run_binding.get('schema') != run_binding.SCHEMA_2
+            or evd.execution.run_binding.get('files') != {
+                key: values[key] for key in ('target_sha256', 'source_artifact_sha256')}
             or values['source_evidence'] != _dump(source.ref())
             or source.ref() not in evd.refs or not plan.inputs.execution_recipe_sha256
             or source.plan != evd.plan or source.environment != evd.environment or source.side != evd.side
@@ -229,8 +231,12 @@ def _verified_rows(original_report, objects, pack, expected, artifact_store=None
                 expected_refs = [plan.ref(), env_ref]
                 passive_values = _passive_hop_values(obj)
                 if passive_values is not None:
-                    source_ref = Ref.model_validate(passive_values.get('source_evidence'))
-                    if source_ref.kind != 'EVD' or len(obj.refs) != 3:
+                    try:
+                        source_ref = Ref.model_validate(passive_values.get('source_evidence'))
+                    except ValueError:
+                        raise InvalidReport('ORIGINAL_EVIDENCE_BINDING_MISMATCH') from None
+                    if (source_ref.kind != 'EVD' or not source_ref.id or source_ref.revision < 1
+                            or SHA256.fullmatch(source_ref.sha256) is None or len(obj.refs) != 3):
                         raise InvalidReport('ORIGINAL_EVIDENCE_BINDING_MISMATCH')
                     expected_refs.append(source_ref)
                 if (obj.plan != plan.ref() or obj.environment != env_ref

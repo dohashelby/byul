@@ -1005,6 +1005,11 @@
       "manifest_sha256": "22309ebaf11a842f8448aa678d5eb22a2a0d138082951b81b6c1309f51297e1e",
       "reviewed_by": "Codex / OBS-04 and PLT-06 owned declaration readiness / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T17:45:45+00:00"
+    },
+    {
+      "manifest_sha256": "4f3f680de1cb667bc230d6a075f989cc29fe24cd64c9c539d257a42d21736eec",
+      "reviewed_by": "Codex / paired OBS-06 and PLT-12 input integrity / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T18:24:06+00:00"
     }
   ]
 }

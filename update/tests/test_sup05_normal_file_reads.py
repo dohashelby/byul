@@ -1,4 +1,4 @@
-"""Pinned native17 reader and lifecycle capture with an EXAMPLE Kubernetes transport."""
+"""Pinned file-read producers and lifecycle capture with an EXAMPLE Kubernetes transport."""
 from copy import deepcopy
 from datetime import timedelta
 import json
@@ -24,7 +24,16 @@ PACK_DIRECTORY = REPOSITORY / "update" / "packs" / "PACK-BASELINE"
 
 
 def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=None, model_root=None, engine_role=None,
-                engine_image=IMAGE, platform=None):
+                engine_image=IMAGE, platform=None, release=None):
+    profile = sensor.PROFILE
+    if release is not None:
+        from guard.adapters import vllm_lifecycle_catalog as catalog
+        from guard.adapters.vllm_approved_file_read_composition import PROFILES
+
+        profile = PROFILES[release]
+        approved = catalog.row(profile)
+        engine_image = approved["images"][0]
+        platform = f"fixture; engine_requested={approved['engine_mode']}"
     root.mkdir()
     model_root = model_root or root / "approved-model"
     model_root.mkdir(exist_ok=True)
@@ -40,7 +49,7 @@ def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=
     reference = root / "reference.json"
     reference.write_bytes(manifest)
     env = environment(id=env_id, origin=DataOrigin.DECLARED,
-                      engine={"name": "vllm", "version": "0.31.0", "image_digest": engine_image},
+                      engine={"name": "vllm", "version": release or "0.31.0", "image_digest": engine_image},
                       runtime={"gpu_count": 1, "gpu_model": "EXAMPLE GPU", "driver": "EXAMPLE driver", "platform": platform},
                       model={"id": "example/approved", "revision": "safe-example", "inventory_sha256": inventory_sha})
     engine = {**sampling_inputs()["kubernetes"]["engine"], **(engine_role or {}),
@@ -55,26 +64,17 @@ def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=
     input_scope = root / "input-scope.json"
     input_scope.write_bytes(canonical_json(scope))
     assets = root / "assets"
-    prepared = prepare_assets(assets, REPOSITORY, profile=sensor.PROFILE, model_read_scope=input_scope)
-    producer = make_world(root, patch, session=prepared["session"], path=file, scope_path=assets / "model-read-scope.json")
-    producer.run_loader()
-    assert any(row["event"] == "FILE_READ" for row in producer.observer.recorded)
+    prepared = prepare_assets(assets, REPOSITORY, profile=profile, model_read_scope=input_scope)
+    if release is None:
+        raw = _legacy_recording(root, patch, prepared, file, assets)
+    else:
+        from tests.test_approved_model_file_reads import produce_normal_file_read_fixture
 
-    transport = FakeOS()
-    with patch.context() as writer_patch:
-        writer_patch.setattr(base8, "PROFILE", sensor.PROFILE)
-        writer_patch.setattr(base8, "SCHEMA", sensor.SCHEMA)
-        writer_patch.setattr(base8, "__file__", sensor.__file__)
-        writer_patch.setattr(base8, "os", transport)
-        writer_patch.setattr(base8, "threading", SimpleNamespace(RLock=threading.RLock, Thread=SilentThread, Event=threading.Event))
-        writer_patch.setattr(base8, "_open_directory", lambda _: 10)
-        writer = base8.Writer(json.loads((assets / "settings.json").read_bytes()),
-                              prepared["assets"]["settings.json"]["sha256"], dict(CONTEXT))
-        for row in producer.observer.recorded:
-            writer.write(row["event"], row["payload"])
-        writer.close("SEALED")
-    raw = bytes(transport.data)
-    group = SimpleNamespace(root=root, env=env, prepared=prepared, raw=raw, raw_by_pid={CONTEXT["pid"]: raw})
+        _, raw = produce_normal_file_read_fixture(root, patch, release, model_path=file,
+                                                  prepared_path=assets / "manifest.json")
+    start = json.loads(raw.splitlines()[0])
+    pid = start["payload"]["context"]["pid"]
+    group = SimpleNamespace(root=root, env=env, prepared=prepared, raw=raw, raw_by_pid={pid: raw})
     world = World(group, target, mode)
     if mode == "unsealed":
         world.docker.group_mode = "unsealed"
@@ -105,6 +105,27 @@ def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=
     cfg = {boot.NORMAL_FILE_READS_OPTION: True, "normal": {"target": str(target_file),
             "prepared": str(assets / "manifest.json"), "reference_manifest": str(reference)}}
     return SimpleNamespace(env=env, cfg=cfg, values=values, world=world, runner=runner, raw=raw)
+
+
+def _legacy_recording(root, patch, prepared, file, assets):
+    producer = make_world(root, patch, session=prepared["session"], path=file, scope_path=assets / "model-read-scope.json")
+    producer.run_loader()
+    assert any(row["event"] == "FILE_READ" for row in producer.observer.recorded)
+
+    transport = FakeOS()
+    with patch.context() as writer_patch:
+        writer_patch.setattr(base8, "PROFILE", sensor.PROFILE)
+        writer_patch.setattr(base8, "SCHEMA", sensor.SCHEMA)
+        writer_patch.setattr(base8, "__file__", sensor.__file__)
+        writer_patch.setattr(base8, "os", transport)
+        writer_patch.setattr(base8, "threading", SimpleNamespace(RLock=threading.RLock, Thread=SilentThread, Event=threading.Event))
+        writer_patch.setattr(base8, "_open_directory", lambda _: 10)
+        writer = base8.Writer(json.loads((assets / "settings.json").read_bytes()),
+                              prepared["assets"]["settings.json"]["sha256"], dict(CONTEXT))
+        for row in producer.observer.recorded:
+            writer.write(row["event"], row["payload"])
+        writer.close("SEALED")
+    return bytes(transport.data)
 
 
 def run(case, workdir, *, values=None, cfg=None, check_id="SUP-05"):

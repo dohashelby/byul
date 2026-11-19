@@ -465,6 +465,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if normal_safetensors_reader and prebound_kubernetes and check.executor == 'supply_boot':
             executor.prepared_normal_reader(check, env, effective,
                                             expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if normal_graph_capture and prebound_kubernetes and check.executor == 'engine_sensor':
+            executor.prepared_normal_graph_capture(check, env, effective,
+                                                   expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if normal_sampling or normal_stream:
             expected = sha256_hex(canonical_json(target_data))
             if normal_sampling:

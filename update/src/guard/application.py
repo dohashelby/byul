@@ -599,6 +599,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     from guard.executors import registry, run_binding
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
     from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
+    from guard.executors.kubernetes_normal_graph_capture import KubernetesNormalGraphCaptureExecutor
     from guard.executors.kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
     from guard.executors.kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
@@ -769,6 +770,10 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                                 and isinstance(executor, KubernetesNormalSafetensorsReaderExecutor)):
                             executor.prepared_normal_reader(check_def, selected_env, values,
                                                             expected_target_sha256=expected_target)
+                        if (prebound and item.check_id == "REQ-20"
+                                and isinstance(executor, KubernetesNormalGraphCaptureExecutor)):
+                            executor.prepared_normal_graph_capture(check_def, selected_env, values,
+                                                                   expected_target_sha256=expected_target)
                         if item.check_id == "OBS-04":
                             executor.prepared_local_observation(check_def, selected_env, values,
                                                                 expected_target_sha256=expected_target)

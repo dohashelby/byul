@@ -1508,14 +1508,19 @@ def test_startup_checks_prepare_separate_owned_bindings(
                and row['binding_schema'] == run_binding.SCHEMA and not row['engine_executed'] for row in origins), origins
     prepared = application.update_readiness(pack, envs, policy, cfg)
     assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
-    if reader_enabled:
-        def forbid_preflight_io(*_args, **_kwargs):
-            pytest.fail('Default reader declaration checks must not contact the workload')
+    def forbid_preflight_io(*_args, **_kwargs):
+        pytest.fail('Startup declaration checks must not contact the workload')
 
+    for check_id, override, reason in (
+        ('SUP-12', '--safetensors-load-strategy=eager', 'SUP12_READER_TARGET_OR_SOURCE_UNVERIFIED'),
+        ('REQ-20', '--enforce-eager', 'REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED'),
+    ):
+        if check_id not in options:
+            continue
         path = sides['candidate']['target']
         original = path.read_bytes()
         declaration = json.loads(original)
-        declaration['comparison_config']['launch']['argv'].append('--safetensors-load-strategy=eager')
+        declaration['comparison_config']['launch']['argv'].append(override)
         try:
             _write(path, declaration)
             with monkeypatch.context() as pure:
@@ -1524,11 +1529,10 @@ def test_startup_checks_prepare_separate_owned_bindings(
                 prepared = application.update_readiness(pack, envs, policy, cfg)
                 rows = tool.readiness.audit(output / 'input-sources.json', pack=pack)['rows']
             check = next(row for row in prepared['checks'] if row['check'] == 'inputs')
-            reason = 'SUP12_READER_TARGET_OR_SOURCE_UNVERIFIED'
             assert not check['ok'] and check['detail'] == reason
             checked = [row for row in rows if row['check_id'] in options]
             rejected, = [row for row in checked if not row['file_binding_valid']]
-            assert (rejected['check_id'], rejected['side'], rejected['blocking_codes']) == ('SUP-12', 'candidate', [reason])
+            assert (rejected['check_id'], rejected['side'], rejected['blocking_codes']) == (check_id, 'candidate', [reason])
             assert all(not row['engine_executed'] and row['actual_results'] is None for row in checked)
         finally:
             path.write_bytes(original)

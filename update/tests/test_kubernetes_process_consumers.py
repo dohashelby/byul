@@ -169,6 +169,42 @@ def test_approved_ipc_path_metadata_uses_owned_reader_without_any_connection(tmp
     assert world.process_reads == 1
 
 
+@pytest.mark.parametrize('case,error', [
+    ('ordinary', None),
+    ('zero-duration', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+    ('foreign-model-revision', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('changed-target-pin', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+    ('missing-marker', 'KUBERNETES_IPC_PATH_METADATA_CONFIGURATION_INVALID'),
+])
+def test_protected_paths_preparation_checks_saved_target_without_collecting(tmp_path, monkeypatch, case, error):
+    def forbidden(*args, **kwargs):
+        pytest.fail('PLT-02 preparation must not contact the target or read processes')
+
+    monkeypatch.setattr(KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(KubernetesHTTP, 'process_snapshot', forbidden)
+    env, target = full_inputs()
+    target['lab'] = False
+    if case == 'foreign-model-revision':
+        target['model_mapping']['revision'] = ('1' if env.model.revision == '0' * 40 else '0') * 40
+    raw = canonical_json(target)
+    target_path = tmp_path / 'saved-target.json'
+    target_path.write_bytes(raw)
+    digest = sha256_hex(raw)
+    cfg = {'target': str(target_path), 'max_duration_seconds': 0 if case == 'zero-duration' else 30}
+    if case != 'missing-marker':
+        cfg['protected_path_metadata_only'] = True
+    executor = KubernetesIPCProductExecutor(cfg, runner=forbidden, expected_target_sha256=digest)
+    expected = 'f' * 64 if case == 'changed-target-pin' else digest
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['PLT-02']
+    values = {'protected_unix_paths': ['/run/fixture/engine.sock'], 'allowed_ipc_uids': ['1000']}
+    if error is None:
+        executor.prepared_protected_paths(check, env, values, expected_target_sha256=expected)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_protected_paths(check, env, values, expected_target_sha256=expected)
+
+
 @pytest.mark.parametrize("kind,expected", [("normal", Verdict.UNKNOWN), ("root", Verdict.FAIL),
                                             ("capability", Verdict.FAIL)])
 def test_stable_container_facts_keep_known_violations_without_whole_worker_or_host_claim(tmp_path, kind, expected):

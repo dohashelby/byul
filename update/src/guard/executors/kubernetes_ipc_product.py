@@ -71,11 +71,21 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
 
     def prepared_worker_trust(self, check, env, values, *, expected_target_sha256=None):
         """Qualify only the saved PLT-06 marker metadata declaration, without a collection."""
-        from guard.adapters.vllm_file_read_sensor import dependency
-
         if not self.worker_metadata:
             raise ValueError('KUBERNETES_WORKER_TRUST_METADATA_CONFIGURATION_INVALID')
         self.validate_policy(check, values)
+        self._prepared_metadata_target(env, expected_target_sha256=expected_target_sha256)
+
+    def prepared_protected_paths(self, check, env, values, *, expected_target_sha256=None):
+        """Qualify only the saved PLT-02 path metadata declaration."""
+        if not self.path_metadata or self.worker_metadata:
+            raise ValueError('KUBERNETES_IPC_PATH_METADATA_CONFIGURATION_INVALID')
+        self.validate_policy(check, values)
+        self._prepared_metadata_target(env, expected_target_sha256=expected_target_sha256)
+
+    def _prepared_metadata_target(self, env, *, expected_target_sha256):
+        from guard.adapters.vllm_file_read_sensor import dependency
+
         try:
             duration = self._duration(env, metadata_only=True)
             target = strict_json(dependency(self.cfg['target'], None), limit=65536)

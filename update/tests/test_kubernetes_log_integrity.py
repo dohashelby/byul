@@ -182,6 +182,7 @@ def test_obs11_record_from_the_probe_pod_reuses_the_original_evaluation(tmp_path
     reasons = {v['reason'] for v in draft.observations['collection_gap_violations'].value}
     assert reasons == {'gap_not_marked_in_time', 'alert_not_raised_in_time', 'dependent_test_passed_without_record'}
     assert draft.status.value=='COMPLETED' and not observer.validated and observer.attached==0
+    assert draft.artifacts[0].collector.endswith('+k8s.2')
     summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
     assert summary['selected_record_timeline']==[late] and summary['producer_authenticated'] is False
     assert 'private-unselected-record-name' not in json.dumps(summary)

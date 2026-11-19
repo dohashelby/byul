@@ -273,7 +273,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
             summary["kubernetes_source"] = self._source
             return obs, normal, steps, summary
         # OBS-11: 원 log_collection_gap의 기록 검증·판정을 그대로 쓰고 읽기만 probe Pod로 바꾼다.
-        self.version = log_collection_gap.VERSION + "+k8s.1"
+        self.version = log_collection_gap.VERSION + "+k8s.2"
         values = ctx.policy_values
         packet, file_sha256, diagnostics, result = None, None, [], None
         try:

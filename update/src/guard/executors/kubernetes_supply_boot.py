@@ -133,14 +133,24 @@ class KubernetesSupplyBootExecutor:
     name = "supply_boot"
     version = VERSION
 
-    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
+    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None,
+                 expected_prepared_sha256_by_role=None):
         self.cfg, self.runner, self.expected_target = cfg, runner, expected_target_sha256
+        if expected_prepared_sha256_by_role is not None and (
+                type(expected_prepared_sha256_by_role) is not dict
+                or set(expected_prepared_sha256_by_role) != set(contract.ROLES)
+                or any(type(value) is not str or len(value) != 64 or any(c not in '0123456789abcdef' for c in value)
+                       for value in expected_prepared_sha256_by_role.values())):
+            raise ValueError('SUPPLY_BOOT_PREPARED_PINS_INVALID')
+        self.expected_prepared_sha256_by_role = dict(expected_prepared_sha256_by_role or {})
         if cfg.get(NORMAL_FILE_READS_OPTION) is True:
             self.version = "0.1.0+k8s-normal-model-file-reads"
 
     def validate_policy(self, check, values):
         if check.id not in contract.CHECK_PROFILES or getattr(check, "collection_profile", None) != contract.CHECK_PROFILES[check.id]:
             raise ValueError("SUPPLY_BOOT_PROFILE_UNSUPPORTED")
+        if self.expected_prepared_sha256_by_role and check.id not in {'SUP-15', 'SUP-16'}:
+            raise ValueError('SUPPLY_BOOT_PREPARED_PINS_INVALID')
         if NORMAL_FILE_READS_OPTION in self.cfg:
             self.validate_configuration(check)
             _normal_validity(values)
@@ -172,7 +182,9 @@ class KubernetesSupplyBootExecutor:
             raise ValueError
         with Path(section["target"]).open("rb") as stream:
             target = strict_json(stream.read(65537), limit=65536)
-        prepared = load_prepared(section["prepared"])
+        expected_prepared = self.expected_prepared_sha256_by_role.get(role)
+        prepared = (load_prepared(section['prepared'], expected_sha256=expected_prepared)
+                    if expected_prepared is not None else load_prepared(section['prepared']))
         digest = sha256_hex(canonical_json(target))
         if (digest != values[f"supply_{role}_target_sha256"] or target.get("lab") is not True
                 or sha256_hex(canonical_json(prepared)) != values[f"supply_{role}_prepared_sha256"]):
@@ -192,16 +204,32 @@ class KubernetesSupplyBootExecutor:
 
     def sup15_prepared_roles(self, env, values, *, require_complete=False):
         """Check bound role files locally. Readiness requires both; runtime can keep an available role."""
+        return self._prepared_roles(env, values, require_complete=require_complete, distinct_locations=True)
+
+    def prepared_supply_roles(self, check, env, values):
+        """Validate both B3 role declarations locally, without verifying live owners or reading records."""
+        self.validate_policy(check, values)
+        if check.id not in {'SUP-15', 'SUP-16'}:
+            raise ValueError('SUPPLY_BOOT_PROFILE_UNSUPPORTED')
+        if check.id == 'SUP-16' and any(type(self.cfg.get(role)) is not dict
+                or set(self.cfg[role]) != {'target', 'prepared'} for role in contract.ROLES):
+            raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
+        return self._prepared_roles(env, values, require_complete=True, distinct_locations=check.id == 'SUP-15')
+
+    def _prepared_roles(self, env, values, *, require_complete, distinct_locations):
         if require_complete:
             self._validate_paired_configuration(env, values)
         roles = {role: self._load_available(env, values, role) for role in contract.ROLES}
-        normal, challenge = (_record_location(roles[role], env) if roles[role] is not None else None
-                             for role in contract.ROLES)
-        if normal is not None and normal == challenge:
-            # A record replaced between reads cannot supply two separate roles.
-            raise ValueError('SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED')
+        if distinct_locations:
+            normal, challenge = (_record_location(roles[role], env) if roles[role] is not None else None
+                                 for role in contract.ROLES)
+            if normal is not None and normal == challenge:
+                # A record replaced between reads cannot supply two separate SUP-15 roles.
+                raise ValueError('SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED')
+            if require_complete and (normal is None or challenge is None):
+                raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
         if require_complete:
-            if normal is None or challenge is None:
+            if any(value is None for value in roles.values()):
                 raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
             for target, prepared, _ in roles.values():
                 self._role_reader(target, env, prepared)

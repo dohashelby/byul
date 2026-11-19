@@ -10,12 +10,16 @@ from types import SimpleNamespace
 import pytest
 
 from guard import application
-from guard.collectors.lifecycle import prepare_assets
+from guard.adapters import vllm_file_read_sensor
+from guard.adapters.vllm_release_profiles import release_profile
+from guard.collectors.lifecycle import load_prepared, prepare_assets
 from guard.core.run import _normalize
 from guard.executors import registry
+from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, sha256_hex
 from tests.builders import environment, evidence, policy
+from tests.test_a1_file_read_sensor import scope_value
 from tests.test_b3_supply_records import retained
 from tests.test_kubernetes_lifecycle import World
 from tests.test_kubernetes_sampling import inputs
@@ -60,6 +64,89 @@ def _prepare_roles(tmp_path, env, late_owner_change, *, first_owner=1):
         worlds[engine["namespace"]] = world
         records[role] = raw
     return settings, pins, worlds, records
+
+
+def _sup16_roles(root, version):
+    env = environment(engine={'name': 'vllm', 'version': version, 'image_digest': release_profile(version)['images'][0]},
+        model={'id': 'EXAMPLE-model', 'revision': 'EXAMPLE-revision', 'inventory_sha256': 'a' * 64})
+    settings, pins, _, _ = _prepare_roles(root, env, late_owner_change=False)
+    return env, settings, pins
+
+
+@pytest.mark.parametrize(('version', 'mode', 'error'), [
+    ('0.30.0', 'ordinary', None), ('0.31.0', 'same-location', None),
+    ('0.31.0', 'native-scope', None), ('0.31.0', 'foreign-native-scope', 'MODEL_READ_SCOPE_TARGET_MISMATCH'),
+    ('0.30.0', 'foreign-owner', 'KUBERNETES_CAPTURE_TARGET_INVALID'),
+    ('0.31.0', 'missing-prepared', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
+])
+def test_sup16_prepares_both_native_role_declarations_without_runtime(external, version, mode, error):
+    env, settings, pins = _sup16_roles(external, version)
+    if mode == 'same-location':
+        settings['challenge'] = dict(settings['normal'])
+        for kind in ('target', 'prepared'):
+            pins[f'supply_challenge_{kind}_sha256'] = pins[f'supply_normal_{kind}_sha256']
+    if mode == 'foreign-owner':
+        path = Path(settings['challenge']['target'])
+        target = json.loads(path.read_bytes())
+        target['environment_ref']['sha256'] = '0' * 64
+        path.write_bytes(canonical_json(target))
+        pins['supply_challenge_target_sha256'] = sha256_hex(path.read_bytes())
+    if mode in {'native-scope', 'foreign-native-scope'}:
+        target = json.loads(Path(settings['challenge']['target']).read_bytes())
+        scope = scope_value(external / 'example.safetensors', env=env, target=target)
+        if mode == 'foreign-native-scope':
+            scope['target_sha256'] = '0' * 64
+        scope_path = external / 'scope.json'
+        scope_path.write_bytes(canonical_json(scope))
+        assets = external / 'native-assets'
+        prepared = prepare_assets(assets, ROOT.parent, profile=vllm_file_read_sensor.PROFILE, model_read_scope=scope_path)
+        settings['challenge']['prepared'] = str(assets / 'manifest.json')
+        pins['supply_challenge_prepared_sha256'] = sha256_hex(canonical_json(prepared))
+    if mode == 'missing-prepared':
+        settings['challenge']['prepared'] = str(external / 'unavailable.json')
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Static role validation dispatched runtime I/O')
+
+    check = PACK.checks['SUP-16']
+    executor = KubernetesSupplyBootExecutor(settings, runner=forbidden)
+    values = base_values(env, check.id, pins)
+    if error is not None:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_supply_roles(check, env, values)
+    else:
+        roles = executor.prepared_supply_roles(check, env, values)
+        assert set(roles) == {'normal', 'challenge'}
+        assert all(row[0]['environment_ref'] == env.ref().model_dump(mode='json') for row in roles.values())
+        assert all(not row[1]['engine_started'] and not row[1]['image_contents_verified'] for row in roles.values())
+        if mode == 'native-scope':
+            assert roles['challenge'][1]['profile'] == vllm_file_read_sensor.PROFILE
+
+
+def test_sup16_raw_prepared_pin_checks_exact_read_and_preserves_other_role(external, tmp_path, monkeypatch):
+    env, settings, pins = _sup16_roles(external, '0.31.0')
+    raw_pins = {role: sha256_hex(Path(entry['prepared']).read_bytes()) for role, entry in settings.items()}
+    executor = KubernetesSupplyBootExecutor(settings, expected_prepared_sha256_by_role=raw_pins)
+    check = PACK.checks['SUP-16']
+    values = base_values(env, check.id, pins)
+    roles = executor.prepared_supply_roles(check, env, values)
+    path = Path(settings['challenge']['prepared'])
+    path.write_bytes(path.read_bytes() + b'\n')
+    assert load_prepared(path) == roles['challenge'][1]
+    with pytest.raises(ValueError, match='^SUPPLY_BOOT_INPUT_UNAVAILABLE$'):
+        executor.prepared_supply_roles(check, env, values)
+
+    seen = []
+    def unavailable(target, selected_env, prepared):
+        seen.append((target, selected_env, prepared))
+        raise ValueError('EXAMPLE no runtime')
+    monkeypatch.setattr(executor, '_role_reader', unavailable)
+    draft = executor.run(check, env, values, None, tmp_path / 'evidence')
+    normal, challenge = draft.observations['supply_boot_sessions'].value
+    assert seen == [(roles['normal'][0], env, roles['normal'][1])]
+    assert normal['diagnostic_codes'] == ['SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE']
+    assert challenge['diagnostic_codes'] == ['SUPPLY_BOOT_INPUT_UNAVAILABLE']
+    assert draft.status is ExecStatus.ABORTED and draft.data_origin is DataOrigin.EXAMPLE
 
 
 @pytest.mark.parametrize(("candidate_input", "prepare_gap", "audit_gap"), [

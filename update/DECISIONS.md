@@ -556,6 +556,11 @@ main9365a65b에서 새 브랜치를 만들고 승인된 #281 소스972783ea와 #
 
 ## 열린 질문
 
+### 팩 39 적용 근거와 REQ-01·03 범위 (2026-11-19)
+
+- 활성 점검 69개 중 53개는 적용 조건이 설명문에만 있다. 양쪽 실측 ENV에는 `gateway` 사실이 없어 REQ-01·03도 `UNDETERMINED`로 선정됐다. 양쪽에서 `gateway=false`를 근거와 함께 입증하면 현행 규칙은 두 점검을 통째로 제외한다. 정본에서 REQ-01은 직통 진입점의 인증·인가·노출 제한을, REQ-03은 관리 접점의 등록·노출·권한을 기본 범위로 요구한다. [REQ-01](packs/PACK-BASELINE/checks/REQ-01.yaml) · [REQ-03](packs/PACK-BASELINE/checks/REQ-03.yaml) · [프레임워크 정본](reference/framework/data/checklist.json)
+- 후속 검토 팩에서 69개 ID를 유지하고 점검별 적용 사실과 입증 자료를 구조화할지 결정이 필요하다. REQ-01·03의 기본 범위를 항상 선정하고 Gateway 경유 비교를 검증된 토폴로지에 따라 분기하는 안을 검토한다.
+
 ### 기준 uvicorn 설치 행 대조 (2026-11-15, 사용자 승인·대조됨)
 
 - 기준 LIF-03·04를 위한 `uvicorn-0.34.0-py3-none-any.whl` 한 개(62,315 bytes, SHA-256 `023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4`) 다운로드를 사용자에게 별도로 물었고 “이 wheel만 받아 대조 진행”으로 승인받았다. 앞선 W6은 후보0.53.0 wheel 승인이다. [PyPI 원 메타데이터](https://pypi.org/pypi/uvicorn/0.34.0/json)의 wheel METADATA SHA `6d2f1a12…`는 M-A3 기준 이미지 distribution metadata와 같다. 정확 wheel bytes/SHA와 METADATA 일치를 확인했고 Python 파일 세 개를 소스만 읽어 대조했다. flow_control은 기존 핀과 같고 h11/httptools는 달라 /33 소스 검토로 잇는다. 실제 이미지 Python 파일·ABI·GPU 자격은 아직 승격하지 않는다. 다른 M-A6 독립 개발은 계속한다.

@@ -543,6 +543,7 @@ def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
 @pytest.mark.parametrize(('check_id', 'damage', 'reason'), [
     ('OBS-06', None, None),
     ('OBS-06', 'policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
+    ('OBS-06', 'producer_changed', 'MVP_INPUT_FILE_CHANGED'),
     ('PLT-12', None, None),
     ('PLT-12', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('PLT-12', 'inventory_changed', 'MVP_INPUT_FILE_CHANGED'),
@@ -552,6 +553,7 @@ def test_record_declarations_match_runtime_input_contracts(
     from guard import application
     from guard.executors import credential_copy_contract as copy
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
+    from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
     from guard.models import canonical_json, sha256_hex
     from tests.builders import environment, policy
     from tests.test_a1_credential_copy_contract import example as copy_example
@@ -619,20 +621,25 @@ def test_record_declarations_match_runtime_input_contracts(
 
     ready = application.update_readiness(pack, envs, pol, cfg)
     inputs = next(row for row in ready['checks'] if row['check'] == 'inputs')
-    assert inputs['ok'] is (damage in {None, 'inventory_changed'}), ready
+    assert inputs['ok'] is (reason in {None, 'MVP_INPUT_FILE_CHANGED'}), ready
     if not inputs['ok']:
         assert inputs['detail'] == reason
 
-    if damage == 'inventory_changed':
-        prepare = KubernetesRequiredEventExecutor.prepared_copy_record_snapshot
-        candidate_inventory = tmp_path / 'candidate-inventory.json'
+    if reason == 'MVP_INPUT_FILE_CHANGED':
+        if record_access:
+            executor, method = KubernetesRecordAccessExecutor, 'prepared_record_access'
+            candidate_file = tmp_path / 'candidate-producer-identity.txt'
+        else:
+            executor, method = KubernetesRequiredEventExecutor, 'prepared_copy_record_snapshot'
+            candidate_file = tmp_path / 'candidate-inventory.json'
+        prepare = getattr(executor, method)
 
         def replace_after_validation(self, check, env, values, **kwargs):
             prepare(self, check, env, values, **kwargs)
             if env.ref() == envs[1].ref():
-                candidate_inventory.write_bytes(candidate_inventory.read_bytes() + b'\n')
+                candidate_file.write_bytes(candidate_file.read_bytes() + b'\n')
 
-        monkeypatch.setattr(KubernetesRequiredEventExecutor, 'prepared_copy_record_snapshot', replace_after_validation)
+        monkeypatch.setattr(executor, method, replace_after_validation)
     policy_path, config_path = tmp_path / 'policy.json', tmp_path / 'guard.toml'
     policy_path.write_bytes(canonical_json(pol.to_dict()))
     write_config(cfg, config_path)

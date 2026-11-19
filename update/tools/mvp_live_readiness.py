@@ -262,6 +262,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     binding_options = {}
     role_digests = {}
     prepared_raw_digests = {}
+    record_digests = {}
     if supply_record_roles:
         for role in SUPPLY_ROLES:
             for key in ('target', 'prepared'):
@@ -287,11 +288,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         raw, identity = _read(path)
         bound_files.append((path, raw, identity))
         if record_access:
-            declared_key = 'record_subject_plan_sha256'
-            declared_digest = sha256_hex(canonical_json(strict_json(raw, limit=262144)))
+            record_digests['record_subject_plan_sha256'] = sha256_hex(
+                canonical_json(strict_json(raw, limit=262144)))
         else:
-            declared_key = 'copy_inventory_sha256'
-            declared_digest = sha256_hex(raw)
+            record_digests['copy_inventory_sha256'] = sha256_hex(raw)
     if normal_file_reads:
         binding_options['expected_target_sha256'] = _scoped_target_sha256(raw_target, env, scoped_check=check.id)
         normal_hashes = {}
@@ -367,6 +367,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         binding = None  # The source evidence belongs to a future run attempt.
     else:
         run_cfg = run_binding.run_config(config, check.id)
+        if record_digests and type(run_cfg) is dict and set(run_cfg) == run_binding.config_keys(check):
+            path = run_cfg['record_producer']
+            raw, identity = _read(path)
+            bound_files.append((path, raw, identity))
+            key = 'record_inventory_source_sha256' if record_access else 'copy_record_source_sha256'
+            record_digests[key] = sha256_hex(raw)
         if supply_record_binding and type(run_cfg) is dict and 'record_producer' in run_cfg:
             producer = run_binding.producer_sha256(run_cfg['record_producer'])
             binding_options['expected_supply_record_digests'] = {**prepared_raw_digests, 'record_producer': producer}
@@ -410,7 +416,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             executor.prepared_collection_status(check, env, effective,
                                                 expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if record_access or copy_snapshot:
-            if effective[declared_key] != declared_digest:
+            if any(effective[key] != digest for key, digest in record_digests.items()):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             expected = sha256_hex(canonical_json(target_data))
             if record_access:

@@ -1,4 +1,4 @@
-"""Source pins for the stock CUDA V1 model load log in the owned paired operation."""
+"""Source pins for stock CUDA V1 model load and compile cache observations."""
 
 from .vllm import REQUEST_BINDING_GPU_IMAGE
 
@@ -11,6 +11,7 @@ _SOURCE_PROFILES = {
         "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
         "commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
         "line": 5416,
+        "compile_backend": ("fa4bff8920b363efbbde9456f135fa9d2c004a5bde1898877f177418b2d8b008", 1094),
         "files": {
             "v1/worker/gpu_model_runner.py": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51",
             "utils/mem_utils.py": "d2b5c90f643d9a4ae17cb68fac19032161bc83329db3c8b30db589620f25b5a7",
@@ -23,6 +24,7 @@ _SOURCE_PROFILES = {
         "image": "docker.io/" + REQUEST_BINDING_GPU_IMAGE,
         "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
         "line": 5354,
+        "compile_backend": ("16af622b799f22f30eaa1c78f7ccca9d54c7c72785ad89e90c87e859bf8ef876", 1090),
         "files": {
             "v1/worker/gpu_model_runner.py": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
             "utils/mem_utils.py": "8b21755c8cae378b64d2d5c72c901135820072764218808191f266a65cf3aad5",
@@ -34,12 +36,19 @@ _SOURCE_PROFILES = {
 }
 
 
-def source_profile(env):
-    """Select the reviewed image and installed file identities for this startup reader."""
+def _reviewed_profile(env):
     engine = env.engine
     profile = _SOURCE_PROFILES.get(engine.version)
     if (engine.name != "vllm" or profile is None or engine.image_digest != profile["image"]
             or engine.source_commit not in {None, profile["commit"]}):
+        return None
+    return profile
+
+
+def source_profile(env):
+    """Select the reviewed image and installed file identities for this startup reader."""
+    profile = _reviewed_profile(env)
+    if profile is None:
         raise ValueError("LIF01_BOOT_SOURCE_UNQUALIFIED")
     return {
         "source_root": _SOURCE_ROOT,
@@ -60,4 +69,24 @@ def source_profile(env):
             "--config", "--log-config-file", "--logging-config", "--load-format", "--trust-remote-code",
             "--worker-cls", "--worker-extension-cls", "--speculative-config",
         ],
+    }
+
+
+def compile_cache_profile(env):
+    """Select the compile log call sites and known cache layout for the same GPU image."""
+    profile = _reviewed_profile(env)
+    if profile is None:
+        raise ValueError("SUP07_COMPILE_CACHE_SOURCE_UNQUALIFIED")
+    backend_sha256, directory_line = profile["compile_backend"]
+    return {
+        "file_sha256": {
+            "compilation/backends.py": backend_sha256,
+            "compilation/monitor.py": "43b24c5cb1bc4d32dc979f3222596905c7b3acc58415328a234402e6edc76abf",
+        },
+        "directory_call_linenumber": directory_line,
+        "completion_call_linenumber": 53,
+        "cache_env": "VLLM_CACHE_ROOT",
+        "cache_root": "/cache/vllm",
+        "relative_directory_pattern": "torch_compile_cache/[0-9a-f]{10}/rank_0_0/backbone",
+        "artifact_name": "vllm_compile_cache.py",
     }

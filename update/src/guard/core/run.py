@@ -15,6 +15,7 @@ from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
 from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS, cilium_egress_status_requested,
+                                 NORMAL_COMPILE_CACHE_SCOPE_ERROR, normal_compile_cache_requested,
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, installed_plugin_inventory_requested,
                                  NORMAL_SERVING_READINESS_SCOPE_ERROR, normal_request_latency_requested,
                                  NORMAL_STARTUP_LOAD_SCOPE_ERROR, normal_startup_load_requested,
@@ -129,6 +130,8 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
             raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
         if any(normal_startup_load_requested(config) for config in configurations):
             raise ValueError(NORMAL_STARTUP_LOAD_SCOPE_ERROR)
+        if any(normal_compile_cache_requested(config) for config in configurations):
+            raise ValueError(NORMAL_COMPILE_CACHE_SCOPE_ERROR)
         if any(normal_token_input_requested(config) for config in configurations):
             raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
     validate_policy_time(store.resolve(plan.inputs.policy))
@@ -293,7 +296,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
             target_options = {}
-            if (check.id in {'LIF-01', 'LIF-03', 'OBS-02', 'PLT-07', 'SUP-10'}
+            if (check.id in {'LIF-01', 'LIF-03', 'OBS-02', 'PLT-07', 'SUP-07', 'SUP-10'}
                     and type(section) is dict and option in section):
                 hashes = raw.get("_kubernetes_target_sha256_by_executor")
                 expected_target = hashes.get(item.executor) if type(hashes) is dict else None

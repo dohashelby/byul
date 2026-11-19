@@ -25,6 +25,7 @@ from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
+                                 NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_OPTION, NORMAL_STARTUP_LOAD_SCOPE_ERROR,
@@ -85,6 +86,7 @@ from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .kubernetes_record_access_product import KubernetesRecordAccessExecutor
 from .kubernetes_supply_boot import KubernetesSupplyBootExecutor
+from .kubernetes_normal_compile_cache import KubernetesNormalCompileCacheExecutor
 from .kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 from .template_source_cpu import TemplateSourceCPUExecutor
@@ -247,17 +249,20 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
                 settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if executor == "supply_boot":
         settings = cfg.get(executor)
-        if type(settings) is dict and NORMAL_STARTUP_LOAD_OPTION in settings:
-            if (impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation")
-                    or INSTALLED_PLUGIN_INVENTORY_OPTION in settings):
-                raise ValueError(NORMAL_STARTUP_LOAD_SCOPE_ERROR)
-            return KubernetesNormalStartupLoadExecutor(
-                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
-        if type(settings) is dict and INSTALLED_PLUGIN_INVENTORY_OPTION in settings:
-            if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
-                raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
-            return KubernetesInstalledPluginInventoryExecutor(
-                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
+        if type(settings) is dict:
+            modes = {
+                NORMAL_STARTUP_LOAD_OPTION: (KubernetesNormalStartupLoadExecutor, NORMAL_STARTUP_LOAD_SCOPE_ERROR),
+                NORMAL_COMPILE_CACHE_OPTION: (KubernetesNormalCompileCacheExecutor, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
+                INSTALLED_PLUGIN_INVENTORY_OPTION: (
+                    KubernetesInstalledPluginInventoryExecutor, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
+            }
+            selected = [mode for option, mode in modes.items() if option in settings]
+            if selected:
+                executor_type, scope_error = selected[0]
+                if (len(selected) != 1 or impl != "kubernetes" or cfg.get("lab_activation")
+                        or cfg.get("record_attestation")):
+                    raise ValueError(scope_error)
+                return executor_type(settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if impl == "kubernetes":
         factory = activated(factory) if executor in ACTIVATED else attested(factory)
     return factory(cfg)

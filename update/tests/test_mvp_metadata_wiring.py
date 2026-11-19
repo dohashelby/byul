@@ -1143,11 +1143,13 @@ def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_
         run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
 
 
-def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, sources, monkeypatch):
+@pytest.mark.parametrize('compile_enabled', [False, True])
+def test_startup_supply_checks_prepare_separate_owned_bindings(tmp_path, sources, monkeypatch, compile_enabled):
     from guard.adapters.engine_provider import get_provider
     from guard.core.run import run_plan
     from guard.executors import run_binding
     from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
+    from guard.executors.kubernetes_normal_compile_cache import KubernetesNormalCompileCacheExecutor
     from guard.executors.kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
     from guard.models import Side
@@ -1157,7 +1159,7 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
     provider = get_provider('vllm')
     envs = []
     pins = {}
-    for paths, line in zip(sides.values(), (5416, 5354)):
+    for paths, load_line, cache_line in zip(sides.values(), (5416, 5354), (1094, 1090)):
         env = tool.Environment.model_validate_json(paths['environment'].read_bytes())
         env = env.model_copy(update={'runtime': env.runtime.model_copy(update={'pp_size': 1, 'dp_size': 1})}).seal()
         envs.append(env)
@@ -1171,17 +1173,25 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
         _write(paths['target'], target)
         pins[env.id] = sha256_hex(canonical_json(target))
         profile = provider.evidence_contract('startup_load_source', env)
-        assert profile['logger_call_linenumber'] == line and len(profile['file_sha256']) == 5
+        assert profile['logger_call_linenumber'] == load_line and len(profile['file_sha256']) == 5
         assert profile['required_env'] == {'VLLM_USE_V2_MODEL_RUNNER': '0'}
+        cache = provider.evidence_contract('compile_cache_source', env)
+        assert cache['directory_call_linenumber'] == cache_line and cache['completion_call_linenumber'] == 53
+        assert cache['cache_root'] == '/cache/vllm' and cache['artifact_name'] == 'vllm_compile_cache.py'
         wrong = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': None})})
         with pytest.raises(ValueError, match='LIF01_BOOT_SOURCE_UNQUALIFIED'):
             provider.evidence_contract('startup_load_source', wrong)
+        with pytest.raises(ValueError, match='SUP07_COMPILE_CACHE_SOURCE_UNQUALIFIED'):
+            provider.evidence_contract('compile_cache_source', wrong)
 
     budgets = {'supply_stage_budget_ms': {'load': 600000}, 'supply_stage_budget_bytes': {'load': 17179869184},
                'supply_total_budget_ms': 1800000}
+    options = {'LIF-01': 'normal_startup_load_only', 'SUP-10': 'installed_plugin_inventory_only'}
+    if compile_enabled:
+        options['SUP-07'] = 'normal_compile_cache_only'
     prior = tool.Policy.model_validate_json(policy_path.read_bytes())
     policy = prior.model_copy(update={'values': {'LIF-01': budgets},
-        'scope': prior.scope.model_copy(update={'include': ['LIF-01', 'SUP-10', 'SUP-11']})}).seal()
+        'scope': prior.scope.model_copy(update={'include': [*sorted(options), 'SUP-11']})}).seal()
     _write(policy_path, policy.to_dict())
     output, store_path, fresh = (tmp_path / name for name in ('startup', 'store', 'fresh-target.json'))
     empty, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store_path)
@@ -1191,11 +1201,15 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
     incomplete.pop('startup_log_prefix')
     without_prefix['candidate']['target'] = _write(tmp_path / 'candidate-no-prefix.json', incomplete)
     fallback, _, decisions = tool.assemble(without_prefix, policy_path, pack=pack, store=store_path,
-        normal_startup_load=True, installed_plugin_inventory=True)
+        normal_startup_load=True, installed_plugin_inventory=True, normal_compile_cache=compile_enabled)
     assert fallback['update']['allowed_checks'] == ['SUP-10']
     assert decisions['LIF-01']['sides']['candidate'] == 'NORMAL_STARTUP_LOAD_TARGET_UNAVAILABLE'
+    if compile_enabled:
+        assert decisions['SUP-07']['sides']['candidate'] == 'NORMAL_COMPILE_CACHE_TARGET_UNAVAILABLE'
     args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store_path), '--output', str(output),
             '--normal-startup-load', '--installed-plugin-inventory', '--candidate-target-after-baseline', str(fresh)]
+    if compile_enabled:
+        args.append('--normal-compile-cache')
     for side, paths in sides.items():
         for role, path in paths.items():
             args.extend([f'--{side}-{role}', str(path)])
@@ -1203,13 +1217,12 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
     tool.main()
     cfg = tomllib.loads((output / 'preliminary-guard.toml').read_text())
     assert cfg['executors'] == {'supply_boot': 'kubernetes'}
-    assert cfg['update']['allowed_checks'] == ['LIF-01', 'SUP-10']
-    assert cfg['check_config'] == {'LIF-01': {'normal_startup_load_only': True},
-                                    'SUP-10': {'installed_plugin_inventory_only': True}}
+    assert cfg['update']['allowed_checks'] == sorted(options)
+    assert cfg['check_config'] == {check: {option: True} for check, option in options.items()}
     preflight = json.loads((output / 'readiness.json').read_bytes())
-    origins = [row for row in preflight['rows'] if row['check_id'] == 'LIF-01']
-    assert len(origins) == 2 and preflight['active_checks'] == 69
-    assert all(row['file_binding_valid'] and row['normal_startup_load_only']
+    origins = [row for row in preflight['rows'] if row['check_id'] in options]
+    assert len(origins) == 2 * len(options) and preflight['active_checks'] == 69
+    assert all(row['file_binding_valid'] and row[options[row['check_id']]]
                and row['binding_schema'] == run_binding.SCHEMA and not row['engine_executed'] for row in origins), origins
     prepared = application.update_readiness(pack, envs, policy, cfg)
     assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
@@ -1222,10 +1235,13 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
                              normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
 
     startup_run = KubernetesNormalStartupLoadExecutor.run
+    compile_run = KubernetesNormalCompileCacheExecutor.run
     monkeypatch.setattr(KubernetesNormalStartupLoadExecutor, 'run',
         lambda self, check, env, values, *_: sample(check, env, values, self, 'normal_startup_load_only'))
     monkeypatch.setattr(KubernetesInstalledPluginInventoryExecutor, 'run',
         lambda self, check, env, values, *_: sample(check, env, values, self, 'installed_plugin_inventory_only'))
+    monkeypatch.setattr(KubernetesNormalCompileCacheExecutor, 'run',
+        lambda self, check, env, values, *_: sample(check, env, values, self, 'normal_compile_cache_only'))
 
     def forbid_legacy(*_args, **_kwargs):
         raise AssertionError('The prepared boot or challenge collector must stay outside the paired scope')
@@ -1233,7 +1249,7 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
     monkeypatch.setattr(KubernetesSupplyBootExecutor, 'run', forbid_legacy)
     store = Store(store_path)
     report, _ = application.execute_update(store, pack, envs, policy, cfg, tmp_path / 'paired', utcnow())
-    for check_id in ('LIF-01', 'SUP-10'):
+    for check_id in options:
         row = next(row for row in report.by_check if row.check_id == check_id)
         assert row.baseline.security == row.candidate.security == 'UNKNOWN'
         for side in (row.baseline, row.candidate):
@@ -1264,29 +1280,35 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
     plan = bind_recipe(select(pack, envs, policy, mode='update'), staged, envs)
     staged_store.put(plan)
     monkeypatch.setattr(KubernetesNormalStartupLoadExecutor, 'run', startup_run)
+    monkeypatch.setattr(KubernetesNormalCompileCacheExecutor, 'run', compile_run)
     actual = {row.check_id: row for row in run_plan(staged_store, pack, plan, run, only_side=Side.candidate)}
     assert actual['LIF-01'].execution.status == ExecStatus.ABORTED
+    if compile_enabled:
+        assert actual['SUP-07'].execution.status == ExecStatus.ABORTED
     assert actual['SUP-10'].execution.status == ExecStatus.COMPLETED
     assert actual['SUP-11'].execution.status == ExecStatus.NOT_RUN
 
 
-def test_lif01_startup_load_cannot_enable_legacy_supply_checks(tmp_path, sources, monkeypatch):
+@pytest.mark.parametrize(('check_id', 'marker', 'scope_error'), [
+    ('LIF-01', 'normal_startup_load_only', 'NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID'),
+    ('SUP-07', 'normal_compile_cache_only', 'NORMAL_COMPILE_CACHE_EXECUTION_SCOPE_INVALID'),
+])
+def test_startup_supply_checks_cannot_enable_legacy_dispatch(tmp_path, sources, monkeypatch, check_id, marker, scope_error):
     from guard.core.run import run_plan
 
     pack, sides, policy_path = sources
     policy = tool.Policy.model_validate_json(policy_path.read_bytes())
     envs = [tool.Environment.model_validate_json(paths['environment'].read_bytes()) for paths in sides.values()]
-    marker = 'normal_startup_load_only'
-    config = {'executors': {'supply_boot': 'kubernetes'}, 'update': {'allowed_checks': ['LIF-01', 'SUP-10']},
+    config = {'executors': {'supply_boot': 'kubernetes'}, 'update': {'allowed_checks': [check_id, 'SUP-10']},
               'sides': {side: {'supply_boot': {'target': str(paths['target'])}} for side, paths in sides.items()},
-              'check_config': {'LIF-01': {marker: True}, 'SUP-10': {'installed_plugin_inventory_only': True}}}
+              'check_config': {check_id: {marker: True}, 'SUP-10': {'installed_plugin_inventory_only': True}}}
     missing, wrong, false_marker, target_override = (deepcopy(config) for _ in range(4))
     missing['check_config'].pop('SUP-10')
-    wrong['check_config']['SUP-11'] = wrong['check_config'].pop('LIF-01')
-    false_marker['sides']['candidate']['check_config'] = {'LIF-01': {marker: False}}
+    wrong['check_config']['SUP-11'] = wrong['check_config'].pop(check_id)
+    false_marker['sides']['candidate']['check_config'] = {check_id: {marker: False}}
     target_override['check_config']['SUP-10']['target'] = str(tmp_path / 'different-target.json')
-    sibling = {**config, 'update': {'allowed_checks': ['LIF-01', 'SUP-10', 'SUP-11']}}
-    mixed = {**config, 'run_binding': {'LIF-01': {}}}
+    sibling = {**config, 'update': {'allowed_checks': [check_id, 'SUP-10', 'SUP-11']}}
+    mixed = {**config, 'run_binding': {check_id: {}}}
     wrapped = {**config, 'record_attestation': {'mode': 'example'}}
 
     def forbid_prepare(*_args, **_kwargs):
@@ -1295,11 +1317,11 @@ def test_lif01_startup_load_cannot_enable_legacy_supply_checks(tmp_path, sources
     monkeypatch.setattr(application, 'update_inputs', forbid_prepare)
     store = Store(tmp_path / 'scope-store')
     for invalid in (missing, wrong, false_marker, target_override, sibling, mixed, wrapped):
-        with pytest.raises(ValueError, match='NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID'):
+        with pytest.raises(ValueError, match=f'^{scope_error}$'):
             application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
     audit = select(pack, envs[:1], policy, mode='audit')
-    startup_only = {**missing, 'update': {'allowed_checks': ['LIF-01']}}
-    with pytest.raises(ValueError, match='^NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID$'):
+    startup_only = {**missing, 'update': {'allowed_checks': [check_id]}}
+    with pytest.raises(ValueError, match=f'^{scope_error}$'):
         run_plan(store, pack, audit, application.run_config(startup_only))
     with pytest.raises(ValueError, match='^INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID$'):
         run_plan(store, pack, audit, application.run_config(config))

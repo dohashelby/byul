@@ -19,6 +19,7 @@ from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snap
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
+from guard.executors.kubernetes_normal_compile_cache import normal_compile_cache_transport
 from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
 from guard.executors.kubernetes_normal_startup_load import normal_startup_load_transport
@@ -37,7 +38,7 @@ from tools.mvp_a_input_preflight import _pairs, _read
 from tools.mvp_versions import versions
 
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
-                   'SUP-03': 'template_validation', 'SUP-10': 'supply_boot',
+                   'SUP-03': 'template_validation', 'SUP-07': 'supply_boot', 'SUP-10': 'supply_boot',
                    'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
                    'OBS-04': 'boundary_egress', 'PLT-07': 'boundary_egress', 'PLT-06': 'unix_ipc',
                    'OBS-01': 'required_event_record', 'OBS-02': 'observation_state',
@@ -47,7 +48,7 @@ CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', '
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
                if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-01', 'LIF-03', 'LIF-04',
-                              'PLT-07', 'REQ-09', 'REQ-10', 'SUP-10', passive_api_hop.CHECK})
+                              'PLT-07', 'REQ-09', 'REQ-10', 'SUP-07', 'SUP-10', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
@@ -262,6 +263,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
                 installed_plugin_inventory_transport(target, env, duration=1, runner=_detached_runner)
             except (KubernetesBindingError, ValueError):
                 return 'INSTALLED_PLUGIN_INVENTORY_TARGET_UNAVAILABLE'
+        if check.id == 'SUP-07':
+            config[check.executor]['target'] = target_path
+            try:
+                normal_compile_cache_transport(target, env, duration=1, runner=_detached_runner)
+            except (KubernetesBindingError, ValueError):
+                return 'NORMAL_COMPILE_CACHE_TARGET_UNAVAILABLE'
         if check.id == 'LIF-03':
             config[check.executor]['target'] = target_path
             try:
@@ -339,7 +346,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
              protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None,
              gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
              normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False,
-             cilium_egress_status=False, normal_startup_load=False):
+             cilium_egress_status=False, normal_startup_load=False, normal_compile_cache=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -382,6 +389,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 'LIF-03': normal_request_latency, 'LIF-04': normal_stream_buffer,
                 'REQ-10': normal_sampling, 'REQ-09': normal_token_input,
                 'OBS-02': normal_serving_readiness,
+                'SUP-07': normal_compile_cache,
                 'SUP-10': installed_plugin_inventory,
                 'PLT-07': cilium_egress_status,
                 **dict.fromkeys(records, True)}
@@ -431,7 +439,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
     bounded_metadata_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
-    shared_checks = ('SUP-03', 'SUP-10', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03', 'LIF-04', 'REQ-09',
+    shared_checks = ('SUP-03', 'SUP-07', 'SUP-10', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03', 'LIF-04', 'REQ-09',
                      *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
@@ -487,6 +495,8 @@ def main():
                         help='Read reported egress policy state for the owned PLT-07 endpoint')
     parser.add_argument('--normal-startup-load', action='store_true',
                         help='Read the source-checked model load timing for LIF-01')
+    parser.add_argument('--normal-compile-cache', action='store_true',
+                        help='Read the owned normal startup compile record and cache file metadata for SUP-07')
     parser.add_argument('--copy-record-inputs', type=Path,
                         help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
@@ -508,7 +518,8 @@ def main():
                                         normal_request_latency=args.normal_request_latency,
                                         installed_plugin_inventory=args.installed_plugin_inventory,
                                         cilium_egress_status=args.cilium_egress_status,
-                                        normal_startup_load=args.normal_startup_load)
+                                        normal_startup_load=args.normal_startup_load,
+                                        normal_compile_cache=args.normal_compile_cache)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

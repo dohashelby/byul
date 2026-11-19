@@ -128,6 +128,9 @@ class VllmProvider(EngineProvider):
         if name == "startup_load_source":
             from .vllm_startup_load import source_profile
             return source_profile(*args)
+        if name == "compile_cache_source":
+            from .vllm_startup_load import compile_cache_profile
+            return compile_cache_profile(*args)
         return super().evidence_contract(name, *args)
 
     def sandbox_arguments(self, options):

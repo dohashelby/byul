@@ -55,6 +55,7 @@ from guard.executors.supply_boot_contract import ROLES as SUPPLY_ROLES
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
 from guard.models import Environment, canonical_json, load_pack, sha256_hex
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
+from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
 from tools.mvp_a_input_preflight import _code, _pairs, _read
 from tools.mvp_versions import versions
@@ -133,18 +134,19 @@ def _redeployment_manifest(cfg, bound_files):
             raw, identity = _read(path)
             bound_files.append((path, raw, identity))
             files[key] = raw
-        if len(files['target']) > 65536 or len(files['prepared']) > 262144:
-            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
-        declared = yaml.safe_load(files['environment'])
-        if type(declared) is not dict or declared.get('kind') != 'ENV':
-            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
-        env = Environment.model_validate(declared)
-        target = json.loads(files['target'], object_pairs_hook=_pairs)
-        prepared = json.loads(files['prepared'], object_pairs_hook=_pairs)
-        if (not env.hash_ok() or type(target) is not dict or type(prepared) is not dict
-                or prepared.get('profile') not in (generation_sensor.PROFILE, endpoint_sensor.PROFILE)):
-            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
-        manifest.append(_manifest_row(row['id'], env, target, prepared))
+        try:
+            declared = yaml.safe_load(files['environment'])
+            if type(declared) is not dict or declared.get('kind') != 'ENV':
+                raise ValueError
+            env = Environment.model_validate(declared)
+            target = strict_json(files['target'], limit=65536)
+            prepared = strict_json(files['prepared'], limit=262144)
+            if (not env.hash_ok() or type(target) is not dict or type(prepared) is not dict
+                    or prepared.get('profile') not in (generation_sensor.PROFILE, endpoint_sensor.PROFILE)):
+                raise ValueError
+            manifest.append(_manifest_row(row['id'], env, target, prepared))
+        except (RecursionError, TypeError, ValueError, yaml.YAMLError):
+            raise ValueError('TRANSITION_CONFIGURATION_INVALID') from None
     return manifest
 
 

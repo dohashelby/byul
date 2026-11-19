@@ -155,6 +155,7 @@ def test_public_preparation_validates_declared_generation_files(external, monkey
     ("LIF-16", "same-pod-restart", None),
     ("LIF-05", "cross-side-owner", "TRANSITION_GENERATION_SIDE_REUSE"),
     ("LIF-16", "foreign-side-env", "TRANSITION_CONFIGURATION_INVALID"),
+    ("LIF-05", "malformed-target", "TRANSITION_CONFIGURATION_INVALID"),
     ("LIF-16", "manifest-rewritten", "MVP_INPUT_FILE_CHANGED"),
 ])
 def test_mvp_readiness_checks_owned_generation_files(external, monkeypatch, check_id, change, error):
@@ -171,6 +172,8 @@ def test_mvp_readiness_checks_owned_generation_files(external, monkeypatch, chec
     else:
         assert inputs["ok"], report
     assert all(not row["runtime_qualified"] for row in report["check_support"])
+    if change == "malformed-target":
+        Path(candidate[1]["target"]).write_bytes(b"{")
 
     policy_path = Path(_write(external / "policy.json", pol.to_dict()))
     config_path = external / "guard.toml"

@@ -3,7 +3,7 @@ import re
 import stat
 
 from guard.models import canonical_json, sha256_hex
-from guard.runtime.kubernetes_process import paths
+from guard.runtime.kubernetes_process import capture_status, paths
 from .container_config import read_kubernetes_process_observations
 
 PROFILE = 'kubernetes-owned-ipc-path-metadata-v1'
@@ -52,6 +52,7 @@ def collect(ctx):
         diagnostics.append('IPC_PATH_METADATA_UNAVAILABLE')
     snapshot = {'profile': PROFILE, 'target_sha256': record['target_sha256'],
                 'binding_verified': verified, 'path_metadata': rows, 'diagnostic_codes': diagnostics,
+                'capture_status': capture_status(record),
                 'mount_namespace_sha256': sha256_hex(canonical_json(subject['mount_namespace_inode'])) if verified else None,
                 'fixture': {'profile': PROFILE, 'reader_source_sha256': record['program_sha256']}}
     observations = {'unix_ipc_trials': {'value': rows if rows else None, 'collected': bool(rows)},

@@ -4,7 +4,7 @@ from posixpath import normpath
 
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.kubernetes_http import KubernetesBindingError
-from guard.runtime.kubernetes_process import _mounts
+from guard.runtime.kubernetes_process import _mounts, capture_status
 from . import ipc_trust_scope
 from .container_config import kubernetes_process_rows, read_kubernetes_process_observations
 
@@ -90,6 +90,7 @@ def collect(ctx):
     }
     summary = {'profile': PROFILE, 'target_sha256': ctx.cprobe.target_sha256,
                'binding_verified': bool(record and record['binding_verified_before_after']),
+               'capture_status': capture_status(record) if record else None,
                'process_inventory_stable': bool(stable_rows and record['packet']['pid_inventory_stable']),
                'stable_process_rows': len(stable_rows), 'ambiguous_processes': ambiguous, 'diagnostic_codes': diagnostics,
                'reader_pid_namespace_sha256': sha256_hex(canonical_json(subject['pid_namespace_inode'])) if subject else None,

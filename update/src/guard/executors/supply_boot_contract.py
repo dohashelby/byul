@@ -113,6 +113,11 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
             if (type(row["path_sha256"]) is not str or _SHA.fullmatch(row["path_sha256"]) is None
                     or any(type(row[key]) is not bool for key in flags)):
                 raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+    if check_id == "SUP-12":
+        for row in packet["rows"]:
+            events = row["side_effects"]
+            if type(events) is not list or any(type(event) is not str for event in events):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
     return packet
 
 

@@ -273,6 +273,27 @@ def good_packet(env_ref, digest, check_id="SUP-07"):
             "target_sha256": digest, "source_sha256": SOURCE, "change": change(), "rows": []}
 
 
+def test_sup12_requires_typed_side_effect_events_before_evaluation():
+    env_ref, target = environment().ref().model_dump(mode="json"), "b" * 64
+    packet = good_packet(env_ref, target, "SUP-12")
+    binding = {"check_id": "SUP-12", "role": "normal", "environment_ref": env_ref,
+               "target_sha256": target, "source_sha256": SOURCE}
+    row = {"fixture_sha256": sha256_hex(b"approved-reader-fixture"), "format": "safetensors",
+           "reader": "safetensors", "outcome": "loaded", "fallback": False}
+    for malformed in ("false", False, None, {"file_open": False}, [False]):
+        packet["rows"] = [{**row, "side_effects": malformed}]
+        with pytest.raises(ValueError, match="SUPPLY_BOOT_RECORD_INVALID"):
+            contract.validate_record(json.loads(json.dumps(packet)), **binding)
+
+    packet["rows"] = [{**row, "side_effects": []}]
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-12", verified, VALUES) == ([], [])
+    packet["rows"] = [{**row, "side_effects": ["file_open"]}]
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-12", verified, VALUES) == (
+        [{"reason": "forbidden_side_effect", "fixture_sha256": row["fixture_sha256"]}], [])
+
+
 @pytest.mark.parametrize("damage", ["extra", "role", "environment", "target", "source", "profile", "row", "change"])
 def test_boot_record_binding_is_closed(damage):
     packet = good_packet({"id": 1}, "t")

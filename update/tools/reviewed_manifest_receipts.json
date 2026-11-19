@@ -1010,6 +1010,11 @@
       "manifest_sha256": "4f3f680de1cb667bc230d6a075f989cc29fe24cd64c9c539d257a42d21736eec",
       "reviewed_by": "Codex / paired OBS-06 and PLT-12 input integrity / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T18:24:06+00:00"
+    },
+    {
+      "manifest_sha256": "fb7a6d62ed1b6af1deff2aa561328969e1a039af5a51f5417e92f218757755a6",
+      "reviewed_by": "Codex / paired OBS-01 snapshot and LIF-12 retry input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T18:51:51+00:00"
     }
   ]
 }

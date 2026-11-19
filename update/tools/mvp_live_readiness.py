@@ -48,8 +48,9 @@ from guard.executors.kubernetes_normal_serving_readiness import normal_serving_r
 from guard.executors.kubernetes_normal_startup_load import normal_startup_load_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_passive_egress_policy import passive_egress_policy_transport
+from guard.executors.supply_boot_contract import ROLES as SUPPLY_ROLES
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
-from guard.models import load_pack
+from guard.models import canonical_json, load_pack, sha256_hex
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
 from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
 from tools.mvp_a_input_preflight import _code, _pairs, _read
@@ -182,6 +183,7 @@ def _inspect(source, check, pack, issued_at):
     if gateway_snapshot:
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
     normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
+    supply_record_roles = check.id == 'SUP-15' and implementation == 'kubernetes'
     normal_graph_capture = check.id == 'REQ-20' and cfg.get(NORMAL_GRAPH_CAPTURE_OPTION) is True
     normal_safetensors_reader = check.id == 'SUP-12' and cfg.get(NORMAL_SAFETENSORS_READER_OPTION) is True
     normal_compile_cache = check.id == 'SUP-07' and cfg.get(NORMAL_COMPILE_CACHE_OPTION) is True
@@ -192,11 +194,20 @@ def _inspect(source, check, pack, issued_at):
     normal_serving_readiness = check.id == 'OBS-02' and cfg.get(NORMAL_SERVING_READINESS_OPTION) is True
     normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
     target = cfg['normal']['target'] if normal_file_reads else cfg.get('target')
-    if implementation == 'kubernetes' and target is None:
+    if implementation == 'kubernetes' and target is None and not supply_record_roles:
         raise ValueError('MVP_CURRENT_TARGET_REQUIRED')
     bound_files = []
     binding_options = {}
-    if target is not None:
+    role_digests = {}
+    if supply_record_roles:
+        for role in SUPPLY_ROLES:
+            for key in ('target', 'prepared'):
+                path = cfg[role][key]
+                raw, identity = _read(path)
+                bound_files.append((path, raw, identity))
+                document = json.loads(raw, object_pairs_hook=_pairs)
+                role_digests[f'supply_{role}_{key}_sha256'] = sha256_hex(canonical_json(document))
+    elif target is not None:
         raw_target, identity = _read(target)
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
         if type(target_data) is not dict or target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
@@ -286,6 +297,10 @@ def _inspect(source, check, pack, issued_at):
             raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
         if normal_file_reads:
             executor.normal_file_read_inputs(env, effective)
+        if supply_record_roles:
+            if any(effective.get(key) != digest for key, digest in role_digests.items()):
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            executor.sup15_prepared_roles(env, effective, require_complete=True)
     if requires_native_matrix and not normal_token_input:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():

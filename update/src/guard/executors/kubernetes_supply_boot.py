@@ -185,6 +185,33 @@ class KubernetesSupplyBootExecutor:
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             return None
 
+    def _validate_paired_configuration(self, env, values):
+        if (set(self.cfg) - CONFIG_KEYS or set(contract.ROLES) - set(self.cfg)
+                or env.ref().sha256 != values['supply_environment_sha256']):
+            raise ValueError('SUPPLY_BOOT_CONFIGURATION_INVALID')
+
+    def sup15_prepared_roles(self, env, values, *, require_complete=False):
+        """Check bound role files locally. Readiness requires both; runtime can keep an available role."""
+        if require_complete:
+            self._validate_paired_configuration(env, values)
+        roles = {role: self._load_available(env, values, role) for role in contract.ROLES}
+        normal, challenge = (_record_location(roles[role], env) if roles[role] is not None else None
+                             for role in contract.ROLES)
+        if normal is not None and normal == challenge:
+            # A record replaced between reads cannot supply two separate roles.
+            raise ValueError('SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED')
+        if require_complete:
+            if normal is None or challenge is None:
+                raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
+            for target, prepared, _ in roles.values():
+                self._role_reader(target, env, prepared)
+        return roles
+
+    def _role_reader(self, target, env, prepared):
+        return SupplyBootReader(target, env, prepared, runner=self.runner,
+                                binary=self.cfg.get("kubectl_binary", "kubectl"),
+                                duration=self.cfg.get("max_duration_seconds", 120))
+
     def _collect_role(self, check, env, values, role, *, role_inputs=None):
         """역할 하나의 세션. 입력·연결 오류는 진단 코드로만 남기고 앞선 역할을 지우지 않는다."""
         from guard.collectors import native_model_file_reads
@@ -212,8 +239,7 @@ class KubernetesSupplyBootExecutor:
                 row["worker_shard_input_error"] = {"type": type(exc).__name__, "message": str(exc)[:1024]}
         reader = None
         try:
-            reader = SupplyBootReader(target, env, prepared, runner=self.runner, binary=self.cfg.get("kubectl_binary", "kubectl"),
-                                      duration=self.cfg.get("max_duration_seconds", 120))
+            reader = self._role_reader(target, env, prepared)
             reader.snapshot()
         except Exception:
             row["diagnostic_codes"].append("SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE")
@@ -266,24 +292,18 @@ class KubernetesSupplyBootExecutor:
         self.validate_policy(check, policy_values)
         if NORMAL_FILE_READS_OPTION in self.cfg:
             return self._run_normal_read(check, env, policy_values, workdir, started)
-        if set(self.cfg) - CONFIG_KEYS or set(contract.ROLES) - set(self.cfg):
-            raise ValueError("SUPPLY_BOOT_CONFIGURATION_INVALID")
-        if env.ref().sha256 != policy_values["supply_environment_sha256"]:
-            raise ValueError("SUPPLY_BOOT_CONFIGURATION_INVALID")
+        self._validate_paired_configuration(env, policy_values)
         begin, end = contract.normalize_policy(check.id, policy_values)
         if not begin <= started <= end:
             raise ValueError("SUPPLY_BOOT_POLICY_WINDOW_EXPIRED")
         if check.id in {"SUP-05", "SUP-15"}:
-            role_inputs = {role: self._load_available(env, policy_values, role) for role in contract.ROLES}
-            normal, challenge = (role_inputs[role] for role in contract.ROLES)
-            if normal is not None and challenge is not None:
-                if check.id == "SUP-05" and normal[1]["session"] == challenge[1]["session"]:
+            if check.id == "SUP-15":
+                role_inputs = self.sup15_prepared_roles(env, policy_values)
+            else:
+                role_inputs = {role: self._load_available(env, policy_values, role) for role in contract.ROLES}
+                normal, challenge = (role_inputs[role] for role in contract.ROLES)
+                if normal is not None and challenge is not None and normal[1]["session"] == challenge[1]["session"]:
                     raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
-                if check.id == "SUP-15":
-                    # A record replaced between reads cannot supply two separate roles.
-                    normal_location = _record_location(normal, env)
-                    if normal_location is not None and normal_location == _record_location(challenge, env):
-                        raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
             collected = {role: self._collect_role(check, env, policy_values, role, role_inputs=role_inputs)
                          for role in contract.ROLES}
         else:

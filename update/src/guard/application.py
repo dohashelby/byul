@@ -597,6 +597,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                      change=None, previous_plan=None, source_store=None) -> dict:
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry
+    from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
     from guard.executors.lifecycle_transition import (LifecycleTransitionExecutor, REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE,
                                                       generation_identity, redeployment_side_reuse)
     from guard.core.preflight import validate_pack
@@ -718,6 +719,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     executor.validate_policy(check_def, values)
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
+                    if kube and item.check_id == "SUP-15" and isinstance(executor, KubernetesSupplyBootExecutor):
+                        executor.sup15_prepared_roles(selected_env, values, require_complete=True)
                     if (kube and item.check_id in REDEPLOY_CHECKS and isinstance(executor, LifecycleTransitionExecutor)
                             and 2 in run_binding.stages_for(check_def)):
                         redeploy_preflight = True

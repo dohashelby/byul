@@ -3,31 +3,36 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import socket
+import subprocess
 from types import SimpleNamespace
 
 import pytest
 
+from guard import application
 from guard.collectors.lifecycle import prepare_assets
 from guard.core.run import _normalize
 from guard.executors import registry
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, sha256_hex
-from tests.builders import environment, evidence
+from tests.builders import environment, evidence, policy
 from tests.test_b3_supply_records import retained
 from tests.test_kubernetes_lifecycle import World
 from tests.test_kubernetes_sampling import inputs
 from tests.test_lifecycle_capture import Docker, IMAGE, external
 from tests.test_supply_boot_record_access import PACK, ROOT, base_values, change, good_packet
+from tools import mvp_live_readiness
+from tools.j02_run_config import write_config
 
 
-def _prepare_roles(tmp_path, env, late_owner_change):
+def _prepare_roles(tmp_path, env, late_owner_change, *, first_owner=1):
     settings, pins, worlds, records = {}, {}, {}, {}
-    for index, role in enumerate(("normal", "challenge"), start=1):
+    for index, role in enumerate(("normal", "challenge"), start=first_owner):
         directory = tmp_path / role
         directory.mkdir()
         prepared = prepare_assets(directory / "assets", ROOT.parent)
         engine = inputs()["kubernetes"]["engine"]
-        engine.update(namespace=f"guard-{role}", pod=f"engine-{role}", image=IMAGE,
+        engine.update(namespace=f"guard-{role}", pod=f"engine-{role}", image=env.engine.image_digest,
                       namespace_uid=f"10000000-0000-0000-0000-{index:012d}",
                       pod_uid=f"20000000-0000-0000-0000-{index:012d}",
                       container_id="containerd://" + str(index) * 64,
@@ -55,6 +60,98 @@ def _prepare_roles(tmp_path, env, late_owner_change):
         worlds[engine["namespace"]] = world
         records[role] = raw
     return settings, pins, worlds, records
+
+
+@pytest.mark.parametrize(("candidate_input", "prepare_gap", "audit_gap"), [
+    ("distinct", None, None),
+    ("alias", "SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED", "SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED"),
+    ("foreign-target", "SUPPLY_BOOT_INPUT_UNAVAILABLE", "SUPPLY_BOOT_INPUT_UNAVAILABLE"),
+    ("missing-preparation", "RUN_BINDING_UNAVAILABLE", "MA7_INPUT_INVALID"),
+    ("changed-snapshot", None, "MVP_INPUT_FILE_CHANGED"),
+])
+def test_sup15_offline_readiness_binds_both_declared_roles(
+        external, monkeypatch, candidate_input, prepare_gap, audit_gap):
+    def no_runtime(*args, **kwargs):
+        pytest.fail("SUP-15 file readiness must not contact or run a target")
+
+    monkeypatch.setattr(subprocess, "Popen", no_runtime)
+    monkeypatch.setattr(socket, "socket", no_runtime)
+    producer = external / "producer.py"
+    producer.write_bytes(b"# EXAMPLE boot-record source\n")
+    check_id = "SUP-15"
+    pol = policy(PACK.ref(), scope={"include": [check_id]}, values={})
+    policy_path = external / "policy.json"
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    cfg = {"adapter": {"name": "vllm"}, "executors": {"supply_boot": "kubernetes"},
+           "update": {"mode": "external", "allowed_checks": [check_id]},
+           "run_binding": {check_id: {"record_producer": str(producer)}}, "sides": {}}
+    envs, entries = [], []
+    config_path = external / "guard.toml"
+    for side, release in mvp_live_readiness.versions().items():
+        root = external / side
+        root.mkdir()
+        env = environment(id=f"ENV-EXAMPLE-SUP15-{side.upper()}",
+            engine={"name": release["engine"], "version": release["version"], "image_digest": release["image"]},
+            runtime={"gpu_count": 1, "gpu_model": "EXAMPLE GPU", "driver": "EXAMPLE driver"})
+        env_path = root / "env.json"
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        settings, _, _, _ = _prepare_roles(root, env, late_owner_change=False, first_owner=1 + 2 * len(envs))
+        if side == "candidate":
+            target_path = Path(settings["challenge"]["target"])
+            if candidate_input == "alias":
+                alias = json.loads(Path(settings["normal"]["target"]).read_bytes())
+                alias["kubernetes"]["context"] = "fixture-alias-context"
+                target_path.write_bytes(canonical_json(alias))
+                settings["challenge"]["prepared"] = settings["normal"]["prepared"]
+            elif candidate_input == "foreign-target":
+                target = json.loads(target_path.read_bytes())
+                target["environment_ref"] = envs[0].ref().model_dump(mode="json")
+                target_path.write_bytes(canonical_json(target))
+            elif candidate_input == "missing-preparation":
+                settings["challenge"]["prepared"] = str(root / "missing-manifest.json")
+        cfg["sides"][side] = {"supply_boot": settings}
+        envs.append(env)
+        entries.append((side, env_path))
+
+    prepared = application.update_readiness(PACK, envs, pol, cfg)
+    inputs = next(item for item in prepared["checks"] if item["check"] == "inputs")
+    assert inputs["ok"] is (prepare_gap is None), inputs
+    if prepare_gap is not None:
+        assert inputs["detail"] == prepare_gap
+
+    write_config(cfg, config_path)
+    index = mvp_live_readiness.template(PACK)
+    index["inputs"] = [{"check_id": check_id, "side": side, **{
+        role: {"path": str(path), "sha256": sha256_hex(path.read_bytes())}
+        for role, path in {"environment": env, "policy": policy_path, "configuration": config_path}.items()
+    }} for side, env in entries]
+    index_path = external / "index.json"
+    index_path.write_bytes(canonical_json(index))
+    if candidate_input == "changed-snapshot":
+        prepared_target = Path(cfg["sides"]["candidate"]["supply_boot"]["challenge"]["target"])
+        read = mvp_live_readiness._read
+
+        def replace_after_snapshot(path):
+            raw, identity = read(path)
+            if Path(path) == prepared_target:
+                target = json.loads(raw)
+                target["kubernetes"]["context"] = "fixture-new-context"
+                prepared_target.write_bytes(canonical_json(target))
+            return raw, identity
+
+        monkeypatch.setattr(mvp_live_readiness, "_read", replace_after_snapshot)
+    report = mvp_live_readiness.audit(index_path, pack=PACK)
+    assert report["sides"] == 138 and report["active_checks"] == 69
+    assert report["file_binding_valid_sides"] == (2 if audit_gap is None else 1)
+    for row in report["rows"]:
+        if row["check_id"] != check_id:
+            continue
+        assert row["ready_for_execution"] is row["live_target_verified"] is row["engine_executed"] is False
+        if row["side"] == "candidate" and audit_gap is not None:
+            assert row["blocking_codes"] == [audit_gap]
+        else:
+            assert row["binding_schema"] == "guard-run-binding/2"
+            assert set(row["blocking_codes"]) == {"EXAMPLE_ENV_NOT_ACTUAL", "LIVE_EXECUTOR_PREFLIGHT_REQUIRED"}
 
 
 @pytest.mark.parametrize(('same_owner', 'same_session'), [(True, True), (True, False), (False, True)])

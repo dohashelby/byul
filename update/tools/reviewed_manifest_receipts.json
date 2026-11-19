@@ -925,6 +925,11 @@
       "manifest_sha256": "1f3d612a1c33ed970b07a452b2be432b980d9641a883d89ac7708abfaa17c1ec",
       "reviewed_by": "Codex / OBS-01 policy binding and OBS-09 and OBS-11 evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T08:59:14+00:00"
+    },
+    {
+      "manifest_sha256": "d4445fbb9b2c8fb98499a28153286dec8596fe3d4b2e25d2ce98cd20d2247f73",
+      "reviewed_by": "Codex / SUP-05 preparation executor ownership / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T09:04:06+00:00"
     }
   ]
 }

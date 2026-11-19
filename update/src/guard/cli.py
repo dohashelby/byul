@@ -535,7 +535,7 @@ def prepare_sup05_normal(
     nonsecret_model_weights: bool = typer.Option(False, "--nonsecret-model-weights"),
 ) -> None:
     """저장된 소유 관계와 승인 참조로 SUP-05 정상 읽기 입력을 준비한다."""
-    from guard.collectors.sup05_normal_preparation import prepare
+    from guard.executors.kubernetes_sup05_normal_preparation import prepare
     try:
         value = prepare(output, Path(__file__).resolve().parents[3], environment=env, target=target,
                         owner_snapshot=owner_snapshot, owner_snapshot_sha256=owner_snapshot_sha256,

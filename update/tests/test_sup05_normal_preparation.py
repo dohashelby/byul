@@ -13,8 +13,8 @@ from guard.adapters import vllm_lifecycle_catalog as catalog
 from guard.adapters.vllm_approved_file_read_composition import PROFILES
 from guard.cli import app
 from guard.collectors.lifecycle import load_prepared
-from guard.collectors.sup05_normal_preparation import prepare
 from guard.executors import registry, run_binding
+from guard.executors.kubernetes_sup05_normal_preparation import prepare
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
 from tests.builders import environment
 from tests.test_kubernetes_sampling import inputs as sampling_inputs

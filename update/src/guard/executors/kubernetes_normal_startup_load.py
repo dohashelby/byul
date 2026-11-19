@@ -257,7 +257,8 @@ class KubernetesNormalStartupLoadExecutor:
                    "binding_sha256": transport.report()["binding_sha256"], "fixed_boot_prefix": prefix,
                    "installed_source_sha256": source["file_sha256"] if observed else None,
                    "source_log_call_linenumber": source["logger_call_linenumber"] if observed else None,
-                   "observation": observed, "conditions_sha256": conditions_sha, "missing": missing}
+                   "observation": observed, "conditions_sha256": conditions_sha, "missing": missing,
+                   "gap": None if observed else failure}
         error = None if observed else failure
         artifacts = []
         try:

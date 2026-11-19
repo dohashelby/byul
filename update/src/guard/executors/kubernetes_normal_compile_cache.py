@@ -294,7 +294,8 @@ class KubernetesNormalCompileCacheExecutor:
         summary = {"profile": PROFILE, "target_sha256": target_sha, "environment_sha256": env.ref().sha256,
                    "binding_sha256": logs.report()["binding_sha256"], "fixed_boot_prefix": prefix,
                    "installed_source_sha256": source_hashes if observed else None, "observation": observed,
-                   "conditions_sha256": conditions_sha, "missing": missing}
+                   "conditions_sha256": conditions_sha, "missing": missing,
+                   "gap": None if observed else failure}
         error = None if observed else failure
         artifacts = []
         try:

@@ -605,7 +605,8 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 values[key] = _stamp(start)
             elif key.endswith('validity_end'):
                 values[key] = _stamp(end)
-            elif key == 'init_prepared_sha256':
+            elif key == 'init_prepared_sha256' and (expected_prepared is not None
+                    or (type(executor_cfg.get('prepared')) is str and executor_cfg['prepared'])):
                 from guard.adapters.vllm_release_profiles import InitializationPreparationMismatch
                 from guard.collectors.lifecycle import load_initialization_prepared
                 try:

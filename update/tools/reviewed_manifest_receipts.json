@@ -870,6 +870,11 @@
       "manifest_sha256": "81ebe39df1346b42983b004d4332e260b42fd1f006bc6d98b1a443cc9d413667",
       "reviewed_by": "Codex / paired stock CUDA graph capture / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T04:48:01+00:00"
+    },
+    {
+      "manifest_sha256": "d06414b946b69cb3d3b227b4d316066e068508fc45fc5a109574802506410526",
+      "reviewed_by": "Codex / paired candidate scope and effective usage report / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T05:21:13+00:00"
     }
   ]
 }

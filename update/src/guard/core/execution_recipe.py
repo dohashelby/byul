@@ -3,11 +3,11 @@ from contextlib import contextmanager
 from pathlib import Path
 import os
 import inspect
-from guard.models import canonical_json, sha256_hex, utcnow
+from guard.models import Mode, canonical_json, sha256_hex, utcnow
 
 
 def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None,
-                         transition_manifests=None):
+                         transition_manifests=None, plan=None, initialization_digests=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
@@ -85,6 +85,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     factories(cfg, 'root', environments[0] if len(environments) == 1 else None)
     from guard.configuration import for_check, merge_config
     from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, inputs_manifest, redeployment_side_reuse
+    from guard.executors.run_binding import INITIALIZATION_CHECKS, initialization_recipe_digests
     sides = {s: None for s in cfg.get('sides', {})}
     if len(environments) == 2: sides.update(zip(('baseline', 'candidate'), environments))
     redeploy_inputs = {}
@@ -93,13 +94,19 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     update = cfg.get('update', {})
     permitted = update.get('allowed_checks')
     paired_external = len(environments) == 2 and update.get('mode', 'external') == 'external'
+    init_checks = []
+    if paired_external and plan is not None and plan.mode == Mode.update:
+        init_checks = [item.check_id for item in plan.items if item.selected and not item.gaps
+                       and item.executor == 'initialization' and item.check_id in INITIALIZATION_CHECKS
+                       and (type(permitted) is not list or item.check_id in permitted)]
+    init_inputs = {}
     for side, env in sides.items():
         effective = merge_config(cfg, cfg.get('sides', {}).get(side, {}))
         factories(effective, side, env)
+        bindings = effective.get('run_binding')
         # Stage-2 redeploy inputs use a list of per-generation files rather
         # than the one target path committed by the generic recipe visitor.
         if paired_external and side in ('baseline', 'candidate') and effective.get('executors', {}).get('lifecycle_transition') == 'kubernetes':
-            bindings = effective.get('run_binding')
             for check_id in sorted(REDEPLOY_CHECKS):
                 if (type(bindings) is not dict or check_id not in bindings
                         or type(permitted) is list and check_id not in permitted):
@@ -115,6 +122,17 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                     redeploy_conflicts.add(check_id)
                 previous.update(identities)
                 redeploy_inputs[side + ':' + check_id] = digest
+        if (init_checks and side in ('baseline', 'candidate') and type(bindings) is dict
+                and effective.get('executors', {}).get('initialization') == 'kubernetes'):
+            for check_id in init_checks:
+                if check_id not in bindings:
+                    continue  # Legacy policy-supplied scenario digests have no file to pin.
+                try:
+                    settings = for_check(effective, 'initialization', check_id)['initialization']
+                    digests = initialization_recipe_digests(settings, bindings[check_id])
+                except (KeyError, TypeError, ValueError, OSError):
+                    digests = None
+                init_inputs[side + ':' + check_id] = digests
     if transition_manifests is not None:
         # Commit even stale declarations. Only a selected execution consumes
         # this diagnostic, so unused bindings cannot block another check.
@@ -130,6 +148,10 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
               'inputs': inputs, 'implementations': implementations, 'software_sha256': sha256_hex(canonical_json(software))}
     if redeploy_inputs:
         recipe['transition_manifest_sha256_by_side_check'] = redeploy_inputs
+    if init_inputs:
+        recipe['initialization_file_sha256_by_side_check'] = init_inputs
+    if initialization_digests is not None:
+        initialization_digests.update(init_inputs)
     return sha256_hex(canonical_json(recipe))
 
 
@@ -144,7 +166,7 @@ def validate_policy_time(policy):
 def bind_recipe(plan, cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None):
     return plan.model_copy(update={'inputs': plan.inputs.model_copy(update={
         'execution_recipe_sha256': configuration_sha256(cfg, environments, target_snapshots=target_snapshots,
-                                                       normal_file_hashes=normal_file_hashes)})}).seal()
+                                                       normal_file_hashes=normal_file_hashes, plan=plan)})}).seal()
 
 
 @contextmanager

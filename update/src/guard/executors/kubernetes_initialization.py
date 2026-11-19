@@ -59,8 +59,9 @@ from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
 class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='initialization';version='0.4.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
-    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
+    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None,expected_prepared_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
+        self.expected_prepared = expected_prepared_sha256
 
     def validate_policy(self,check,values):
         if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('INITIALIZATION_PROFILE_UNSUPPORTED')
@@ -73,7 +74,9 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
             if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            target_hash=sha256_hex(canonical_json(target));prepared=load_initialization_prepared(self.cfg['prepared'],env);start,end=normalize_check_policy(check,policy_values)
+            target_hash = sha256_hex(canonical_json(target))
+            prepared = load_initialization_prepared(self.cfg['prepared'], env, expected_sha256=self.expected_prepared)
+            start, end = normalize_check_policy(check, policy_values)
             if prepared['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}:
                 required={item.key for item in check.required_observations}
                 if not {'init_worker_generation_events','init_worker_generation_candidates','init_ready_send_observations'}<=required:raise ValueError

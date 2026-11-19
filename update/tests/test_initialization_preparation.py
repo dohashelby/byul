@@ -1,5 +1,6 @@
 """The installed release remains a prerequisite after offline preparation."""
 from pathlib import Path
+import json
 import subprocess
 
 import pytest
@@ -9,8 +10,15 @@ from guard.adapters import vllm_initialization_release_sensor as release
 from guard.adapters import vllm_initialization_sensor as legacy
 from guard.adapters.vllm_lifecycle_release_sensor import COMMIT
 from guard.adapters.vllm_release_profiles import release_profile
-from guard.collectors.lifecycle import prepare_assets
-from guard.models import canonical_json, load_pack
+from guard.collectors.lifecycle import load_initialization_prepared, prepare_assets
+from guard.core.execution_recipe import bind_recipe, configuration_sha256
+from guard.core.run import run_plan
+from guard.core.select import select
+from guard.executors import run_binding
+from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
+from guard.models import ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
+from guard.store import Store
+from guard.store.packs import put_pack
 from tests.builders import environment, policy
 from tests.test_kubernetes_sampling import inputs as owned_target
 from tests.test_lifecycle_capture import REPOSITORY, external  # noqa: F401
@@ -19,6 +27,10 @@ from tests.test_lifecycle_capture import REPOSITORY, external  # noqa: F401
 def _write(path, value):
     path.write_bytes(canonical_json(value))
     return str(path)
+
+
+def _forbidden(*args, **kwargs):
+    pytest.fail('Offline initialization preparation must not perform a runtime request')
 
 
 def _paired_inputs(external, check_id, change):
@@ -95,10 +107,7 @@ def _paired_inputs(external, check_id, change):
     ('LIF-09', 'asset', 'RUN_BINDING_UNAVAILABLE'),
 ])
 def test_public_preparation_checks_exact_release_assets(external, monkeypatch, check_id, change, error):  # noqa: F811
-    def forbidden(*args, **kwargs):
-        pytest.fail('Offline initialization preparation must not perform a runtime request')
-
-    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', _forbidden)
     report = application.update_readiness(*_paired_inputs(external, check_id, change))
     inputs = next(row for row in report['checks'] if row['check'] == 'inputs')
     assert inputs['ok'] is (error is None), report
@@ -106,3 +115,119 @@ def test_public_preparation_checks_exact_release_assets(external, monkeypatch, c
         assert error in inputs['detail']
     assert len(report['check_support']) == 2
     assert all(row['runtime_qualified'] is False for row in report['check_support'])
+
+
+def _sealed_plan(store, pack, envs, pol, cfg):
+    put_pack(store, pack.path)
+    for item in [*envs, pol]:
+        store.put(item)
+    plan = bind_recipe(select(pack, envs, pol, mode='update'), cfg, envs)
+    store.put(plan)
+    return plan
+
+
+def test_recipe_pins_raw_files_and_preserves_canonical_run_binding(external, tmp_path):  # noqa: F811
+    check_id = 'LIF-07'
+    pack, envs, pol, cfg = _paired_inputs(external, check_id, None)
+    run_cfg = cfg['run_binding'][check_id]
+    scenario = Path(run_cfg['scenario'])
+    scenario.write_bytes(b'{\n  "case": "EXAMPLE normal startup"\n}\n')
+    plan = _sealed_plan(Store(tmp_path / 'store'), pack, envs, pol, cfg)
+    files = {}
+    assert configuration_sha256(cfg, envs, plan=plan, initialization_digests=files) == plan.inputs.execution_recipe_sha256
+    assert len(files) == 2
+    for side, env in zip(('baseline', 'candidate'), envs):
+        settings = cfg['sides'][side]['initialization']
+        manifest = Path(settings['prepared'])
+        exact = files[side + ':' + check_id]
+        assert exact == {'prepared': sha256_hex(manifest.read_bytes()), 'scenario': sha256_hex(scenario.read_bytes())}
+        doc, _ = run_binding.effective_values(pack.checks[check_id], settings, env, pol.values[check_id],
+            side=side, attempt_id=None, issued_at=utcnow(), run_cfg=run_cfg, expected_initialization_digests=exact)
+        assert doc['schema'] == run_binding.SCHEMA_2
+        assert doc['files']['init_prepared_sha256'] == sha256_hex(canonical_json(json.loads(manifest.read_bytes())))
+        assert doc['files']['init_scenario_sha256'] == sha256_hex(canonical_json(json.loads(scenario.read_bytes())))
+        assert doc['files']['init_scenario_sha256'] != exact['scenario']
+
+
+@pytest.mark.parametrize('late', [False, True])
+@pytest.mark.parametrize(('field', 'side', 'check_id'), [
+    ('prepared', Side.baseline, 'LIF-07'), ('scenario', Side.candidate, 'LIF-09'),
+])
+def test_recipe_rejects_a_valid_substitute_without_dispatch(external, tmp_path, monkeypatch, field, side, check_id, late):  # noqa: F811
+    from guard.core import run as core_run
+
+    pack, envs, pol, cfg = _paired_inputs(external, check_id, None)
+    store = Store(tmp_path / 'store')
+    plan = _sealed_plan(store, pack, envs, pol, cfg)
+    if field == 'prepared':
+        manifest = Path(cfg['sides'][side.value]['initialization']['prepared'])
+        other = external / 'replacement'
+        original_prepared = load_initialization_prepared(manifest, envs[0])
+        prepare_assets(other, REPOSITORY, profile=original_prepared['profile'])
+
+        def replace():
+            for file in other.iterdir():
+                (manifest.parent / file.name).write_bytes(file.read_bytes())
+            assert load_initialization_prepared(manifest, envs[0])['session'] != original_prepared['session']
+    else:
+        scenario = Path(cfg['run_binding'][check_id]['scenario'])
+
+        def replace():
+            _write(scenario, {'case': 'EXAMPLE same path, different valid input'})
+
+    monkeypatch.setattr(KubernetesInitializationExecutor, 'run', _forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', _forbidden)
+    if late:
+        original_run = core_run._run_one
+
+        def replace_after_recipe(*args, **kwargs):
+            replace()
+            return original_run(*args, **kwargs)
+
+        monkeypatch.setattr(core_run, '_run_one', replace_after_recipe)
+        evidence, = run_plan(store, pack, plan, application.run_config(cfg), only_side=side)
+        assert evidence.execution.status == ExecStatus.NOT_RUN
+        assert evidence.execution.abort_reason == f'RUN_BINDING_INITIALIZATION_{field.upper()}_CHANGED'
+        assert evidence.execution.run_binding is None
+    else:
+        replace()
+        with pytest.raises(ValueError, match='EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED'):
+            run_plan(store, pack, plan, application.run_config(cfg), only_side=side)
+        assert not store.find_latest('EVD', lambda row: row.plan == plan.ref())
+
+
+def test_unselected_initialization_files_do_not_block_other_checks(external, tmp_path, monkeypatch):  # noqa: F811
+    pack, envs, _, cfg = _paired_inputs(external, 'LIF-07', None)
+    del cfg['update']['allowed_checks']
+    pol = policy(pack.ref(), scope={'include': ['SUP-10']}, values={})
+    store = Store(tmp_path / 'store')
+    plan = _sealed_plan(store, pack, envs, pol, cfg)
+    Path(cfg['run_binding']['LIF-07']['scenario']).unlink()
+    Path(cfg['sides']['baseline']['initialization']['prepared']).unlink()
+    monkeypatch.setattr(subprocess, 'Popen', _forbidden)
+    evidence, = run_plan(store, pack, plan, application.run_config(cfg), only_side=Side.baseline)
+    assert evidence.check_id == 'SUP-10'
+    assert evidence.execution.abort_reason == "executor 'supply_boot' not configured in guard.toml [executors]"
+
+
+def test_executor_rejects_manifest_rewrite_after_run_binding(external, tmp_path, monkeypatch):  # noqa: F811
+    check_id = 'LIF-09'
+    pack, envs, pol, cfg = _paired_inputs(external, check_id, None)
+    store = Store(tmp_path / 'store')
+    plan = _sealed_plan(store, pack, envs, pol, cfg)
+    path = Path(cfg['sides']['candidate']['initialization']['prepared'])
+    declared = json.loads(path.read_bytes())
+    effective_values = run_binding.effective_values
+
+    def rewrite_after_binding(*args, **kwargs):
+        result = effective_values(*args, **kwargs)
+        path.write_bytes(path.read_bytes() + b'\n')
+        assert json.loads(path.read_bytes()) == declared
+        return result
+
+    monkeypatch.setattr(run_binding, 'effective_values', rewrite_after_binding)
+    monkeypatch.setattr('guard.executors.kubernetes_initialization.KubernetesInitializationHTTP', _forbidden)
+    evidence, = run_plan(store, pack, plan, application.run_config(cfg), only_side=Side.candidate)
+    assert evidence.execution.status == ExecStatus.ABORTED
+    assert evidence.execution.abort_reason == 'EXECUTOR_FAILURE'
+    assert evidence.execution.run_binding['files']['init_prepared_sha256'] == sha256_hex(canonical_json(declared))

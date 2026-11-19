@@ -147,7 +147,8 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
             raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
     validate_policy_time(store.resolve(plan.inputs.policy))
     environments = [store.resolve(r) for r in plan.inputs.environments]
-    if plan.inputs.execution_recipe_sha256 is not None and configuration_sha256(requested, environments) != plan.inputs.execution_recipe_sha256:
+    if (plan.inputs.execution_recipe_sha256 is not None
+            and configuration_sha256(requested, environments, plan=plan) != plan.inputs.execution_recipe_sha256):
         raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
     with execution_lock(store.root, plan.id):
         cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
@@ -196,9 +197,11 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             if only_side is not None and side != only_side:
                 continue
             transition_manifests = {} if bound_external_update else None
+            initialization_digests = {} if bound_external_update else None
             if plan.inputs.execution_recipe_sha256 is not None:
                 from .execution_recipe import configuration_sha256
-                if configuration_sha256(requested, envs, transition_manifests=transition_manifests) != plan.inputs.execution_recipe_sha256:
+                if configuration_sha256(requested, envs, plan=plan, transition_manifests=transition_manifests,
+                                        initialization_digests=initialization_digests) != plan.inputs.execution_recipe_sha256:
                     raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
@@ -226,7 +229,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                            policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks,
                            passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
                            source_ref=source_refs.get(side),
-                           transition_manifests=transition_manifests)
+                           transition_manifests=transition_manifests, initialization_digests=initialization_digests)
             try:
                 store.put(evd)
             except Exception:
@@ -247,7 +250,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
 
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
              policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
-             transition_manifests=None) -> Evidence:
+             transition_manifests=None, initialization_digests=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -336,6 +339,14 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 if expected_manifest is None:
                     raise run_binding.RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_UNAVAILABLE')
                 target_options["expected_transition_manifest_sha256"] = expected_manifest
+            if (initialization_digests is not None and check.id in run_binding.INITIALIZATION_CHECKS
+                    and check.executor == 'initialization' and cfg.executors[item.executor] == 'kubernetes'
+                    and {1, 2}.issubset(run_binding.stages_for(check))):
+                expected_files = initialization_digests.get(common['side'].value + ':' + check.id)
+                if expected_files is None:
+                    raise run_binding.RunBindingUnavailable('RUN_BINDING_INITIALIZATION_FILES_UNAVAILABLE')
+                target_options['expected_initialization_digests'] = expected_files
+                raw = {**raw, '_initialization_prepared_sha256': expected_files['prepared']}
             binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],

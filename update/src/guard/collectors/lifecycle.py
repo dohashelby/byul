@@ -398,11 +398,11 @@ def load_prepared(path, *, expected_sha256=None):
     return manifest
 
 
-def load_initialization_prepared(path, env):
+def load_initialization_prepared(path, env, *, expected_sha256=None):
     """Validate locally prepared initialization assets against the declared ENV."""
     from guard.adapters.vllm_release_profiles import validate_initialization_preparation
 
-    prepared = load_prepared(path)
+    prepared = load_prepared(path, expected_sha256=expected_sha256)
     validate_initialization_preparation(env, prepared['profile'])
     return prepared
 

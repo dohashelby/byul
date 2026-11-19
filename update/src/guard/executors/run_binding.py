@@ -53,6 +53,7 @@ from guard.models import canonical_json, sha256_hex
 SCHEMA = 'guard-run-binding/1'
 SCHEMA_2 = 'guard-run-binding/2'
 SCHEMAS = (SCHEMA, SCHEMA_2)
+INITIALIZATION_CHECKS = frozenset({'LIF-07', 'LIF-09'})
 _TARGET_ONLY_NORMAL_MODES = {
     'LIF-01': ('supply_boot', NORMAL_STARTUP_LOAD_OPTION, 'supply_target_sha256'),
     'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
@@ -447,7 +448,15 @@ def _stage_3(check, run_cfg, issued_at, valid_from=None, valid_until=None):
     return files, values, validity
 
 
-def _stage_2(check, executor_cfg, run_cfg, issued_at):
+def initialization_recipe_digests(executor_cfg, run_cfg):
+    """Commit bounded raw input bytes separately from the published JSON digests."""
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    return {'prepared': sha256_hex(dependency(executor_cfg['prepared'], None)),
+            'scenario': sha256_hex(dependency(run_cfg['scenario'], None))}
+
+
+def _stage_2(check, executor_cfg, run_cfg, issued_at, *, expected_initialization_scenario_sha256=None):
     """Return (file hashes, values) for the stage-2 keys of this check."""
     cid, files, values = check.id, {}, {}
     if cid in ('LIF-05', 'LIF-06', 'LIF-16'):
@@ -457,7 +466,17 @@ def _stage_2(check, executor_cfg, run_cfg, issued_at):
         path = run_cfg['scenario']
         if type(path) is not str or not path:
             raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE')
-        values[key] = files[key] = sha256_hex(canonical_json(_load(path, 'json')))
+        if cid in INITIALIZATION_CHECKS and expected_initialization_scenario_sha256 is not None:
+            from guard.adapters.vllm_file_read_sensor import dependency
+            from guard.runtime.bounded import strict_json
+            try:
+                raw = dependency(path, expected_initialization_scenario_sha256)
+            except (OSError, ValueError):
+                raise RunBindingUnavailable('RUN_BINDING_INITIALIZATION_SCENARIO_CHANGED') from None
+            scenario = strict_json(raw, limit=_MAX_JSON)
+        else:
+            scenario = _load(path, 'json')
+        values[key] = files[key] = sha256_hex(canonical_json(scenario))
     elif cid in _SESSION_KEY:
         values[_SESSION_KEY[cid]] = _session(run_cfg['record_session'])
     elif cid in ('PLT-07', 'PLT-08'):
@@ -490,7 +509,7 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
             run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None,
-            expected_transition_manifest_sha256=None):
+            expected_transition_manifest_sha256=None, expected_initialization_digests=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
@@ -542,8 +561,13 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     start = end = basis = None
     validity = None
     try:
+        expected_prepared = expected_scenario = None
+        if expected_initialization_digests is not None:
+            expected_prepared = expected_initialization_digests['prepared']
+            expected_scenario = expected_initialization_digests['scenario']
         if 2 in stages:
-            stage_files, extra = _stage_2(check, executor_cfg, run_cfg, issued_at)
+            stage_files, extra = _stage_2(check, executor_cfg, run_cfg, issued_at,
+                                         expected_initialization_scenario_sha256=expected_scenario)
             if expected_transition_manifest_sha256 is not None:
                 if extra.get('transition_inputs_sha256') != expected_transition_manifest_sha256:
                     raise RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_CHANGED')
@@ -585,9 +609,13 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 from guard.adapters.vllm_release_profiles import InitializationPreparationMismatch
                 from guard.collectors.lifecycle import load_initialization_prepared
                 try:
-                    prepared = load_initialization_prepared(executor_cfg['prepared'], env)
+                    prepared = load_initialization_prepared(executor_cfg['prepared'], env, expected_sha256=expected_prepared)
                 except InitializationPreparationMismatch as exc:
                     raise RunBindingUnavailable(str(exc)) from None
+                except (OSError, ValueError):
+                    if expected_prepared is None:
+                        raise
+                    raise RunBindingUnavailable('RUN_BINDING_INITIALIZATION_PREPARED_CHANGED') from None
                 values[key] = files[key] = sha256_hex(canonical_json(prepared))
             elif normal_file_reads and expected_normal_file_sha256 is not None and key == 'supply_normal_prepared_sha256':
                 from guard.collectors.lifecycle import load_prepared

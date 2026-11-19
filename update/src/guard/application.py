@@ -598,6 +598,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
+    from guard.executors.kubernetes_response_content import KubernetesResponseContentExecutor
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
     from guard.executors.lifecycle_transition import (LifecycleTransitionExecutor, REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE,
                                                       generation_identity, redeployment_side_reuse)
@@ -735,6 +736,11 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         if redeployment_side_reuse(seen_generation_identities, identities):
                             raise ValueError(REDEPLOY_SIDE_REUSE)
                         seen_generation_identities.update(identities)
+                if (kube and item.check_id == "REQ-13" and isinstance(executor, KubernetesResponseContentExecutor)
+                        and cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"
+                        and "gateway" in policy.values.get(item.check_id, {}).get("required_targets", ())):
+                    executor.prepared_gateway(selected_env)
+                    continue  # The declared caller key is resolved only at runtime.
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
     except Exception as exc:

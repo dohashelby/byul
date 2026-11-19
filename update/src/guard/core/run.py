@@ -174,6 +174,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
     passive_hop = passive_api_hop.validate_run_scope(pack, plan, cfg, allowed_checks)
     bound_external_update = (plan.mode == Mode.update and plan.inputs.execution_recipe_sha256 is not None
                              and requested.get('update', {}).get('mode', 'external') == 'external')
+    prebound_external_update = (bound_external_update
+        and requested.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
 
     plan_ref = plan.ref()
     pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
@@ -198,10 +200,12 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                 continue
             transition_manifests = {} if bound_external_update else None
             initialization_digests = {} if bound_external_update else None
+            response_route_digests = {} if prebound_external_update else None
             if plan.inputs.execution_recipe_sha256 is not None:
                 from .execution_recipe import configuration_sha256
                 if configuration_sha256(requested, envs, plan=plan, transition_manifests=transition_manifests,
-                                        initialization_digests=initialization_digests) != plan.inputs.execution_recipe_sha256:
+                                        initialization_digests=initialization_digests,
+                                        response_route_digests=response_route_digests) != plan.inputs.execution_recipe_sha256:
                     raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
@@ -229,7 +233,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                            policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks,
                            passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
                            source_ref=source_refs.get(side),
-                           transition_manifests=transition_manifests, initialization_digests=initialization_digests)
+                           transition_manifests=transition_manifests, initialization_digests=initialization_digests,
+                           response_route_digests=response_route_digests)
             try:
                 store.put(evd)
             except Exception:
@@ -250,7 +255,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
 
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
              policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
-             transition_manifests=None, initialization_digests=None) -> Evidence:
+             transition_manifests=None, initialization_digests=None, response_route_digests=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -276,6 +281,18 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     option = KUBERNETES_BOUND_CHECK_OPTIONS.get(check.id)
     check_hashes = (raw or {}).get("_kubernetes_target_sha256_by_check")
     section = (raw or {}).get(item.executor)
+    if (response_route_digests is not None and check.id == 'REQ-13' and check.executor == 'response_content'
+            and cfg.executors[item.executor] == 'kubernetes' and type(section) is dict):
+        from guard.executors.kubernetes_response_content import GATEWAY_TARGET_REQUIRED, ROUTE_TARGET_CHANGED
+        side = common['side'].value
+        if 'route_target' in section or side in response_route_digests:
+            expected = response_route_digests.get(side)
+            if expected is None or 'route_target' not in section:
+                return stopped(ExecStatus.NOT_RUN, ROUTE_TARGET_CHANGED)
+            raw = {**raw, '_response_route_target_sha256': expected}
+        elif (type(policy_values.get('required_targets')) is list
+                and 'gateway' in policy_values['required_targets']):
+            return stopped(ExecStatus.NOT_RUN, GATEWAY_TARGET_REQUIRED)
     if (option and type(section) is dict and section.get(option) is True
             and type(check_hashes) is dict and check.id in check_hashes):
         # The public paired update derives this pin from the recipe's own

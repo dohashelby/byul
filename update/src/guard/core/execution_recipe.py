@@ -7,7 +7,8 @@ from guard.models import Mode, canonical_json, sha256_hex, utcnow
 
 
 def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None,
-                         transition_manifests=None, plan=None, initialization_digests=None):
+                         transition_manifests=None, plan=None, initialization_digests=None,
+                         response_route_digests=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
@@ -84,6 +85,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                         key=lambda item: (item['name'], item['sha256']))
     factories(cfg, 'root', environments[0] if len(environments) == 1 else None)
     from guard.configuration import for_check, merge_config
+    from guard.executors.kubernetes_response_content import route_target_bytes
     from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, inputs_manifest, redeployment_side_reuse
     from guard.executors.run_binding import INITIALIZATION_CHECKS, initialization_recipe_digests
     sides = {s: None for s in cfg.get('sides', {})}
@@ -104,6 +106,9 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     if eligible.get('LIF-06') == 'lifecycle_transition':
         transition_checks = REDEPLOY_CHECKS | {'LIF-06'}
     init_inputs = {}
+    response_routes = {}
+    prebound_response = (eligible.get('REQ-13') == 'response_content'
+                         and update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
     for side, env in sides.items():
         effective = merge_config(cfg, cfg.get('sides', {}).get(side, {}))
         factories(effective, side, env)
@@ -138,6 +143,14 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                 except (KeyError, TypeError, ValueError, OSError):
                     digests = None
                 init_inputs[side + ':' + check_id] = digests
+        if (prebound_response and side in ('baseline', 'candidate')
+                and effective.get('executors', {}).get('response_content') == 'kubernetes'):
+            try:
+                settings = for_check(effective, 'response_content', 'REQ-13').get('response_content', {})
+                if 'route_target' in settings:
+                    response_routes[side] = sha256_hex(route_target_bytes(settings['route_target']))
+            except (KeyError, OSError, TypeError, ValueError):
+                response_routes[side] = None
     if transition_manifests is not None:
         # Commit even stale declarations. Only a selected execution consumes
         # this diagnostic, so unused bindings cannot block another check.
@@ -157,6 +170,10 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
         recipe['initialization_file_sha256_by_side_check'] = init_inputs
     if initialization_digests is not None:
         initialization_digests.update(init_inputs)
+    if response_routes:
+        recipe['response_route_target_sha256_by_side'] = response_routes
+    if response_route_digests is not None:
+        response_route_digests.update(response_routes)
     return sha256_hex(canonical_json(recipe))
 
 

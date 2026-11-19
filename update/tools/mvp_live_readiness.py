@@ -187,6 +187,9 @@ def _inspect(source, check, pack, issued_at):
     initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
                       and check.id in run_binding.INITIALIZATION_CHECKS
                       and {1, 2}.issubset(run_binding.stages_for(check)))
+    gateway_response = (check.id == 'REQ-13' and check.executor == 'response_content'
+                        and implementation == 'kubernetes' and 'gateway' in values['required_targets']
+                        and config.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
     normal_graph_capture = check.id == 'REQ-20' and cfg.get(NORMAL_GRAPH_CAPTURE_OPTION) is True
     normal_safetensors_reader = check.id == 'SUP-12' and cfg.get(NORMAL_SAFETENSORS_READER_OPTION) is True
     normal_compile_cache = check.id == 'SUP-07' and cfg.get(NORMAL_COMPILE_CACHE_OPTION) is True
@@ -227,6 +230,11 @@ def _inspect(source, check, pack, issued_at):
             bound_files.append((path, raw, identity))
             normal_hashes[role] = sha256(raw).hexdigest()
         binding_options['expected_normal_file_sha256'] = normal_hashes
+    if gateway_response and 'route_target' in cfg:
+        path = cfg['route_target']
+        raw, identity = _read(path)
+        bound_files.append((path, raw, identity))
+        config = {**config, '_response_route_target_sha256': sha256_hex(raw)}
     if cilium_egress_status:
         try:
             passive_egress_policy_transport(target_data, env, duration=1)
@@ -317,6 +325,8 @@ def _inspect(source, check, pack, issued_at):
             if effective['init_target_sha256'] != sha256_hex(canonical_json(target_data)):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             executor.prepared_inputs(check, env, effective)
+        if gateway_response:
+            executor.prepared_gateway(env, expected_target_sha256=sha256_hex(canonical_json(target_data)))
     if requires_native_matrix and not normal_token_input:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():

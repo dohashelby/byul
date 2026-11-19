@@ -486,6 +486,8 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
     ('REQ-10', 'sampling_validation', None, None),
     ('REQ-10', 'sampling_validation', 'model', 'KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED'),
     ('REQ-10', 'sampling_validation', 'missing-scope', 'NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID'),
+    ('LIF-03', 'stream_buffer', None, None),
+    ('LIF-03', 'stream_buffer', 'duration', 'LIF03_NORMAL_TARGET_UNVERIFIED'),
     ('LIF-04', 'stream_buffer', None, None),
     ('LIF-04', 'stream_buffer', 'duration', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('LIF-04', 'stream_buffer', 'missing-scope', 'NORMAL_STREAM_EXECUTION_SCOPE_INVALID'),
@@ -517,7 +519,7 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
     elif check_id == 'OBS-02':
         policy_values[check_id] = {'observation_state_required_components': ['http_listener'],
                                   'profiler_backend_kind': 'torch', 'profiler_required_ranks': ['0']}
-    elif check_id == 'LIF-04':
+    elif check_id in {'LIF-03', 'LIF-04'}:
         _, _, _, effective = stream_configuration(tmp_path)
         policy_values[check_id] = {field.key: effective[field.key] for field in pack.checks[check_id].policy_params}
     if check_id in {'REQ-10', 'LIF-04'}:

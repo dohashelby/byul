@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -18,10 +18,83 @@ from . import supply_boot_contract as contract
 VERSION = "0.1.0"
 RECORD_DIRECTORY = "/guard-supply-boot/data/"
 CONFIG_KEYS = {"normal", "challenge", "kubectl_binary", "max_duration_seconds"}
+NORMAL_FILE_READS_OPTION = "normal_file_reads_only"
+NORMAL_FILE_READS_PROFILE = "owned-normal-model-file-reads/1"
+_MODEL_ROOT = "/models"
+_REFERENCE_KEY = "supply_normal_reference_manifest_sha256"
+_NORMAL_BINDING_KEYS = {"supply_environment_sha256", "supply_normal_target_sha256",
+                        "supply_normal_prepared_sha256", _REFERENCE_KEY,
+                        "supply_validity_start", "supply_validity_end"}
 
 
 def record_path(session):
     return RECORD_DIRECTORY + session + "/boot-record.json"
+
+
+def _read_projection(captured, prepared, digest, prepared_sha256, analysis):
+    native = contract.native_consumption(analysis)
+    native["source_binding"] = {"session": prepared["session"], "target_sha256": digest,
+                                "prepared_sha256": prepared_sha256, "declared_scope": analysis["declared_scope"]}
+    for projection, candidate in zip(native["rows"], analysis["candidates"], strict=True):
+        source = captured["recordings"][candidate["recording"]]["capture"]["provenance"]
+        projection["source_binding"] = {"recording_sha256": source["capture_sha256"],
+            "recording_owner_binding_verified": source["owner_binding_verified"],
+            "process_start_ticks": candidate["start_ticks"], "root_event": candidate["root_event"],
+            "source_events": candidate["source_events"], "hash_status": candidate["hash_status"],
+            "reference_sha256": candidate["reference_sha256"],
+            "read_return_sha256": candidate["read_return_bytes_sha256"]}
+    return native
+
+
+def _normal_validity(values):
+    from guard.adapters.vllm_file_read_sensor import fingerprint
+    from .rank_failure_contract import stamp
+
+    if (type(values) is not dict or set(values) != _NORMAL_BINDING_KEYS
+            or any(not fingerprint(values[key]) for key in _NORMAL_BINDING_KEYS if key.endswith("_sha256"))):
+        raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
+    start, end = stamp(values["supply_validity_start"]), stamp(values["supply_validity_end"])
+    if not 0 < (end - start).total_seconds() <= 3600:
+        raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
+    return start, end
+
+
+def _approved_reference(path, expected_sha256, env, target, prepared):
+    from guard.adapters import vllm_file_read_sensor as sensor
+    from guard.collectors.model_manifest import _load_manifest
+    from guard.collectors.model_read_scope import validate_binding
+
+    validate_binding(prepared, env, target)
+    raw = sensor.dependency(path, expected_sha256)
+    manifest = _load_manifest(strict_json(raw, limit=sensor.MAX_SCOPE_BYTES), None)
+    if (manifest.get("schema") != "guard.model-manifest/1" or manifest.get("model_id") != env.model.id
+            or manifest["inventory_sha256"] != env.model.inventory_sha256):
+        raise ValueError("SUPPLY_BOOT_NORMAL_REFERENCE_MISMATCH")
+    files = []
+    for row in manifest["files"]:
+        if not row["path"].endswith(".safetensors"):
+            continue
+        if (row["path"] != PurePosixPath(row["path"]).as_posix() or "\x00" in row["path"]
+                or type(row["bytes"]) is not int or not 0 < row["bytes"] <= sensor.MAX_HASH_BYTES):
+            raise ValueError("SUPPLY_BOOT_NORMAL_REFERENCE_MISMATCH")
+        files.append({"normalized_path_sha256": sha256_hex(str(PurePosixPath(_MODEL_ROOT) / row["path"]).encode()),
+                      "reference_sha256": row["sha256"], "bytes": row["bytes"]})
+    scope = prepared["model_read_scope"]
+    if (not files or scope["files"] != files or scope["manifest_bytes_sha256"] != expected_sha256
+            or scope["nonsecret_model_weights"] is not True or scope["hash_model_bytes"] is not True
+            or scope["max_hash_bytes"] < max(row["bytes"] for row in files)
+            or scope["data_origin"] != ("EXAMPLE" if env.data_origin == DataOrigin.EXAMPLE else "DECLARED")):
+        raise ValueError("SUPPLY_BOOT_NORMAL_REFERENCE_MISMATCH")
+
+
+def _model_mount(snapshot):
+    spec = snapshot["pod"]["spec"]
+    container, = spec["containers"]
+    mount, = [row for row in container["volumeMounts"] if row.get("mountPath") == _MODEL_ROOT]
+    if mount.get("readOnly") is not True or any(mount.get(key) for key in ("subPath", "subPathExpr", "mountPropagation")):
+        raise ValueError("SUPPLY_BOOT_NORMAL_MODEL_MOUNT_UNVERIFIED")
+    volume, = [row for row in spec["volumes"] if row["name"] == mount["name"]]
+    return mount, volume
 
 
 class SupplyBootReader(KubernetesLifecycleReader):
@@ -40,15 +113,31 @@ class KubernetesSupplyBootExecutor:
 
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         self.cfg, self.runner, self.expected_target = cfg, runner, expected_target_sha256
+        if cfg.get(NORMAL_FILE_READS_OPTION) is True:
+            self.version = "0.1.0+k8s-normal-model-file-reads"
 
     def validate_policy(self, check, values):
         if check.id not in contract.CHECK_PROFILES or getattr(check, "collection_profile", None) != contract.CHECK_PROFILES[check.id]:
             raise ValueError("SUPPLY_BOOT_PROFILE_UNSUPPORTED")
+        if NORMAL_FILE_READS_OPTION in self.cfg:
+            self.validate_configuration(check)
+            _normal_validity(values)
+            return
         contract.normalize_policy(check.id, values)
         if check.id == "SUP-05" and any(
                 values[f"supply_normal_{kind}_sha256"] == values[f"supply_challenge_{kind}_sha256"]
                 for kind in ("target", "prepared")):
             raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
+
+    def validate_configuration(self, check):
+        if NORMAL_FILE_READS_OPTION not in self.cfg:
+            return
+        section = self.cfg.get("normal")
+        if (self.cfg[NORMAL_FILE_READS_OPTION] is not True or check.id != "SUP-05" or check.executor != self.name
+                or set(self.cfg) - ((CONFIG_KEYS - {"challenge"}) | {NORMAL_FILE_READS_OPTION})
+                or type(section) is not dict or set(section) != {"target", "prepared", "reference_manifest"}
+                or any(type(path) is not str or not path for path in section.values())):
+            raise ValueError("SUPPLY_BOOT_NORMAL_CONFIGURATION_INVALID")
 
     def keys(self):
         return {}
@@ -114,7 +203,7 @@ class KubernetesSupplyBootExecutor:
             packet = contract.validate_record(strict_json(raw, limit=MAX_BYTES), check_id=check.id, role=role,
                 environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
                 source_sha256=values["supply_record_source_sha256"])
-            if check.id == "LIF-01" and provenance["owner_binding_verified"] is not True:
+            if check.id in {"LIF-01", "SUP-15"} and provenance["owner_binding_verified"] is not True:
                 raise ValueError("SUPPLY_BOOT_RECORD_OWNER_UNVERIFIED")
             row.update(collected=True, record_sha256=provenance["capture_sha256"],
                        owner_binding_verified=provenance["owner_binding_verified"])
@@ -134,20 +223,11 @@ class KubernetesSupplyBootExecutor:
                     owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)
                 row["native_files_covered"] = captured["recorded_files_covered"]
                 analysis = native_model_file_reads.analyze(captured, prepared)
-                native = contract.native_consumption(analysis)
                 if check.id == "SUP-05":
-                    native["source_binding"] = {"session": prepared["session"], "target_sha256": digest,
-                        "prepared_sha256": values[f"supply_{role}_prepared_sha256"],
-                        "declared_scope": analysis["declared_scope"]}
-                    for projection, candidate in zip(native["rows"], analysis["candidates"], strict=True):
-                        source = captured["recordings"][candidate["recording"]]["capture"]["provenance"]
-                        projection["source_binding"] = {"recording_sha256": source["capture_sha256"],
-                            "recording_owner_binding_verified": source["owner_binding_verified"],
-                            "process_start_ticks": candidate["start_ticks"], "root_event": candidate["root_event"],
-                            "source_events": candidate["source_events"], "hash_status": candidate["hash_status"],
-                            "reference_sha256": candidate["reference_sha256"],
-                            "read_return_sha256": candidate["read_return_bytes_sha256"]}
-                result["native"] = native
+                    result["native"] = _read_projection(captured, prepared, digest,
+                                                        values[f"supply_{role}_prepared_sha256"], analysis)
+                else:
+                    result["native"] = contract.native_consumption(analysis)
             except Exception:
                 row["diagnostic_codes"].append("SUPPLY_BOOT_NATIVE_UNAVAILABLE")
         try:
@@ -162,6 +242,8 @@ class KubernetesSupplyBootExecutor:
     def run(self, check, env, policy_values, adapter, workdir):
         started = utcnow()
         self.validate_policy(check, policy_values)
+        if NORMAL_FILE_READS_OPTION in self.cfg:
+            return self._run_normal_read(check, env, policy_values, workdir, started)
         if set(self.cfg) - CONFIG_KEYS or set(contract.ROLES) - set(self.cfg):
             raise ValueError("SUPPLY_BOOT_CONFIGURATION_INVALID")
         if env.ref().sha256 != policy_values["supply_environment_sha256"]:
@@ -179,6 +261,97 @@ class KubernetesSupplyBootExecutor:
         else:
             collected = {role: self._collect_role(check, env, policy_values, role) for role in contract.ROLES}
         return self._draft(check, env, policy_values, workdir, started, collected)
+
+    def _run_normal_read(self, check, env, values, workdir, started):
+        from guard.adapters import vllm_file_read_sensor as sensor
+        from guard.adapters.vllm_runner_capture import profile as reviewed_release
+        from guard.collectors import native_model_file_reads
+        from guard.collectors.lifecycle import load_prepared
+        from .supply_boot_artifacts import persist
+
+        start, end = _normal_validity(values)
+        if not start <= started <= end or env.ref().sha256 != values["supply_environment_sha256"]:
+            raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
+        section = self.cfg["normal"]
+        with Path(section["target"]).open("rb") as stream:
+            target = strict_json(stream.read(65537), limit=65536)
+        prepared = load_prepared(section["prepared"])
+        target_sha256 = sha256_hex(canonical_json(target))
+        prepared_sha256 = sha256_hex(canonical_json(prepared))
+        release = reviewed_release(env.engine.version)
+        if (prepared["profile"] != sensor.PROFILE or release is None or prepared["public_commit"] != release.source_commit
+                or env.engine.source_commit not in (None, release.source_commit)
+                or target_sha256 != values["supply_normal_target_sha256"]
+                or prepared_sha256 != values["supply_normal_prepared_sha256"]
+                or self.expected_target is not None and self.expected_target != target_sha256):
+            raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
+        _approved_reference(section["reference_manifest"], values[_REFERENCE_KEY], env, target, prepared)
+        reader = KubernetesLifecycleReader(target, env, prepared, runner=self.runner,
+                                            binary=self.cfg.get("kubectl_binary", "kubectl"),
+                                            duration=self.cfg.get("max_duration_seconds", 120))
+        engine = reader.binding["engine"]
+        native = None
+        cleanup = []
+        gap = "SUPPLY_BOOT_NORMAL_SEALED_CAPTURE_UNAVAILABLE"
+        try:
+            mount = _model_mount(reader.snapshot())
+            captured = capture_session(reader, target, container=engine["container"], image=engine["image"], prepared=prepared,
+                owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)
+            if (captured["session"] != prepared["session"] or not captured["recorded_files_covered"]
+                    or any(captured[key]["metadata"]["sealed"] is not True for key in ("before", "after"))
+                    or _model_mount(reader.snapshot()) != mount):
+                raise ValueError(gap)
+            analysis = native_model_file_reads.analyze(captured, prepared)
+            analysis["candidates"] = [row for row in analysis["candidates"] if (
+                row["declared_reference_comparison_observed"] and row["recording_closed"]
+                and row["path_fd_metadata_match_observed"] and row["close_observed"]
+                and captured["recordings"][row["recording"]]["capture"]["provenance"]["owner_binding_verified"] is True
+            )]
+            if analysis["candidates"]:
+                native = _read_projection(captured, prepared, target_sha256, prepared_sha256, analysis)
+                gap = None
+            else:
+                gap = "SUPPLY_BOOT_NORMAL_OWNED_READ_UNAVAILABLE"
+        except (KeyError, TypeError, ValueError, OSError, RuntimeError, IndexError):
+            pass
+        try:
+            report = reader.report()
+            if report.get("parent_cleanup_unverified"):
+                cleanup.append("SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED")
+            elif report["collection_gap"]:
+                cleanup.append("SUPPLY_BOOT_NORMAL_CAPTURE_INCOMPLETE")
+        except (KeyError, TypeError, ValueError, OSError, RuntimeError):
+            cleanup.append("SUPPLY_BOOT_READER_REPORT_UNAVAILABLE")
+        session = {"role": "normal", "session": prepared["session"], "owner_bound_records": native is not None,
+                   "target_sha256": target_sha256, "prepared_sha256": prepared_sha256,
+                   "approved_reference_manifest_sha256": values[_REFERENCE_KEY], "producer_authenticated": False}
+        missing = ["normal_serving_control_unobserved", "change_and_enforcement_unobserved", "producer_authentication_unavailable"]
+        missing.extend(native["missing"] if native is not None else [gap])
+        rows = [{"role": "normal", **native}] if native is not None else []
+        summary = {"profile": NORMAL_FILE_READS_PROFILE, "sessions": [session], "native": rows, "gap": gap,
+                   "missing": sorted(set(missing + cleanup))}
+        artifacts, errors = persist(workdir, summary, {"normal": {}, "challenge": {}}, f"{self.name}/{self.version}")
+        observed = {"supply_boot_sessions": [session], "supply_boot_missing": sorted(set(missing + cleanup + errors)),
+                    "supply_boot_complete": False, "supply_boot_normal_verified": False,
+                    "supply_boot_change_applied": False, "supply_boot_record_authenticated": False}
+        observations = {key: {"value": value, "collected": True} for key, value in observed.items()}
+        observations["supply_boot_native_consumption"] = {"value": rows or None, "collected": bool(rows)}
+        observations["supply_boot_violations"] = observations["supply_boot_change"] = {"value": None, "collected": False}
+        origin = DataOrigin.EXAMPLE if self.runner is not None or env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
+        settings = {"profile": NORMAL_FILE_READS_PROFILE, "model_root": _MODEL_ROOT}
+        return EvidenceDraft(
+            status=ExecStatus.ABORTED if gap or cleanup or errors else ExecStatus.COMPLETED, data_origin=origin,
+            normal_control={"attempted": False, "succeeded": None, "detail": "Existing startup file reads only."},
+            challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
+            observations=observations, artifacts=artifacts, started_at=started, finished_at=utcnow(),
+            abort_reason="; ".join(([gap] if gap else []) + cleanup + errors) or None, cleanup_errors=cleanup + errors,
+            comparability={"fixture_sha256": sha256_hex(canonical_json(settings)),
+                           "config_sha256": sha256_hex(canonical_json({"model_root": _MODEL_ROOT, "strategy": "eager"})),
+                           "model_inventory_sha256": env.model.inventory_sha256, "gpu": env.runtime.gpu_model,
+                           "driver": env.runtime.driver, "cpu": env.runtime.cpu},
+            config={**settings, NORMAL_FILE_READS_OPTION: True, "target_sha256": target_sha256,
+                    "prepared_sha256": prepared_sha256, "reference_manifest_sha256": values[_REFERENCE_KEY]},
+        )
 
     def _project(self, check, collected):
         normal, challenge = collected["normal"], collected["challenge"]

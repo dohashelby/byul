@@ -542,32 +542,50 @@ def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
 
 def _record_declarations(tmp_path, record_access_context, check_id, damage=None):
     from guard.executors import credential_copy_contract as copy
+    from guard.executors.observation_contract import MANDATORY_FIELDS
+    from guard.executors.retry_record_contract import DECISION_KEY as RETRY_DECISION_KEY
     from guard.models import canonical_json, sha256_hex
     from tests.builders import environment, policy
     from tests.test_a1_credential_copy_contract import example as copy_example
+    from tests.test_a1_retry_record_contract import example as retry_example
     from tests.test_kubernetes_request_binding import target as http_target
     from tools.mvp_versions import versions
 
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
     check = pack.checks[check_id]
     record_access = check_id == 'OBS-06'
+    retry_records = check_id == 'LIF-12'
     values = {}
-    if not record_access:
+    if check_id == 'PLT-12':
         inventory, copy_values, _, _ = copy_example()
         values = {copy.DECISION_KEY: copy.treatments(inventory),
                   'copy_max_record_delay_ms': copy_values['copy_max_record_delay_ms']}
         inventory['policy_sha256'] = sha256_hex(canonical_json(values))
+    elif check_id == 'OBS-01':
+        values = {'observation_required_events': ['ACCESS_ALLOWED'],
+                  'observation_required_fields': sorted(MANDATORY_FIELDS), 'observation_max_delay_ms': 300000}
+    elif retry_records:
+        retry_scope, retry_values, _, _ = retry_example()
+        values = {key: retry_values[key] for key in ('retry_policy_mode', 'retry_max_record_delay_ms')}
+        values[RETRY_DECISION_KEY] = retry_scope['limits']
     pol = policy(pack.ref(), scope={'include': [check_id]}, values={check_id: values})
     cfg = {'adapter': {'name': 'vllm'}, 'executors': {check.executor: 'kubernetes'},
            'update': {'allowed_checks': [check_id]}, 'sides': {}}
     envs, env_paths = [], {}
     for number, (side, row) in enumerate(versions().items(), start=1):
-        env = environment(id=f'ENV-RECORD-DECLARATION-{side.upper()}', model={'id': 'EXAMPLE', 'revision': 'r1'},
+        model = {'id': 'EXAMPLE', 'revision': 'r1'}
+        if retry_records:
+            model['inventory_sha256'] = retry_scope['model_inventory_sha256']
+        env = environment(id=f'ENV-RECORD-DECLARATION-{side.upper()}', model=model,
             engine={'name': row['engine'], 'version': row['version'], 'image_digest': row['image']},
             runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE', 'driver': 'EXAMPLE'})
         ref = env.ref().model_dump(mode='json')
         target_path = tmp_path / f'{side}-target.json'
         settings = {'target': str(target_path)}
+        producer = tmp_path / f'{side}-producer-identity.txt'
+        producer.write_text('' if side == 'candidate' and damage == 'empty_producer'
+                            else f'EXAMPLE producer identity for {side}\n', encoding='utf-8')
+        run_cfg = {'record_session': f'{number:032x}', 'record_producer': str(producer)}
         if record_access:
             target = deepcopy(record_access_context.target)
             target['environment_ref'] = ref
@@ -582,21 +600,29 @@ def _record_declarations(tmp_path, record_access_context, check_id, damage=None)
             settings['subjects'] = str(subjects_path)
         else:
             target = http_target(env)
-            target.update(lab=False, observed_version=row['version'])
+            target.update(lab=retry_records, observed_version=row['version'])
             target['engine']['image_digest'] = row['image']
             target['kubernetes']['engine'].update(image=row['image'], image_id=row['image'])
             if side == 'candidate' and damage == 'model':
                 target['model_mapping']['revision'] = 'EXAMPLE-foreign-revision'
-            inventory_path = tmp_path / f'{side}-inventory.json'
-            inventory_path.write_bytes(canonical_json(inventory))
-            settings.update(copy_inventory=str(inventory_path), copy_record_snapshot_only=True)
+            if check_id == 'PLT-12':
+                inventory_path = tmp_path / f'{side}-inventory.json'
+                inventory_path.write_bytes(canonical_json(inventory))
+                settings.update(copy_inventory=str(inventory_path), copy_record_snapshot_only=True)
+            elif check_id == 'OBS-01':
+                settings['record_snapshot_only'] = True
+                run_cfg['test_actors'] = {'allowed': 'd'*64, 'denied': 'e'*64}
+            elif retry_records:
+                scope = {**retry_scope, 'run_id': target['kubernetes']['run_id'], 'model_revision': env.model.revision,
+                         'image_digest': row['image'].rsplit('@', 1)[1], 'policy_sha256': sha256_hex(canonical_json(values)),
+                         'producer_source_sha256': sha256_hex(producer.read_bytes())}
+                if side == 'candidate' and damage == 'scope':
+                    scope['run_id'] = 'example-other-run'
+                scope_path = tmp_path / f'{side}-retry-scope.json'
+                scope_path.write_bytes(canonical_json(scope))
+                settings.update(retry_scope=str(scope_path), prepared=str(tmp_path / 'unused-legacy-prepared.json'))
         target_path.write_bytes(canonical_json(target))
-        producer = tmp_path / f'{side}-producer-identity.txt'
-        producer.write_text('' if side == 'candidate' and damage == 'empty_producer'
-                            else f'EXAMPLE producer identity for {side}\n', encoding='utf-8')
-        cfg['sides'][side] = {check.executor: settings, 'run_binding': {check_id: {
-            'record_session': f'{number:032x}', 'record_producer': str(producer),
-        }}}
+        cfg['sides'][side] = {check.executor: settings, 'run_binding': {check_id: run_cfg}}
         env_path = tmp_path / f'{side}-env.json'
         env_path.write_bytes(canonical_json(env.to_dict()))
         envs.append(env)
@@ -609,6 +635,11 @@ def _no_record_collection(*args, **kwargs):
 
 
 @pytest.mark.parametrize(('check_id', 'damage', 'reason'), [
+    ('OBS-01', None, None),
+    ('OBS-01', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('LIF-12', None, None),
+    ('LIF-12', 'scope', 'RETRY_CONFIGURATION_INVALID'),
+    ('LIF-12', 'scope_changed', 'MVP_INPUT_FILE_CHANGED'),
     ('OBS-06', None, None),
     ('OBS-06', 'policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
     ('OBS-06', 'producer_changed', 'MVP_INPUT_FILE_CHANGED'),
@@ -620,13 +651,16 @@ def _no_record_collection(*args, **kwargs):
 def test_record_declarations_match_runtime_input_contracts(
         tmp_path, monkeypatch, record_access_context, check_id, damage, reason):
     from guard import application
+    from guard.executors.http_common import HttpCheckExecutor
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
     from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
+    from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
     from guard.models import canonical_json, sha256_hex
     from tools.j02_run_config import write_config
 
     monkeypatch.setattr(socket, 'socket', _no_record_collection)
     monkeypatch.setattr(subprocess, 'Popen', _no_record_collection)
+    monkeypatch.setattr(HttpCheckExecutor, 'keys', _no_record_collection)
     pack, envs, pol, cfg, env_paths = _record_declarations(tmp_path, record_access_context, check_id, damage)
     ready = application.update_readiness(pack, envs, pol, cfg)
     inputs = next(row for row in ready['checks'] if row['check'] == 'inputs')
@@ -638,6 +672,9 @@ def test_record_declarations_match_runtime_input_contracts(
         if check_id == 'OBS-06':
             executor, method = KubernetesRecordAccessExecutor, 'prepared_record_access'
             candidate_file = tmp_path / 'candidate-producer-identity.txt'
+        elif check_id == 'LIF-12':
+            executor, method = KubernetesRequestTerminationExecutor, 'prepared_retry_records'
+            candidate_file = tmp_path / 'candidate-retry-scope.json'
         else:
             executor, method = KubernetesRequiredEventExecutor, 'prepared_copy_record_snapshot'
             candidate_file = tmp_path / 'candidate-inventory.json'

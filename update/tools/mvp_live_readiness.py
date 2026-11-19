@@ -218,13 +218,27 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     cfg = config.get(check.executor, {})
     gateway_snapshot = check.id == 'OBS-01' and cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True
     external_kubernetes = implementation == 'kubernetes' and requested_update.get('mode', 'external') == 'external'
+    prebound_kubernetes = (external_kubernetes
+                           and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
+    prebound_record_stages = prebound_kubernetes and run_binding.stages_for(check) == (1, 2, 3, 4)
     record_access = external_kubernetes and run_binding.is_record_access_binding(check)
-    copy_snapshot = (external_kubernetes and check.id == 'PLT-12' and check.executor == 'required_event_record'
-                     and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['PLT-12']) is True
-                     and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
-                     and run_binding.stages_for(check) == (1, 2, 3, 4))
-    if gateway_snapshot or copy_snapshot:
+    record_snapshot = (prebound_record_stages and check.id == 'OBS-01' and check.executor == 'required_event_record'
+                       and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-01']) is True
+                       and GATEWAY_RECORD_SNAPSHOT_OPTION not in cfg and KUBERNETES_BOUND_CHECK_OPTIONS['PLT-12'] not in cfg)
+    copy_snapshot = (prebound_record_stages and check.id == 'PLT-12' and check.executor == 'required_event_record'
+                     and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['PLT-12']) is True)
+    retry_records = (prebound_record_stages and check.id == 'LIF-12' and check.executor == 'request_termination'
+                     and not config.get('lab_activation'))
+    if gateway_snapshot or record_snapshot or copy_snapshot:
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
+    record_source_key = None
+    if record_access or record_snapshot or copy_snapshot or retry_records:
+        record_source_key = {
+            'OBS-01': 'observation_expected_source_sha256',
+            'OBS-06': 'record_inventory_source_sha256',
+            'PLT-12': 'copy_record_source_sha256',
+            'LIF-12': 'retry_record_source_sha256',
+        }[check.id]
     normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
     supply_record_binding = (implementation == 'kubernetes' and run_binding.is_supply_record_binding(check)
                              and requested_update.get('mode', 'external') == 'external'
@@ -283,15 +297,17 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if gateway_snapshot:
             _scoped_target_sha256(raw_target, env, gateway_snapshot=True, scoped_check=check.id)
         bound_files.append((target, raw_target, identity))
-    if record_access or copy_snapshot:
-        path = cfg['subjects' if record_access else 'copy_inventory']
+    if record_access or copy_snapshot or retry_records:
+        scope_key, digest_key = {
+            'OBS-06': ('subjects', 'record_subject_plan_sha256'),
+            'PLT-12': ('copy_inventory', 'copy_inventory_sha256'),
+            'LIF-12': ('retry_scope', 'retry_scope_sha256'),
+        }[check.id]
+        path = cfg[scope_key]
         raw, identity = _read(path)
         bound_files.append((path, raw, identity))
-        if record_access:
-            record_digests['record_subject_plan_sha256'] = sha256_hex(
-                canonical_json(strict_json(raw, limit=262144)))
-        else:
-            record_digests['copy_inventory_sha256'] = sha256_hex(raw)
+        digest_bytes = canonical_json(strict_json(raw, limit=262144)) if record_access else raw
+        record_digests[digest_key] = sha256_hex(digest_bytes)
     if normal_file_reads:
         binding_options['expected_target_sha256'] = _scoped_target_sha256(raw_target, env, scoped_check=check.id)
         normal_hashes = {}
@@ -367,12 +383,11 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         binding = None  # The source evidence belongs to a future run attempt.
     else:
         run_cfg = run_binding.run_config(config, check.id)
-        if record_digests and type(run_cfg) is dict and set(run_cfg) == run_binding.config_keys(check):
+        if record_source_key is not None and type(run_cfg) is dict and set(run_cfg) == run_binding.config_keys(check):
             path = run_cfg['record_producer']
             raw, identity = _read(path, min_bytes=0, max_bytes=run_binding._MAX_PRODUCER_BYTES)
             record_source_file = (path, raw, identity)
-            key = 'record_inventory_source_sha256' if record_access else 'copy_record_source_sha256'
-            record_digests[key] = sha256_hex(raw)
+            record_digests[record_source_key] = sha256_hex(raw)
         if supply_record_binding and type(run_cfg) is dict and 'record_producer' in run_cfg:
             producer = run_binding.producer_sha256(run_cfg['record_producer'])
             binding_options['expected_supply_record_digests'] = {**prepared_raw_digests, 'record_producer': producer}
@@ -415,14 +430,18 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if collection_status:
             executor.prepared_collection_status(check, env, effective,
                                                 expected_target_sha256=sha256_hex(canonical_json(target_data)))
-        if record_access or copy_snapshot:
+        if record_source_key is not None:
             if any(effective[key] != digest for key, digest in record_digests.items()):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             expected = sha256_hex(canonical_json(target_data))
             if record_access:
                 executor.prepared_record_access(check, env, effective, expected_target_sha256=expected)
-            else:
+            elif copy_snapshot:
                 executor.prepared_copy_record_snapshot(check, env, effective, expected_target_sha256=expected)
+            elif record_snapshot:
+                executor.prepared_record_snapshot(check, env, effective, expected_target_sha256=expected)
+            else:
+                executor.prepared_retry_records(check, env, effective, expected_target_sha256=expected)
         if local_metadata:
             expected = sha256_hex(canonical_json(target_data))
             if check.id == 'OBS-04':

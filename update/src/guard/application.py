@@ -601,6 +601,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
     from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
+    from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
     from guard.executors.kubernetes_response_content import KubernetesResponseContentExecutor
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
     from guard.executors.lifecycle_transition import (LifecycleTransitionExecutor, REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE,
@@ -624,6 +625,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     transition_requested = False
     generation_preflight = set()
     try:
+        prebound = cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"
         allowed_checks = None if single else update_allowed_checks(cfg, pack)
         execution_config = _update_config_for_execution(pack, cfg, allowed_checks)
         if not single and cfg.get("update", {}).get("mode", "external") == "external":
@@ -750,11 +752,15 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         elif item.check_id == "PLT-06":
                             executor.prepared_worker_trust(check_def, selected_env, values,
                                                            expected_target_sha256=expected_target)
-                        elif (item.check_id == "PLT-12" and isinstance(executor, KubernetesRequiredEventExecutor)
-                              and run_binding.stages_for(check_def) == (1, 2, 3, 4)
-                              and cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"):
-                            executor.prepared_copy_record_snapshot(check_def, selected_env, values,
-                                                                   expected_target_sha256=expected_target)
+                        elif (prebound and isinstance(executor, KubernetesRequiredEventExecutor)
+                              and run_binding.stages_for(check_def) == (1, 2, 3, 4)):
+                            if item.check_id == "PLT-12":
+                                executor.prepared_copy_record_snapshot(check_def, selected_env, values,
+                                                                       expected_target_sha256=expected_target)
+                            elif (item.check_id == "OBS-01" and GATEWAY_RECORD_SNAPSHOT_OPTION not in settings
+                                  and KUBERNETES_BOUND_CHECK_OPTIONS["PLT-12"] not in settings):
+                                executor.prepared_record_snapshot(check_def, selected_env, values,
+                                                                  expected_target_sha256=expected_target)
                     if paired_supply_roles and isinstance(executor, KubernetesSupplyBootExecutor):
                         executor.prepared_supply_roles(check_def, selected_env, values)
                     if (kube and item.check_id in run_binding.INITIALIZATION_CHECKS
@@ -767,6 +773,11 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     if (kube and isinstance(executor, KubernetesRecordAccessExecutor)
                             and run_binding.is_record_access_binding(check_def)):
                         executor.prepared_record_access(check_def, selected_env, values)
+                    if (kube and prebound and item.check_id == "LIF-12" and not c.get("lab_activation")
+                            and isinstance(executor, KubernetesRequestTerminationExecutor)
+                            and run_binding.stages_for(check_def) == (1, 2, 3, 4)):
+                        executor.prepared_retry_records(check_def, selected_env, values)
+                        continue  # The validated record reader has no role keys.
                     if (kube and isinstance(executor, LifecycleTransitionExecutor)
                             and run_binding.is_lifecycle_generation_binding(check_def)):
                         generation_preflight.add(item.check_id)

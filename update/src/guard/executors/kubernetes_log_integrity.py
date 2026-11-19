@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+from copy import copy
 from datetime import datetime
 import hashlib
 import json
@@ -22,14 +23,60 @@ from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json
 from guard.runtime.kubernetes_http import LOG_INTEGRITY_PROFILE, KubernetesBindingError, KubernetesHTTP
 from . import log_collection_gap
 from .http_common import Ctx
+from .kubernetes_lifecycle_capture import KubernetesCaptureError, KubernetesLifecycleReader
 from .log_integrity import _ENV, LogIntegrityExecutor, _pinned_image
 from .log_integrity_parser import MAX_CAPTURE_BYTES
+from .owned_capture import EXTENDED_RECORDING_PROFILE, _FILE_READER, strict_json
 
 _SETTINGS = {"target", "kubectl_binary", "request_timeout", "max_duration_seconds", "max_total_requests",
              "max_id_bytes", "max_events", "endpoint"}
 _STAMP = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})) ")
 ATTACH_SETTLE_SECONDS = 1.0
 SOURCE_PROFILE = "kubernetes-cri-time-attach-bytes-v1"
+_STATUS_CAP = 512 * 1024
+
+
+class _CollectionStatusReader(KubernetesLifecycleReader):
+    def __init__(self, transport, target, session):
+        if (transport.profile != LOG_INTEGRITY_PROFILE or transport.target_sha256 != sha256_hex(canonical_json(target))):
+            raise KubernetesCaptureError()
+        binding = {"context": transport.binding["context"], "run_id": transport.binding["run_id"],
+                   "engine": transport.binding["probe"]}
+        self._initialize(binding, target, {"session": session}, binary=transport.binary, duration=30,
+                         runner=transport.runner)
+        self.transport = transport
+        self.deadline = min(self.deadline, transport.deadline)
+        self.file_read_limit = _STATUS_CAP
+        self.file_read_profile = EXTENDED_RECORDING_PROFILE
+        self.path = f"/guard-collection/data/{self.session}/collection-status.json"
+
+    def _owner(self, timeout):
+        # Reuse the original engine/probe binding checks under this read's budget.
+        # The shallow copy keeps the same transport runner, lock and cleanup list.
+        transport = copy(self.transport)
+        transport.deadline = min(transport.deadline, transport.clock() + timeout)
+        transport._verify()
+        return self.binding["engine"]
+
+    def _program(self, container, argv, max_bytes):
+        if (container != self.binding["engine"]["container"] or max_bytes != _STATUS_CAP * 2
+                or argv != ["python3", "-c", _FILE_READER, self.path, str(_STATUS_CAP)]):
+            raise KubernetesCaptureError()
+        return "file"
+
+
+def _read_collection_status(ctx, session):
+    reader = _CollectionStatusReader(ctx.cprobe, ctx._collection_target, session)
+    role = reader.binding["engine"]
+    try:
+        raw, proof = reader.read_file(reader, ctx._collection_target, container=role["container"], image=role["image"],
+                                     path=reader.path, max_bytes=_STATUS_CAP)
+        if proof.get("owner_binding_verified") is not True or reader.gap:
+            raise KubernetesCaptureError()
+        return strict_json(raw, limit=_STATUS_CAP), proof["capture_sha256"]
+    finally:
+        if reader.report().get("parent_cleanup_unverified"):
+            ctx._collection_status_cleanup.append("COLLECTION_STATUS_PARENT_CLEANUP_UNVERIFIED")
 
 
 def align_attach(lines, attach_raw):
@@ -107,15 +154,20 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         ctx = Ctx(check=check, env=env, adapter=adapter, target=view, policy_values=policy_values,
                   timeout=float(self.cfg.get("request_timeout", 30)), allow_mutating=False, keys={}, secrets=[],
                   cprobe=transport, workdir=workdir, started=utcnow())
+        status_profile = getattr(check, "collection_profile", None) == log_collection_gap.PROFILE
+        if status_profile:
+            ctx._collection_target = target
+            ctx._collection_status_cleanup = []
         draft = self._finish(ctx)
         draft.cleanup_errors.extend(transport.report()["cleanup_errors"])
         if transport.injected:
             draft.data_origin = DataOrigin.EXAMPLE
-        if (getattr(check, "collection_profile", None) == log_collection_gap.PROFILE
-                and (not ctx._collection_status_available or draft.cleanup_errors)):
-            draft.status = ExecStatus.ABORTED
-            draft.abort_reason = draft.abort_reason or "COLLECTION_STATUS_UNAVAILABLE"
-            draft.data_origin = min(draft.data_origin, DataOrigin.DECLARED, key=ORIGIN_STRENGTH.get)
+        if status_profile:
+            draft.cleanup_errors.extend(ctx._collection_status_cleanup)
+            if not ctx._collection_status_available or draft.cleanup_errors:
+                draft.status = ExecStatus.ABORTED
+                draft.abort_reason = draft.abort_reason or "COLLECTION_STATUS_UNAVAILABLE"
+                draft.data_origin = min(draft.data_origin, DataOrigin.DECLARED, key=ORIGIN_STRENGTH.get)
         return draft
 
     def _snapshot(self, ctx, launch, deadline):
@@ -225,9 +277,8 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         values = ctx.policy_values
         packet, file_sha256, diagnostics, result = None, None, [], None
         try:
-            read = ctx.cprobe.read_collection_status(values["collection_session"])
-            file_sha256 = read["sha256"]
-            packet = log_collection_gap.validate_record(read["document"], environment_ref=ctx.env.ref().model_dump(mode="json"),
+            document, file_sha256 = _read_collection_status(ctx, values["collection_session"])
+            packet = log_collection_gap.validate_record(document, environment_ref=ctx.env.ref().model_dump(mode="json"),
                                                         session=values["collection_session"])
             result = log_collection_gap.evaluate(packet, values)
         except Exception:

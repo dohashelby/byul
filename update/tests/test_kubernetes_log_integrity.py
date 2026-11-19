@@ -4,17 +4,23 @@ kubectl은 부르지 않는다. 엔진 응답과 vLLM 원 형식 로그 줄은 �
 요청은 실제 전송 검증기(_log_integrity_request)를 통과해야 한다.
 """
 from copy import deepcopy
+from contextlib import redirect_stdout
+import io
 import json
+import os
 import re
 import sys
+from time import monotonic
+from types import SimpleNamespace
 
 import pytest
 
 from guard.adapters.vllm import VllmAdapter
 from guard.executors import kubernetes_log_integrity as module
+from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.executors.log_integrity import _ENV
 from guard.executors.registry import EXECUTORS
-from guard.models import Verdict
+from guard.models import Verdict, canonical_json, sha256_hex
 from guard.runtime.kubernetes_http import KubernetesBindingError, KubernetesHTTP
 from pathlib import Path
 
@@ -90,11 +96,6 @@ class Transport:
         return {'stdout_bytes': cri(result.stdout).encode(), 'stderr_bytes': b'', 'returncode': result.returncode,
                 'capture': {'complete': True}}
 
-    def read_collection_status(self, session):
-        if self.status is None:
-            raise KubernetesBindingError()
-        return self.status
-
     def report(self):
         return {'cleanup_errors': []}
 
@@ -105,6 +106,12 @@ def run(tmp_path, monkeypatch, *, changes=None, identity=None, definition=None, 
     path = tmp_path / 'target.json'; path.write_text(json.dumps(data), encoding='utf-8')
     fake = Transport(world, identity=identity, status=status, attach=attach)
     monkeypatch.setattr(module, 'KubernetesHTTP', lambda *a, **k: fake)
+    def read_status(ctx, session):
+        assert ctx.cprobe is fake
+        if status is None:
+            raise KubernetesBindingError()
+        return status['document'], status['sha256']
+    monkeypatch.setattr(module, '_read_collection_status', read_status)
     executor = module.KubernetesLogIntegrityExecutor({'target': str(path), 'request_timeout': 1})
     env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE}, model={'id': 'fixture-model'})
     draft = executor.run(definition or check(), env, deepcopy(VALUES if values is None else values), VllmAdapter(), tmp_path / 'work')
@@ -185,6 +192,79 @@ def test_obs11_unreadable_record_stays_uncollected(tmp_path, monkeypatch):
     assert draft.observations['collection_gap_violations'].collected is False
     assert draft.status.value=='ABORTED' and draft.abort_reason=='COLLECTION_STATUS_UNAVAILABLE'
     assert draft.data_origin.value=='EXAMPLE' and not observer.validated and observer.attached==0
+
+
+@pytest.mark.parametrize('fault', [None, 'duplicate', 'symlink', 'owner-changed', 'file-changed'])
+def test_obs11_bound_reader_parses_only_stable_original_bytes(tmp_path, monkeypatch, fault):
+    session = 'a' * 32
+    selected = tmp_path / 'guard-collection/data'
+    selected.mkdir(parents=True)
+    directory = selected / session
+    if fault == 'symlink':
+        alternate = tmp_path / 'another-owner'
+        alternate.mkdir()
+        directory.symlink_to(alternate, target_is_directory=True)
+    else:
+        directory.mkdir()
+    document = {'schema': 'guard-collection-status/1', 'session': session, 'environment_ref': {},
+                'events': [{'record': 'request', 'event_at_ms': 50, 'arrived_at_ms': 60}]}
+    raw = canonical_json(document)
+    if fault == 'duplicate':
+        raw = raw.replace(b'"arrived_at_ms":60', b'"arrived_at_ms":60,"arrived_at_ms":2000')
+    receipt = directory / 'collection-status.json'
+    receipt.write_bytes(raw)
+    topology = {'lab': False}
+    probe = {'namespace': 'fixture', 'pod': 'fixture-probe', 'container': 'probe', 'image': IMAGE, 'image_id': IMAGE}
+    ownership, calls = [], []
+
+    def runner(argv, **_kwargs):
+        calls.append(argv)
+        assert argv[3:13] == ['--namespace=fixture', 'exec', 'fixture-probe', '--container=probe', '--',
+                              'python3', '-I', '-S', '-B', '-c']
+        assert argv[13] == supervised_source(module._FILE_READER)
+        assert argv[15:] == [f'/guard-collection/data/{session}/collection-status.json', str(module._STATUS_CAP)]
+        original_os_open = os.open
+        original_os_read = os.read
+
+        def sandbox_open(name, *args, **kwargs):
+            return original_os_open(tmp_path if name == '/' else name, *args, **kwargs)
+
+        reads = []
+        def concurrent_write(fd, limit):
+            data = original_os_read(fd, limit)
+            if not reads:
+                receipt.write_bytes(raw + b' ')
+            reads.append(True)
+            return data
+
+        output = io.StringIO()
+        with monkeypatch.context() as patch, redirect_stdout(output):
+            patch.setattr(os, 'open', sandbox_open)
+            if fault == 'file-changed':
+                patch.setattr(os, 'read', concurrent_write)
+            patch.setattr(sys, 'argv', ['reader', *argv[15:]])
+            exec(compile(module._FILE_READER, 'owned file reader', 'exec'), {})
+        return {'returncode': 0, 'stdout_bytes': output.getvalue().encode(),
+                'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
+
+    class BoundTransport(SimpleNamespace):
+        def _verify(self):
+            assert 0 < self.deadline - self.clock() <= 5
+            ownership.append(True)
+            if fault == 'owner-changed' and len(ownership) == 2:
+                raise KubernetesBindingError()
+
+    transport = BoundTransport(profile=module.LOG_INTEGRITY_PROFILE, target_sha256=sha256_hex(canonical_json(topology)),
+        binding={'context': 'fixture', 'run_id': 'fixture-run', 'probe': probe}, binary='kubectl',
+        runner=runner, clock=monotonic, deadline=monotonic() + 30)
+    ctx = SimpleNamespace(cprobe=transport, _collection_target=topology, _collection_status_cleanup=[])
+    if fault:
+        with pytest.raises((ValueError, module.KubernetesCaptureError)):
+            module._read_collection_status(ctx, session)
+    else:
+        assert module._read_collection_status(ctx, session) == (document, sha256_hex(raw))
+    assert len(calls) == 1 and len(ownership) == 2 and not ctx._collection_status_cleanup
+    assert transport.deadline - transport.clock() > 5
 
 
 def test_transport_accepts_only_the_seven_fixed_body_ids():

@@ -104,17 +104,35 @@ class KubernetesNormalServingReadinessExecutor:
             raise ValueError("OBS02_NORMAL_POLICY_INVALID")
         string_list(values, "profiler_required_ranks")
 
+    def _target_transport(self, target, env, *, expected_target_sha256=None):
+        target_sha = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self._expected_target_sha256, expected_target_sha256) if pin is not None]
+        if not pins or any(pin != target_sha for pin in pins):
+            raise ValueError
+        transport = normal_serving_readiness_transport(target, env, duration=self.cfg.get("max_duration_seconds", 12),
+            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner)
+        return target_sha, transport
+
+    def prepared_normal_serving_readiness(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the selected target and effective transport settings without dispatching."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            self._target_transport(target, env, expected_target_sha256=expected_target_sha256)
+        except (KubernetesBindingError, KeyError, OSError, OverflowError, TypeError, ValueError):
+            raise ValueError("OBS02_NORMAL_TARGET_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if adapter is None or target_sha != self._expected_target_sha256:
+            if adapter is None:
                 raise ValueError
-            transport = normal_serving_readiness_transport(target, env, duration=self.cfg.get("max_duration_seconds", 12),
-                binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner)
+            target_sha, transport = self._target_transport(target, env)
         except (KubernetesBindingError, KeyError, OSError, TypeError, ValueError):
             raise ValueError("OBS02_NORMAL_TARGET_UNVERIFIED") from None
 

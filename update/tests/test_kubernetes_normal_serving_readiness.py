@@ -207,3 +207,51 @@ def test_obs02_rejects_unbound_scope_before_transport(tmp_path, fault):
         expected_target_sha256=None if fault == "unbound" else sha256_hex(path.read_bytes()))
     with pytest.raises(ValueError, match="OBS02_NORMAL_(?:SCOPE_INVALID|POLICY_INVALID|TARGET_UNVERIFIED)"):
         executor.run(check, env, values, VllmAdapter(), tmp_path / "work")
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("settings,accepted", [
+    ({}, True),
+    ({"max_duration_seconds": 1.5, "kubectl_binary": "example-kubectl"}, True),
+    ({"max_duration_seconds": 0}, False),
+    ({"max_duration_seconds": True}, False),
+    ({"kubectl_binary": "  "}, False),
+])
+def test_obs02_prepares_effective_settings_without_dispatch(tmp_path, version, settings, accepted):
+    env, target, _, path = normal_sampling_inputs(tmp_path, version)
+    content = canonical_json(target)
+    path.write_bytes(content)
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["OBS-02"]
+
+    def no_remote_calls(*args, **kwargs):
+        pytest.fail("OBS-02 declaration validation must not dispatch")
+
+    executor = KubernetesNormalServingReadinessExecutor({"normal_serving_readiness_only": True,
+        "target": str(path), **settings}, runner=no_remote_calls)
+    digest = sha256_hex(content)
+    if accepted:
+        executor.prepared_normal_serving_readiness(check, env, VALUES, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match="^OBS02_NORMAL_TARGET_UNVERIFIED$"):
+            executor.prepared_normal_serving_readiness(check, env, VALUES, expected_target_sha256=digest)
+
+
+@pytest.mark.parametrize("damage", ["model-mapping", "caller-pin", "executor-pin", "no-pin"])
+def test_obs02_prepares_only_the_selected_target(tmp_path, damage):
+    env, target, _, path = normal_sampling_inputs(tmp_path, "0.31.0")
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["OBS-02"]
+    if damage == "model-mapping":
+        target["model_mapping"]["revision"] = "another-revision"
+    content = canonical_json(target)
+    path.write_bytes(content)
+    digest = sha256_hex(content)
+    wrong = sha256_hex(b"another-owned-target")
+
+    def no_remote_calls(*args, **kwargs):
+        pytest.fail("OBS-02 declaration validation must not dispatch")
+
+    executor = KubernetesNormalServingReadinessExecutor({"normal_serving_readiness_only": True, "target": str(path)},
+        runner=no_remote_calls, expected_target_sha256=wrong if damage == "executor-pin" else None)
+    pin = {"caller-pin": wrong, "no-pin": None}.get(damage, digest)
+    with pytest.raises(ValueError, match="^OBS02_NORMAL_TARGET_UNVERIFIED$"):
+        executor.prepared_normal_serving_readiness(check, env, VALUES, expected_target_sha256=pin)

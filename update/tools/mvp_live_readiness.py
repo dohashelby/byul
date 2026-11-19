@@ -152,9 +152,11 @@ def _generation_manifest_snapshot(cfg, bound_files):
 
 
 def _paired_normal_control_requested(raw):
+    overlays = raw.get('check_config')
     for check_id, executor in (('REQ-10', 'sampling_validation'), ('LIF-04', 'stream_buffer')):
-        settings = for_check(raw, executor, check_id).get(executor)
-        if type(settings) is dict and KUBERNETES_BOUND_CHECK_OPTIONS[check_id] in settings:
+        overlay = overlays.get(check_id) if type(overlays) is dict else None
+        if any(type(settings) is dict and KUBERNETES_BOUND_CHECK_OPTIONS[check_id] in settings
+               for settings in (raw.get(executor), overlay)):
             return True
     return False
 

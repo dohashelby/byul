@@ -66,8 +66,22 @@ def test_supplied_file_hash_mismatch_is_recorded_without_hiding_other_137_sides(
     assert report['blocking_counts']['ACTUAL_INPUT_FILES_MISSING'] == 137
 
 
-def test_example_file_binding_does_not_issue_live_readiness(tmp_path, sources):  # noqa: F811
+@pytest.mark.parametrize(('unused_check', 'unused_executor'), [
+    (None, None), ('LIF-04', 'stream_buffer'), ('REQ-10', 'sampling_validation'),
+])
+def test_example_file_binding_does_not_issue_live_readiness(tmp_path, sources, unused_check, unused_executor):  # noqa: F811
     value = blank();value['inputs'] = sources['inputs']
+    if unused_check:
+        import tomllib
+        from tools.j02_run_config import write_config
+
+        pointer = value['inputs'][0]['configuration']
+        path = Path(pointer['path'])
+        config = tomllib.loads(path.read_text(encoding='utf-8'))
+        config[unused_executor] = 'EXAMPLE-unusable-section'
+        config.setdefault('check_config', {})[unused_check] = {'max_duration_seconds': 120}
+        write_config(config, path)
+        pointer['sha256'] = sha256(path.read_bytes()).hexdigest()
     report = run(tmp_path, value)
     bound = [r for r in report['rows'] if r['file_binding_valid']]
     assert report['file_binding_valid_sides'] == len(bound) == 2

@@ -249,6 +249,18 @@ def test_invalid_scoped_inputs_fail_before_transport(external, monkeypatch, chan
     assert not case.world.calls
 
 
+@pytest.mark.parametrize("option,value", [("max_duration_seconds", 0), ("kubectl_binary", " ")])
+def test_normal_file_read_preparation_rejects_unusable_reader_settings(external, monkeypatch, option, value):
+    case = normal_case(external / "case", monkeypatch)
+    cfg = {**case.cfg, option: value}
+    executor = boot.KubernetesSupplyBootExecutor(cfg, runner=case.runner)
+    with pytest.raises(ValueError, match="^KUBERNETES_CAPTURE_BINDING_UNAVAILABLE$"):
+        executor.normal_file_read_inputs(case.env, case.values)
+    with pytest.raises(ValueError, match="^KUBERNETES_CAPTURE_BINDING_UNAVAILABLE$"):
+        run(case, external / "out", cfg=cfg)
+    assert not case.world.calls
+
+
 def test_other_release_prepared_cannot_use_current_target(external, monkeypatch):
     from guard.adapters import vllm_lifecycle_catalog as catalog
     from guard.adapters.vllm_approved_file_read_composition import PROFILES

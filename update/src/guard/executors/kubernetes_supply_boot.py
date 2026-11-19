@@ -380,7 +380,13 @@ class KubernetesSupplyBootExecutor:
         return self._draft(check, env, policy_values, workdir, started, collected)
 
     def normal_file_read_inputs(self, env, values):
-        """Validate the trusted local files without touching the owned workload."""
+        """Validate the local files and reader settings without contacting the workload."""
+        inputs = self._read_normal_file_inputs(env, values)
+        target, prepared, _, _ = inputs
+        self._normal_reader(target, env, prepared)
+        return inputs
+
+    def _read_normal_file_inputs(self, env, values):
         from guard.adapters import vllm_file_read_sensor as sensor
         from guard.adapters.vllm_runner_capture import profile as reviewed_release
         from guard.collectors.lifecycle import load_prepared
@@ -409,6 +415,11 @@ class KubernetesSupplyBootExecutor:
         _approved_reference(section["reference_manifest"], values[_REFERENCE_KEY], env, target, prepared)
         return target, prepared, target_sha256, prepared_sha256
 
+    def _normal_reader(self, target, env, prepared):
+        return KubernetesLifecycleReader(target, env, prepared, runner=self.runner,
+                                         binary=self.cfg.get("kubectl_binary", "kubectl"),
+                                         duration=self.cfg.get("max_duration_seconds", 120))
+
     def _run_normal_read(self, check, env, values, workdir, started):
         from guard.adapters import vllm_file_read_sensor as sensor
         from .supply_boot_artifacts import persist, persist_normal_file_read_sources
@@ -416,14 +427,12 @@ class KubernetesSupplyBootExecutor:
         start, end = _normal_validity(values)
         if not start <= started <= end:
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
-        target, prepared, target_sha256, prepared_sha256 = self.normal_file_read_inputs(env, values)
+        target, prepared, target_sha256, prepared_sha256 = self._read_normal_file_inputs(env, values)
         if prepared["profile"] == sensor.PROFILE:
             from guard.collectors import native_model_file_reads as model_reads
         else:
             from guard.collectors import approved_model_file_reads as model_reads
-        reader = KubernetesLifecycleReader(target, env, prepared, runner=self.runner,
-                                            binary=self.cfg.get("kubectl_binary", "kubectl"),
-                                            duration=self.cfg.get("max_duration_seconds", 120))
+        reader = self._normal_reader(target, env, prepared)
         engine = reader.binding["engine"]
         native = None
         cleanup = []

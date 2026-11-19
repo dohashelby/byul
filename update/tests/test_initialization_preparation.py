@@ -8,6 +8,8 @@ import pytest
 from guard import application
 from guard.adapters import vllm_initialization_release_sensor as release
 from guard.adapters import vllm_initialization_sensor as legacy
+from guard.adapters import vllm_ready_endpoint_sensor as endpoint, vllm_worker_generation_sensor as generation
+from guard.adapters import vllm_worker_initialization_sensor as joint
 from guard.adapters.vllm_lifecycle_release_sensor import COMMIT
 from guard.adapters.vllm_release_profiles import release_profile
 from guard.collectors.lifecycle import load_initialization_prepared, prepare_assets
@@ -20,6 +22,7 @@ from guard.models import ExecStatus, Side, canonical_json, load_pack, sha256_hex
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import environment, policy
+from tests.test_a1_file_read_sensor import scope_value
 from tests.test_kubernetes_sampling import inputs as owned_target
 from tests.test_lifecycle_capture import REPOSITORY, external  # noqa: F401
 
@@ -115,6 +118,69 @@ def test_public_preparation_checks_exact_release_assets(external, monkeypatch, c
         assert error in inputs['detail']
     assert len(report['check_support']) == 2
     assert all(row['runtime_qualified'] is False for row in report['check_support'])
+
+
+@pytest.mark.parametrize(('side', 'check_id', 'change', 'error'), [
+    ('baseline', 'LIF-09', None, None),
+    ('candidate', 'LIF-07', None, None),
+    ('baseline', 'LIF-09', 'not-owned-lab', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('candidate', 'LIF-07', 'wrong-model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('candidate', 'LIF-09', 'aliased-owner', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('baseline', 'LIF-07', 'other-profile', 'INITIALIZATION_CONFIGURATION_INVALID'),
+    ('candidate', 'LIF-07', generation.PROFILE, 'INITIALIZATION_CONFIGURATION_INVALID'),
+    ('candidate', 'LIF-09', endpoint.PROFILE, 'INITIALIZATION_CONFIGURATION_INVALID'),
+    ('candidate', 'LIF-09', 'scope-mismatch', 'MODEL_READ_SCOPE_TARGET_MISMATCH'),
+])
+def test_executor_prepared_inputs_reuse_run_checks_without_owner_reads(
+        external, tmp_path, monkeypatch, side, check_id, change, error):  # noqa: F811
+    monkeypatch.setattr(subprocess, 'Popen', _forbidden)
+    pack, envs, pol, cfg = _paired_inputs(external, check_id, None)
+    check = pack.checks[check_id]
+    env = envs[side == 'candidate']
+    settings = cfg['sides'][side]['initialization']
+    target_path = Path(settings['target'])
+    target = json.loads(target_path.read_bytes())
+    if change == 'not-owned-lab':
+        target['lab'] = False
+    elif change == 'wrong-model':
+        target['model_mapping']['repository_id'] = 'EXAMPLE-other-model'
+    elif change == 'aliased-owner':
+        target['kubernetes']['probe']['container_id'] = target['kubernetes']['engine']['container_id']
+    target_path.write_bytes(canonical_json(target))
+    if change == 'other-profile':
+        assets = external / 'other-profile'
+        prepare_assets(assets, REPOSITORY)
+        settings['prepared'] = str(assets / 'manifest.json')
+    if change in {generation.PROFILE, endpoint.PROFILE, 'scope-mismatch'}:
+        native = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': True,
+            'run_id': target['kubernetes']['run_id'], 'environment_ref': target['environment_ref'],
+            'kubernetes': {key: target['kubernetes'][key] for key in ('context', 'engine')}}
+        scope = scope_value(external / 'public.safetensors', env=env, target=native)
+        if change == 'scope-mismatch':
+            scope['target_sha256'] = '0' * 64
+        scope_path = _write(external / 'model-scope.json', scope)
+        assets = external / 'model-profile'
+        prepare_assets(assets, REPOSITORY, profile=joint.PROFILE if change == 'scope-mismatch' else change,
+                       model_read_scope=scope_path)
+        settings['prepared'] = str(assets / 'manifest.json')
+    _, values = run_binding.effective_values(check, settings, env, pol.values[check_id], side=side,
+        attempt_id=None, issued_at=utcnow(), run_cfg=cfg['run_binding'][check_id])
+    executor = KubernetesInitializationExecutor(settings, runner=_forbidden)
+    if error is None:
+        bound_target, prepared, transport = executor.prepared_inputs(check, env, values)
+        assert bound_target == target
+        assert prepared['profile'] == (release.PROFILE if side == 'baseline' else legacy.PROFILE)
+        assert transport.binding == target['kubernetes']
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_inputs(check, env, values)
+        if change == 'scope-mismatch':
+            draft = executor.run(check, env, values, object(), tmp_path / 'runtime-gap')
+            assert draft.status is ExecStatus.ABORTED and draft.abort_reason is not None
+            assert 'INITIALIZATION_PREFLIGHT_UNAVAILABLE' in draft.abort_reason
+        else:
+            with pytest.raises((RuntimeError, ValueError), match=f'^{error}$'):
+                executor.run(check, env, values, object(), tmp_path / 'invalid-runtime')
 
 
 def _sealed_plan(store, pack, envs, pol, cfg):

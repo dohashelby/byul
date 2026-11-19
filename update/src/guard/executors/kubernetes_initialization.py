@@ -9,6 +9,7 @@ from guard.adapters import vllm_worker_generation_sensor as generation_sensor,vl
 from guard.adapters import vllm_worker_initialization_sensor as joint_sensor,vllm_worker_initialization_metadata as joint_metadata
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
+from guard.runtime.engine_http import KubernetesBindingError
 from guard.runtime.kubernetes_initialization import KubernetesInitializationHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
@@ -67,11 +68,10 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
         if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('INITIALIZATION_PROFILE_UNSUPPORTED')
         normalize_check_policy(check,values)
 
-    def run(self,check,env,policy_values,adapter,workdir):
+    def _local_inputs(self, check, env, policy_values):
         from guard.collectors.lifecycle import load_initialization_prepared
-        self.validate_policy(check,policy_values)
         try:
-            if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
+            if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             target_hash = sha256_hex(canonical_json(target))
@@ -87,17 +87,43 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
                     or sha256_hex(canonical_json(prepared))!=policy_values['init_prepared_sha256'] or not start<=utcnow()<=end or type(env.model.inventory_sha256) is not str or len(env.model.inventory_sha256)!=64):raise ValueError
         except (KeyError,ValueError,TypeError,RuntimeError,OSError):raise ValueError('INITIALIZATION_CONFIGURATION_INVALID') from None
         transport=KubernetesInitializationHTTP(target,env,runner=self.runner,duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))
+        return target, prepared, transport
+
+    @staticmethod
+    def _native_target(target, env, transport):
+        return {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': target['lab'],
+            'run_id': transport.binding['run_id'], 'environment_ref': env.ref().model_dump(mode='json'),
+            'kubernetes': {'context': transport.binding['context'], 'engine': transport.binding['engine']}}
+
+    def _native_reader(self, native_target, env, prepared):
+        return KubernetesLifecycleReader(native_target, env, prepared, runner=self.runner,
+            binary=self.cfg.get('kubectl_binary', 'kubectl'), duration=self.cfg.get('max_duration_seconds', 120))
+
+    def prepared_inputs(self, check, env, policy_values):
+        """Validate local inputs only, without taking ownership snapshots or dispatching."""
+        self.validate_policy(check, policy_values)
+        try:
+            target, prepared, transport = self._local_inputs(check, env, policy_values)
+            self._native_reader(self._native_target(target, env, transport), env, prepared)
+        except KubernetesBindingError as exc:
+            raise ValueError(str(exc)) from None
+        return target, prepared, transport
+
+    def run(self,check,env,policy_values,adapter,workdir):
+        self.validate_policy(check, policy_values)
+        if adapter is None:
+            raise ValueError('INITIALIZATION_CONFIGURATION_INVALID')
+        target, prepared, transport = self._local_inputs(check, env, policy_values)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,allow_mutating=False,
             keys={'none':None},secrets=[],cprobe=transport,workdir=workdir,started=utcnow(),http_probe_profile=HTTP_PROFILE)
         ctx._init_prepared=prepared;return self._finish(ctx)
 
     def collect(self,ctx):
         start,end=normalize_check_policy(ctx.check,ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[]
-        native_target={'schema':'guard-kubernetes-lifecycle-target/1','lab':ctx.target['lab'],'run_id':ctx.cprobe.binding['run_id'],
-            'environment_ref':ctx.env.ref().model_dump(mode='json'),'kubernetes':{'context':ctx.cprobe.binding['context'],'engine':ctx.cprobe.binding['engine']}}
+        native_target = self._native_target(ctx.target, ctx.env, ctx.cprobe)
         try:
-            reader=KubernetesLifecycleReader(native_target,ctx.env,ctx._init_prepared,runner=self.runner,
-                binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120));reader.snapshot()
+            reader = self._native_reader(native_target, ctx.env, ctx._init_prepared)
+            reader.snapshot()
             for slot in SLOTS:
                 row={'case_id':'lif09-'+slot,'request_id_sha256':sha256_hex(('byul-lif09-'+token+'-'+slot).encode()),
                     'attempted':False,'started_at':None,'finished_at':None,'policy_window_verified':False,

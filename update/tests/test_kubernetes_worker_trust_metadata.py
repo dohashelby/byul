@@ -18,18 +18,30 @@ VALUES = {'worker_isolation_requirement': 'independent-uid', 'worker_trust_group
 
 class WorkerWorld(ProcessWorld):
     def __init__(self, target, case):
-        super().__init__(target, mode='replacement' if case == 'replaced' else None)
+        super().__init__(target, mode={'replaced': 'replacement', 'partial-process': 'later-row-gap'}.get(case))
         self.case = case
 
     def runner(self, argv, **kwargs):
         if 'exec' not in argv:
-            return super().runner(argv, **kwargs)
+            result = super().runner(argv, **kwargs)
+            if 'get' in argv and 'pod' in argv and self.target['kubernetes']['engine']['pod'] in argv:
+                pod = json.loads(result['stdout_bytes'])
+                mounts = pod['spec']['containers'][0].setdefault('volumeMounts', [])
+                paths = {'one-marker': ['/proca'], 'root-mount': ['/'], 'proc-mount': ['/proc'],
+                         'proc-child': ['/proc/sys'], 'duplicate-mount': ['/scratch', '/scratch/'],
+                         'mount-changed': ['/scratch'] if self.process_reads else []}.get(self.case, [])
+                mounts.extend({'name': f'mount-{index}', 'mountPath': path} for index, path in enumerate(paths))
+                result['stdout_bytes'] = canonical_json(pod)
+            return result
         assert json.loads(kwargs['input_bytes']) == {'candidate_paths': []}
         result = super().runner(argv, **kwargs)
         packet = json.loads(result['stdout_bytes'])
         first, second = packet['processes']
         first['name'] = 'VLLMWorker' if self.case == 'ambiguous' else 'VLLM::EngineCor'
-        second['name'] = 'Worker' if self.case == 'two-markers' else 'python3'
+        if self.case == 'two-markers':
+            second.update(name='Worker', mount_namespace_inode=30)
+        elif second['name'] is not None:
+            second['name'] = 'python3'
         first['environment_names'].append('PRIVATE_SETTING_NAME')
         first['environment_names'].sort()
         result['stdout_bytes'] = canonical_json(packet)
@@ -38,7 +50,9 @@ class WorkerWorld(ProcessWorld):
 
 @pytest.mark.parametrize('case,completed,markers', [
     ('one-marker', True, ['VLLM']), ('two-markers', True, ['VLLM', 'Worker']),
-    ('ambiguous', False, []), ('replaced', False, []),
+    ('partial-process', True, ['VLLM']), ('ambiguous', False, []), ('replaced', False, []),
+    ('mount-changed', False, []), ('root-mount', False, []), ('proc-mount', False, []),
+    ('proc-child', False, []), ('duplicate-mount', False, []),
 ])
 def test_worker_marker_map_uses_owned_read_only_metadata(tmp_path, case, completed, markers):
     env, target = full_inputs()
@@ -51,16 +65,32 @@ def test_worker_marker_map_uses_owned_read_only_metadata(tmp_path, case, complet
     cfg = {'target': str(path), 'worker_trust_metadata_only': True}
     executor = KubernetesIPCProductExecutor(cfg, runner=world.runner, expected_target_sha256=sha256_hex(canonical_json(target)))
     draft = executor.run(check, env, VALUES, VllmAdapter(), tmp_path / 'work')
-    assert world.process_reads == 1 and not world.packets
+    shadowed = case in {'root-mount', 'proc-mount', 'proc-child'}
+    assert world.process_reads == (0 if shadowed or case == 'duplicate-mount' else 1) and not world.packets
     assert draft.status == (ExecStatus.COMPLETED if completed else ExecStatus.ABORTED)
     assert draft.data_origin.value == 'EXAMPLE'
     assert not draft.normal_control.attempted and all(not row.attempted for row in draft.challenges)
     observations = draft.observations
     mapping = observations['worker_trust_group_map'].value or []
     assert [group['marker'] for group in mapping] == markers
+    summary = json.loads(draft.artifacts[0].path.read_text().splitlines()[-1])
+    assert summary['worker_role_authenticated'] is False and summary['process_pid_namespace_membership_verified'] is False
     if mapping:
         assert all(item['effective_uid'] == 2000 for group in mapping for item in group['processes'])
+        assert all(set(item) == {'pid', 'start_ticks', 'effective_uid', 'mount_namespace_sha256'}
+                   for group in mapping for item in group['processes'])
+        assert summary['reader_pid_namespace_sha256'] == sha256_hex(canonical_json(20))
+        assert summary['reader_mount_namespace_sha256'] == sha256_hex(canonical_json(10))
+        assert [(item['pid'], item['start_ticks'], item['shares_reader_mount_namespace'])
+                for item in summary['marker_mount_namespace_relations']] == (
+                    [(1, 101, True), (2, 102, False)] if case == 'two-markers' else [(1, 101, True)])
         assert observations['worker_trust_groups_missing'].value == sorted(set(VALUES['worker_trust_group_markers']) - set(markers))
+    if shadowed:
+        assert 'WORKER_TRUST_PROC_VIEW_SHADOWED' in summary['diagnostic_codes']
+    if case in {'duplicate-mount', 'mount-changed'}:
+        assert 'WORKER_TRUST_PROC_VIEW_UNVERIFIED' in summary['diagnostic_codes']
+    if shadowed or case in {'duplicate-mount', 'mount-changed'}:
+        assert summary['reader_pid_namespace_sha256'] is None and not observations['worker_trust_group_map'].collected
     assert not observations['worker_isolation_violations'].collected
     assert not observations['worker_shared_resources'].collected
     assert observations['worker_trust_map_complete'].value is False

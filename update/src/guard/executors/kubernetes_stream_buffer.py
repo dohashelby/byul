@@ -3,6 +3,7 @@ from pathlib import Path
 import uuid
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
+from guard.runtime.engine_http import KubernetesBindingError
 from guard.runtime.kubernetes_stream_buffer_http import KubernetesStreamBufferHTTP,HTTP_PROFILE,SLOTS
 from guard.adapters import vllm_stream_buffer_sensor as sensor,vllm_stream_buffer_metadata as metadata
 from guard.adapters import vllm_release_observation_sensor as release_observation
@@ -37,6 +38,43 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
             raise ValueError('STREAM_BUFFER_NORMAL_CONFIGURATION_INVALID')
         normalize_policy(values,normal_only=self.normal_only)
 
+    def _validate_target(self, target, env, values, *, expected_target_sha256=None):
+        digest = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self.expected_target, expected_target_sha256) if pin is not None]
+        if (digest != values['buffer_target_sha256'] or env.ref().sha256 != values['buffer_environment_sha256']
+                or self.normal_only and not pins or any(digest != pin for pin in pins)):
+            raise ValueError
+
+    def _transport(self, target, env, profiles):
+        return KubernetesStreamBufferHTTP(target, env, read_profiles=profiles, runner=self.runner,
+            duration=self.cfg.get('max_duration_seconds', 120), binary=self.cfg.get('kubectl_binary', 'kubectl'),
+            normal_only=self.normal_only)
+
+    def prepared_normal_stream(self, check, env, values, *, expected_target_sha256=None):
+        """Validate only the saved, bounded LIF-04 normal-stream declaration."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+        from .run_binding import stages_for
+
+        if not self.normal_only or check.id != 'LIF-04' or check.executor != self.name or stages_for(check) != (1,):
+            raise ValueError('STREAM_BUFFER_NORMAL_CONFIGURATION_INVALID')
+        self.validate_policy(check, values)
+        try:
+            if any(type(value) is not str or not value for value in (env.model.id, env.model.revision)):
+                raise ValueError
+            target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+            if type(target) is not dict:
+                raise ValueError
+            self._validate_target(target, env, values, expected_target_sha256=expected_target_sha256)
+            _, _, profiles = normalize_policy(values, normal_only=True)
+        except (KeyError, TypeError, ValueError, OSError, RuntimeError):
+            raise ValueError('STREAM_BUFFER_CONFIGURATION_INVALID') from None
+        try:
+            self._transport(target, env, profiles)
+        except KubernetesBindingError as error:
+            raise ValueError(str(error)) from None
+        except OverflowError:
+            raise ValueError('STREAM_BUFFER_CONFIGURATION_INVALID') from None
+
     def run(self,check,env,policy_values,adapter,workdir):
         from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check,policy_values)
@@ -44,17 +82,14 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
             if (adapter is None or not self.normal_only and set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            digest=sha256_hex(canonical_json(target));start,end,profiles=normalize_policy(policy_values,normal_only=self.normal_only)
-            if (digest!=policy_values['buffer_target_sha256'] or env.ref().sha256!=policy_values['buffer_environment_sha256']
-                    or self.normal_only and self.expected_target is None
-                    or self.expected_target is not None and digest!=self.expected_target
-                    or not start<=utcnow()<=end):raise ValueError
+            start,end,profiles=normalize_policy(policy_values,normal_only=self.normal_only)
+            self._validate_target(target, env, policy_values)
+            if not start<=utcnow()<=end:raise ValueError
             prepared=None if self.normal_only else load_prepared(self.cfg['prepared'])
             if not self.normal_only and (prepared['profile'] not in {sensor.PROFILE,release_observation.STREAM_PROFILE,baseline_stream.PROFILE}
                     or sha256_hex(canonical_json(prepared))!=policy_values['buffer_prepared_sha256']):raise ValueError
         except (ValueError,KeyError,TypeError,RuntimeError,OSError):raise ValueError('STREAM_BUFFER_CONFIGURATION_INVALID') from None
-        transport=KubernetesStreamBufferHTTP(target,env,read_profiles=profiles,runner=self.runner,
-            duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'),normal_only=self.normal_only)
+        transport = self._transport(target, env, profiles)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,allow_mutating=False,
             keys={'none':None},secrets=[],cprobe=transport,workdir=workdir,started=utcnow(),http_probe_profile=HTTP_PROFILE)
         ctx._buffer_prepared=prepared

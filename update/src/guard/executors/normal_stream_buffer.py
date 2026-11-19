@@ -155,6 +155,14 @@ def collect(ctx, start, end):
     summary = {'fixture': {'profile': PROFILE, 'memory_source_sha256': MEMORY_SOURCE_SHA256,
                           'probe_source_sha256': transport['probe_source_sha256']},
                'target_sha256': transport['target_sha256'], 'observations': values}
+    normal_cases = {'lif04-' + slot for slot in NORMAL_SLOTS}
+    failed_attempts = [{key: row[key] for key in ('case_id', 'binding_verified', 'diagnostic')}
+                       for row in transport.get('requests', [])
+                       if type(row) is dict and type(row.get('case_id')) is str and row['case_id'] in normal_cases
+                       and row.get('binding_verified') is False
+                       and row.get('diagnostic') == 'STREAM_BUFFER_HTTP_UNAVAILABLE']
+    if failed_attempts:
+        summary['failed_transport_attempts'] = failed_attempts
     control = {'attempted': bool(trials), 'succeeded': None,
                'detail': 'Observed normal request completion and sampled owned container memory around the stream.'}
     return observations, control, [], summary

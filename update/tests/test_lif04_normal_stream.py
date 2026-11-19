@@ -13,6 +13,8 @@ from guard.adapters.vllm import VllmAdapter
 from guard.executors import normal_stream_buffer as normal, stream_probe
 from guard.executors.kubernetes_stream_buffer import KubernetesStreamBufferExecutor
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
+from guard.runtime.engine_http import KubernetesBindingError, KubernetesHTTP
+from guard.runtime.kubernetes_stream_buffer_http import KubernetesStreamBufferHTTP
 from tests.test_model_preparation_integration import FullWorld, full_inputs
 from tests.test_stream_probe import _server
 
@@ -126,6 +128,78 @@ def test_normal_stream_requires_exact_readonly_admission_before_io(tmp_path, bad
     executor = KubernetesStreamBufferExecutor(cfg, runner=no_read, environ={}, expected_target_sha256=pin)
     with pytest.raises(ValueError, match='STREAM_BUFFER_.*CONFIGURATION_INVALID'):
         executor.run(check, env, values, VllmAdapter(), tmp_path / 'work')
+
+
+@pytest.mark.parametrize('case,error', [
+    ('ordinary', None),
+    ('foreign-model-revision', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('over-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('wrong-pin', 'STREAM_BUFFER_CONFIGURATION_INVALID'),
+    ('sibling', 'STREAM_BUFFER_NORMAL_CONFIGURATION_INVALID'),
+])
+def test_normal_stream_preparation_matches_the_declared_transport(tmp_path, monkeypatch, case, error):
+    def forbidden(*args, **kwargs):
+        pytest.fail('LIF-04 preparation must not start an observation or contact the target')
+
+    monkeypatch.setattr(KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(KubernetesStreamBufferHTTP, '__call__', forbidden)
+    monkeypatch.setattr(normal, 'collect', forbidden)
+    env, target, cfg, values = configuration(tmp_path)
+    digest = values['buffer_target_sha256']
+    if case == 'foreign-model-revision':
+        target['model_mapping']['revision'] = ('1' if env.model.revision == '0' * 40 else '0') * 40
+        raw = canonical_json(target)
+        Path(cfg['target']).write_bytes(raw)
+        digest = values['buffer_target_sha256'] = sha256_hex(raw)
+    if case == 'over-budget':
+        cfg['max_duration_seconds'] = 301
+    executor = KubernetesStreamBufferExecutor(
+        cfg, runner=forbidden, expected_target_sha256='f' * 64 if case == 'wrong-pin' else None)
+    check = load_pack(PACK_PATH).checks['LIF-03' if case == 'sibling' else 'LIF-04']
+    if error is None:
+        executor.prepared_normal_stream(check, env, values, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_normal_stream(check, env, values, expected_target_sha256=digest)
+
+
+def test_failed_normal_transport_keeps_only_its_typed_diagnostic_in_artifact(tmp_path, monkeypatch):
+    def binding_unavailable(*args, **kwargs):
+        raise KubernetesBindingError()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('A failed declaration binding must not dispatch or read memory')
+
+    transport_report = KubernetesStreamBufferHTTP.report
+
+    def report(transport):
+        result = transport_report(transport)
+        attempt, = result['requests']
+        attempt['private_note'] = PRIVATE_OUTPUT
+        result['requests'].append({**attempt, 'case_id': 'unselected-example-case'})
+        return result
+
+    monkeypatch.setattr(KubernetesHTTP, '_verify', binding_unavailable)
+    monkeypatch.setattr(KubernetesHTTP, '_call', forbidden)
+    monkeypatch.setattr(KubernetesStreamBufferHTTP, 'report', report)
+    monkeypatch.setattr(normal, 'memory_sample', forbidden)
+    env, _, cfg, values = configuration(tmp_path)
+    check = load_pack(PACK_PATH).checks['LIF-04']
+    executor = KubernetesStreamBufferExecutor(
+        cfg, runner=forbidden, expected_target_sha256=values['buffer_target_sha256'])
+    draft = executor.run(check, env, values, VllmAdapter(), tmp_path / 'work')
+    assert draft.status.value == 'ABORTED' and draft.data_origin.value == 'EXAMPLE'
+    assert draft.observations['activation_scope_complete'].value is False
+    assert draft.observations['activation_violations'].value == []
+    step, = draft.observations['activation_steps'].value
+    assert not step['container_memory_samples'] and 'failed_transport_attempts' not in step
+    artifact, = draft.artifacts
+    saved = artifact.path.read_text(encoding='utf-8')
+    summary = json.loads(saved.splitlines()[-1])
+    assert summary['failed_transport_attempts'] == [{
+        'case_id': 'lif04-normal-before', 'binding_verified': False, 'diagnostic': 'STREAM_BUFFER_HTTP_UNAVAILABLE',
+    }]
+    assert PRIVATE_OUTPUT not in saved and 'unselected-example-case' not in saved and 'binding' not in summary
 
 
 @pytest.mark.parametrize('same_group', [True, False])

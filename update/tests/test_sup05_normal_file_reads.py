@@ -12,13 +12,15 @@ from guard.adapters import vllm_lifecycle_sensor as base8, vllm_file_read_sensor
 from guard.collectors.lifecycle import prepare_assets
 from guard.collectors.model_read_scope import build_scope
 from guard.executors import kubernetes_supply_boot as boot
-from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
-from tests.builders import baseline_pack, environment
+from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
+from tests.builders import environment
 from tests.test_a1_file_read_sensor import MODEL_BYTES, make_world
 from tests.test_kubernetes_lifecycle import World
 from tests.test_kubernetes_sampling import inputs as sampling_inputs
 from tests.test_lifecycle_capture import IMAGE, REPOSITORY
 from tests.test_lifecycle_sensor import CONTEXT, FakeOS, SilentThread
+
+PACK_DIRECTORY = REPOSITORY / "update" / "packs" / "PACK-BASELINE"
 
 
 def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=None, model_root=None, engine_role=None):
@@ -105,7 +107,8 @@ def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=
 
 def run(case, workdir, *, values=None, cfg=None, check_id="SUP-05"):
     executor = boot.KubernetesSupplyBootExecutor(case.cfg if cfg is None else cfg, runner=case.runner)
-    return executor.run(baseline_pack().checks[check_id], case.env, case.values if values is None else values, None, workdir)
+    return executor.run(load_pack(PACK_DIRECTORY).checks[check_id], case.env,
+                        case.values if values is None else values, None, workdir)
 
 
 @pytest.mark.parametrize("mismatch", [False, True])

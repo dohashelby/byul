@@ -23,6 +23,8 @@ NORMAL_REQUEST_LATENCY_OPTION = "normal_request_latency_only"
 NORMAL_REQUEST_LATENCY_SCOPE_ERROR = "NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID"
 NORMAL_COMPILE_CACHE_OPTION = "normal_compile_cache_only"
 NORMAL_COMPILE_CACHE_SCOPE_ERROR = "NORMAL_COMPILE_CACHE_EXECUTION_SCOPE_INVALID"
+NORMAL_GRAPH_CAPTURE_OPTION = "normal_graph_capture_only"
+NORMAL_GRAPH_CAPTURE_SCOPE_ERROR = "NORMAL_GRAPH_CAPTURE_EXECUTION_SCOPE_INVALID"
 NORMAL_SAFETENSORS_READER_OPTION = "normal_safetensors_reader_only"
 NORMAL_SAFETENSORS_READER_SCOPE_ERROR = "NORMAL_SAFETENSORS_READER_EXECUTION_SCOPE_INVALID"
 NORMAL_SERVING_READINESS_OPTION = "normal_serving_readiness_only"
@@ -37,6 +39,7 @@ _NORMAL_ONLY_CASES = {
     "PLT-07": ("boundary_egress", CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR),
     "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
     "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
+    "REQ-20": ("engine_sensor", NORMAL_GRAPH_CAPTURE_OPTION, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR),
     "SUP-07": ("supply_boot", NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
     "SUP-12": ("supply_boot", NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
     "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
@@ -141,6 +144,10 @@ def normal_compile_cache_requested(raw):
     return next(_option_occurrences(raw, NORMAL_COMPILE_CACHE_OPTION), None) is not None
 
 
+def normal_graph_capture_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_GRAPH_CAPTURE_OPTION), None) is not None
+
+
 def normal_safetensors_reader_requested(raw):
     return next(_option_occurrences(raw, NORMAL_SAFETENSORS_READER_OPTION), None) is not None
 
@@ -185,6 +192,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         _validate_normal_option_placement(raw, NORMAL_COMPILE_CACHE_OPTION, {
             (CHECK_CONFIG, "SUP-07", NORMAL_COMPILE_CACHE_OPTION),
         }, NORMAL_COMPILE_CACHE_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_GRAPH_CAPTURE_OPTION, {
+            (CHECK_CONFIG, "REQ-20", NORMAL_GRAPH_CAPTURE_OPTION),
+        }, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
         _validate_normal_option_placement(raw, NORMAL_SAFETENSORS_READER_OPTION, {
             (CHECK_CONFIG, "SUP-12", NORMAL_SAFETENSORS_READER_OPTION),
         }, NORMAL_SAFETENSORS_READER_SCOPE_ERROR)
@@ -232,13 +242,13 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
-                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10",
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10", "REQ-20",
                                      "SUP-07", "SUP-10", "SUP-12"}
                         and raw.get("record_attestation"))
-                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "SUP-07", "SUP-10", "SUP-12"}
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
                         and "run_binding" in raw
                         and (type(bindings) is not dict or check_id in bindings))
-                    or (check_id in {"LIF-01", "PLT-07", "SUP-07", "SUP-10", "SUP-12"}
+                    or (check_id in {"LIF-01", "PLT-07", "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
                         and set(settings) - {option, "target", "kubectl_binary", "max_duration_seconds"})):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)

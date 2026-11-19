@@ -1,4 +1,4 @@
-"""Source pins for stock CUDA V1 load, reader and compile cache observations."""
+"""Source pins for stock CUDA V1 startup observations."""
 
 from .vllm import REQUEST_BINDING_GPU_IMAGE
 
@@ -11,6 +11,7 @@ _SOURCE_PROFILES = {
         "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
         "commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
         "line": 5416,
+        "graph_capture_line": 6929,
         "compile_backend": ("fa4bff8920b363efbbde9456f135fa9d2c004a5bde1898877f177418b2d8b008", 1094),
         "safetensors_reader": {
             "file_sha256": {
@@ -35,6 +36,7 @@ _SOURCE_PROFILES = {
         "image": "docker.io/" + REQUEST_BINDING_GPU_IMAGE,
         "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
         "line": 5354,
+        "graph_capture_line": 6854,
         "compile_backend": ("16af622b799f22f30eaa1c78f7ccca9d54c7c72785ad89e90c87e859bf8ef876", 1090),
         "safetensors_reader": {
             "file_sha256": {
@@ -121,3 +123,11 @@ def safetensors_reader_profile(env):
         raise ValueError("SUP12_SAFETENSORS_READER_SOURCE_UNQUALIFIED")
     reader = profile["safetensors_reader"]
     return {**reader, "file_sha256": dict(reader["file_sha256"])}
+
+
+def graph_capture_profile(env):
+    """Select the capture completion line of the already-pinned runner source."""
+    profile = _reviewed_profile(env)
+    if profile is None:
+        raise ValueError("REQ20_CAPTURE_SOURCE_UNQUALIFIED")
+    return {"capture_completion_call_linenumber": profile["graph_capture_line"]}

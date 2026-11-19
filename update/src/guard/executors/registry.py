@@ -26,6 +26,7 @@ from guard.adapters.vllm import VllmAdapter
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR,
+                                 NORMAL_GRAPH_CAPTURE_OPTION, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
                                  NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
@@ -88,6 +89,7 @@ from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .kubernetes_record_access_product import KubernetesRecordAccessExecutor
 from .kubernetes_supply_boot import KubernetesSupplyBootExecutor
 from .kubernetes_normal_compile_cache import KubernetesNormalCompileCacheExecutor
+from .kubernetes_normal_graph_capture import KubernetesNormalGraphCaptureExecutor
 from .kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
 from .kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
@@ -248,6 +250,13 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
             if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
                 raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
             return KubernetesNormalTokenInputExecutor(
+                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
+    if executor == "engine_sensor":
+        settings = cfg.get(executor)
+        if type(settings) is dict and NORMAL_GRAPH_CAPTURE_OPTION in settings:
+            if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
+                raise ValueError(NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
+            return KubernetesNormalGraphCaptureExecutor(
                 settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if executor == "supply_boot":
         settings = cfg.get(executor)

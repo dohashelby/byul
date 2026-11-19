@@ -44,6 +44,7 @@ from pathlib import Path
 
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
+                                 NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_STARTUP_LOAD_OPTION,
                                  NORMAL_STREAM_OPTION)
@@ -57,6 +58,7 @@ _TARGET_ONLY_NORMAL_MODES = {
     'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
     'OBS-02': ('observation_state', NORMAL_SERVING_READINESS_OPTION, 'observation_state_target_sha256'),
     'PLT-07': ('boundary_egress', CILIUM_EGRESS_STATUS_OPTION, 'egress_target_sha256'),
+    'REQ-20': ('engine_sensor', NORMAL_GRAPH_CAPTURE_OPTION, 'sensor_target_sha256'),
     'SUP-07': ('supply_boot', NORMAL_COMPILE_CACHE_OPTION, 'supply_target_sha256'),
     'SUP-10': ('supply_boot', INSTALLED_PLUGIN_INVENTORY_OPTION, 'supply_target_sha256'),
     'SUP-12': ('supply_boot', NORMAL_SAFETENSORS_READER_OPTION, 'supply_target_sha256'),

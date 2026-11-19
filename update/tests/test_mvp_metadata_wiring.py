@@ -1143,14 +1143,18 @@ def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_
         run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
 
 
-@pytest.mark.parametrize(('compile_enabled', 'reader_enabled'), [(False, False), (True, False), (True, True)])
-def test_startup_supply_checks_prepare_separate_owned_bindings(
-        tmp_path, sources, monkeypatch, compile_enabled, reader_enabled):
+@pytest.mark.parametrize(('compile_enabled', 'reader_enabled', 'graph_enabled'), [
+    (False, False, False), (True, False, False), (True, True, False), (True, True, True),
+])
+def test_startup_checks_prepare_separate_owned_bindings(
+        tmp_path, sources, monkeypatch, compile_enabled, reader_enabled, graph_enabled):
     from guard.adapters.engine_provider import get_provider
     from guard.core.run import run_plan
     from guard.executors import run_binding
+    from guard.executors.engine_sensor import EngineSensorExecutor
     from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
     from guard.executors.kubernetes_normal_compile_cache import KubernetesNormalCompileCacheExecutor
+    from guard.executors.kubernetes_normal_graph_capture import KubernetesNormalGraphCaptureExecutor
     from guard.executors.kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
     from guard.executors.kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
@@ -1161,8 +1165,8 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
     provider = get_provider('vllm')
     envs = []
     pins = {}
-    reader_lines_by_side = ((895, 918, 430), (1063, 1086, 484))
-    for paths, load_line, cache_line, reader_lines in zip(sides.values(), (5416, 5354), (1094, 1090), reader_lines_by_side):
+    lines_by_side = ((5416, 1094, (895, 918, 430), 6929), (5354, 1090, (1063, 1086, 484), 6854))
+    for paths, (load_line, cache_line, reader_lines, graph_line) in zip(sides.values(), lines_by_side):
         env = tool.Environment.model_validate_json(paths['environment'].read_bytes())
         env = env.model_copy(update={'runtime': env.runtime.model_copy(update={'pp_size': 1, 'dp_size': 1})}).seal()
         envs.append(env)
@@ -1184,6 +1188,8 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
         reader = provider.evidence_contract('safetensors_reader_source', env)
         assert (reader['filesystem_call_linenumber'], reader['default_strategy_call_linenumber'],
                 reader['loader_completion_call_linenumber']) == reader_lines
+        assert provider.evidence_contract('graph_capture_source', env) == {
+            'capture_completion_call_linenumber': graph_line}
         wrong = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': None})})
         with pytest.raises(ValueError, match='LIF01_BOOT_SOURCE_UNQUALIFIED'):
             provider.evidence_contract('startup_load_source', wrong)
@@ -1191,6 +1197,8 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
             provider.evidence_contract('compile_cache_source', wrong)
         with pytest.raises(ValueError, match='SUP12_SAFETENSORS_READER_SOURCE_UNQUALIFIED'):
             provider.evidence_contract('safetensors_reader_source', wrong)
+        with pytest.raises(ValueError, match='REQ20_CAPTURE_SOURCE_UNQUALIFIED'):
+            provider.evidence_contract('graph_capture_source', wrong)
 
     budgets = {'supply_stage_budget_ms': {'load': 600000}, 'supply_stage_budget_bytes': {'load': 17179869184},
                'supply_total_budget_ms': 1800000}
@@ -1201,9 +1209,11 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
     if reader_enabled:
         options['SUP-12'] = 'normal_safetensors_reader_only'
         values_by_check['SUP-12'] = {'supply_allowed_readers': ['safetensors']}
+    if graph_enabled:
+        options['REQ-20'] = 'normal_graph_capture_only'
     prior = tool.Policy.model_validate_json(policy_path.read_bytes())
     policy = prior.model_copy(update={'values': values_by_check,
-        'scope': prior.scope.model_copy(update={'include': [*sorted(options), 'SUP-11']})}).seal()
+        'scope': prior.scope.model_copy(update={'include': [*sorted(options), 'SUP-11', 'REQ-19']})}).seal()
     _write(policy_path, policy.to_dict())
     output, store_path, fresh = (tmp_path / name for name in ('startup', 'store', 'fresh-target.json'))
     empty, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store_path)
@@ -1214,11 +1224,13 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
     without_prefix['candidate']['target'] = _write(tmp_path / 'candidate-no-prefix.json', incomplete)
     fallback, _, decisions = tool.assemble(without_prefix, policy_path, pack=pack, store=store_path,
         normal_startup_load=True, installed_plugin_inventory=True, normal_compile_cache=compile_enabled,
-        normal_safetensors_reader=reader_enabled)
+        normal_safetensors_reader=reader_enabled, normal_graph_capture=graph_enabled)
     assert fallback['update']['allowed_checks'] == ['SUP-10']
     assert decisions['LIF-01']['sides']['candidate'] == 'NORMAL_STARTUP_LOAD_TARGET_UNAVAILABLE'
     if compile_enabled:
         assert decisions['SUP-07']['sides']['candidate'] == 'NORMAL_COMPILE_CACHE_TARGET_UNAVAILABLE'
+    if graph_enabled:
+        assert decisions['REQ-20']['sides']['candidate'] == 'NORMAL_GRAPH_CAPTURE_TARGET_UNAVAILABLE'
     if reader_enabled:
         assert decisions['SUP-12']['sides']['candidate'] == 'NORMAL_SAFETENSORS_READER_TARGET_UNAVAILABLE'
         unsupported_values = {**values_by_check, 'SUP-12': {'supply_allowed_readers': ['safetensors', 'other']}}
@@ -1226,7 +1238,7 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
         unsupported_path = _write(tmp_path / 'unsupported-reader-policy.json', unsupported.to_dict())
         partial, _, decisions = tool.assemble(sides, unsupported_path, pack=pack, store=store_path,
             normal_startup_load=True, installed_plugin_inventory=True, normal_compile_cache=compile_enabled,
-            normal_safetensors_reader=True)
+            normal_safetensors_reader=True, normal_graph_capture=graph_enabled)
         assert partial['update']['allowed_checks'] == sorted(set(options) - {'SUP-12'})
         assert not decisions['SUP-12']['configuration_enabled']
         assert set(decisions['SUP-12']['sides'].values()) == {'METADATA_EXECUTOR_OR_POLICY_UNAVAILABLE'}
@@ -1236,13 +1248,15 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
         args.append('--normal-compile-cache')
     if reader_enabled:
         args.append('--normal-safetensors-reader')
+    if graph_enabled:
+        args.append('--normal-graph-capture')
     for side, paths in sides.items():
         for role, path in paths.items():
             args.extend([f'--{side}-{role}', str(path)])
     monkeypatch.setattr(sys, 'argv', args)
     tool.main()
     cfg = tomllib.loads((output / 'preliminary-guard.toml').read_text())
-    assert cfg['executors'] == {'supply_boot': 'kubernetes'}
+    assert cfg['executors'] == {pack.checks[cid].executor: 'kubernetes' for cid in options}
     assert cfg['update']['allowed_checks'] == sorted(options)
     assert cfg['check_config'] == {check: {option: True} for check, option in options.items()}
     preflight = json.loads((output / 'readiness.json').read_bytes())
@@ -1263,6 +1277,7 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
     startup_run = KubernetesNormalStartupLoadExecutor.run
     compile_run = KubernetesNormalCompileCacheExecutor.run
     reader_run = KubernetesNormalSafetensorsReaderExecutor.run
+    graph_run = KubernetesNormalGraphCaptureExecutor.run
     monkeypatch.setattr(KubernetesNormalStartupLoadExecutor, 'run',
         lambda self, check, env, values, *_: sample(check, env, values, self, 'normal_startup_load_only'))
     monkeypatch.setattr(KubernetesInstalledPluginInventoryExecutor, 'run',
@@ -1271,11 +1286,14 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
         lambda self, check, env, values, *_: sample(check, env, values, self, 'normal_compile_cache_only'))
     monkeypatch.setattr(KubernetesNormalSafetensorsReaderExecutor, 'run',
         lambda self, check, env, values, *_: sample(check, env, values, self, 'normal_safetensors_reader_only'))
+    monkeypatch.setattr(KubernetesNormalGraphCaptureExecutor, 'run',
+        lambda self, check, env, values, *_: sample(check, env, values, self, 'normal_graph_capture_only'))
 
     def forbid_legacy(*_args, **_kwargs):
         raise AssertionError('The prepared boot or challenge collector must stay outside the paired scope')
 
     monkeypatch.setattr(KubernetesSupplyBootExecutor, 'run', forbid_legacy)
+    monkeypatch.setattr(EngineSensorExecutor, 'run', forbid_legacy)
     store = Store(store_path)
     report, _ = application.execute_update(store, pack, envs, policy, cfg, tmp_path / 'paired', utcnow())
     for check_id in options:
@@ -1285,7 +1303,8 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
             evidence = store.resolve(store.resolve(side.result).evidence)
             binding = evidence.execution.run_binding
             assert evidence.execution.status == ExecStatus.COMPLETED and not run_binding.verify(binding, evidence)
-            assert binding['files'] == {'supply_target_sha256': pins[evidence.environment.id]}
+            target_field = 'sensor_target_sha256' if check_id == 'REQ-20' else 'supply_target_sha256'
+            assert binding['files'] == {target_field: pins[evidence.environment.id]}
             assert 'values' not in binding
 
     staged = tomllib.loads((output / 'guard.toml').read_text())
@@ -1297,16 +1316,16 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
     current['startup_log_prefix'].update(
         container_started_at='2026-11-18T08:02:00Z', ready_at='2026-11-18T08:02:01Z', sha256='b' * 64)
     _write(fresh, current)
-    assert tool.revalidate_candidate(staged, envs[1], pointer) == {
-        'supply_boot': sha256_hex(canonical_json(current))}
+    assert tool.revalidate_candidate(staged, envs[1], pointer) == dict.fromkeys(
+        cfg['executors'], sha256_hex(canonical_json(current)))
     current.pop('startup_log_prefix')
     _write(fresh, current)
     pins[envs[1].id] = sha256_hex(canonical_json(current))
     run = application.run_config(staged)
     run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_executor'] = (
         tool.revalidate_candidate(staged, envs[1], pointer))
-    assert run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_executor'] == {
-        'supply_boot': pins[envs[1].id]}
+    assert run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_executor'] == dict.fromkeys(
+        cfg['executors'], pins[envs[1].id])
     staged_store = Store(tmp_path / 'staged-store')
     put_pack(staged_store, pack.path)
     for obj in (*envs, policy):
@@ -1316,12 +1335,16 @@ def test_startup_supply_checks_prepare_separate_owned_bindings(
     monkeypatch.setattr(KubernetesNormalStartupLoadExecutor, 'run', startup_run)
     monkeypatch.setattr(KubernetesNormalCompileCacheExecutor, 'run', compile_run)
     monkeypatch.setattr(KubernetesNormalSafetensorsReaderExecutor, 'run', reader_run)
+    monkeypatch.setattr(KubernetesNormalGraphCaptureExecutor, 'run', graph_run)
     actual = {row.check_id: row for row in run_plan(staged_store, pack, plan, run, only_side=Side.candidate)}
     assert actual['LIF-01'].execution.status == ExecStatus.ABORTED
     if compile_enabled:
         assert actual['SUP-07'].execution.status == ExecStatus.ABORTED
     if reader_enabled:
         assert actual['SUP-12'].execution.status == ExecStatus.ABORTED
+    if graph_enabled:
+        assert actual['REQ-20'].execution.status == ExecStatus.ABORTED
+    assert actual['REQ-19'].execution.status == ExecStatus.NOT_RUN
     assert actual['SUP-10'].execution.status == ExecStatus.COMPLETED
     assert actual['SUP-11'].execution.status == ExecStatus.NOT_RUN
 
@@ -1365,6 +1388,43 @@ def test_startup_supply_checks_cannot_enable_legacy_dispatch(tmp_path, sources, 
         run_plan(store, pack, audit, application.run_config(startup_only))
     with pytest.raises(ValueError, match='^INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID$'):
         run_plan(store, pack, audit, application.run_config(config))
+
+
+def test_req20_capture_scope_rejects_native_siblings_before_target_preparation(tmp_path, sources, monkeypatch):
+    from guard.core.run import run_plan
+    from guard.executors.engine_sensor import EngineSensorExecutor
+
+    pack, sides, policy_path = sources
+    policy = tool.Policy.model_validate_json(policy_path.read_bytes())
+    envs = [tool.Environment.model_validate_json(paths['environment'].read_bytes()) for paths in sides.values()]
+    marker = 'normal_graph_capture_only'
+    scope_error = '^NORMAL_GRAPH_CAPTURE_EXECUTION_SCOPE_INVALID$'
+    config = {'executors': {'engine_sensor': 'kubernetes'}, 'update': {'allowed_checks': ['REQ-20']},
+              'sides': {side: {'engine_sensor': {'target': str(paths['target'])}} for side, paths in sides.items()},
+              'check_config': {'REQ-20': {marker: True}}}
+    legacy = registry.build_executor('engine_sensor', 'kubernetes', {'engine_sensor': {}},
+        engine=envs[0].engine.name, version=envs[0].engine.version)
+    assert isinstance(legacy, EngineSensorExecutor)
+    half, wrong, disabled, native_inputs = (deepcopy(config) for _ in range(4))
+    half['sides']['baseline']['check_config'] = half.pop('check_config')
+    wrong['check_config']['REQ-19'] = wrong['check_config'].pop('REQ-20')
+    disabled['sides']['candidate']['check_config'] = {'REQ-20': {marker: False}}
+    native_inputs['check_config']['REQ-20']['prepared'] = str(tmp_path / 'prepared.json')
+    sibling = {**config, 'update': {'allowed_checks': ['REQ-19', 'REQ-20']}}
+    wrapped = {**config, 'record_attestation': {'mode': 'example'}}
+    managed = {**config, 'update': {**config['update'], 'mode': 'managed'}}
+    binding = {**config, 'run_binding': {'REQ-20': {}}}
+
+    def forbid_prepare(*_args, **_kwargs):
+        raise AssertionError('Invalid graph capture scope reached target preparation')
+
+    monkeypatch.setattr(application, 'update_inputs', forbid_prepare)
+    store = Store(tmp_path / 'scope-store')
+    for invalid in (half, wrong, disabled, native_inputs, sibling, wrapped, managed, binding):
+        with pytest.raises(ValueError, match=scope_error):
+            application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
+    with pytest.raises(ValueError, match=scope_error):
+        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(config))
 
 
 def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources):

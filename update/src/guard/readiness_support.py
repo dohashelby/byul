@@ -178,7 +178,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             continue
         row['code_available'] = True
         if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-07', 'PLT-12', 'LIF-01', 'LIF-03', 'LIF-04',
-                                 'REQ-09', 'REQ-10', 'SUP-07', 'SUP-10', 'SUP-12'}:
+                                 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-07', 'SUP-10', 'SUP-12'}:
             effective = for_check(cfg, executor, check_id).get(executor, {})
             setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
             if type(effective) is dict and effective.get(setting) is True:
@@ -220,6 +220,9 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 elif check_id == 'REQ-09':
                     row["scope"] = "owned tokenization and one ordinary completion using the returned token IDs"
                     row["limitations"].append("rejection boundaries and native processor consumption stay unverified")
+                elif check_id == 'REQ-20':
+                    row["scope"] = "source-checked ordinary CUDA graph capture completion in the owned startup log"
+                    row["limitations"].append("capture inputs, replay, output use and buffer lifetime require separate observations")
                 else:
                     row["scope"] = "one ordinary completion with the approved sampling options"
                     row["limitations"].append("sampling limits, rejections, structured output and runner consumption stay unverified")

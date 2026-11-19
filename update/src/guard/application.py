@@ -15,12 +15,14 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECOR
                                  INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_COMPILE_CACHE_SCOPE_ERROR,
+                                 NORMAL_GRAPH_CAPTURE_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_SCOPE_ERROR,
                                  bounded_metadata_scopes, cilium_egress_status_requested, for_check,
                                  installed_plugin_inventory_requested,
                                  normal_compile_cache_requested,
+                                 normal_graph_capture_requested,
                                  normal_request_latency_requested,
                                  normal_safetensors_reader_requested,
                                  normal_serving_readiness_requested,
@@ -161,6 +163,7 @@ def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
     sides = cfg.get("sides", {})
     if (cilium_egress_status_requested(cfg) or installed_plugin_inventory_requested(cfg)
             or normal_compile_cache_requested(cfg)
+            or normal_graph_capture_requested(cfg)
             or normal_request_latency_requested(cfg)
             or normal_safetensors_reader_requested(cfg)
             or normal_serving_readiness_requested(cfg)
@@ -230,6 +233,11 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=
             elif scoped_check == "REQ-09":
                 from guard.executors.kubernetes_normal_token_input import normal_input_transports
                 normal_input_transports(target, env, duration=1)
+            elif scoped_check == "REQ-20":
+                from guard.executors.kubernetes_normal_graph_capture import normal_graph_capture_transport
+                if get_provider(env.engine.name).evidence_contract("graph_capture_source", env) is None:
+                    raise ValueError("REQ20_CAPTURE_SOURCE_UNQUALIFIED")
+                normal_graph_capture_transport(target, env, duration=1)
             elif scoped_check == "SUP-07":
                 from guard.executors.kubernetes_normal_compile_cache import normal_compile_cache_transport
                 if get_provider(env.engine.name).evidence_contract("compile_cache_source", env) is None:
@@ -456,6 +464,8 @@ def _validation_inputs(env, cfg: dict):
         raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
     if normal_compile_cache_requested(cfg):
         raise ValueError(NORMAL_COMPILE_CACHE_SCOPE_ERROR)
+    if normal_graph_capture_requested(cfg):
+        raise ValueError(NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
     if normal_safetensors_reader_requested(cfg):
         raise ValueError(NORMAL_SAFETENSORS_READER_SCOPE_ERROR)
     if normal_request_latency_requested(cfg):
@@ -649,7 +659,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 settings = c.get(item.executor, {})
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
                 explicit_observer = (item.check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09",
-                                                       "SUP-07", "SUP-10", "SUP-12"}
+                                                       "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
                                      and type(settings) is dict
                                      and option in settings)
                 if kube and option and type(settings) is dict and settings.get(option) is True:

@@ -22,6 +22,7 @@ from guard.collectors import native_input_rejection_qualification, reused_input_
 from guard.collectors.file import load_environment, load_policy
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
                                  NORMAL_COMPILE_CACHE_OPTION,
+                                 NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION,
@@ -30,6 +31,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_I
                                  bounded_metadata_scopes, cilium_egress_status_requested, for_check, merge_config,
                                  installed_plugin_inventory_requested, normal_request_latency_requested,
                                  normal_compile_cache_requested,
+                                 normal_graph_capture_requested,
                                  normal_safetensors_reader_requested,
                                  normal_serving_readiness_requested,
                                  normal_startup_load_requested,
@@ -38,6 +40,7 @@ from guard.core.select import _in_scope, check_policy_value
 from guard.executors import passive_api_hop, registry, run_binding
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
 from guard.executors.kubernetes_normal_compile_cache import normal_compile_cache_transport
+from guard.executors.kubernetes_normal_graph_capture import normal_graph_capture_transport
 from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
 from guard.executors.kubernetes_normal_safetensors_reader import normal_safetensors_reader_transport
 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
@@ -151,6 +154,7 @@ def _inspect(source, check, pack, issued_at):
     side_configs = {side: merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES}
     if any(cilium_egress_status_requested(raw) or installed_plugin_inventory_requested(raw)
            or normal_compile_cache_requested(raw)
+           or normal_graph_capture_requested(raw)
            or normal_safetensors_reader_requested(raw)
            or normal_request_latency_requested(raw)
            or normal_serving_readiness_requested(raw)
@@ -172,6 +176,7 @@ def _inspect(source, check, pack, issued_at):
                                  version=env.engine.version) is None:
         raise ValueError('MVP_EXECUTOR_UNAVAILABLE')
     cfg = config.get(check.executor, {})
+    normal_graph_capture = check.id == 'REQ-20' and cfg.get(NORMAL_GRAPH_CAPTURE_OPTION) is True
     normal_safetensors_reader = check.id == 'SUP-12' and cfg.get(NORMAL_SAFETENSORS_READER_OPTION) is True
     normal_compile_cache = check.id == 'SUP-07' and cfg.get(NORMAL_COMPILE_CACHE_OPTION) is True
     normal_startup_load = check.id == 'LIF-01' and cfg.get(NORMAL_STARTUP_LOAD_OPTION) is True
@@ -215,6 +220,16 @@ def _inspect(source, check, pack, issued_at):
             normal_safetensors_reader_transport(target_data, env, duration=1)
         except (KubernetesBindingError, ValueError):
             raise ValueError('NORMAL_SAFETENSORS_READER_TARGET_UNAVAILABLE') from None
+    if normal_graph_capture:
+        try:
+            if get_provider(env.engine.name).evidence_contract('graph_capture_source', env) is None:
+                raise ValueError
+        except ValueError:
+            raise ValueError('NORMAL_GRAPH_CAPTURE_SOURCE_UNAVAILABLE') from None
+        try:
+            normal_graph_capture_transport(target_data, env, duration=1)
+        except (KubernetesBindingError, ValueError):
+            raise ValueError('NORMAL_GRAPH_CAPTURE_TARGET_UNAVAILABLE') from None
     if installed_plugin_inventory:
         try:
             installed_plugin_inventory_transport(target_data, env, duration=1)
@@ -270,6 +285,7 @@ def _inspect(source, check, pack, issued_at):
             'environment_origin': env.data_origin.value, 'implementation': implementation,
             'binding_schema': binding['schema'] if binding else None,
             'files': {role: source[role] for role in files}, 'blocking_codes': blockers,
+            **({NORMAL_GRAPH_CAPTURE_OPTION: True} if normal_graph_capture else {}),
             **({NORMAL_SAFETENSORS_READER_OPTION: True} if normal_safetensors_reader else {}),
             **({NORMAL_COMPILE_CACHE_OPTION: True} if normal_compile_cache else {}),
             **({NORMAL_STARTUP_LOAD_OPTION: True} if normal_startup_load else {}),

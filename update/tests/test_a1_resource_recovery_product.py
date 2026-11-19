@@ -165,6 +165,41 @@ def test_full_two_branches_and_original_76_definition_bytes_remain(tmp_path):
         if p.is_file() and p.relative_to(seed.path).as_posix() not in {'pack.yaml','checks/LIF-11.yaml'}:assert p.read_bytes()==(pack.path/p.relative_to(seed.path)).read_bytes()
 
 
+@pytest.mark.parametrize('mode', ['released-descriptors', 'retained', 'census-failure'])
+def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp_path, group, native_target, mode):
+    from guard.adapters.engine_provider import PROVIDERS
+    from guard.core.run import _normalize
+    from guard.executors.kubernetes_resource_recovery import KubernetesResourceRecoveryExecutor
+
+    world, selected, values_, _ = inputs(tmp_path, group, native_target, mode, 'runtime-failure')
+    target, selection_path = tmp_path / 'target.json', tmp_path / 'selection.json'
+    target.write_bytes(canonical_json(world.target))
+    selection_path.write_bytes(canonical_json(selected))
+    executor = KubernetesResourceRecoveryExecutor({
+        'target': str(target), 'selection': str(selection_path), 'prepared': str(group.manifest_path),
+    }, runner=world.runner)
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['LIF-11']
+    adapter = PROVIDERS[group.env.engine.name].adapter()
+    draft = executor.run(check, group.env, values_, adapter, tmp_path / 'work')
+
+    observations = _normalize(check, draft)['observations']
+    assert set(observations) == {'activation_steps', 'activation_missing', 'activation_violations', 'activation_scope_complete'}
+    assert observations['activation_steps']['collected'] is True
+    step, = observations['activation_steps']['value']
+    assert step['step'] == 'selected-resource-census'
+    resources = {row['id']: row for row in step['resources']}
+    selected_ids = {row['id'] for row in selected['owners'] + selected['resources']}
+    assert set(resources) == selected_ids
+    assert all(row['before_status'] == 'match' for row in resources.values())
+    after = {'released-descriptors': 'absent', 'retained': 'match', 'census-failure': None}
+    assert all(resources[row['id']]['after_status'] == after[mode] for row in selected['resources'])
+    assert observations['activation_missing']['value']
+    assert observations['activation_violations']['value'] is None
+    assert not observations['activation_violations']['collected']
+    assert observations['activation_scope_complete']['value'] is False
+    assert draft.data_origin.value == 'EXAMPLE'
+
+
 @pytest.mark.parametrize('key,value',[('recovery_deadline_basis','auto'),('recovery_branch','ray'),('recovery_expected_ranks',['0','0']),
     ('recovery_max_clock_skew_ms',True),('recovery_required_resource_kinds',['guess']),('recovery_phase','complete')])
 def test_policy_never_infers_deadline_failure_or_ownership(key,value):

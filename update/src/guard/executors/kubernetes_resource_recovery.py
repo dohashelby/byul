@@ -172,7 +172,20 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             'recovery_missing':projection['missing'],'recovery_absolute_deadline_violated':projection['absolute_deadline_violated'],
             'recovery_selected_absence_observed':projection['selected_absence_observed'],'recovery_global_resources_released':False,
             'recovery_next_normal_launch_verified':False,'recovery_scope_complete':False}
-        return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
+        observations = {key: {'value': value, 'collected': True} for key, value in observations.items()}
+        # The baseline pack consumes activation evidence. Retain the selected
+        # census without turning its independent functional deadline into a
+        # security finding about the entire failure and subsequent restart.
+        selected = [row for row in projection['rows'] if row['before_status'] == 'match'
+                    or row['after_status'] in {'match', 'absent', 'replaced'}]
+        step = {'step': 'selected-resource-census', 'resources': selected}
+        observations.update({
+            'activation_steps': {'value': [step] if selected else None, 'collected': bool(selected)},
+            'activation_missing': {'value': projection['missing'], 'collected': True},
+            'activation_violations': {'value': None, 'collected': False},
+            'activation_scope_complete': {'value': False, 'collected': True},
+        })
+        return observations,{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Explicit selected owner/PID/start and descriptor/inode census; unconditional absolute policy deadline violations separate from missing failure/restart/global release.'},[],summary
 
     def _finish(self,ctx):

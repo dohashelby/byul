@@ -11,10 +11,11 @@ from pathlib import Path
 import re
 import time
 
+from guard.adapters.engine_provider import get_provider
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import validate_capture_target
-from guard.runtime.kubernetes_http import KubernetesHTTP, USAGE_CONTROL_PROFILE
+from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesBindingError, KubernetesHTTP, USAGE_CONTROL_PROFILE
 from .content_common import bounded_probe, control_state
 from .http_common import Ctx, functional_requests
 from .kubernetes_lifecycle_capture import KubernetesCaptureError, KubernetesLifecycleReader, supervised_source
@@ -28,21 +29,50 @@ _SNAPSHOT_BYTES = 262144
 _NO_SESSION = "0" * 32
 _OPTOUT_SETTINGS = ("VLLM_NO_USAGE_STATS", "DO_NOT_TRACK")
 _REPORT_PATHS = frozenset({"/root/usage.jsonl", "/root/.config/vllm/usage_stats.json", "/home/guard/.config/vllm/usage_stats.json"})
-_LOCAL_READER = r'''
+_EFFECTIVE_PATHS = {"cache-xdg": "/cache/config/vllm/usage_stats.json",
+                    "root-default": "/root/.config/vllm/usage_stats.json",
+                    "guard-default": "/home/guard/.config/vllm/usage_stats.json"}
+_USAGE_SOURCE_ROOT = "/usr/local/lib/python3.12/dist-packages/vllm"
+_USAGE_SOURCE_FILES = ("envs.py", "usage/usage_lib.py")
+_LOCAL_READER = (f"REPORT_PATHS = {sorted(_REPORT_PATHS)!r}\nEFFECTIVE_PATHS = {_EFFECTIVE_PATHS!r}\n"
+                 f"OPTOUTS = {_OPTOUT_SETTINGS!r}\n" + r'''
 import hashlib,json,os,stat,sys
+
+def identity(info):
+    return (info.st_dev, info.st_ino)
+
+def checked_row(row, opened, missing=None):
+    chain = []
+    for parent, (name, fd) in enumerate(opened):
+        selected = os.fstat(fd)
+        if parent and identity(os.stat(name, dir_fd=opened[parent-1][1], follow_symlinks=False)) != identity(selected):
+            return dict(path=row['path'], exists=None, readable=False)
+        chain.append(hashlib.sha256(('%d:%d' % identity(selected)).encode('ascii')).hexdigest())
+    if missing is not None:
+        try:
+            os.stat(missing, dir_fd=opened[-1][1], follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            return dict(path=row['path'], exists=None, readable=False)
+    return dict(row, directory_chain=chain)
 
 def file_metadata(path):
     row = dict(path=path, exists=None, readable=False)
     parts = path.lstrip('/').split('/')
-    directory = os.open('/', os.O_DIRECTORY | os.O_RDONLY)
-    file_found = False
+    opened = [('/', os.open('/', os.O_DIRECTORY | os.O_RDONLY))]
     try:
         for name in parts[:-1]:
-            child = os.open(name, os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory)
-            os.close(directory)
-            directory = child
-        metadata = os.stat(parts[-1], dir_fd=directory, follow_symlinks=False)
-        file_found = True
+            try:
+                child = os.open(name, os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW, dir_fd=opened[-1][1])
+            except FileNotFoundError:
+                return checked_row(dict(path=path, exists=False, readable=True), opened, missing=name)
+            opened.append((name, child))
+        directory = opened[-1][1]
+        try:
+            metadata = os.stat(parts[-1], dir_fd=directory, follow_symlinks=False)
+        except FileNotFoundError:
+            return checked_row(dict(path=path, exists=False, readable=True), opened, missing=parts[-1])
         if not stat.S_ISREG(metadata.st_mode):
             return row
         fd = os.open(parts[-1], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory)
@@ -60,45 +90,87 @@ def file_metadata(path):
         current = os.stat(parts[-1], dir_fd=directory, follow_symlinks=False)
         if (current.st_dev, current.st_ino, current.st_ctime_ns) != (end.st_dev, end.st_ino, end.st_ctime_ns):
             return row
-        return dict(path=path, exists=True, readable=True, bytes=len(raw), lines=raw.count(b'\n'), sha256=hashlib.sha256(raw).hexdigest())
-    except FileNotFoundError:
-        return row if file_found else dict(path=path, exists=False, readable=True)
+        return checked_row(dict(path=path, exists=True, readable=True, bytes=len(raw), lines=raw.count(b'\n'),
+                                sha256=hashlib.sha256(raw).hexdigest()), opened)
     except OSError:
         return row
     finally:
-        os.close(directory)
+        for _, fd in reversed(opened):
+            os.close(fd)
 
 def start_ticks():
     with open('/proc/1/stat', 'rb') as stream:
         return int(stream.read(4096).rsplit(b')', 1)[1].split()[19])
 
-started = start_ticks()
-names = sys.argv[1].split(',')
-with open('/proc/1/environ', 'rb') as stream:
-    environment = stream.read(1048577)
-if len(environment) > 1048576:
+def selected_environment():
+    with open('/proc/1/environ', 'rb') as stream:
+        environment = stream.read(1048577)
+    if len(environment) > 1048576:
+        raise ValueError('usage process profile unavailable')
+    names = (b'HOME', b'XDG_CONFIG_HOME', b'VLLM_CONFIG_ROOT', *(name.encode() for name in OPTOUTS))
+    selected = {}
+    for item in environment.split(b'\0'):
+        name, sep, value = item.partition(b'=')
+        if name not in names:
+            continue
+        if not sep or name in selected or name == b'VLLM_CONFIG_ROOT':
+            raise ValueError('usage process profile unavailable')
+        selected[name] = value
+    return selected
+
+def report_root(environment):
+    home, xdg = environment.get(b'HOME'), environment.get(b'XDG_CONFIG_HOME')
+    if home == b'/cache/home' and xdg == b'/cache/config':
+        return 'cache-xdg'
+    if home == b'/root' and xdg in (None, b'/root/.config'):
+        return 'root-default'
+    if home == b'/home/guard' and xdg in (None, b'/home/guard/.config'):
+        return 'guard-default'
     raise ValueError('usage process profile unavailable')
-settings = {name: [item.partition(b'=')[2] for item in environment.split(b'\0')
-                   if item.startswith(name.encode() + b'=')] == [b'1'] for name in names}
-files = [file_metadata(path) for path in sys.argv[2:]]
-if start_ticks() != started:
+
+allow_cache, *paths = sys.argv[2:]
+if (sys.argv[1] != ','.join(OPTOUTS) or allow_cache not in ('0', '1')
+        or not paths or not set(paths) <= set(REPORT_PATHS)):
+    raise ValueError('usage report paths unavailable')
+started = start_ticks()
+environment = selected_environment()
+root = report_root(environment)
+if root == 'cache-xdg' and allow_cache != '1':
+    print(json.dumps(dict(gap='effective-source-unverified')))
+    sys.exit()
+settings = {name: environment.get(name.encode()) == b'1' for name in OPTOUTS}
+files = [file_metadata(path) for path in dict.fromkeys([*paths, EFFECTIVE_PATHS[root]])]
+if selected_environment() != environment or start_ticks() != started:
     raise ValueError('usage process changed')
-print(json.dumps(dict(files=files, settings=settings, process_start_ticks=started)))
-'''
+print(json.dumps(dict(files=files, settings=settings, process_start_ticks=started, report_root=root)))
+''')
 
 
-def _local_snapshot_value(value, paths):
-    if (type(value) is not dict or set(value) != {"files", "settings", "process_start_ticks"}
+def _local_snapshot_value(value, paths, allow_cache):
+    if (type(value) is not dict or set(value) != {"files", "settings", "process_start_ticks", "report_root"}
             or type(value["process_start_ticks"]) is not int or value["process_start_ticks"] <= 0
             or type(value["settings"]) is not dict or set(value["settings"]) != set(_OPTOUT_SETTINGS)
             or any(type(setting) is not bool for setting in value["settings"].values())
-            or type(value["files"]) is not list or len(value["files"]) != len(paths)):
+            or type(value["report_root"]) is not str or value["report_root"] not in _EFFECTIVE_PATHS
+            or value["report_root"] == "cache-xdg" and not allow_cache
+            or type(value["files"]) is not list):
+        raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
+    paths = list(dict.fromkeys([*paths, _EFFECTIVE_PATHS[value["report_root"]]]))
+    if len(value["files"]) != len(paths):
         raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
     for row, path in zip(value["files"], paths):
         if type(row) is not dict or row.get("path") != path:
             raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
         common = {"path", "exists", "readable"}
         exists, readable = row.get("exists"), row.get("readable")
+        if readable is True:
+            common.add("directory_chain")
+            chain = row.get("directory_chain")
+            directory_count = path.count("/")
+            if (type(chain) is not list or not 1 <= len(chain) <= directory_count
+                    or exists is True and len(chain) != directory_count
+                    or any(type(digest) is not str or re.fullmatch(r"[a-f0-9]{64}", digest) is None for digest in chain)):
+                raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
         if exists is True and readable is True:
             if (set(row) != common | {"bytes", "lines", "sha256"}
                     or type(row["bytes"]) is not int or type(row["lines"]) is not int
@@ -108,6 +180,49 @@ def _local_snapshot_value(value, paths):
         elif set(row) != common or not (exists is False and readable is True or exists is None and readable is False):
             raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
     return value
+
+
+def _stable_local_reports(before, after):
+    """Ignore replacements of previously observed folders, but allow genuine creation."""
+    old = {row["path"]: row for row in before["files"]}
+    stable_files = []
+    for row in after["files"]:
+        earlier = old[row["path"]]
+        prior_chain = earlier.get("directory_chain", [])
+        chain = row.get("directory_chain", [])
+        # Losing a prior ancestor also prevents comparing this path.
+        stable_files.append(row if chain[:len(prior_chain)] == prior_chain else {**row, "readable": False})
+    return new_reports(before, {"files": stable_files})
+
+
+def _usage_source(ctx):
+    """Only separately reviewed release profiles may add the fixed XDG path."""
+    try:
+        source = get_provider(ctx.env.engine.name).evidence_contract("usage_report_source", ctx.env)
+    except (AttributeError, ValueError):
+        return None
+    if (type(source) is not dict or source.keys() != {"source_root", "file_sha256", "filename"}
+            or source["source_root"] != _USAGE_SOURCE_ROOT or source["filename"] != "usage_stats.json"
+            or type(source["file_sha256"]) is not dict or source["file_sha256"].keys() != set(_USAGE_SOURCE_FILES)
+            or any(type(digest) is not str or re.fullmatch(r"[a-f0-9]{64}", digest) is None
+                   for digest in source["file_sha256"].values())):
+        return None
+    return source
+
+
+def _verify_usage_source(transport, source):
+    if transport is None:
+        return False
+    try:
+        files = [{"root": 0, "relative": name} for name in _USAGE_SOURCE_FILES]
+        rows = transport.engine_supply_hashes([source["source_root"]], files)
+        observed = {row["relative"]: row["sha256"] for row in rows if row["state"] == "hashed"
+                    and type(row["root"]) is int and row["root"] == 0}
+        report = transport.report()
+        return (len(rows) == len(observed) and observed == source["file_sha256"]
+                and not report["collection_gap"] and not report["cleanup_errors"])
+    except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
+        return False
 
 
 def _complete_control(result):
@@ -139,7 +254,8 @@ class _UsageReader(KubernetesLifecycleReader):
         raw = super()._request(args, deadline=deadline, cap=cap)
         if self._local and args[1:3] == ["get", "pod"]:
             pod = strict_json(raw, limit=cap)
-            if pod.get("spec", {}).get("shareProcessNamespace", False) is not False:
+            spec = pod.get("spec", {})
+            if any(spec.get(key, False) is not False for key in ("hostPID", "shareProcessNamespace")):
                 self.gap = True
                 raise KubernetesCaptureError()
         return raw
@@ -149,7 +265,8 @@ class _UsageReader(KubernetesLifecycleReader):
             raise KubernetesCaptureError()
         if self._local:
             if (not self._sink and self._paths and set(self._paths) <= _REPORT_PATHS and max_bytes == _SNAPSHOT_BYTES
-                    and argv == ["python3", "-c", _LOCAL_READER, ",".join(_OPTOUT_SETTINGS), *self._paths]):
+                    and len(argv) == 5 + len(self._paths) and argv[4] in ("0", "1")
+                    and argv == ["python3", "-c", _LOCAL_READER, ",".join(_OPTOUT_SETTINGS), argv[4], *self._paths]):
                 return "usage"
             raise KubernetesCaptureError()
         if (not self._sink and self._paths and max_bytes == _SNAPSHOT_BYTES
@@ -251,11 +368,26 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         if len(requests) != 1:
             raise ValueError("KUBERNETES_USAGE_LOCAL_CONTROL_UNAVAILABLE")
         transport = ctx.cprobe._transport
-        paths = ctx.policy_values["usage_report_paths"]
-        reader = self._reader(ctx, ctx.target, paths=paths, local_transport=transport)
-        before = self._local_snapshot(reader, paths)
+        policy_paths = ctx.policy_values["usage_report_paths"]
+        reader = self._reader(ctx, ctx.target, paths=policy_paths, local_transport=transport)
+        source = _usage_source(ctx)
+        source_reader = None
+        if source:
+            try:
+                source_reader = KubernetesHTTP(ctx.target, ctx.env, duration=ctx._usage_duration,
+                    binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner,
+                    profile=ENGINE_CALLBACK_PROFILE, clock=transport.clock)
+                source_reader.deadline = transport.deadline
+            except (TypeError, ValueError, KubernetesBindingError):
+                pass
+        qualified = _verify_usage_source(source_reader, source)
+        source_gaps = []
+        before = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
         after = None
-        attempted = bool(before and all(before["settings"].values()))
+        effective = _EFFECTIVE_PATHS[before["report_root"]] if before else None
+        paths = list(dict.fromkeys([*policy_paths, *([effective] if effective else [])]))
+        before_effective = next((row for row in before["files"] if row["path"] == effective), None) if before else None
+        attempted = bool(before_effective and before_effective["readable"] and all(before["settings"].values()))
         outcome = "no_response"
         if attempted:
             result = bounded_probe(ctx, ctx.trusted_net, requests[0])
@@ -264,29 +396,39 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
             wait = self.cfg.get("usage_wait_seconds", 5)
             if wait < transport.deadline - transport.clock():
                 time.sleep(wait)
-                after = self._local_snapshot(reader, paths)
+                if effective == _EFFECTIVE_PATHS["cache-xdg"]:
+                    qualified = _verify_usage_source(source_reader, source)
+                after = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
 
-        diagnostics = []
+        diagnostics = sorted(set(source_gaps))
         if before is None:
             diagnostics.append("USAGE_REPORT_BASELINE_UNAVAILABLE")
-        elif not attempted:
+        elif not all(before["settings"].values()):
             diagnostics.append("USAGE_OPTOUT_UNVERIFIED")
+        elif not before_effective["readable"]:
+            diagnostics.append("USAGE_EFFECTIVE_REPORT_PATH_UNAVAILABLE")
         if attempted and after is None:
             diagnostics.append("USAGE_REPORT_AFTER_UNAVAILABLE")
         if attempted and outcome != "pass":
             diagnostics.append("USAGE_NORMAL_CONTROL_UNVERIFIED")
         owner_stable = bool(before and after and before["process_start_ticks"] == after["process_start_ticks"])
-        settings_stable = bool(owner_stable and before["settings"] == after["settings"])
+        settings_stable = bool(owner_stable and before["settings"] == after["settings"]
+                               and before["report_root"] == after["report_root"])
         if before and after and not settings_stable:
             diagnostics.append("USAGE_PROCESS_OR_SETTINGS_CHANGED")
-        fresh, gaps = new_reports(before, after) if settings_stable and outcome == "pass" else ([], paths)
+        fresh, gaps = _stable_local_reports(before, after) if settings_stable and outcome == "pass" else ([], paths)
         if gaps:
             diagnostics.append("USAGE_LOCAL_PATHS_UNAVAILABLE")
         reader_report = reader.report()
         ctx._usage_local_cleanup = (["USAGE_READER_PARENT_CLEANUP_UNVERIFIED"]
                                     if reader_report.get("parent_cleanup_unverified") else [])
+        if source_reader is not None:
+            ctx._usage_local_cleanup.extend(source_reader.report()["cleanup_errors"])
         observed_paths = set(paths) - set(gaps)
-        ctx._usage_gap = bool(not observed_paths or reader.gap or ctx._usage_local_cleanup)
+        effective_verified = effective in observed_paths
+        if attempted and settings_stable and outcome == "pass" and not effective_verified:
+            diagnostics.append("USAGE_EFFECTIVE_REPORT_PATH_UNAVAILABLE")
+        ctx._usage_gap = bool(not effective_verified or reader.gap or ctx._usage_local_cleanup)
         reports = [{"path_sha256": sha256_hex(row["path"].encode()), "bytes": row["bytes"],
                     "lines": row["lines"], "sha256": row["sha256"]} for row in fresh]
         settings = {name: "1" for name, enabled in before["settings"].items() if enabled} if before else None
@@ -307,6 +449,10 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         challenges = [{"step": step, "attempted": False} for step in ctx.check.challenge_steps]
         summary = {"profile": SILENCE_PROFILE, "local_observation_only": True, "target_sha256": transport.target_sha256,
                    "diagnostic_codes": diagnostics, "owner_and_optouts_stable": settings_stable,
+                   "effective_report_path_observed": effective_verified,
+                   "effective_report_path_sha256": sha256_hex(effective.encode()) if effective_verified else None,
+                   "effective_source_contract_sha256": (sha256_hex(canonical_json(source))
+                       if effective_verified and effective == _EFFECTIVE_PATHS["cache-xdg"] else None),
                    "local_paths_complete": not gaps, "unverified_paths": [sha256_hex(path.encode()) for path in gaps],
                    "observed_paths": sorted(sha256_hex(path.encode()) for path in observed_paths),
                    "local_snapshot_presence": {
@@ -318,14 +464,19 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                                "probe_source_sha256": transport.source_sha256}}
         return observations, normal, challenges, summary
 
-    def _local_snapshot(self, reader, paths):
+    def _local_snapshot(self, reader, paths, qualified, source_gaps):
         try:
             result = reader.exec_bounded(reader.binding["engine"]["container"],
-                                         ["python3", "-c", _LOCAL_READER, ",".join(_OPTOUT_SETTINGS), *paths],
+                                         ["python3", "-c", _LOCAL_READER, ",".join(_OPTOUT_SETTINGS),
+                                          "1" if qualified else "0", *paths],
                                          timeout=5, max_bytes=_SNAPSHOT_BYTES)
             if result.owner_binding_verified is not True:
                 raise KubernetesCaptureError()
-            return _local_snapshot_value(strict_json(result.stdout.encode(), limit=_SNAPSHOT_BYTES), paths)
+            value = strict_json(result.stdout.encode(), limit=_SNAPSHOT_BYTES)
+            if value == {"gap": "effective-source-unverified"}:
+                source_gaps.append("USAGE_EFFECTIVE_REPORT_SOURCE_UNVERIFIED")
+                return None
+            return _local_snapshot_value(value, paths, qualified)
         except (KubernetesCaptureError, AttributeError, ValueError, TypeError, OSError):
             return None
 

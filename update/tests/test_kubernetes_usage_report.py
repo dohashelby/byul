@@ -84,17 +84,22 @@ def test_registry_sends_only_usage_profiles_to_the_new_executor_and_rejects_unkn
 LOCAL_PATHS = ['/root/usage.jsonl', '/home/guard/.config/vllm/usage_stats.json']
 LOCAL_VALUES = {'usage_allowed': False, 'usage_report_paths': LOCAL_PATHS, 'usage_settings_fresh_process': True}
 PRIVATE = 'EXAMPLE-USAGE-RAW-MUST-NOT-PERSIST'
+CACHE_PATH = '/cache/config/vllm/usage_stats.json'
+CACHE_ENV = b'HOME=/cache/home\0XDG_CONFIG_HOME=/cache/config\0'
+OPTOUT_ENV = b'VLLM_NO_USAGE_STATS=1\0DO_NOT_TRACK=1\0'
+SOURCE = {'source_root': module._USAGE_SOURCE_ROOT, 'filename': 'usage_stats.json',
+          'file_sha256': {'envs.py': '1' * 64, 'usage/usage_lib.py': '2' * 64}}
 
 
 def test_local_reader_projects_only_optouts_and_regular_file_metadata(tmp_path, monkeypatch, capsys):
-    normal = tmp_path / 'report.json'
+    legacy = ['/root/usage.jsonl', '/root/.config/vllm/usage_stats.json', '/home/guard/.config/vllm/usage_stats.json']
+    normal, missing, alias, raced = (tmp_path / path.lstrip('/') for path in [*legacy, CACHE_PATH])
+    for path in (normal, alias, raced):
+        path.parent.mkdir(parents=True)
     normal.write_text(PRIVATE, encoding='utf-8')
-    missing = tmp_path / 'missing.json'
-    alias = tmp_path / 'link.json'
     alias.symlink_to(normal)
-    raced = tmp_path / 'raced.json'
     raced.write_text(PRIVATE, encoding='utf-8')
-    fake_proc = {'/proc/1/environ': b'VLLM_NO_USAGE_STATS=1\0DO_NOT_TRACK=1\0VLLM_USAGE_STATS_SERVER=' + PRIVATE.encode(),
+    fake_proc = {'/proc/1/environ': CACHE_ENV + OPTOUT_ENV + b'VLLM_USAGE_STATS_SERVER=' + PRIVATE.encode(),
                  '/proc/1/stat': b'1 (engine) ' + b'0 ' * 19 + b'88'}
     original_open = builtins.open
     original_os_open = os.open
@@ -105,27 +110,76 @@ def test_local_reader_projects_only_optouts_and_regular_file_metadata(tmp_path, 
         return original_open(path, *args, **kwargs)
 
     def race_after_stat(path, *args, **kwargs):
-        if path == raced.name:
+        if path == '/':
+            path = tmp_path
+        if path == raced.name and kwargs.get('dir_fd') is not None:
             raced.unlink()
         return original_os_open(path, *args, **kwargs)
 
     with monkeypatch.context() as patch:
         patch.setattr(builtins, 'open', owned_proc)
         patch.setattr(os, 'open', race_after_stat)
-        patch.setattr(sys, 'argv', ['reader', ','.join(module._OPTOUT_SETTINGS), *map(str, (normal, missing, alias, raced))])
+        patch.setattr(sys, 'argv', ['reader', ','.join(module._OPTOUT_SETTINGS), '1', *legacy])
         exec(compile(module._LOCAL_READER, 'local usage reader', 'exec'), {})
     output = capsys.readouterr().out
     assert PRIVATE not in output
-    rows = module._local_snapshot_value(json.loads(output), list(map(str, (normal, missing, alias, raced))))
+    rows = module._local_snapshot_value(json.loads(output), legacy, True)
+    assert rows['report_root'] == 'cache-xdg'
     assert rows['settings'] == {'VLLM_NO_USAGE_STATS': True, 'DO_NOT_TRACK': True}
     assert rows['process_start_ticks'] == 88
     assert [row['exists'] for row in rows['files']] == [True, False, None, None]
 
 
+@pytest.mark.parametrize(('env', 'allow_cache', 'exit_type'), [
+    (CACHE_ENV + b'HOME=/cache/home\0', '1', ValueError),
+    (CACHE_ENV + b'VLLM_CONFIG_ROOT=/cache/config/vllm\0', '1', ValueError),
+    (b'HOME=/cache/home\0XDG_CONFIG_HOME=/other/config\0', '1', ValueError),
+    (CACHE_ENV, '0', SystemExit),
+])
+def test_pid1_reader_rejects_unbound_active_location_before_any_file_read(monkeypatch, capsys, env, allow_cache, exit_type):
+    reads = []
+
+    def proc(path, *_args):
+        reads.append(path)
+        return io.BytesIO(env + OPTOUT_ENV if path == '/proc/1/environ' else b'1 (engine) ' + b'0 ' * 19 + b'88')
+
+    with monkeypatch.context() as patch:
+        patch.setattr(builtins, 'open', proc)
+        patch.setattr(os, 'open', lambda *_args, **_kwargs: pytest.fail('unbound report read'))
+        patch.setattr(sys, 'argv', ['reader', ','.join(module._OPTOUT_SETTINGS), allow_cache, *LOCAL_PATHS])
+        with pytest.raises(exit_type):
+            exec(compile(module._LOCAL_READER, 'local usage reader', 'exec'), {})
+    assert reads == ['/proc/1/stat', '/proc/1/environ']
+    assert capsys.readouterr().out.strip() == ('{"gap": "effective-source-unverified"}' if exit_type is SystemExit else '')
+
+
+@pytest.mark.parametrize(('home', 'root'), [
+    ('/root', 'root-default'), ('/home/guard', 'guard-default'),
+])
+def test_pid1_reader_keeps_conventional_roots_without_native_source_contract(tmp_path, monkeypatch, capsys, home, root):
+    original_os_open = os.open
+
+    def proc(path, *_args):
+        return io.BytesIO(f'HOME={home}\0'.encode() + OPTOUT_ENV if path == '/proc/1/environ'
+                          else b'1 (engine) ' + b'0 ' * 19 + b'88')
+
+    def rooted_open(path, *args, **kwargs):
+        return original_os_open(tmp_path if path == '/' else path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(builtins, 'open', proc)
+        patch.setattr(os, 'open', rooted_open)
+        patch.setattr(sys, 'argv', ['reader', ','.join(module._OPTOUT_SETTINGS), '0', *LOCAL_PATHS])
+        exec(compile(module._LOCAL_READER, 'local usage reader', 'exec'), {})
+    snapshot = module._local_snapshot_value(json.loads(capsys.readouterr().out), LOCAL_PATHS, False)
+    assert snapshot['report_root'] == root
+    assert all(row['exists'] is False for row in snapshot['files'])
+
+
 class LocalUsageWorld(FullWorld):
     def __init__(self, target, mode):
         super().__init__(target)
-        self.mode, self.snapshots, self.controls = mode, 0, 0
+        self.mode, self.snapshots, self.controls, self.source_reads = mode, 0, 0, 0
 
     def runner(self, argv, **kwargs):
         if 'get' in argv and 'namespace' in argv:
@@ -135,21 +189,42 @@ class LocalUsageWorld(FullWorld):
         elif 'exec' in argv and 'input_bytes' not in kwargs:
             engine = self.target['kubernetes']['engine']
             assert engine['pod'] in argv and '--container=' + engine['container'] in argv
-            assert argv[-3:] == [','.join(module._OPTOUT_SETTINGS), *LOCAL_PATHS]
+            assert argv[-4] == ','.join(module._OPTOUT_SETTINGS) and argv[-2:] == LOCAL_PATHS
             assert module.supervised_source(module._LOCAL_READER) in argv
             assert 'VLLM_USAGE_STATS_SERVER' not in module._LOCAL_READER
             self.snapshots += 1
-            files = [{'path': path, 'exists': False, 'readable': True} for path in LOCAL_PATHS]
+            cache = self.mode.startswith('cache')
+            if cache and argv[-3] == '0':
+                value = {'gap': 'effective-source-unverified'}
+                return {'returncode': 0, 'stdout_bytes': canonical_json(value),
+                        'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
+            paths = [*LOCAL_PATHS, CACHE_PATH] if cache else LOCAL_PATHS
+            files = [{'path': path, 'exists': False, 'readable': True,
+                      'directory_chain': ['f' * 64] * path.count('/')} for path in paths]
             if self.mode in ('one-unreadable', 'all-unreadable'):
                 for row in files[:1 if self.mode == 'one-unreadable' else 2]:
                     row.update(exists=None, readable=False)
-            if self.mode == 'new' and self.snapshots == 2:
-                files[0].update(exists=True, bytes=42, lines=1, sha256='a' * 64)
+                    del row['directory_chain']
+            if self.mode in ('new', 'cache-new') and self.snapshots == 2:
+                files[-1 if cache else 0].update(exists=True, bytes=42, lines=1, sha256='a' * 64)
+            if self.mode == 'cache-folder-changed' and self.snapshots == 2:
+                files[-1]['directory_chain'][-1] = '0' * 64
             value = {'files': files, 'settings': {'VLLM_NO_USAGE_STATS': self.mode != 'optout-missing', 'DO_NOT_TRACK': True},
-                     'process_start_ticks': 90 if self.mode == 'process-changed' and self.snapshots == 2 else 88}
+                     'process_start_ticks': 90 if self.mode == 'process-changed' and self.snapshots == 2 else 88,
+                     'report_root': 'cache-xdg' if cache else 'guard-default'}
         elif 'exec' in argv and 'input_bytes' in kwargs:
+            payload = json.loads(kwargs['input_bytes'])
+            if 'files' in payload:
+                self.source_reads += 1
+                assert self.mode.startswith('cache') and payload['roots'] == [SOURCE['source_root']]
+                files = [{'root': 0, 'relative': row['relative'], 'state': 'hashed',
+                          'sha256': SOURCE['file_sha256'][row['relative']]} for row in payload['files']]
+                if self.mode == 'cache-source-change' and self.source_reads == 2:
+                    files[0]['sha256'] = 'a' * 64
+                return {'returncode': 0, 'stdout_bytes': canonical_json({'files': files}),
+                        'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
             self.controls += 1
-            request, = json.loads(kwargs['input_bytes'])['requests']
+            request, = payload['requests']
             assert request['id'] == 'usage-control' and request['headers'] == {}
             assert request['body'] == {'model': 'fixture-model', 'prompt': 'ping', 'max_tokens': 1}
             body = json.dumps({'model': 'fixture-model', 'choices': [{'text': PRIVATE, 'finish_reason': 'length'}],
@@ -159,9 +234,9 @@ class LocalUsageWorld(FullWorld):
                       'capture_complete': True, 'utf8_valid': True, 'eof': self.mode != 'partial-control', 'body_truncated': False}]
         else:
             result = super().runner(argv, **kwargs)
-            if self.mode == 'shared-pid' and 'get' in argv and 'pod' in argv:
+            if self.mode in ('shared-pid', 'host-pid') and 'get' in argv and 'pod' in argv:
                 pod = json.loads(result['stdout_bytes'])
-                pod['spec']['shareProcessNamespace'] = True
+                pod['spec']['shareProcessNamespace' if self.mode == 'shared-pid' else 'hostPID'] = True
                 result['stdout_bytes'] = canonical_json(pod)
             result['capture'].update(bounded_at_source=True, timed_out=False, truncated=False)
             return result
@@ -172,12 +247,23 @@ class LocalUsageWorld(FullWorld):
 @pytest.mark.parametrize('mode,completed,collected,verdict', [
     ('absent', True, True, 'UNKNOWN'), ('new', True, True, 'FAIL'), ('one-unreadable', True, False, 'UNKNOWN'),
     ('all-unreadable', False, False, 'UNKNOWN'), ('optout-missing', False, False, 'UNKNOWN'),
-    ('process-changed', False, False, 'UNKNOWN'), ('partial-control', False, False, 'UNKNOWN'), ('shared-pid', False, False, 'UNKNOWN'),
+    ('process-changed', False, False, 'UNKNOWN'), ('partial-control', False, False, 'UNKNOWN'),
+    ('shared-pid', False, False, 'UNKNOWN'), ('host-pid', False, False, 'UNKNOWN'),
+    ('cache-absent', True, True, 'UNKNOWN'), ('cache-new', True, True, 'FAIL'),
+    ('cache-folder-changed', False, False, 'UNKNOWN'), ('cache-source-change', False, False, 'UNKNOWN'),
+    ('cache-unqualified', False, False, 'UNKNOWN'),
 ])
-def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, mode, completed, collected, verdict):
+def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monkeypatch, mode, completed, collected, verdict):
     env, target = full_inputs()
     target['lab'] = False
     world = LocalUsageWorld(target, mode)
+    with_source = mode.startswith('cache') and mode != 'cache-unqualified'
+
+    def evidence_contract(name, bound_env):
+        assert name == 'usage_report_source' and bound_env is env
+        return SOURCE if with_source else None
+
+    monkeypatch.setattr(module, 'get_provider', lambda _name: SimpleNamespace(evidence_contract=evidence_contract))
     target_path = tmp_path / 'target.json'
     target_path.write_bytes(canonical_json(target))
     pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
@@ -186,8 +272,11 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, mode
                                                     'usage_wait_seconds': 0}, runner=world.runner,
                                                    expected_target_sha256=sha256_hex(canonical_json(target)))
     draft = executor.run(check, env, LOCAL_VALUES, VllmAdapter(), tmp_path / 'work')
-    assert world.snapshots == {'optout-missing': 1, 'shared-pid': 0}.get(mode, 2)
-    assert world.controls == (0 if mode in {'optout-missing', 'shared-pid'} else 1)
+    assert world.snapshots == {'optout-missing': 1, 'shared-pid': 0, 'host-pid': 0,
+                               'all-unreadable': 1, 'cache-unqualified': 1}.get(mode, 2)
+    assert world.controls == (0 if mode in {'optout-missing', 'shared-pid', 'host-pid',
+                                           'all-unreadable', 'cache-unqualified'} else 1)
+    assert world.source_reads == (2 if with_source else 0)
     assert draft.status == (ExecStatus.COMPLETED if completed else ExecStatus.ABORTED)
     assert draft.data_origin.value == 'EXAMPLE'
     assert draft.observations['usage_new_local_reports'].collected is collected
@@ -199,7 +288,11 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, mode
                                           normal=draft.normal_control.model_dump()),
                             policy(pack.ref(), values={'OBS-04': LOCAL_VALUES}), T0)
     assert result.verdicts.security.value == verdict
-    assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
+    assert all(raw not in artifact.path.read_bytes() for artifact in draft.artifacts
+               for raw in (PRIVATE.encode(), CACHE_PATH.encode(), b'/cache/home', SOURCE['source_root'].encode()))
+    if mode == 'cache-new':
+        reports = draft.observations['usage_new_local_reports'].value
+        assert [report['path_sha256'] for report in reports] == [sha256_hex(CACHE_PATH.encode())]
 
 
 @pytest.mark.parametrize('change', ['missing-hash', 'wrong-hash', 'lab', 'sink', 'path', 'allowed', 'sibling'])
@@ -233,6 +326,7 @@ def test_declared_environment_preserves_actual_bound_capture_origin(tmp_path, mo
     target.update(lab=False, environment_ref=env.ref().model_dump(mode='json'))
     target['model_mapping']['environment_ref'] = target['environment_ref']
     world = LocalUsageWorld(target, mode)
+    monkeypatch.setattr(module, 'get_provider', lambda _name: SimpleNamespace(evidence_contract=lambda *_: None))
     monkeypatch.setattr(kubernetes_lifecycle_capture, 'capture_pipes', world.runner)
     monkeypatch.setattr(kubernetes_http, 'capture_pipes', world.runner)
     target_path = tmp_path / 'target.json'

@@ -885,6 +885,11 @@
       "manifest_sha256": "1d3349f63f334df8177abfda8f41bb11fdbf59892d802955006de9f09f036180",
       "reviewed_by": "Codex / Gateway preflight and owned source observations / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T05:58:43+00:00"
+    },
+    {
+      "manifest_sha256": "eb894f7f19633fa7e5e8dacf30de24ee0ae41522ab6a65ece795fa6139614980",
+      "reviewed_by": "Codex / owned LIF-11 census phase binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T06:00:10+00:00"
     }
   ]
 }

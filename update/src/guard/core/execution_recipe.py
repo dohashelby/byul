@@ -88,40 +88,45 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     from guard.executors.run_binding import INITIALIZATION_CHECKS, initialization_recipe_digests
     sides = {s: None for s in cfg.get('sides', {})}
     if len(environments) == 2: sides.update(zip(('baseline', 'candidate'), environments))
-    redeploy_inputs = {}
+    transition_inputs = {}
     redeploy_identities = {}
     redeploy_conflicts = set()
     update = cfg.get('update', {})
     permitted = update.get('allowed_checks')
     paired_external = len(environments) == 2 and update.get('mode', 'external') == 'external'
-    init_checks = []
+    eligible = {}
     if paired_external and plan is not None and plan.mode == Mode.update:
-        init_checks = [item.check_id for item in plan.items if item.selected and not item.gaps
-                       and item.executor == 'initialization' and item.check_id in INITIALIZATION_CHECKS
-                       and (type(permitted) is not list or item.check_id in permitted)]
+        eligible = {item.check_id: item.executor for item in plan.items if item.selected and not item.gaps
+                    and (type(permitted) is not list or item.check_id in permitted)}
+    init_checks = [check_id for check_id, executor in eligible.items()
+                   if executor == 'initialization' and check_id in INITIALIZATION_CHECKS]
+    transition_checks = REDEPLOY_CHECKS
+    if eligible.get('LIF-06') == 'lifecycle_transition':
+        transition_checks = REDEPLOY_CHECKS | {'LIF-06'}
     init_inputs = {}
     for side, env in sides.items():
         effective = merge_config(cfg, cfg.get('sides', {}).get(side, {}))
         factories(effective, side, env)
         bindings = effective.get('run_binding')
-        # Stage-2 redeploy inputs use a list of per-generation files rather
+        # Stage-2 transition inputs use a list of per-generation files rather
         # than the one target path committed by the generic recipe visitor.
         if paired_external and side in ('baseline', 'candidate') and effective.get('executors', {}).get('lifecycle_transition') == 'kubernetes':
-            for check_id in sorted(REDEPLOY_CHECKS):
+            for check_id in sorted(transition_checks):
                 if (type(bindings) is not dict or check_id not in bindings
                         or type(permitted) is list and check_id not in permitted):
                     continue
-                identities = set()
+                identities = set() if check_id in REDEPLOY_CHECKS else None
                 try:
                     settings = for_check(effective, 'lifecycle_transition', check_id)['lifecycle_transition']
                     digest = sha256_hex(canonical_json(inputs_manifest(settings, generation_identities=identities)))
                 except (KeyError, TypeError, ValueError, OSError):
                     digest = None
-                previous = redeploy_identities.setdefault(check_id, set())
-                if redeployment_side_reuse(previous, identities):
-                    redeploy_conflicts.add(check_id)
-                previous.update(identities)
-                redeploy_inputs[side + ':' + check_id] = digest
+                if identities is not None:
+                    previous = redeploy_identities.setdefault(check_id, set())
+                    if redeployment_side_reuse(previous, identities):
+                        redeploy_conflicts.add(check_id)
+                    previous.update(identities)
+                transition_inputs[side + ':' + check_id] = digest
         if (init_checks and side in ('baseline', 'candidate') and type(bindings) is dict
                 and effective.get('executors', {}).get('initialization') == 'kubernetes'):
             for check_id in init_checks:
@@ -138,7 +143,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
         # this diagnostic, so unused bindings cannot block another check.
         transition_manifests.update({
             key: REDEPLOY_SIDE_REUSE if key.split(':')[1] in redeploy_conflicts else digest
-            for key, digest in redeploy_inputs.items()})
+            for key, digest in transition_inputs.items()})
     # Commit the actual installed common implementation, not a manifest's
     # assertion about its own bytes. This is outside the measured trial.
     package = Path(__file__).parents[1]
@@ -146,8 +151,8 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
         for p in sorted(package.rglob('*')) if p.is_file() and p.suffix in {'.py', '.json', '.yaml', '.txt'}}
     recipe = {'schema': 'guard-execution-recipe/1', 'requested': normalize(cfg),
               'inputs': inputs, 'implementations': implementations, 'software_sha256': sha256_hex(canonical_json(software))}
-    if redeploy_inputs:
-        recipe['transition_manifest_sha256_by_side_check'] = redeploy_inputs
+    if transition_inputs:
+        recipe['transition_manifest_sha256_by_side_check'] = transition_inputs
     if init_inputs:
         recipe['initialization_file_sha256_by_side_check'] = init_inputs
     if initialization_digests is not None:

@@ -330,7 +330,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                             or any(digest is None for digest in cfg.normal_file_read_sha256.values())):
                         raise run_binding.RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_FILES_UNAVAILABLE')
                     target_options["expected_normal_file_sha256"] = cfg.normal_file_read_sha256
-            if (transition_manifests is not None and check.id in REDEPLOY_CHECKS
+            if (transition_manifests is not None and (check.id == 'LIF-06' or check.id in REDEPLOY_CHECKS)
                     and check.executor == 'lifecycle_transition' and cfg.executors[item.executor] == 'kubernetes'
                     and 2 in run_binding.stages_for(check)):
                 expected_manifest = transition_manifests.get(common["side"].value + ":" + check.id)

@@ -15,7 +15,8 @@ from guard.core.execution_recipe import bind_recipe
 from guard.core.run import run_plan
 from guard.core.select import select
 from guard.executors import lifecycle_transition
-from guard.models import ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
+from guard.executors.base import EvidenceDraft
+from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import environment, policy
@@ -155,11 +156,12 @@ def test_side_reuse_blocks_the_transition_and_leaves_unselected_inputs_nonblocki
 
 
 @pytest.mark.parametrize("replace_after_check", [False, True])
-def test_run_rejects_changed_generation_manifest_before_runtime(external, tmp_path, monkeypatch, replace_after_check):
+@pytest.mark.parametrize("check_id", ["LIF-05", "LIF-06"])
+def test_run_rejects_changed_generation_manifest_before_runtime(
+        external, tmp_path, monkeypatch, replace_after_check, check_id):
     from guard.core import run as core_run
 
-    check_id = "LIF-05"
-    pack, envs, pol, cfg = _configuration(external, check_id)
+    pack, envs, pol, cfg = _configuration(external, check_id, change="same-owner" if check_id == "LIF-06" else None)
     store = Store(tmp_path / "store")
     plan = _bound_plan(store, pack, envs, pol, cfg)
     target = Path(cfg["sides"]["candidate"]["check_config"][check_id]["generations"][1]["target"])
@@ -184,3 +186,36 @@ def test_run_rejects_changed_generation_manifest_before_runtime(external, tmp_pa
         with pytest.raises(ValueError, match="EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED"):
             run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
         assert not store.find_latest("EVD", lambda row: row.plan == plan.ref())
+
+
+def test_lif06_pins_selected_live_generations_with_a_shared_owner(external, tmp_path, monkeypatch):
+    pack, envs, pol, cfg = _configuration(external, "LIF-06", change="same-owner")
+    del cfg["update"]["allowed_checks"]
+    store = Store(tmp_path / "store")
+    plan = _bound_plan(store, pack, envs, pol, cfg)
+    candidate = cfg["sides"]["candidate"]["check_config"]["LIF-06"]
+    digest = sha256_hex(canonical_json(lifecycle_transition.inputs_manifest(candidate)))
+
+    def collect(executor, check, env, values, *_args):
+        generations, manifest = executor.prepared_generations(check, env, values)
+        old, new = generations["old"], generations["new"]
+        assert old.target["kubernetes"]["engine"] == new.target["kubernetes"]["engine"]
+        assert old.env.ref() != new.env.ref() and old.prepared["session"] != new.prepared["session"]
+        assert sha256_hex(canonical_json(manifest)) == digest
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={"attempted": False})
+
+    monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", collect)
+    monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
+    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+    assert evidence.execution.status == ExecStatus.COMPLETED
+    assert evidence.execution.run_binding["values"]["transition_inputs_sha256"] == digest
+
+    other = policy(pack.ref(), id="POL-UNRELATED-LIF06-EXAMPLE", scope={"include": ["SUP-10"]}, values={})
+    unselected = _bound_plan(store, pack, envs, other, cfg)
+    target_path = Path(candidate["generations"][1]["target"])
+    changed = json.loads(target_path.read_bytes())
+    changed["comparison_config"] = {"EXAMPLE_launch_label": "different"}
+    _write(target_path, changed)
+    evidence, = run_plan(store, pack, unselected, application.run_config(cfg), only_side=Side.candidate)
+    assert evidence.check_id == "SUP-10" and evidence.execution.status == ExecStatus.NOT_RUN

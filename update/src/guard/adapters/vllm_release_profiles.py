@@ -20,3 +20,15 @@ def http_profile(version, image):
     if row is None or image not in row['images'] or 'http' not in row:
         return None
     return {**row['http'], 'pin_status': row['pin_status']}
+
+
+def usage_report_profile(env):
+    """Select the stock local-report source candidates for the exact image."""
+    engine = env.engine
+    row = release_profile(engine.version)
+    if engine.name != 'vllm' or row is None or engine.image_digest not in row['images']:
+        return None
+    source = row.get('usage_report_source')
+    if source is None or engine.source_commit not in {None, source['source_commit']}:
+        return None
+    return {key: source[key] for key in ('source_root', 'file_sha256', 'filename')}

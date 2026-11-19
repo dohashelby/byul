@@ -253,6 +253,15 @@
         "profiler_directory_env": null
       },
       "qualification": "기동 명령은 레지스트리 config·태그 소스 근거다. 설치 파일 고정값·GPU 실측·생산자 등록을 대신하지 않는다.",
+      "usage_report_source": {
+        "source_commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
+        "source_root": "/usr/local/lib/python3.12/dist-packages/vllm",
+        "file_sha256": {
+          "envs.py": "fbd370b2f56ff798d373e85705c9e044ccae893ef974f2800eec4ef6f2b4fb7f",
+          "usage/usage_lib.py": "26150a9e2a0fad4e51bacb6435e4e739be765db3645dc23b132d628bedc7f8f3"
+        },
+        "filename": "usage_stats.json"
+      },
       "http": {
         "error_envelope": "nested-error",
         "length_error_format": "input-output-with-parameter",
@@ -340,6 +349,15 @@
         "env": {}
       },
       "qualification": "기동 데이터는 aws-handoff-20261026 및 docs/gpu-a/ENVIRONMENT.md의 amd64 이미지 고정과 과거 GPU 기동 기록을 근거로 한다. 새 실행의 설치 파일·제품 증거·생산자 자격은 별도 확인한다.",
+      "usage_report_source": {
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "source_root": "/usr/local/lib/python3.12/dist-packages/vllm",
+        "file_sha256": {
+          "envs.py": "1d7101800f67b803a700fbf7489292cf1f0022b570085166ad407e6b1513dc15",
+          "usage/usage_lib.py": "26150a9e2a0fad4e51bacb6435e4e739be765db3645dc23b132d628bedc7f8f3"
+        },
+        "filename": "usage_stats.json"
+      },
       "check_launch_args": {
         "REQ-16": [
           "--enable-prefix-caching"

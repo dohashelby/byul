@@ -137,6 +137,9 @@ class VllmProvider(EngineProvider):
         if name == "graph_capture_source":
             from .vllm_startup_load import graph_capture_profile
             return graph_capture_profile(*args)
+        if name == "usage_report_source":
+            from .vllm_release_profiles import usage_report_profile
+            return usage_report_profile(*args)
         return super().evidence_contract(name, *args)
 
     def sandbox_arguments(self, options):

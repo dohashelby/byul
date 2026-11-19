@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import re
+from types import SimpleNamespace
 
 import yaml
 import pytest
@@ -81,6 +82,30 @@ def test_candidate_gpu_launch_row_does_not_add_a_reviewed_http_profile():
     _, version, image = pair()[1]
     assert http_profile(version, image) is None
     assert all(http_profile(version, gpu_image) is None for gpu_image in release_profile(version)['images'])
+
+
+def test_usage_report_catalog_is_bound_to_exact_reviewed_release_images():
+    provider = get_provider('vllm')
+    expected_env_files = {
+        '0.30.0': 'fbd370b2f56ff798d373e85705c9e044ccae893ef974f2800eec4ef6f2b4fb7f',
+        '0.31.0': '1d7101800f67b803a700fbf7489292cf1f0022b570085166ad407e6b1513dc15',
+    }
+    for _, version, image in pair():
+        engine = SimpleNamespace(name='vllm', version=version, image_digest=image, source_commit=None)
+        env = SimpleNamespace(engine=engine)
+        assert provider.evidence_contract('usage_report_source', env) == {
+            'source_root': '/usr/local/lib/python3.12/dist-packages/vllm',
+            'filename': 'usage_stats.json',
+            'file_sha256': {
+                'envs.py': expected_env_files[version],
+                'usage/usage_lib.py': '26150a9e2a0fad4e51bacb6435e4e739be765db3645dc23b132d628bedc7f8f3',
+            },
+        }
+        engine.source_commit = '0' * 40
+        assert provider.evidence_contract('usage_report_source', env) is None
+        engine.source_commit = None
+        engine.image_digest = image[:-64] + 'e' * 64
+        assert provider.evidence_contract('usage_report_source', env) is None
 
 
 def test_moved_path_review_maps_exact_files_and_retains_unmapped_paths():

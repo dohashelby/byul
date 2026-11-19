@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from .base import EvidenceDraft
-from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
+from .kubernetes_lifecycle_capture import KubernetesLifecycleReader, validate_target
 from .lifecycle_session import capture_session
 from .owned_capture import _FILE_READER, MAX_BYTES
 from . import supply_boot_contract as contract
@@ -93,6 +93,13 @@ def _model_mount(snapshot):
     mount, = [row for row in container["volumeMounts"] if row.get("mountPath") == _MODEL_ROOT]
     if mount.get("readOnly") is not True or any(mount.get(key) for key in ("subPath", "subPathExpr", "mountPropagation")):
         raise ValueError("SUPPLY_BOOT_NORMAL_MODEL_MOUNT_UNVERIFIED")
+    root = PurePosixPath(_MODEL_ROOT)
+    for other in container["volumeMounts"]:
+        if other is mount:
+            continue
+        path = PurePosixPath(other["mountPath"])
+        if (path.root != "/" or ".." in path.parts or path.is_relative_to(root) or root.is_relative_to(path)):
+            raise ValueError("SUPPLY_BOOT_NORMAL_MODEL_MOUNT_UNVERIFIED")
     volume, = [row for row in spec["volumes"] if row["name"] == mount["name"]]
     return mount, volume
 
@@ -262,19 +269,19 @@ class KubernetesSupplyBootExecutor:
             collected = {role: self._collect_role(check, env, policy_values, role) for role in contract.ROLES}
         return self._draft(check, env, policy_values, workdir, started, collected)
 
-    def _run_normal_read(self, check, env, values, workdir, started):
+    def normal_file_read_inputs(self, env, values):
+        """Validate the trusted local files without touching the owned workload."""
         from guard.adapters import vllm_file_read_sensor as sensor
         from guard.adapters.vllm_runner_capture import profile as reviewed_release
-        from guard.collectors import native_model_file_reads
         from guard.collectors.lifecycle import load_prepared
-        from .supply_boot_artifacts import persist
 
-        start, end = _normal_validity(values)
-        if not start <= started <= end or env.ref().sha256 != values["supply_environment_sha256"]:
+        _normal_validity(values)
+        if env.ref().sha256 != values["supply_environment_sha256"]:
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
         section = self.cfg["normal"]
         with Path(section["target"]).open("rb") as stream:
             target = strict_json(stream.read(65537), limit=65536)
+        validate_target(target, env)
         prepared = load_prepared(section["prepared"])
         target_sha256 = sha256_hex(canonical_json(target))
         prepared_sha256 = sha256_hex(canonical_json(prepared))
@@ -286,6 +293,16 @@ class KubernetesSupplyBootExecutor:
                 or self.expected_target is not None and self.expected_target != target_sha256):
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
         _approved_reference(section["reference_manifest"], values[_REFERENCE_KEY], env, target, prepared)
+        return target, prepared, target_sha256, prepared_sha256
+
+    def _run_normal_read(self, check, env, values, workdir, started):
+        from guard.collectors import native_model_file_reads
+        from .supply_boot_artifacts import persist
+
+        start, end = _normal_validity(values)
+        if not start <= started <= end:
+            raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
+        target, prepared, target_sha256, prepared_sha256 = self.normal_file_read_inputs(env, values)
         reader = KubernetesLifecycleReader(target, env, prepared, runner=self.runner,
                                             binary=self.cfg.get("kubectl_binary", "kubectl"),
                                             duration=self.cfg.get("max_duration_seconds", 120))

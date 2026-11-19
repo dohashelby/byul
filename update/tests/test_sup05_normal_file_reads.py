@@ -17,7 +17,7 @@ from tests.builders import environment
 from tests.test_a1_file_read_sensor import MODEL_BYTES, make_world
 from tests.test_kubernetes_lifecycle import World
 from tests.test_kubernetes_sampling import inputs as sampling_inputs
-from tests.test_lifecycle_capture import IMAGE, REPOSITORY
+from tests.test_lifecycle_capture import IMAGE, REPOSITORY, external
 from tests.test_lifecycle_sensor import CONTEXT, FakeOS, SilentThread
 
 PACK_DIRECTORY = REPOSITORY / "update" / "packs" / "PACK-BASELINE"
@@ -84,6 +84,7 @@ def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=
             pod = json.loads(result["stdout_bytes"])
             pod["spec"]["containers"][0]["volumeMounts"] = [
                 {"name": "model", "mountPath": model_root.as_posix(), "readOnly": mode != "writable-model"},
+                {"name": "other", "mountPath": (model_root / "nested").as_posix() if mode == "nested-shadow" else "/cache"},
             ]
             pod["spec"]["volumes"] = [{"name": "model", "hostPath": {"path": "/example/owned-model", "type": "Directory"}}]
             result["stdout_bytes"] = canonical_json(pod)
@@ -112,9 +113,14 @@ def run(case, workdir, *, values=None, cfg=None, check_id="SUP-05"):
 
 
 @pytest.mark.parametrize("mismatch", [False, True])
-def test_retains_exact_source_read_and_reference_without_challenge(tmp_path, monkeypatch, mismatch):
-    case = normal_case(tmp_path / "case", monkeypatch, mismatch=mismatch)
-    draft = run(case, tmp_path / "out")
+def test_retains_exact_source_read_and_reference_without_challenge(external, monkeypatch, mismatch):
+    case = normal_case(external / "case", monkeypatch, mismatch=mismatch)
+    executor = boot.KubernetesSupplyBootExecutor(case.cfg, runner=case.runner)
+    target, prepared, target_hash, prepared_hash = executor.normal_file_read_inputs(case.env, case.values)
+    assert target_hash == case.values["supply_normal_target_sha256"] == sha256_hex(canonical_json(target))
+    assert prepared_hash == case.values["supply_normal_prepared_sha256"] == sha256_hex(canonical_json(prepared))
+    assert not case.world.calls
+    draft = run(case, external / "out")
     assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
     assert not draft.normal_control.attempted and not any(step.attempted for step in draft.challenges)
     native, = draft.observations["supply_boot_native_consumption"].value
@@ -133,24 +139,24 @@ def test_retains_exact_source_read_and_reference_without_challenge(tmp_path, mon
     assert MODEL_BYTES.decode() not in artifact.path.read_text() and "approved-model" not in artifact.path.read_text()
 
 
-@pytest.mark.parametrize("mode", ["unsealed", "late-file-owner", "writable-model", "cleanup"])
-def test_scope_and_transport_gaps_cannot_make_a_success(tmp_path, monkeypatch, mode):
-    case = normal_case(tmp_path / "case", monkeypatch, mode=mode)
-    draft = run(case, tmp_path / "out")
+@pytest.mark.parametrize("mode", ["unsealed", "late-file-owner", "writable-model", "nested-shadow", "cleanup"])
+def test_scope_and_transport_gaps_cannot_make_a_success(external, monkeypatch, mode):
+    case = normal_case(external / "case", monkeypatch, mode=mode)
+    draft = run(case, external / "out")
     assert draft.status == ExecStatus.ABORTED and draft.abort_reason
     assert not draft.observations["supply_boot_violations"].collected
     if mode == "cleanup":
         assert "SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED" in draft.cleanup_errors
     else:
         assert not draft.observations["supply_boot_native_consumption"].collected
-    if mode == "writable-model":
+    if mode in {"writable-model", "nested-shadow"}:
         assert not case.world.execs
 
 
 @pytest.mark.parametrize("changed", ["false-marker", "other-check", "wrong-reference", "wrong-prepared", "wrong-target",
                                     "reference-scope-changed"])
-def test_invalid_scoped_inputs_fail_before_transport(tmp_path, monkeypatch, changed):
-    case = normal_case(tmp_path / "case", monkeypatch)
+def test_invalid_scoped_inputs_fail_before_transport(external, monkeypatch, changed):
+    case = normal_case(external / "case", monkeypatch)
     cfg, values, check_id = deepcopy(case.cfg), dict(case.values), "SUP-05"
     if changed == "false-marker":
         cfg[boot.NORMAL_FILE_READS_OPTION] = False
@@ -166,5 +172,5 @@ def test_invalid_scoped_inputs_fail_before_transport(tmp_path, monkeypatch, chan
                "wrong-target": "supply_normal_target_sha256"}[changed]
         values[key] = "0" * 64
     with pytest.raises(ValueError):
-        run(case, tmp_path / "out", values=values, cfg=cfg, check_id=check_id)
+        run(case, external / "out", values=values, cfg=cfg, check_id=check_id)
     assert not case.world.calls

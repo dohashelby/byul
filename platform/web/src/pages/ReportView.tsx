@@ -25,6 +25,7 @@ import {
   VERDICT,
   label,
 } from "../lib/labels";
+import { OBSERVATION_NAMES } from "./reportObservationNames";
 import p from "./pages.module.css";
 
 const AXES = [
@@ -215,60 +216,7 @@ function needsEvidenceNote(side: ReportSide) {
       && !side.decisions?.some((decision) => decision.axis === "security"));
 }
 
-const OBSERVATION_NAMES: Record<string, string> = {
-  activation_steps: "실행 단계별 시험 기록",
-  activation_violations: "실행 단계에서 확인된 정책 위반",
-  activation_missing: "관측하지 못한 실행 단계",
-  activation_scope_complete: "대상 실행 단계 전체의 관측",
-  supply_boot_sessions: "공급물을 사용한 시작 세션 기록",
-  supply_boot_violations: "공급물 사용·시작 과정에서 확인된 정책 위반",
-  supply_boot_missing: "공급물 사용·시작 과정에서 빠진 항목",
-  supply_boot_complete: "공급물 사용·시작 과정 전체의 관측",
-  supply_boot_normal_verified: "정상 구성의 시작 검증",
-  supply_boot_change_applied: "시험에서 지정한 변경의 적용 여부",
-  supply_boot_record_authenticated: "시작 관측 기록의 출처 확인",
-  supply_boot_native_consumption: "실행 구성 요소의 공급물 사용 기록",
-  supply_boot_change: "시작 시험에 적용한 변경 기록",
-  engine_sensor_violation: "엔진 관측에서 확인된 정책 위반",
-  engine_sensor_full_scope: "대상 엔진 동작 전체의 관측",
-  normal_controls: "정상 조건으로 수행한 대조 시험",
-  log_coverage_gaps: "로그에서 관측이 빠진 범위",
-  process_scan_complete: "대상 프로세스 전체의 확인",
-  routes_registered: "등록된 요청 경로",
-  routes_tested: "실제로 시험한 요청 경로",
-  direct_outcomes: "게이트웨이를 거치지 않은 요청의 처리 결과",
-  gateway_outcomes: "게이트웨이를 거친 요청의 처리 결과",
-  trusted_origin_reachable: "정상 호출 경로의 연결 여부",
-  running_image_unapproved: "실행 이미지의 승인 목록 일치 여부",
-  supply_execution_scope_complete: "실행 코드와 의존성 전체의 승인 여부",
-  log_security_violations: "요청 입력이 신뢰 로그에 미치는 영향",
-  unix_ipc_violations: "허용되지 않은 내부 통신 연결의 성공 여부",
-  unix_ipc_trials: "내부 통신 연결 시험 결과",
-  ipc_scope_complete: "대상 내부 통신 접점 전체의 관측",
-  forbidden_egress_successes: "금지된 외부 송신의 성공 여부",
-  egress_trials: "외부 송신 시험 결과",
-  egress_scope_complete: "대상 송신 경로 전체의 관측",
-  forbidden_plaintext_successes: "금지된 평문 API 요청의 성공 여부",
-  api_transport_trials: "API 전송 시험 결과",
-  api_transport_scope_complete: "대상 API 전송 구간 전체의 관측",
-  template_render_witness_verified: "템플릿을 실제 렌더링한 결과",
-  forbidden_template_type_reference_verified: "금지된 속성 참조의 실행 여부",
-  template_sandbox_scope_complete: "템플릿 실행 제한 전체의 관측",
-  selected_template_sha256: "선택된 템플릿의 해시",
-  template_identity_verified: "선택된 템플릿의 식별 확인",
-  selected_template_approved: "선택된 템플릿의 승인 여부",
-  input_projection_exact_match: "토큰화와 추론 입력의 일치 여부",
-  template_consumer_verified: "템플릿의 실제 소비 확인",
-  supply_scope_complete: "공급물 관측 범위의 완결 여부",
-  functional_probes_planned: "계획된 정상 동작 시험",
-  functional_probe_results: "정상 동작 시험 결과",
-  code_selection_trials: "코드 판본 선택 시험 기록",
-  code_selection_fields_planned: "확인 대상 코드 판본 선택 필드",
-  code_selection_resolved_fields: "최종 선택 여부를 확인한 필드",
-  code_selection_unverified_fields: "최종 선택 여부를 확인하지 못한 필드",
-  code_selection_confirmed_violations: "금지된 코드 선택의 확인 결과",
-  code_selection_final_code_verified: "최종 코드의 확인 결과",
-};
+
 
 const DECISION_LIMITS: Record<string, string> = {
   no_rule: "이 축에 적용할 판정 규칙이 없습니다.",

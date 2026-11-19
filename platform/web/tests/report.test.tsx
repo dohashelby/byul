@@ -177,6 +177,28 @@ describe("검증 보고서 화면", () => {
       .every((item) => !item.textContent?.includes("unknown_technical_key"))).toBe(true);
   });
 
+  it.each([
+    ["REQ-03", "nonadmin_outcomes", "관리자 권한이 없는 사용자로 작업을 요청한 결과", "PASS"],
+    ["PLT-06", "worker_isolation_violations", "작업 프로세스 사이에서 확인된 격리 위반", "FAIL"],
+    ["OBS-06", "record_copy_inventory", "확인 대상 기록 복사본 목록", "UNKNOWN"],
+  ] as const)("새 한국어 관측명을 기본 화면에 표시하고 키는 상세 근거에 둔다 (%s)", (id, key, name, verdict) => {
+    mockApi({});
+    const row = check(id, {
+      headline: verdict, baseline: null, candidate: null,
+      single: { ...side(verdict), decisions: [{
+        axis: "security", verdict, observations: verdict === "UNKNOWN" ? [] : [{ key, kind: "count", value: 1 }],
+        missing: verdict === "UNKNOWN" ? [key] : [], unmet: [], policy_missing: [], limits: [],
+      }] },
+    });
+    renderAt("/update/results", "/update/results", <FullReport report={{ ...report, mode: "audit", checks: [row] }} rawChecks={null} selected={id} onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    const basic = drawer.getByText(name, { exact: false, selector: "li" });
+    expect(basic.textContent).not.toContain(key);
+    const details = drawer.getByText("상세 근거").closest("details")!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain(key);
+  });
+
   it("미확인 점검을 충족처럼 보이게 하지 않는다", () => {
     mockApi({});
     renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected={null} onSelect={() => {}} />);

@@ -9,8 +9,9 @@ from guard.executors.kubernetes_normal_startup_load import (
     KubernetesNormalStartupLoadExecutor, capture_startup_log_prefix,
 )
 from guard.judges.rule_table import RuleTableJudge
-from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, sha256_hex
-from tests.builders import baseline_pack, evidence
+from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
+from tests.builders import evidence
+from tests.test_gpu_a_run_inputs import UPDATE
 from tests.test_kubernetes_sampling import World, normal_sampling_inputs
 
 STARTED = "2026-10-26T00:00:00Z"
@@ -141,7 +142,7 @@ def _run(tmp_path, version, fault=None):
     config = {"normal_startup_load_only": fault != "disabled", "target": str(path)}
     pin = "0" * 64 if fault == "wrong-target-pin" else sha256_hex(path.read_bytes())
     executor = KubernetesNormalStartupLoadExecutor(config, expected_target_sha256=pin, runner=world.runner)
-    check = baseline_pack().checks["LIF-01"]
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["LIF-01"]
     if fault in {"disabled", "wrong-target-pin"}:
         with pytest.raises(ValueError, match=r"^LIF01_BOOT_(SCOPE_INVALID|TARGET_OR_SOURCE_UNVERIFIED)$"):
             executor.run(check, env, VALUES, world.adapter, tmp_path / "work")

@@ -223,15 +223,24 @@ def snapshot_inputs(tmp_path,mode='normal',*,declared=False):
     return environment,world,values,pack,{'target':str(target),'copy_inventory':str(path),'copy_record_snapshot_only':True},digest
 
 
-@pytest.mark.parametrize('mode',['normal','missing','wrong-source','pod-replaced','outside-inventory'])
+@pytest.mark.parametrize('mode',['normal','missing','wrong-source','pod-replaced','outside-inventory',
+                                 'interleaved-sequence','source-sequence-gap'])
 def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mode):
     environment,world,values,pack,cfg,digest=snapshot_inputs(tmp_path,mode,declared=True)
     if mode=='outside-inventory':world.copy_packet['events'][0]['copy_id']='0'*32
+    source_checksums=[]
+    if mode in {'interleaved-sequence','source-sequence-gap'}:
+        first_claim,unselected,*_=world.copy_packet['events']
+        second_claim={**first_claim,'event_id':'a'*32,'seq':2}
+        world.copy_packet['events']=[first_claim,unselected,second_claim] if mode=='interleaved-sequence' else [first_claim,second_claim]
 
     def read_only(argv,**kwargs):
         assert 'input_bytes' not in kwargs
         output=world.runner(argv,**kwargs)
-        if 'exec' in argv:world.after_exec=True
+        if 'exec' in argv:
+            world.after_exec=True
+            raw=base64.b64decode(json.loads(output['stdout_bytes'])['raw_base64'])
+            source_checksums.append((len(raw),sha256_hex(raw)))
         return output
 
     monkeypatch.setattr(copy_executor,'capture_pipes',read_only)
@@ -243,7 +252,8 @@ def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mo
     assert executor.roles()=={} and executor.keys()=={}
     draft=executor.run(pack.checks['PLT-12'],environment,values,VllmAdapter(),tmp_path/'snapshot')
     assert world.reads==1 and not world.sent
-    assert draft.data_origin==DataOrigin.DECLARED and draft.status==(ExecStatus.COMPLETED if mode=='normal' else ExecStatus.ABORTED)
+    completed=mode in {'normal','interleaved-sequence','source-sequence-gap'}
+    assert draft.data_origin==DataOrigin.DECLARED and draft.status==(ExecStatus.COMPLETED if completed else ExecStatus.ABORTED)
     assert not draft.normal_control.attempted and all(not row.attempted for row in draft.challenges)
     for key in ('copy_treatment_candidates','copy_reuse_candidates','copy_issuer_declarations'):
         assert not draft.observations[key].collected
@@ -257,6 +267,18 @@ def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mo
         assert snapshot['source_event_count']>1 and record['type']=='COPY_INVENTORY_CLAIM'
         attachment,=draft.observations['copy_collection'].value
         assert attachment['stage']=='snapshot' and attachment['owner_binding_verified'] and attachment['file_bytes_sha256']
+    if mode in {'interleaved-sequence','source-sequence-gap'}:
+        snapshot,=draft.observations['copy_record_snapshots'].value
+        attachment,=draft.observations['copy_collection'].value
+        events=draft.observations['copy_event_declarations'].value
+        assert [row['seq'] for row in snapshot['packet']['events']]==[0,2]
+        assert [(row['seq'],row['type']) for row in events]==[(0,'COPY_INVENTORY_CLAIM'),(2,'COPY_INVENTORY_CLAIM')]
+        assert snapshot['source_event_count']==(3 if mode=='interleaved-sequence' else 2)
+        assert source_checksums==[(attachment['file_bytes'],attachment['file_bytes_sha256'])]
+        assert attachment['owner_binding_verified']
+        missing=draft.observations['copy_missing'].value
+        assert ('copy_declared_event_sequence_gap' in missing)==(mode=='source-sequence-gap')
+        assert all(unselected['event_id'].encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
     if mode in {'missing','wrong-source','pod-replaced'}:
         assert draft.observations['copy_record_snapshots'].collected is False
     assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)

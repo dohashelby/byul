@@ -137,7 +137,11 @@ def validate_record(value,*,environment_ref,target_sha256,session,source_sha256,
     except (KeyError,TypeError,ValueError):raise ValueError('COPY_RECORD_INVALID') from None
 
 
-def project(inventory,snapshots,values):
+def inventory_claims(events):
+    return [event for event in events if event['type'] == 'COPY_INVENTORY_CLAIM']
+
+
+def project(inventory,snapshots,values,*,inventory_only=False):
     start,end=normalize_policy(values)
     result={'inventory':inventory['copies'],'events':[],'treatment_candidates':[],'reuse_candidates':[],
         'issuer_declarations':[],'missing':[],'conflicts':[],
@@ -149,9 +153,13 @@ def project(inventory,snapshots,values):
         if not snapshot.get('collected') or packet is None:continue
         producer_ids.add(packet['producer_id']);generations.add(packet['snapshot_generation'])
         if not packet['declared_complete']:result['missing'].append('copy_producer_declared_partial')
-        seqs=sorted({r['seq'] for r in packet['events']})
-        if seqs and seqs!=list(range(len(seqs))):result['missing'].append('copy_declared_event_sequence_gap')
-        for row in packet['events']:
+        events = packet['events']
+        seqs = sorted({row['seq'] for row in events})
+        if seqs and seqs != list(range(len(seqs))):
+            result['missing'].append('copy_declared_event_sequence_gap')
+        if inventory_only:
+            events = inventory_claims(events)
+        for row in events:
             identity=(row['event_id'],digest(canonical_json(row)))
             unique[identity]=row;occurrences.setdefault(row['event_id'],set()).add(identity[1])
             sequences.setdefault((packet['producer_id'],packet['snapshot_generation'],row['seq']),set()).add(identity)

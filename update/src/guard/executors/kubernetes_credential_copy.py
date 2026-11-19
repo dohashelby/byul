@@ -14,7 +14,7 @@ from .owned_capture import MAX_BYTES
 from . import credential_copy_contract as contract
 
 SNAPSHOT_OPTION='copy_record_snapshot_only'
-SNAPSHOT_VERSION='0.2.0+copy-record-snapshot'
+SNAPSHOT_VERSION='0.2.1+copy-record-snapshot'
 
 
 def load_inventory(path,expected_hash,expected_policy):
@@ -103,9 +103,6 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
                 snapshot={'stage':stage,'collected':True,'packet':packet}
                 if snapshot_only:
                     if not start<=contract.stamp(packet['recorded_at'])<=utcnow():raise ValueError
-                    events=[event for event in packet['events'] if event['type']=='COPY_INVENTORY_CLAIM']
-                    snapshot.update(packet={**packet,'events':events}, event_scope='copy-inventory-claims-only',
-                                    source_event_count=len(packet['events']))
                 row.update(collected=True,file_bytes_sha256=sha256_hex(raw),file_bytes=len(raw),
                     owner_binding_verified=provenance.get('owner_binding_verified') is True)
                 snapshots.append(snapshot)
@@ -120,7 +117,15 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
             else:
                 reader.snapshot();collect_stage('before');reader.snapshot();collect_stage('after');reader.snapshot()
         except Exception:diagnostics.append('COPY_PREFLIGHT_OR_GENERATION_UNAVAILABLE')
-        projected=contract.project(ctx._copy_inventory,snapshots,values)
+        projected=contract.project(ctx._copy_inventory,snapshots,values,inventory_only=snapshot_only)
+        if snapshot_only:
+            # Continuity describes the original file. Retain only the selected
+            # claims, with their original sequence numbers, in evidence.
+            for snapshot in snapshots:
+                packet = snapshot['packet']
+                source_events = packet['events']
+                snapshot.update(packet={**packet,'events':contract.inventory_claims(source_events)},
+                                event_scope='copy-inventory-claims-only',source_event_count=len(source_events))
         report=None;transport=None;cleanup=[]
         try:transport=ctx.cprobe.report();cleanup.extend(transport.get('cleanup_errors',[]))
         except Exception:diagnostics.append('COPY_TRANSPORT_REPORT_UNAVAILABLE')

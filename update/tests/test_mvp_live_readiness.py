@@ -467,30 +467,48 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
     ('PLT-06', 'unix_ipc', None, None),
     ('PLT-06', 'unix_ipc', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('PLT-06', 'unix_ipc', 'duration', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+    ('REQ-10', 'sampling_validation', None, None),
+    ('REQ-10', 'sampling_validation', 'model', 'KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED'),
+    ('REQ-10', 'sampling_validation', 'missing-scope', 'NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID'),
+    ('LIF-04', 'stream_buffer', None, None),
+    ('LIF-04', 'stream_buffer', 'duration', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('LIF-04', 'stream_buffer', 'missing-scope', 'NORMAL_STREAM_EXECUTION_SCOPE_INVALID'),
 ])
-def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
+def test_prebound_owned_preflights_share_the_declared_target_limits(
         tmp_path, monkeypatch, check_id, executor_name, damage, reason):
     from guard import application
     from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS
+    from guard.executors.http_common import HttpCheckExecutor
     from guard.models import canonical_json, sha256_hex
     from tests.builders import environment, policy
     from tests.test_kubernetes_request_binding import target as owned_target
     from tests.test_kubernetes_usage_report import LOCAL_VALUES
     from tests.test_kubernetes_worker_trust_metadata import VALUES as WORKER_VALUES
+    from tests.test_lif04_normal_stream import configuration as stream_configuration
     from tools.j02_run_config import write_config
     from tools.mvp_versions import versions
 
     def forbidden(*args, **kwargs):
-        pytest.fail('Scoped metadata preparation must not access the declared Pod')
+        pytest.fail('Scoped preparation must not access credentials or the declared Pod')
 
     monkeypatch.setattr(socket, 'socket', forbidden)
     monkeypatch.setattr(subprocess, 'Popen', forbidden)
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
-    pol = policy(pack.ref(), scope={'include': [check_id]},
-                 values={check_id: LOCAL_VALUES if check_id == 'OBS-04' else WORKER_VALUES})
+    policy_values = {'OBS-04': LOCAL_VALUES, 'PLT-06': WORKER_VALUES}
+    if check_id == 'REQ-10':
+        policy_values[check_id] = {'allowed_sampling_options': ['max_tokens', 'temperature'],
+                                   'rejection_codes': ['400', '422']}
+    elif check_id == 'LIF-04':
+        _, _, _, effective = stream_configuration(tmp_path)
+        policy_values[check_id] = {field.key: effective[field.key] for field in pack.checks[check_id].policy_params}
+    if check_id in {'REQ-10', 'LIF-04'}:
+        monkeypatch.setattr(HttpCheckExecutor, 'keys', forbidden)
+    pol = policy(pack.ref(), scope={'include': [check_id]}, values={check_id: policy_values[check_id]})
+    option = {check_id: {KUBERNETES_BOUND_CHECK_OPTIONS[check_id]: True}}
     cfg = {'adapter': {'name': 'vllm'}, 'executors': {executor_name: 'kubernetes'},
-           'update': {'allowed_checks': [check_id]}, 'sides': {},
-           'check_config': {check_id: {KUBERNETES_BOUND_CHECK_OPTIONS[check_id]: True}}}
+           'update': {'allowed_checks': [check_id]}, 'sides': {}}
+    if damage != 'missing-scope':
+        cfg['check_config'] = option
     envs, env_paths = [], {}
     for side, row in versions().items():
         env = environment(id=f'ENV-OWNED-METADATA-{side.upper()}', model={'id': 'EXAMPLE', 'revision': 'r1'},
@@ -508,6 +526,8 @@ def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
             settings['max_duration_seconds'] = 0
         target_path.write_bytes(canonical_json(declaration))
         cfg['sides'][side] = {executor_name: settings}
+        if side == 'baseline' and damage == 'missing-scope':
+            cfg['sides'][side]['check_config'] = option
         env_path = tmp_path / f'{side}-env.json'
         env_path.write_bytes(canonical_json(env.to_dict()))
         envs.append(env)
@@ -528,13 +548,16 @@ def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
         for key, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()
     }} for side, env in env_paths.items()]
     report = run(tmp_path, index)
-    assert report['sides'] == 138 and report['file_binding_valid_sides'] == (2 if reason is None else 1)
+    invalid_sides = {'candidate'} if reason else set()
+    if damage == 'missing-scope':
+        invalid_sides.add('baseline')
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 2 - len(invalid_sides)
     for row in report['rows']:
         if row['check_id'] != check_id:
             continue
         assert row['engine_executed'] is row['live_target_verified'] is row['ready_for_execution'] is False
         assert row['actual_results'] is None
-        if row['side'] == 'candidate' and reason:
+        if row['side'] in invalid_sides:
             assert row['blocking_codes'] == [reason]
         else:
             assert row['file_binding_valid'] and 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']

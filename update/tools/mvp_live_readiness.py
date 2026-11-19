@@ -151,6 +151,14 @@ def _generation_manifest_snapshot(cfg, bound_files):
     return manifest
 
 
+def _paired_normal_control_requested(raw):
+    for check_id, executor in (('REQ-10', 'sampling_validation'), ('LIF-04', 'stream_buffer')):
+        settings = for_check(raw, executor, check_id).get(executor)
+        if type(settings) is dict and KUBERNETES_BOUND_CHECK_OPTIONS[check_id] in settings:
+            return True
+    return False
+
+
 def _inspect(source, check, pack, issued_at, redeployment_identities):
     files, identities = {}, {}
     for role in ('environment', 'policy', 'configuration'):
@@ -191,7 +199,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     if allowed is not None and check.id not in allowed:
         raise ValueError(UPDATE_CHECK_OUTSIDE_SCOPE)
     side_configs = {side: merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES}
-    if any(cilium_egress_status_requested(raw) or installed_plugin_inventory_requested(raw)
+    if any(_paired_normal_control_requested(raw)
+           or cilium_egress_status_requested(raw) or installed_plugin_inventory_requested(raw)
            or normal_compile_cache_requested(raw)
            or normal_file_reads_requested(raw)
            or normal_graph_capture_requested(raw)
@@ -221,6 +230,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     prebound_kubernetes = (external_kubernetes
                            and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
     prebound_record_stages = prebound_kubernetes and run_binding.stages_for(check) == (1, 2, 3, 4)
+    normal_sampling = (prebound_kubernetes and check.id == 'REQ-10' and check.executor == 'sampling_validation'
+                       and check.collection_profile is None and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['REQ-10']) is True)
+    normal_stream = (prebound_kubernetes and check.id == 'LIF-04' and check.executor == 'stream_buffer'
+                     and run_binding.stages_for(check) == (1,) and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['LIF-04']) is True)
     record_access = external_kubernetes and run_binding.is_record_access_binding(check)
     record_snapshot = (prebound_record_stages and check.id == 'OBS-01' and check.executor == 'required_event_record'
                        and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-01']) is True
@@ -430,6 +443,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if collection_status:
             executor.prepared_collection_status(check, env, effective,
                                                 expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if normal_sampling or normal_stream:
+            expected = sha256_hex(canonical_json(target_data))
+            if normal_sampling:
+                executor.prepared_normal_sampling(check, env, effective, expected_target_sha256=expected)
+            else:
+                executor.prepared_normal_stream(check, env, effective, expected_target_sha256=expected)
         if record_source_key is not None:
             if any(effective[key] != digest for key, digest in record_digests.items()):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')

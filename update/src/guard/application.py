@@ -603,6 +603,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
     from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
     from guard.executors.kubernetes_response_content import KubernetesResponseContentExecutor
+    from guard.executors.kubernetes_sampling import KubernetesSamplingExecutor
+    from guard.executors.kubernetes_stream_buffer import KubernetesStreamBufferExecutor
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
     from guard.executors.lifecycle_transition import (LifecycleTransitionExecutor, REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE,
                                                       generation_identity, redeployment_side_reuse)
@@ -746,6 +748,16 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
                     if kube and expected_target is not None:
+                        if (prebound and item.check_id == "REQ-10" and check_def.collection_profile is None
+                                and isinstance(executor, KubernetesSamplingExecutor)):
+                            executor.prepared_normal_sampling(check_def, selected_env, values,
+                                                              expected_target_sha256=expected_target)
+                            continue
+                        if (prebound and item.check_id == "LIF-04" and run_binding.stages_for(check_def) == (1,)
+                                and isinstance(executor, KubernetesStreamBufferExecutor)):
+                            executor.prepared_normal_stream(check_def, selected_env, values,
+                                                             expected_target_sha256=expected_target)
+                            continue  # The validated normal stream uses no role keys.
                         if item.check_id == "OBS-04":
                             executor.prepared_local_observation(check_def, selected_env, values,
                                                                 expected_target_sha256=expected_target)

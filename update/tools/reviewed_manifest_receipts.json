@@ -880,6 +880,11 @@
       "manifest_sha256": "a05cbd4fe245fd129d3c035f4e62027555b93e1eb097c252fb7fee223147d63c",
       "reviewed_by": "Codex / paired readiness and stock usage launch / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T05:24:54+00:00"
+    },
+    {
+      "manifest_sha256": "1d3349f63f334df8177abfda8f41bb11fdbf59892d802955006de9f09f036180",
+      "reviewed_by": "Codex / Gateway preflight and owned source observations / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T05:58:43+00:00"
     }
   ]
 }

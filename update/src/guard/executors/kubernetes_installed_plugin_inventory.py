@@ -278,18 +278,38 @@ class KubernetesInstalledPluginInventoryExecutor:
                 or type(self.cfg.get("target")) is not str or not self.cfg["target"]):
             raise ValueError("SUP10_INVENTORY_SCOPE_INVALID")
 
+    def _target_transport(self, raw, env, *, duration, expected_target_sha256):
+        target = strict_json(raw, limit=65536)
+        target_sha = sha256_hex(canonical_json(target))
+        if target_sha != expected_target_sha256 or self._expected_target_sha256 not in (None, target_sha):
+            raise ValueError
+        transport = installed_plugin_inventory_transport(target, env, duration=duration,
+            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner)
+        return target, target_sha, transport
+
+    def prepared_installed_plugin_inventory(self, check, env, values, *, expected_target_sha256):
+        """Validate the saved target and effective transport without collecting inventory."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            raw = dependency(self.cfg["target"], None)
+            self._target_transport(raw, env, duration=self.cfg.get("max_duration_seconds", 12),
+                                   expected_target_sha256=expected_target_sha256)
+        except (KubernetesBindingError, KeyError, OSError, OverflowError, TypeError, ValueError):
+            raise ValueError("SUP10_INVENTORY_TARGET_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 12)
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if adapter is None or target_sha != self._expected_target_sha256:
+                raw = stream.read(65537)
+            if adapter is None:
                 raise ValueError
-            transport = installed_plugin_inventory_transport(target, env, duration=duration,
-                binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner)
+            target, target_sha, transport = self._target_transport(
+                raw, env, duration=duration, expected_target_sha256=self._expected_target_sha256)
         except (KubernetesBindingError, KeyError, OSError, TypeError, ValueError):
             raise ValueError("SUP10_INVENTORY_TARGET_UNVERIFIED") from None
 

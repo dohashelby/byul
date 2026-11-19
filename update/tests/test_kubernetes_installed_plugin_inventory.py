@@ -135,6 +135,42 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
     assert RuleTableJudge().judge(check, evd, check.judge.params, {}).verdicts["security"] == Verdict.UNKNOWN
 
 
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("settings,changed_pin,accepted", [
+    ({}, False, True),
+    ({"max_duration_seconds": 12.5, "kubectl_binary": "example-kubectl"}, False, True),
+    ({"max_duration_seconds": 0}, False, False),
+    ({"kubectl_binary": "  "}, False, False),
+    ({}, True, False),
+])
+def test_sup10_prepares_the_saved_target_without_collecting(
+        tmp_path, monkeypatch, version, settings, changed_pin, accepted):
+    from tools.mvp_versions import versions
+
+    env, target, _, path = normal_sampling_inputs(tmp_path, version)
+    image = next(item["image"] for item in versions().values() if item["version"] == version)
+    env = env.model_copy(update={"engine": env.engine.model_copy(update={"image_digest": image})}).seal()
+    target["environment_ref"] = env.ref().model_dump(mode="json")
+    target["engine"]["image_digest"] = image
+    target["kubernetes"]["engine"].update(image=image, image_id=image)
+    path.write_bytes(canonical_json(target))
+    digest = sha256_hex(path.read_bytes())
+    expected = sha256_hex(b"different-owned-target") if changed_pin else digest
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["SUP-10"]
+
+    def no_collection(*args, **kwargs):
+        pytest.fail("SUP-10 preparation must not collect inventory")
+
+    monkeypatch.setattr(inventory, "_inventory", no_collection)
+    executor = KubernetesInstalledPluginInventoryExecutor({"installed_plugin_inventory_only": True,
+        "target": str(path), **settings}, runner=no_collection, expected_target_sha256=digest if changed_pin else None)
+    if accepted:
+        executor.prepared_installed_plugin_inventory(check, env, {}, expected_target_sha256=expected)
+    else:
+        with pytest.raises(ValueError, match="^SUP10_INVENTORY_TARGET_UNVERIFIED$"):
+            executor.prepared_installed_plugin_inventory(check, env, {}, expected_target_sha256=expected)
+
+
 @pytest.mark.parametrize("fault", ["unbound", "disabled", "foreign-check"])
 def test_sup10_validates_exact_scope_before_transport(tmp_path, fault):
     env, target, _, path = normal_sampling_inputs(tmp_path, "0.30.0")

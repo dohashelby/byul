@@ -307,6 +307,13 @@ def is_paired_supply_role_preflight(check, settings, update: dict) -> bool:
             and {1, 3}.issubset(stages_for(check)))
 
 
+def is_lifecycle_generation_binding(check) -> bool:
+    """The canonical definition binds declared generation files in stage 2."""
+    return (check.executor == 'lifecycle_transition'
+            and 'transition_inputs_sha256' in KEYS_BY_CHECK_2.get(check.id, ())
+            and 2 in stages_for(check))
+
+
 def owned_keys(check):
     """Keys the policy must not carry for this definition (computed or dropped)."""
     stages = stages_for(check)

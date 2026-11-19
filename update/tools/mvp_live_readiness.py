@@ -119,7 +119,7 @@ def _check_native_prepared(spec, target, env):
         raise ValueError('NATIVE_INPUT_CAPTURE_BINDING_CHANGED')
 
 
-def _redeployment_manifest(cfg, bound_files):
+def _generation_manifest_snapshot(cfg, bound_files):
     rows = cfg['generations']
     if type(rows) is not list or not 1 <= len(rows) <= 4:
         raise ValueError('TRANSITION_CONFIGURATION_INVALID')
@@ -225,9 +225,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     supply_record_roles = implementation == 'kubernetes' and (
         supply_record_binding or check.id == 'SUP-15'
         or run_binding.is_paired_supply_role_preflight(check, cfg, requested_update))
-    redeployment = (implementation == 'kubernetes' and check.executor == 'lifecycle_transition'
-                    and check.id in REDEPLOY_CHECKS and 2 in run_binding.stages_for(check)
-                    and requested_update.get('mode', 'external') == 'external' and 'generations' in cfg)
+    generation_inputs = (implementation == 'kubernetes' and run_binding.is_lifecycle_generation_binding(check)
+                         and requested_update.get('mode', 'external') == 'external' and 'generations' in cfg)
     initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
                       and check.id in run_binding.INITIALIZATION_CHECKS
                       and {1, 2}.issubset(run_binding.stages_for(check)))
@@ -244,7 +243,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     normal_serving_readiness = check.id == 'OBS-02' and cfg.get(NORMAL_SERVING_READINESS_OPTION) is True
     normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
     target = cfg['normal']['target'] if normal_file_reads else cfg.get('target')
-    if implementation == 'kubernetes' and target is None and not (supply_record_roles or redeployment):
+    if implementation == 'kubernetes' and target is None and not (supply_record_roles or generation_inputs):
         raise ValueError('MVP_CURRENT_TARGET_REQUIRED')
     bound_files = []
     binding_options = {}
@@ -260,8 +259,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
                 role_digests[f'supply_{role}_{key}_sha256'] = sha256_hex(canonical_json(document))
                 if key == 'prepared':
                     prepared_raw_digests[role] = sha256_hex(raw)
-    elif redeployment:
-        generation_manifest = _redeployment_manifest(cfg, bound_files)
+    elif generation_inputs:
+        generation_manifest = _generation_manifest_snapshot(cfg, bound_files)
     elif target is not None:
         raw_target, identity = _read(target)
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
@@ -374,7 +373,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             if any(effective.get(key) != digest for key, digest in role_digests.items()):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             executor.prepared_supply_roles(check, env, effective)
-        if redeployment:
+        if generation_inputs:
             if sha256_hex(canonical_json(generation_manifest)) != effective['transition_inputs_sha256']:
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             generations, verified_manifest = executor.prepared_generations(check, env, effective)
@@ -396,7 +395,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         after, current = _read(path)
         if after != before or current != identity:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
-    if redeployment:
+    if generation_inputs and check.id in REDEPLOY_CHECKS:
         declared_identities = {generation_identity(row.target, row.env, row.prepared) for row in generations.values()}
         if redeployment_side_reuse(redeployment_identities, declared_identities):
             raise ValueError(REDEPLOY_SIDE_REUSE)

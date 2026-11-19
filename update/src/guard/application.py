@@ -619,7 +619,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     check_support = []
     kube_only = False
     transition_requested = False
-    redeploy_preflight = False
+    generation_preflight = set()
     try:
         allowed_checks = None if single else update_allowed_checks(cfg, pack)
         execution_config = _update_config_for_execution(pack, cfg, allowed_checks)
@@ -746,15 +746,16 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                             and isinstance(executor, KubernetesInitializationExecutor)
                             and {1, 2}.issubset(run_binding.stages_for(check_def))):
                         executor.prepared_inputs(check_def, selected_env, values)
-                    if (kube and item.check_id in REDEPLOY_CHECKS and isinstance(executor, LifecycleTransitionExecutor)
-                            and 2 in run_binding.stages_for(check_def)):
-                        redeploy_preflight = True
+                    if (kube and isinstance(executor, LifecycleTransitionExecutor)
+                            and run_binding.is_lifecycle_generation_binding(check_def)):
+                        generation_preflight.add(item.check_id)
                         generations, _ = executor.prepared_generations(check_def, selected_env, values)
-                        identities = {generation_identity(generation.target, generation.env, generation.prepared)
-                                      for generation in generations.values()}
-                        if redeployment_side_reuse(seen_generation_identities, identities):
-                            raise ValueError(REDEPLOY_SIDE_REUSE)
-                        seen_generation_identities.update(identities)
+                        if item.check_id in REDEPLOY_CHECKS:
+                            identities = {generation_identity(generation.target, generation.env, generation.prepared)
+                                          for generation in generations.values()}
+                            if redeployment_side_reuse(seen_generation_identities, identities):
+                                raise ValueError(REDEPLOY_SIDE_REUSE)
+                            seen_generation_identities.update(identities)
                 if (kube and item.check_id == "REQ-13" and isinstance(executor, KubernetesResponseContentExecutor)
                         and cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"
                         and "gateway" in policy.values.get(item.check_id, {}).get("required_targets", ())):
@@ -769,8 +770,11 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     if kube_only:
         limitations = ["Static Kubernetes preparation only; no kubectl, Docker, engine or GPU execution.",
                        "Existing inspected image/source limits remain; unreviewed GPU images are unsupported."]
-        if redeploy_preflight:
+        if generation_preflight & REDEPLOY_CHECKS:
             limitations.append("LIF-05/LIF-16 preparation checks declared generation files. The installed native producer, actual transition and admission require separate observations.")
+        if "LIF-06" in generation_preflight:
+            limitations.append("LIF-06 preparation checks declared generation files and sample selections. "
+                               "The installed native producer and actual live transition require separate observations.")
         if transition_requested:
             record("kubernetes-static-binding", prepared is not None,
                    "Exact target/ENV declarations checked; actual cluster, Pods, template and GPU remain unverified")

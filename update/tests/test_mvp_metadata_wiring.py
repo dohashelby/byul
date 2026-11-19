@@ -18,6 +18,7 @@ from guard.executors.base import EvidenceDraft
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from tests.builders import T0, policy
+from tests.test_lifecycle_capture import REPOSITORY, external  # noqa: F401
 from tests.test_model_preparation_integration import full_inputs
 from tests.test_template_supply_approval import SHA
 from tools import mvp_credential_copy_inputs as copy_inputs
@@ -1328,6 +1329,96 @@ def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_
     assert not (tmp_path / 'run').exists()
     with pytest.raises(ValueError, match='INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID'):
         run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
+
+
+def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(tmp_path, external, monkeypatch):
+    from guard.executors.kubernetes_sup05_normal_preparation import prepare
+    from tests.test_kubernetes_request_binding import target as ordinary_target
+    from tests.test_sup05_normal_preparation import _case
+
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('Saved declarations must not contact or launch the workload')
+
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    pack = load_pack(tool.readiness.ROOT / 'packs/PACK-BASELINE')
+    pol = policy(pack.ref(), scope={'include': ['SUP-05', 'SUP-10', 'SUP-11']}, values={},
+                 status='CONFIRMED', data_origin=DataOrigin.DECLARED, confirmed_by='Fixture owner', confirmed_at=T0)
+    policy_path = _write(tmp_path / 'policy.json', pol.to_dict())
+    inputs, references, outputs, envs = {}, {}, {}, []
+    for index, (side, row) in enumerate(tool.versions().items(), 1):
+        source = external / side
+        source.mkdir()
+        case = _case(source, row['version'])
+        runtime = case.env.runtime.model_copy(update={'gpu_model': 'Fixture GPU', 'driver': 'Fixture driver'})
+        env = case.env.model_copy(update={'id': f'ENV-EXAMPLE-SUP05-{side.upper()}',
+                                          'data_origin': DataOrigin.DECLARED, 'runtime': runtime}).seal()
+        envs.append(env)
+        args = case.args
+        _write(args['environment'], env.to_dict())
+        lifecycle = json.loads(args['target'].read_bytes())
+        lifecycle['environment_ref'] = env.ref().model_dump(mode='json')
+        engine = lifecycle['kubernetes']['engine']
+        engine['container_id'] = f'containerd://{index:064x}'
+        engine['image_id'] = row['image']
+        case.snapshot['pod']['status']['containerStatuses'][0].update(
+            containerID=engine['container_id'], imageID=engine['image_id'])
+        args['owner_snapshot_sha256'] = sha256_hex(_write(args['owner_snapshot'], case.snapshot).read_bytes())
+        _write(args['target'], lifecycle)
+        outputs[side] = prepare(case.output, REPOSITORY, **args)
+        path = case.output / 'preparation.json'
+        references[side] = {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+
+        declaration = ordinary_target(env)
+        declaration.update(lab=False, observed_version=row['version'], kubernetes={
+            **declaration['kubernetes'], 'engine': engine})
+        declaration['engine']['image_digest'] = row['image']
+        inputs[side] = {'environment': args['environment'], 'target': _write(source / 'ordinary-target.json', declaration)}
+
+    options = {'pack': pack, 'store': tmp_path / 'store', 'installed_plugin_inventory': True}
+    default, _, decisions = tool.assemble(inputs, policy_path, **options)
+    assert default['update']['allowed_checks'] == ['SUP-10'] and 'SUP-05' not in decisions
+    with pytest.raises(ValueError, match='^SUP05_PAIRED_NORMAL_PREPARATIONS_REQUIRED$'):
+        tool.assemble(inputs, policy_path, sup05_normal_preparations={'baseline': references['baseline']}, **options)
+    for candidate in (references['baseline'], {**references['candidate'], 'sha256': '0' * 64}):
+        invalid = {**references, 'candidate': candidate}
+        fallback, _, decisions = tool.assemble(inputs, policy_path, sup05_normal_preparations=invalid, **options)
+        assert fallback == default
+        assert decisions['SUP-05'] == {'configuration_enabled': False,
+            'sides': {'baseline': None, 'candidate': 'SUP05_PREPARATION_RECEIPT_INVALID'}}
+
+    index_path = _write(tmp_path / 'sup05-preparations.json', references)
+    argv = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(options['store']),
+            '--sup05-normal-preparations', str(index_path), '--installed-plugin-inventory']
+    for side, paths in inputs.items():
+        for role, path in paths.items():
+            argv.extend([f'--{side}-{role}', str(path)])
+    output = tmp_path / 'assembled'
+    monkeypatch.setattr(sys, 'argv', [*argv, '--output', str(output)])
+    tool.main()
+    config = tomllib.loads((output / 'guard.toml').read_text())
+    assert config['update']['allowed_checks'] == ['SUP-10', 'SUP-05']
+    assert config['check_config']['SUP-05'] == {'normal_file_reads_only': True}
+    for side in inputs:
+        assert config['sides'][side] == {'check_config': {
+            'SUP-05': {'normal': outputs[side]['normal']},
+            'SUP-10': {'target': str(inputs[side]['target'])},
+        }}
+    ready = application.update_readiness(pack, envs, pol, config)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    audit = json.loads((output / 'readiness.json').read_bytes())
+    assert audit['active_checks'] == 69 and audit['file_binding_valid_sides'] == 4
+    assert audit['actual_results'] is None and not audit['ready_for_execution']
+    sibling = audit['metadata_wiring']['SUP-05']['shared_executor_checks']['SUP-11']
+    assert all(not row['transport_dispatched'] for row in sibling.values())
+    with pytest.raises(ValueError, match='^SUP05_NORMAL_PREPARATIONS_REQUIRE_PREBOUND_PAIR$'):
+        tool.staged_config(config, tmp_path / 'fresh-candidate.json')
+
+    nested = Path(references['baseline']['path']).parent / 'cannot-overwrite-preparation'
+    monkeypatch.setattr(sys, 'argv', [*argv, '--output', str(nested)])
+    with pytest.raises(ValueError, match='outside source inputs'):
+        tool.main()
+    assert not nested.exists()
 
 
 def _startup_declaration(paths, *, source_commit=None):

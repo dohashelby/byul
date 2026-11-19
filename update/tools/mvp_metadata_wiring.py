@@ -10,8 +10,9 @@ from types import SimpleNamespace
 
 from guard.adapters.engine_profiles import supports
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
-                                 RECORD_SNAPSHOT_OPTIONS, bounded_metadata_scopes, merge_config, update_allowed_checks)
+from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS, NORMAL_FILE_READS_OPTION,
+                                 RECORD_SNAPSHOT_OPTIONS, bounded_metadata_scopes, merge_config,
+                                 normal_file_reads_requested, update_allowed_checks)
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
@@ -30,12 +31,13 @@ from guard.executors.kubernetes_passive_egress_policy import passive_egress_poli
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from guard.models import Environment, Policy, load_pack, utcnow
 from guard.models.artifacts import model_closure_sha256
+from guard.runtime.bounded import strict_json
 from guard.runtime.comparison import execution_conditions
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP, REQUEST_BINDING_PROFILE
 from guard.update_validation import _plain_path, reserve_output
 from tools import mvp_live_readiness as readiness
 from tools.j02_run_config import write_config
-from tools.mvp_a_input_preflight import _pairs, _read
+from tools.mvp_a_input_preflight import _code, _pairs, _read
 from tools.mvp_versions import versions
 
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
@@ -122,6 +124,46 @@ def _gateway_record_inputs(value):
     return inputs
 
 
+def _sup05_preparation_refs(value):
+    if type(value) is not dict or set(value) != set(readiness.SIDES):
+        raise ValueError('SUP05_PAIRED_NORMAL_PREPARATIONS_REQUIRED')
+    for entry in value.values():
+        if (type(entry) is not dict or set(entry) != {'path', 'sha256'}
+                or type(entry['path']) is not str or not entry['path']
+                or type(entry['sha256']) is not str or len(entry['sha256']) != 64
+                or any(char not in '0123456789abcdef' for char in entry['sha256'])):
+            raise ValueError('SUP05_NORMAL_PREPARATION_REFERENCE_INVALID')
+    return value
+
+
+def _sup05_normal_inputs(pointer, check, env, policy, *, side, ordinary_target):
+    from guard.executors.kubernetes_sup05_normal_preparation import read_normal_preparation
+
+    if not _in_scope(check.id, policy):
+        return None, 'MVP_POLICY_SCOPE_MISMATCH'
+    if check.executor != 'supply_boot':
+        return None, 'METADATA_EXECUTOR_UNAVAILABLE'
+    try:
+        preparation = read_normal_preparation(pointer['path'], env, expected_sha256=pointer['sha256'])
+        normal = preparation['normal']
+        if Path(normal['target']) == Path(ordinary_target).resolve():
+            raise ValueError('SUP05_DISTINCT_LIFECYCLE_TARGET_REQUIRED')
+        settings = {NORMAL_FILE_READS_OPTION: True, 'normal': normal}
+        expected_target = preparation['target_sha256']
+        _, values = run_binding.effective_values(check, settings, env, policy.values.get(check.id) or {},
+            side=side, attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
+            policy_ref=policy.ref(), expected_target_sha256=expected_target,
+            expected_normal_file_sha256=preparation['expected_normal_file_sha256'])
+        executor = registry.build_executor(check.executor, 'kubernetes',
+            {check.executor: settings, '_kubernetes_target_sha256': expected_target},
+            engine=env.engine.name, version=env.engine.version)
+        executor.validate_policy(check, values)
+        executor.normal_file_read_inputs(env, values)
+    except (KeyError, OSError, TypeError, ValueError) as error:
+        return None, _code(error)
+    return normal, None
+
+
 def staged_config(config, fresh_candidate_target):
     """Use a separate, unpublished file for A's after-baseline candidate phase."""
     new_path = _plain_path(Path(fresh_candidate_target))
@@ -129,6 +171,8 @@ def staged_config(config, fresh_candidate_target):
         raise ValueError('METADATA_FRESH_CANDIDATE_PATH_REQUIRED')
     if config.get('check_config', {}).get('OBS-01', {}).get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True:
         raise ValueError('GATEWAY_RECORDS_REQUIRE_PREBOUND_PAIR')
+    if normal_file_reads_requested(config):
+        raise ValueError('SUP05_NORMAL_PREPARATIONS_REQUIRE_PREBOUND_PAIR')
     result = deepcopy(config)
     result['update']['kubernetes_candidate_binding'] = 'after_baseline'
     for name in result['executors']:
@@ -408,7 +452,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
              gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
              normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False,
              cilium_egress_status=False, normal_startup_load=False, normal_compile_cache=False,
-             normal_safetensors_reader=False, normal_graph_capture=False):
+             normal_safetensors_reader=False, normal_graph_capture=False, sup05_normal_preparations=None):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -465,12 +509,21 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                                        target_path=target_pointer['path'], record_inputs=records.get(check_id, {}).get(side))
                    for side, (env, target, transport, _, target_pointer) in sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
+    normal_file_reads = {}
+    if sup05_normal_preparations is not None:
+        references = _sup05_preparation_refs(sup05_normal_preparations)
+        reasons = {}
+        for side, (env, _, _, _, target_pointer) in sides.items():
+            normal_file_reads[side], reasons[side] = _sup05_normal_inputs(
+                references[side], pack.checks['SUP-05'], env, policy, side=side, ordinary_target=target_pointer['path'])
+        candidates['SUP-05'] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
     passive = candidates.get(passive_api_hop.CHECK)
     if passive and not candidates[passive_api_hop.SOURCE_CHECK]['configuration_enabled']:
         passive['configuration_enabled'] = False
         passive['sides'] = {side: reason or 'PASSIVE_API_HOP_SOURCE_NOT_ADMITTED'
                             for side, reason in passive['sides'].items()}
     bindings = []
+    sup05_enabled = candidates.get('SUP-05', {}).get('configuration_enabled')
     for check_id, decision in candidates.items():
         if not decision['configuration_enabled']:
             continue
@@ -478,7 +531,11 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         config['executors'][check.executor] = 'kubernetes'
         for side, (_, _, _, env_pointer, target_pointer) in sides.items():
             settings = config['sides'][side]
-            settings[check.executor] = {'target': target_pointer['path']}
+            if sup05_enabled and check.executor == 'supply_boot':
+                source = {'normal': normal_file_reads[side]} if check_id == 'SUP-05' else {'target': target_pointer['path']}
+                settings.setdefault('check_config', {})[check_id] = source
+            else:
+                settings[check.executor] = {'target': target_pointer['path']}
             if check_id in records:
                 run_cfg = dict(records[check_id][side])
                 if check_id == 'PLT-12':
@@ -496,8 +553,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
     bounded_metadata_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
-    shared_checks = ('SUP-03', 'SUP-07', 'SUP-10', 'SUP-12', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03', 'LIF-04',
-                     'REQ-09', 'REQ-20',
+    shared_checks = ('SUP-03', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03',
+                     'LIF-04', 'REQ-09', 'REQ-20',
                      *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
@@ -506,7 +563,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         for anchor in anchors:
             siblings = {}
             for check in pack.active_checks():
-                if check.executor != CHECK_EXECUTORS[anchor] or check.id in allowed:
+                if check.executor != pack.checks[anchor].executor or check.id in allowed:
                     continue
                 row = plan.item(check.id)
                 siblings[check.id] = {
@@ -549,6 +606,8 @@ def main():
                         help='Observe the owned Pod readiness and ordinary serving correspondence for OBS-02')
     parser.add_argument('--installed-plugin-inventory', action='store_true',
                         help='Read installed plugin entry-point metadata in the owned SUP-10 container')
+    parser.add_argument('--sup05-normal-preparations', type=Path,
+                        help='Paired SUP-05 preparation receipt pointers with independent SHA-256 pins')
     parser.add_argument('--cilium-egress-status', action='store_true',
                         help='Read reported egress policy state for the owned PLT-07 endpoint')
     parser.add_argument('--normal-startup-load', action='store_true',
@@ -570,6 +629,10 @@ def main():
     observation = _source(args.observation_run_bindings)[0] if args.observation_run_bindings else None
     gateway = _source(args.gateway_record_inputs)[0] if args.gateway_record_inputs else None
     copies = _source(args.copy_record_inputs)[0] if args.copy_record_inputs else None
+    sup05_preparations = None
+    if args.sup05_normal_preparations is not None:
+        raw, _ = _read(_plain_path(args.sup05_normal_preparations), max_bytes=65536)
+        sup05_preparations = _sup05_preparation_refs(strict_json(raw, limit=65536))
     config, bindings, checks = assemble(inputs, args.policy, pack=pack, store=args.store,
                                         node_image_verification=args.node_image_verification, passive_plt08=args.passive_plt08,
                                         protected_ipc_metadata=args.protected_ipc_metadata, observation_run_bindings=observation,
@@ -583,7 +646,8 @@ def main():
                                         normal_startup_load=args.normal_startup_load,
                                         normal_compile_cache=args.normal_compile_cache,
                                         normal_safetensors_reader=args.normal_safetensors_reader,
-                                        normal_graph_capture=args.normal_graph_capture)
+                                        normal_graph_capture=args.normal_graph_capture,
+                                        sup05_normal_preparations=sup05_preparations)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]
@@ -596,6 +660,9 @@ def main():
     if copies is not None:
         protected.extend([args.copy_record_inputs, *(row[key] for row in copies.values()
                          for key in ('record_producer', 'copy_inventory'))])
+    if sup05_preparations is not None:
+        # Each receipt's directory contains all files emitted by prepare-sup05-normal.
+        protected.extend([args.sup05_normal_preparations, *(Path(row['path']).parent for row in sup05_preparations.values())])
     output = reserve_output(args.output, protected=protected)
     config_path = output / ('preliminary-guard.toml' if staged is not None else 'guard.toml')
     write_config(config, config_path)

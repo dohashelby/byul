@@ -1,9 +1,9 @@
 """SUP-06: worker·rank별 배정 shard·필수 shard·적재 완료/실패·READY 후보 (개발 담당, B 의존 반환 5, 2026-11-08).
 
-vLLM 0.31.0의 두 모듈을 원 소스 해시로 고정해 감싼다.
-- `model_loader.default_loader`(d17ab549…): `DefaultModelLoader._prepare_weights`의 반환(이 프로세스가 읽을 가중치 파일 목록과
+vLLM 0.30.0과 0.31.0의 두 모듈을 원 소스 해시로 고정해 감싼다. 소스 고정값은 GPU 생산자 등록이 아니다.
+- `model_loader.default_loader`(9c9d54b1… / d17ab549…): `DefaultModelLoader._prepare_weights`의 반환(이 프로세스가 읽을 가중치 파일 목록과
   index 파일)과 `DefaultModelLoader.track_weights_loading`의 반환/예외(가중치 적재 직후 불리며 누락 텐서가 있으면 예외를 낸다).
-- `v1.executor.multiproc_executor`(11a15543…, REQ-14 분산 관측과 같은 고정값): `WorkerProc.monitor_death_pipe`의 호출.
+- `v1.executor.multiproc_executor`(3ed0149a… / 11a15543…): `WorkerProc.monitor_death_pipe`의 호출.
   worker 생성(모델 적재 포함)이 끝난 뒤 READY를 보내기 직전에 항상 불린다(READY 후보).
 `load_weights`·`WorkerProc.__init__`은 `@instrument` 추적 장식자로 감싸여 원 코드 자격을 얻지 못하므로 감싸지 않는다(k3d 실측).
 모든 행에 PID·시작 ticks·TP rank(`parallel_state`, 읽지 못하면 None)를 남겨 바인딩에 쓴다.
@@ -18,12 +18,16 @@ import os
 import stat
 
 from . import vllm_cache_callback as cache
+from .vllm_observer_pin_rows import candidate_sources
 
 LOADER = 'vllm.model_executor.model_loader.default_loader'
 MP = 'vllm.v1.executor.multiproc_executor'
 TARGETS = {LOADER: ('DefaultModelLoader._prepare_weights', 'DefaultModelLoader.track_weights_loading'), MP: ('WorkerProc.monitor_death_pipe',)}
-SOURCES = {LOADER: 'd17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9',
-           MP: '11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b'}
+SOURCES = candidate_sources({
+    LOADER: ('d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9',
+             '9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8'),
+    MP: '11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b',
+}, (MP,))
 SCHEMA = 'guard-vllm-worker-shard-callback/1'
 MAX_FILES = 256
 

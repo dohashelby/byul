@@ -955,6 +955,11 @@
       "manifest_sha256": "f38243977af3197a5e686eb3432b985d22f218bb543fd5e7bf3eecaeff053466",
       "reviewed_by": "Codex / initialization file-binding compatibility and scoped evidence tests / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T10:54:03+00:00"
+    },
+    {
+      "manifest_sha256": "2bd474fd184b86a8f409a748cd62ef6f1767fb0bdbd49673ee8d8c4c101df6e8",
+      "reviewed_by": "Codex / SUP-15 role isolation and OBS-06 provenance / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T11:11:52+00:00"
     }
   ]
 }

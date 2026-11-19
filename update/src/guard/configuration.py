@@ -25,6 +25,7 @@ NORMAL_COMPILE_CACHE_OPTION = "normal_compile_cache_only"
 NORMAL_COMPILE_CACHE_SCOPE_ERROR = "NORMAL_COMPILE_CACHE_EXECUTION_SCOPE_INVALID"
 NORMAL_FILE_READS_OPTION = "normal_file_reads_only"
 NORMAL_FILE_READS_SCOPE_ERROR = "NORMAL_FILE_READS_EXECUTION_SCOPE_INVALID"
+SUP05_PREPARATION_RECEIPT = "preparation_receipt"
 NORMAL_GRAPH_CAPTURE_OPTION = "normal_graph_capture_only"
 NORMAL_GRAPH_CAPTURE_SCOPE_ERROR = "NORMAL_GRAPH_CAPTURE_EXECUTION_SCOPE_INVALID"
 NORMAL_SAFETENSORS_READER_OPTION = "normal_safetensors_reader_only"
@@ -147,8 +148,27 @@ def normal_compile_cache_requested(raw):
     return next(_option_occurrences(raw, NORMAL_COMPILE_CACHE_OPTION), None) is not None
 
 
+def validate_sup05_preparation_receipt(value):
+    """Validate the path and raw content pin of one saved SUP-05 preparation."""
+    if (type(value) is not dict or set(value) != {"path", "sha256"}
+            or type(value["path"]) is not str or not value["path"]
+            or type(value["sha256"]) is not str or len(value["sha256"]) != 64
+            or any(char not in "0123456789abcdef" for char in value["sha256"])):
+        raise ValueError("SUP05_NORMAL_PREPARATION_REFERENCE_INVALID")
+    return value
+
+
+def _sup05_preparation_receipts(raw):
+    for path, receipt in _option_occurrences(raw, SUP05_PREPARATION_RECEIPT):
+        if path[:2] in {("sides", "baseline"), ("sides", "candidate")}:
+            path = path[2:]
+        if path[0] in {CHECK_CONFIG, "supply_boot"}:
+            yield path, receipt
+
+
 def normal_file_reads_requested(raw):
-    return next(_option_occurrences(raw, NORMAL_FILE_READS_OPTION), None) is not None
+    return (next(_option_occurrences(raw, NORMAL_FILE_READS_OPTION), None) is not None
+            or next(_sup05_preparation_receipts(raw), None) is not None)
 
 
 def normal_graph_capture_requested(raw):
@@ -202,6 +222,13 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         _validate_normal_option_placement(raw, NORMAL_FILE_READS_OPTION, {
             (CHECK_CONFIG, "SUP-05", NORMAL_FILE_READS_OPTION),
         }, NORMAL_FILE_READS_SCOPE_ERROR)
+        receipt_present = False
+        for path, receipt in _sup05_preparation_receipts(raw):
+            receipt_present = True
+            if path not in {(CHECK_CONFIG, "SUP-05", SUP05_PREPARATION_RECEIPT),
+                            ("supply_boot", SUP05_PREPARATION_RECEIPT)}:
+                raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+            validate_sup05_preparation_receipt(receipt)
         _validate_normal_option_placement(raw, NORMAL_GRAPH_CAPTURE_OPTION, {
             (CHECK_CONFIG, "REQ-20", NORMAL_GRAPH_CAPTURE_OPTION),
         }, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
@@ -281,12 +308,14 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                         or ("run_binding" in raw and (type(bindings) is not dict or set(stream_cases) & bindings.keys()))):
                     raise ValueError(stream_error)
         supply_cases = {cid: scoped[cid][0] for cid in ("LIF-01", "SUP-07", "SUP-12", "SUP-10") if cid in scoped}
+        if receipt_present and "SUP-05" not in scoped:
+            raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
         if "SUP-05" in scoped:
             settings, _ = scoped["SUP-05"]
             supply_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}
             normal = settings.get("normal")
             if (supply_checks != {"SUP-05", *supply_cases} or set(settings) - {
-                    NORMAL_FILE_READS_OPTION, "normal", "kubectl_binary", "max_duration_seconds"}
+                    NORMAL_FILE_READS_OPTION, SUP05_PREPARATION_RECEIPT, "normal", "kubectl_binary", "max_duration_seconds"}
                     or type(normal) is not dict or set(normal) != {"target", "prepared", "reference_manifest"}
                     or any(type(path) is not str or not path for path in normal.values())
                     or raw.get("update", {}).get("kubernetes_candidate_binding", "prebound") != "prebound"):

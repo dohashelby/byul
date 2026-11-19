@@ -12,7 +12,7 @@ from types import SimpleNamespace
 from guard.adapters.engine_profiles import supports
 from guard.adapters.engine_provider import get_provider
 from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS, NORMAL_FILE_READS_OPTION,
-                                 RECORD_SNAPSHOT_OPTIONS, bounded_metadata_scopes, merge_config,
+                                 RECORD_SNAPSHOT_OPTIONS, SUP05_PREPARATION_RECEIPT, bounded_metadata_scopes, merge_config,
                                  normal_file_reads_requested, update_allowed_checks)
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.run import RunConfig, _blocked_reason
@@ -137,7 +137,8 @@ def _sup05_normal_inputs(pointer, check, env, policy, *, side, ordinary_target):
         normal = preparation['normal']
         if Path(normal['target']) == Path(ordinary_target).resolve():
             raise ValueError('SUP05_DISTINCT_LIFECYCLE_TARGET_REQUIRED')
-        settings = {NORMAL_FILE_READS_OPTION: True, 'normal': normal}
+        prepared_settings = {'normal': normal, SUP05_PREPARATION_RECEIPT: pointer}
+        settings = {NORMAL_FILE_READS_OPTION: True, **prepared_settings}
         expected_target = preparation['target_sha256']
         _, values = run_binding.effective_values(check, settings, env, policy.values.get(check.id) or {},
             side=side, attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
@@ -150,7 +151,7 @@ def _sup05_normal_inputs(pointer, check, env, policy, *, side, ordinary_target):
         executor.normal_file_read_inputs(env, values)
     except (KeyError, OSError, TypeError, ValueError) as error:
         return None, _code(error)
-    return normal, None
+    return prepared_settings, None
 
 
 def staged_config(config, fresh_candidate_target):
@@ -498,12 +499,12 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                                        target_path=target_pointer['path'], record_inputs=records.get(check_id, {}).get(side))
                    for side, (env, target, transport, _, target_pointer) in sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
-    normal_file_reads = {}
+    normal_file_read_settings = {}
     if sup05_normal_preparations is not None:
         references = readiness._sup05_preparation_refs(sup05_normal_preparations)
         reasons = {}
         for side, (env, _, _, _, target_pointer) in sides.items():
-            normal_file_reads[side], reasons[side] = _sup05_normal_inputs(
+            normal_file_read_settings[side], reasons[side] = _sup05_normal_inputs(
                 references[side], pack.checks['SUP-05'], env, policy, side=side, ordinary_target=target_pointer['path'])
         candidates['SUP-05'] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
     passive = candidates.get(passive_api_hop.CHECK)
@@ -521,7 +522,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         for side, (_, _, _, env_pointer, target_pointer) in sides.items():
             settings = config['sides'][side]
             if sup05_enabled and check.executor == 'supply_boot':
-                source = {'normal': normal_file_reads[side]} if check_id == 'SUP-05' else {'target': target_pointer['path']}
+                source = normal_file_read_settings[side] if check_id == 'SUP-05' else {'target': target_pointer['path']}
                 settings.setdefault('check_config', {})[check_id] = source
             else:
                 settings[check.executor] = {'target': target_pointer['path']}

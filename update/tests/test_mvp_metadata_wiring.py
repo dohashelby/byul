@@ -1401,7 +1401,7 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
     assert config['check_config']['SUP-05'] == {'normal_file_reads_only': True}
     for side in inputs:
         assert config['sides'][side] == {'check_config': {
-            'SUP-05': {'normal': outputs[side]['normal']},
+            'SUP-05': {'normal': outputs[side]['normal'], 'preparation_receipt': references[side]},
             'SUP-10': {'target': str(inputs[side]['target'])},
         }}
     ready = application.update_readiness(pack, envs, pol, config)
@@ -1418,6 +1418,19 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
         if row['check_id'] == 'SUP-05':
             assert row['sup05_normal_preparation'] == references[row['side']]
     assert all(row['configuration'] == published_config for row in json.loads(index.read_bytes())['inputs'])
+    with monkeypatch.context() as replay_environment:
+        replay_environment.chdir(external)
+        replayed = tool.readiness.audit(index, pack=pack)
+    assert replayed['rows'] == audit['rows']
+    conflicting = {**references, 'candidate': {**references['candidate'], 'sha256': '0' * 64}}
+    mismatch = tool.readiness.audit(index, pack=pack, sup05_normal_preparations=conflicting)
+    assert mismatch['file_binding_valid_sides'] == 3
+    candidate = next(row for row in mismatch['rows'] if row['check_id'] == 'SUP-05' and row['side'] == 'candidate')
+    assert candidate['blocking_codes'] == ['SUP05_NORMAL_PREPARATION_REFERENCE_MISMATCH']
+    misplaced = deepcopy(config)
+    misplaced['sides']['candidate']['check_config']['SUP-10']['preparation_receipt'] = references['candidate']
+    with pytest.raises(ValueError, match='^NORMAL_FILE_READS_EXECUTION_SCOPE_INVALID$'):
+        application._validate_requested_normal_scopes(misplaced, pack, update_allowed_checks(misplaced, pack))
     sibling = audit['metadata_wiring']['SUP-05']['shared_executor_checks']['SUP-11']
     assert all(not row['transport_dispatched'] for row in sibling.values())
     with pytest.raises(ValueError, match='^SUP05_NORMAL_PREPARATIONS_REQUIRE_PREBOUND_PAIR$'):
@@ -1447,6 +1460,13 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
             tool.main()
     assert declined.is_dir() and not any(declined.iterdir())
     assert prepared.read_bytes() == original_bytes + b'\n'
+    stale = tool.readiness.audit(index, pack=pack)
+    assert stale['file_binding_valid_sides'] == 3
+    candidate = next(row for row in stale['rows'] if row['check_id'] == 'SUP-05' and row['side'] == 'candidate')
+    assert candidate['blocking_codes'] == ['SUP05_PREPARATION_RECEIPT_INVALID']
+    blocked = application.update_readiness(pack, envs, pol, config)
+    inputs_check = next(row for row in blocked['checks'] if row['check'] == 'inputs')
+    assert not inputs_check['ok'] and inputs_check['detail'] == 'SUP05_PREPARATION_RECEIPT_INVALID'
 
 
 def _startup_declaration(paths, *, source_commit=None):

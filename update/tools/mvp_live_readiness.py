@@ -30,6 +30,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNA
                                  NORMAL_SERVING_READINESS_OPTION,
                                  NORMAL_STARTUP_LOAD_OPTION,
                                  NORMAL_TOKEN_INPUT_OPTION,
+                                 SUP05_PREPARATION_RECEIPT,
                                  bounded_metadata_scopes, cilium_egress_status_requested, for_check, merge_config,
                                  installed_plugin_inventory_requested, normal_request_latency_requested,
                                  normal_compile_cache_requested, normal_file_reads_requested,
@@ -37,7 +38,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNA
                                  normal_safetensors_reader_requested,
                                  normal_serving_readiness_requested,
                                  normal_startup_load_requested,
-                                 normal_token_input_requested)
+                                 normal_token_input_requested, validate_sup05_preparation_receipt)
 from guard.core.select import _in_scope, check_policy_value
 from guard.executors import passive_api_hop, registry, run_binding
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
@@ -75,16 +76,15 @@ def template(pack):
     return {'schema': SCHEMA, 'pack_ref': pack.ref().model_dump(mode='json'), 'inputs': []}
 
 
+def _sup05_preparation_ref(value):
+    reference = validate_sup05_preparation_receipt(value)
+    return {**reference, 'path': str(Path(reference['path']).expanduser().absolute())}
+
+
 def _sup05_preparation_refs(value):
     if type(value) is not dict or set(value) != set(SIDES):
         raise ValueError('SUP05_PAIRED_NORMAL_PREPARATIONS_REQUIRED')
-    for entry in value.values():
-        if (type(entry) is not dict or set(entry) != {'path', 'sha256'}
-                or type(entry['path']) is not str or not entry['path']
-                or type(entry['sha256']) is not str or len(entry['sha256']) != 64
-                or any(char not in '0123456789abcdef' for char in entry['sha256'])):
-            raise ValueError('SUP05_NORMAL_PREPARATION_REFERENCE_INVALID')
-    return value
+    return {side: _sup05_preparation_ref(entry) for side, entry in value.items()}
 
 
 def startup_observer_reason(check_id, target, env, *, runner=None):
@@ -288,6 +288,11 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             'LIF-12': 'retry_record_source_sha256',
         }[check.id]
     normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
+    if check.id == 'SUP-05' and SUP05_PREPARATION_RECEIPT in cfg:
+        saved_preparation = _sup05_preparation_ref(cfg[SUP05_PREPARATION_RECEIPT])
+        if sup05_normal_preparation is not None and saved_preparation != sup05_normal_preparation:
+            raise ValueError('SUP05_NORMAL_PREPARATION_REFERENCE_MISMATCH')
+        sup05_normal_preparation = saved_preparation
     if sup05_normal_preparation is not None and not (
             normal_file_reads and prebound_kubernetes and check.executor == 'supply_boot'):
         raise ValueError('SUP05_NORMAL_PREPARATION_SCOPE_INVALID')

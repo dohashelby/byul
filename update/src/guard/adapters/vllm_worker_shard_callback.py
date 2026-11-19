@@ -86,10 +86,16 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
             return prepared
         prepared['index_present'] = True
         try:
-            if not stat.S_ISREG(identity.st_mode):
+            if not (stat.S_ISREG(identity.st_mode) or stat.S_ISLNK(identity.st_mode)):
                 raise ValueError
-            with open(path, 'rb') as stream:
-                raw = stream.read(1 << 24)
+            descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0))
+            try:
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise ValueError
+                with os.fdopen(descriptor, 'rb', closefd=False) as stream:
+                    raw = stream.read(1 << 24)
+            finally:
+                os.close(descriptor)
             mapping = json.loads(raw).get('weight_map')
             if (type(mapping) is not dict or not mapping or any(type(v) is not str or not v for v in mapping.values())
                     or len(set(mapping.values())) > MAX_FILES):

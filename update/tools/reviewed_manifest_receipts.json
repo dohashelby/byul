@@ -895,6 +895,11 @@
       "manifest_sha256": "689c49c8b8c845ca93e44612e99fbd3f5eede153ba164e8858cce65816e6846e",
       "reviewed_by": "Codex / owned OBS-11 status bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T06:03:50+00:00"
+    },
+    {
+      "manifest_sha256": "2695180b77f8325c921aed6cdd7b92c7f6c879f135d6175d2edc76851fff73f5",
+      "reviewed_by": "Codex / LIF-01, LIF-02, SUP-11 and PLT-09 evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T06:38:47+00:00"
     }
   ]
 }

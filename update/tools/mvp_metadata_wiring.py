@@ -468,13 +468,6 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                                        target_path=target_pointer['path'], record_inputs=records.get(check_id, {}).get(side))
                    for side, (env, target, transport, _, target_pointer) in sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
-    container_checks = ('SUP-04', 'PLT-01')
-    if any(not candidates[cid]['configuration_enabled'] and _in_scope(cid, policy) for cid in container_checks):
-        for cid in container_checks:
-            entry = candidates[cid]
-            if entry['configuration_enabled']:
-                entry['configuration_enabled'] = False
-                entry['sides'] = dict.fromkeys(sides, 'SHARED_CONTAINER_CHECK_INPUT_UNAVAILABLE')
     passive = candidates.get(passive_api_hop.CHECK)
     if passive and not candidates[passive_api_hop.SOURCE_CHECK]['configuration_enabled']:
         passive['configuration_enabled'] = False

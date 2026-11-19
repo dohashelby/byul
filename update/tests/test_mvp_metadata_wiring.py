@@ -190,17 +190,60 @@ def test_template_wiring_requires_the_configured_hash_in_approved_policy(tmp_pat
     assert set(checks['SUP-03']['sides'].values()) == {'CONFIGURED_TEMPLATE_POLICY_APPROVAL_MISSING'}
 
 
-def test_missing_shared_policy_blocks_both_container_checks_without_filling_values(tmp_path, sources):
+@pytest.mark.parametrize(('missing', 'admitted'), [('SUP-04', 'PLT-01'), ('PLT-01', 'SUP-04')])
+def test_shared_container_checks_require_their_own_policy(tmp_path, sources, monkeypatch, missing, admitted):
+    from guard.executors.kubernetes_container_config import KubernetesContainerConfigExecutor
+
     pack, sides, policy_path = sources
-    document, _ = tool._source(policy_path)
-    original = tool.Policy.model_validate(document)
-    values = {key: value for key, value in original.values.items() if key != 'SUP-04'}
-    revised = original.model_copy(update={'values': values}).seal()
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {admitted: original.values[admitted], 'PLT-08': {'plaintext_forbidden': True}}
+    scope = original.scope.model_copy(update={'include': ['SUP-04', 'PLT-01', 'PLT-08']})
+    revised = original.model_copy(update={'values': values, 'scope': scope}).seal()
     _write(policy_path, revised.to_dict())
-    config, _, checks = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
-    assert 'container_config' not in config['executors']
-    assert checks['SUP-04']['sides']['baseline'] == 'MVP_POLICY_VALUE_MISSING'
-    assert checks['PLT-01']['sides']['baseline'] == 'SHARED_CONTAINER_CHECK_INPUT_UNAVAILABLE'
+    store_path = tmp_path / 'store'
+    config, _, checks = tool.assemble(sides, policy_path, pack=pack, store=store_path,
+                                     node_image_verification='local-containerd-v1', passive_plt08=True)
+    assert checks[missing] == {'configuration_enabled': False,
+                              'sides': dict.fromkeys(sides, 'MVP_POLICY_VALUE_MISSING')}
+    assert checks[admitted]['configuration_enabled'] and checks[admitted]['sides'] == dict.fromkeys(sides)
+    assert config['executors']['container_config'] == 'kubernetes'
+    assert all(settings['container_config'] == {'target': str(sides[side]['target'])}
+               for side, settings in config['sides'].items())
+    if admitted == 'PLT-01':
+        assert set(config['update']['allowed_checks']) == {'PLT-01', 'PLT-08'}
+        assert checks['PLT-08']['configuration_enabled']
+    else:
+        assert config['update']['allowed_checks'] == ['SUP-04']
+        assert checks['PLT-08']['sides'] == dict.fromkeys(sides, 'PASSIVE_API_HOP_SOURCE_NOT_ADMITTED')
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    calls = []
+
+    def collect(self, check, env, policy_values, *_args):
+        calls.append((check.id, env.id))
+        self.validate_policy(check, policy_values)
+        assert policy_values == values[admitted]
+        assert self.cfg.get('node_image_verification') == ('local-containerd-v1' if admitted == 'SUP-04' else None)
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None})
+
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('Dispatch regression must use saved inputs and local test doubles only')
+
+    monkeypatch.setattr(KubernetesContainerConfigExecutor, 'run', collect)
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    store = Store(store_path)
+    application.execute_update(store, pack, envs, revised, config, tmp_path / 'update', utcnow())
+    assert calls == [(admitted, env.id) for env in envs]
+    rows = {(evd.check_id, evd.environment.id): evd for evd in store.iter_kind('EVD')}
+    for env in envs:
+        observed = rows[admitted, env.id]
+        assert observed.execution.status == ExecStatus.COMPLETED and observed.data_origin == DataOrigin.EXAMPLE
+        assert rows[missing, env.id].execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
+        unobserved = rows['PLT-08', env.id]
+        assert unobserved.execution.status == ExecStatus.NOT_RUN
+        assert unobserved.execution.abort_reason == ('PASSIVE_API_HOP_ARTIFACT_UNVERIFIED' if admitted == 'PLT-01'
+                                                     else 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE')
 
 
 def test_opt_in_plt08_seals_the_same_plt01_target_in_prebound_and_staged_inputs(tmp_path, monkeypatch, sources):

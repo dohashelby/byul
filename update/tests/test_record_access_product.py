@@ -1,13 +1,19 @@
-"""Real B collector/manual bridge integration with EXAMPLE Kubernetes replies."""
+"""OBS-06 product and manual evidence with EXAMPLE Kubernetes replies."""
+from datetime import timedelta
 import json
 from types import SimpleNamespace
 
+import pytest
+
+from guard.adapters.vllm import VllmAdapter
 from guard.executors import kubernetes_record_access as collector
+from guard.executors import kubernetes_record_access_product as product
 from guard.executors import record_access_evidence as bridge
-from guard.models import DataOrigin
+from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.store import Store
+from tests.builders import baseline_pack
 from tests.test_record_access_evidence import case as prepared_case
-from tests.test_kubernetes_record_access import World, PRIVATE
+from tests.test_kubernetes_record_access import World, PRIVATE, context as access_context
 
 
 def test_real_collector_reaches_original_pack_evidence_and_restored_verdict(prepared_case, monkeypatch):
@@ -54,3 +60,63 @@ def test_real_collector_reaches_original_pack_evidence_and_restored_verdict(prep
         assert PRIVATE not in serialized and 'content_sha256' not in serialized
         assert all(subject['username'] not in serialized for subject in case['subjects']['subjects'])
         assert record['data_origin'] == 'EXAMPLE' and record['storage_encryption'] == 'UNKNOWN'
+
+
+@pytest.mark.parametrize('change', ['matching', 'wrong-target', 'after-window', 'unverified-owner'])
+def test_canonical_obs06_artifact_keeps_qualified_ordinary_capture(access_context, tmp_path, monkeypatch, change):
+    case = access_context
+    target_path, subjects_path = tmp_path / 'target.json', tmp_path / 'subjects.json'
+    target_path.write_bytes(canonical_json(case.target))
+    subjects_path.write_bytes(canonical_json(case.subjects))
+    now = utcnow()
+    policy_end = now + timedelta(minutes=1)
+    values = {
+        'record_environment_sha256': case.env.ref().sha256,
+        'record_target_sha256': sha256_hex(target_path.read_bytes()),
+        'record_subject_plan_sha256': sha256_hex(subjects_path.read_bytes()),
+        'record_inventory_session': 'a' * 32, 'record_inventory_source_sha256': 'b' * 64,
+        'record_validity_start': (now - timedelta(minutes=1)).isoformat(), 'record_validity_end': policy_end.isoformat(),
+        'record_access_policy_ref': case.ref.model_dump(mode='json'),
+    }
+    world = World(case, 'initial-binding' if change == 'unverified-owner' else 'identity-before')
+    produced = []
+
+    def capture(*args, **kwargs):
+        result = collector.capture_record_access(*args, **kwargs)
+        produced.append(result)
+        if change == 'wrong-target':
+            return {**result, 'target_sha256': 'f' * 64}
+        if change == 'after-window':
+            return {**result, 'finished_at': (policy_end + timedelta(seconds=1)).isoformat()}
+        return result
+
+    def unavailable(*args, **kwargs):
+        raise ValueError('No inventory producer in the EXAMPLE session')
+
+    monkeypatch.setattr(product, 'capture_record_access', capture)
+    monkeypatch.setattr(product.KubernetesRecordAccessExecutor, '_inventory', unavailable)
+    executor = product.KubernetesRecordAccessExecutor(
+        {'target': str(target_path), 'subjects': str(subjects_path)}, runner=world.runner)
+    draft = executor.run(baseline_pack().checks['OBS-06'], case.env, values, VllmAdapter(), case.work)
+    original, = produced
+    ordinary_read_verified = change != 'unverified-owner'
+    assert world.logs_calls == (2 if ordinary_read_verified else 0)
+    assert not original['rows'][1]['attempted']
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.observations['record_normal_read_verified'].value is ordinary_read_verified
+    assert draft.observations['record_inventory_authenticated'].value is False
+    assert not draft.observations['record_copy_inventory'].collected
+    artifact, = draft.artifacts
+    serialized = artifact.path.read_text(encoding='utf-8')
+    summary = json.loads(serialized)
+    assert summary['copies'] is None
+    for private in (PRIVATE, 'example-allowed', 'example-unallowed', 'system:authenticated', str(target_path)):
+        assert private not in serialized
+    if change == 'matching':
+        assert summary['ordinary_capture'] == {
+            **{key: original[key] for key in ('schema', 'profile', 'collection_id', 'target_sha256', 'subject_plan_sha256',
+                                              'data_origin', 'started_at', 'finished_at')},
+            'environment_sha256': case.env.ref().sha256, 'policy_sha256': case.ref.sha256,
+        }
+    else:
+        assert 'ordinary_capture' not in summary

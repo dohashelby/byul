@@ -14,6 +14,7 @@ from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utc
 from guard.runtime.bounded import strict_json
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
+from .kubernetes_record_access import PROFILE as ACCESS_CAPTURE_PROFILE, SCHEMA as ACCESS_CAPTURE_SCHEMA
 from .kubernetes_record_access import capture_record_access, _policy_ref
 from .owned_capture import _FILE_READER, MAX_BYTES
 from .rank_failure_contract import stamp
@@ -98,6 +99,40 @@ def evaluate_inventory(packet):
     return violations, sorted(set(missing))
 
 
+def _ordinary_capture_provenance(capture, env, values, policy_ref, started, policy_end):
+    """Keep the scope of a qualified ordinary read without its content or subject identities."""
+    if not capture or not any(
+        row["case_id"] in {"allowed-before", "allowed-after"} and row["role"] == "authorized_reader"
+        and all(row[key] is True for key in ("attempted", "identity_verified", "binding_verified", "read_verified"))
+        for row in capture["rows"]
+    ):
+        return None
+    expected = {
+        "schema": ACCESS_CAPTURE_SCHEMA, "profile": ACCESS_CAPTURE_PROFILE,
+        "environment_ref": env.ref().model_dump(mode="json"),
+        "target_sha256": values["record_target_sha256"], "subject_plan_sha256": values["record_subject_plan_sha256"],
+        "policy_ref": policy_ref, "data_origin": "EXAMPLE" if env.data_origin == DataOrigin.EXAMPLE else "DECLARED",
+    }
+    if any(capture.get(key) != value for key, value in expected.items()):
+        return None
+    collection_id = capture.get("collection_id")
+    if type(collection_id) is not str or re.fullmatch(r"record-access-[0-9a-f]{32}", collection_id) is None:
+        return None
+    try:
+        policy_sha256 = _policy_ref(policy_ref)["sha256"]
+        capture_start, capture_end = stamp(capture.get("started_at")), stamp(capture.get("finished_at"))
+        if not started <= capture_start <= capture_end <= policy_end:
+            return None
+    except ValueError:
+        return None
+    return {
+        "schema": ACCESS_CAPTURE_SCHEMA, "profile": ACCESS_CAPTURE_PROFILE, "collection_id": collection_id,
+        "environment_sha256": values["record_environment_sha256"], "target_sha256": expected["target_sha256"],
+        "subject_plan_sha256": expected["subject_plan_sha256"], "policy_sha256": policy_sha256,
+        "data_origin": expected["data_origin"], "started_at": capture_start.isoformat(), "finished_at": capture_end.isoformat(),
+    }
+
+
 class InventoryReader(KubernetesLifecycleReader):
     """사본 기록 한 개만 읽는다. native 세션 읽기는 허용하지 않는다."""
 
@@ -174,9 +209,10 @@ class KubernetesRecordAccessExecutor:
             evaluated = evaluate_inventory(packet)
         except Exception:
             diagnostics.append("RECORD_ACCESS_INVENTORY_UNAVAILABLE")
-        return self._draft(check, env, workdir, started, capture, packet, evaluated, diagnostics)
+        ordinary_capture = _ordinary_capture_provenance(capture, env, policy_values, expected_policy_ref, started, end)
+        return self._draft(check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture)
 
-    def _draft(self, check, env, workdir, started, capture, packet, evaluated, diagnostics):
+    def _draft(self, check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture):
         unauthorized = capture.get("unauthorized_read_verified") if capture else None
         rows = [{key: row[key] for key in ("case_id", "role", "attempted", "identity_verified", "binding_verified",
                                            "read_verified", "returncode", "byte_count", "gaps")} for row in capture["rows"]] if capture else None
@@ -200,8 +236,10 @@ class KubernetesRecordAccessExecutor:
             if not item["collected"]:
                 item["value"] = None
         artifact = workdir / "record_access_summary.json"
-        artifact.write_text(json.dumps({"profile": PROFILE, "rows": rows, "diagnostic_codes": diagnostics, "copies": packet and packet["copies"]},
-                                       ensure_ascii=False, sort_keys=True), encoding="utf-8")
+        summary = {"profile": PROFILE, "rows": rows, "diagnostic_codes": diagnostics, "copies": packet and packet["copies"]}
+        if ordinary_capture is not None:
+            summary["ordinary_capture"] = ordinary_capture
+        artifact.write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True), encoding="utf-8")
         gap = bool(diagnostics or (capture and capture["gaps"]))
         cleanup = [] if capture is None or capture["cleanup"]["complete"] else ["RECORD_ACCESS_CLEANUP_UNVERIFIED"]
         return EvidenceDraft(

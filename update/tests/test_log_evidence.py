@@ -257,18 +257,17 @@ def test_no_log_report_does_not_count_as_success(tmp_path, monkeypatch):
     assert not result["accepted"] and result["original_inventory_preserved"]
 
 
-@pytest.mark.parametrize("changes", [{}, {"duplicate": True}, {"no_logs": True}, {"wrong_owner": True}])
-def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknown(tmp_path, changes):
+def save_native_integrity_report(tmp_path, draft, env, version):
     from guard.core.select import select
     from guard.models import Evidence
     from guard.store.packs import put_pack
-    from tests.builders import environment, policy
-    from tests.test_log_integrity import IMAGE, VALUES, run
-    draft, _ = run(tmp_path, changes)
+    from tests.builders import policy
+    from tests.test_log_integrity import VALUES
+
+    assert draft.status.value == "COMPLETED"
     store = Store(tmp_path / "native-store")
     pack = baseline_pack()
     put_pack(store, PACK_DIR)
-    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}, model={"id": "fixture-model"})
     pol = policy(pack.ref(), scope={"include": ["OBS-09"]}, values={"OBS-09": VALUES})
     store.put_many([env, pol])
     plan = select(pack, [env], pol)
@@ -280,19 +279,56 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
                           "collected_at": env.created_at, "collector": "EXAMPLE-persisted-draft"})
     evd = Evidence(id="EVD-EXAMPLE-NATIVE", data_origin="EXAMPLE", refs=[plan.ref(), env.ref()],
         plan=plan.ref(), environment=env.ref(), check_id="OBS-09", side="single",
-        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": "0.3.0", "config_sha256": "0" * 64}},
+        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": version, "config_sha256": "0" * 64}},
         normal_control=draft.normal_control, challenges=draft.challenges, observations=draft.observations,
         artifacts=artifacts).seal()
     store.put(evd)
     judge_plan(store, pack, plan, env.created_at)
     report = build_report(store, pack, plan, env.created_at)
     store.put(report)
-    result = analyze_saved_logs(store.root)
+    return store.root
+
+
+@pytest.mark.parametrize("changes,version", [
+    ({}, "0.3.0"), ({"duplicate": True}, "0.3.1"), ({"no_logs": True}, "0.3.0"), ({"wrong_owner": True}, "0.3.0"),
+])
+def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknown(tmp_path, changes, version):
+    from tests.builders import environment
+    from tests.test_log_integrity import IMAGE, run
+
+    draft, _ = run(tmp_path, changes)
+    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}, model={"id": "fixture-model"})
+    source = save_native_integrity_report(tmp_path, draft, env, version)
+    result = analyze_saved_logs(source)
     assert result["accepted"], result
     assert result["checks"][0]["status"] == "PROJECTION_REPLAY_MATCH"
     assert result["checks"][0]["raw_source_replayed"] is False
     assert result["checks"][0]["original_native_parser_replayed"] is False
     assert result["checks"][0]["verdicts"]["security"] == ("FAIL" if changes.get("duplicate") else "UNKNOWN" if changes else "PASS")
+
+
+@pytest.mark.parametrize("version,accepted", [("0.3.1+k8s.1", True), ("0.3.1+k8s.2", True), ("0.3.1+k8s.99", False)])
+def test_native_kubernetes_transcript_replays_partial_cri_evidence(tmp_path, monkeypatch, version, accepted):
+    from tests.test_kubernetes_log_integrity import run
+
+    draft, _, env = run(tmp_path, monkeypatch, attach=None)
+    assert draft.observations["log_trials_reached"].value == ["before", "cr", "reserved", "html", "after"]
+    sample_artifact = next(item for item in draft.artifacts if item.name == "log_integrity_samples.json")
+    assert sample_artifact.collector == "log_integrity/0.3.1+k8s.2"
+    source = save_native_integrity_report(tmp_path, draft, env, version)
+    before = inventory_tree(source)
+    result = analyze_saved_logs(source)
+    detail, = result["checks"]
+
+    assert result["accepted"] is accepted, result
+    assert detail["replayed"] is accepted
+    assert detail["status"] == ("PROJECTION_REPLAY_MATCH" if accepted else "REPLAY_MISMATCH")
+    assert detail["coverage_complete"] is False
+    if accepted:
+        assert detail["verdicts"]["security"] == "UNKNOWN"
+        assert detail["raw_source_replayed"] is False
+        assert detail["original_native_parser_replayed"] is False
+    assert result["original_inventory_preserved"] and inventory_tree(source) == before
 
 
 @pytest.mark.parametrize("kind,leak,expected", [(None, False, "PASS"), ("request", False, "UNKNOWN"),

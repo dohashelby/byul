@@ -28,6 +28,7 @@ from guard.validation_evidence import inventory_tree, read_objects, verify_store
 
 SCHEMA = "guard-log-evidence-audit/1"
 CHECKS = {"OBS-03": "log_analysis", "OBS-09": "log_integrity"}
+_NATIVE_PROJECTION_VERSIONS = frozenset({"0.3.0", "0.3.1", "0.3.1+k8s.1", "0.3.1+k8s.2"})
 MAX_JSON_BYTES = 16 * 1024**2
 
 
@@ -72,7 +73,7 @@ def _obs09(store, evd, sample, values):
     projected = sample.get("schema") == NATIVE_SCHEMA
     version = evd.execution.executor.version
     if projected:
-        if version != "0.3.0":
+        if version not in _NATIVE_PROJECTION_VERSIONS:
             raise ValueError("saved native projection differs from executor version")
         analysis = replay_native(sample)
     elif version == "0.2.1":

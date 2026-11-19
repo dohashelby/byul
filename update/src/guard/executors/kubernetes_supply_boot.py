@@ -207,14 +207,27 @@ class KubernetesSupplyBootExecutor:
         return self._prepared_roles(env, values, require_complete=require_complete, distinct_locations=True)
 
     def prepared_supply_roles(self, check, env, values):
-        """Validate both role declarations locally, without verifying live owners or reading records."""
-        self.validate_policy(check, values)
-        if check.id not in {'SUP-09', 'SUP-11', 'SUP-15', 'SUP-16'}:
+        """Validate both local declarations without contacting owners or reading live boot records."""
+        if check.executor != self.name or NORMAL_FILE_READS_OPTION in self.cfg:
             raise ValueError('SUPPLY_BOOT_PROFILE_UNSUPPORTED')
-        if check.id != 'SUP-15' and any(type(self.cfg.get(role)) is not dict
-                or set(self.cfg[role]) != {'target', 'prepared'} for role in contract.ROLES):
-            raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
-        return self._prepared_roles(env, values, require_complete=True, distinct_locations=True)
+        self.validate_policy(check, values)
+        required = {'target', 'prepared'}
+        allowed = required | {'worker_shard_input'} if check.id in {'SUP-06', 'SUP-15'} else required
+        for role in contract.ROLES:
+            section = self.cfg.get(role)
+            if type(section) is not dict or not required <= set(section) <= allowed:
+                raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
+        roles = self._prepared_roles(env, values, require_complete=True, distinct_locations=True)
+        if check.id == 'SUP-05' and roles['normal'][1]['session'] == roles['challenge'][1]['session']:
+            raise ValueError('SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED')
+        if check.id == 'SUP-06':
+            for role, (_, _, digest) in roles.items():
+                if 'worker_shard_input' in self.cfg[role]:
+                    try:
+                        self._worker_shard_input(env, values, role, digest)
+                    except (KeyError, TypeError, ValueError, OSError):
+                        raise ValueError('B_WORKER_SHARD_INPUT_UNAVAILABLE') from None
+        return roles
 
     def _prepared_roles(self, env, values, *, require_complete, distinct_locations):
         if require_complete:
@@ -240,6 +253,14 @@ class KubernetesSupplyBootExecutor:
                                 binary=self.cfg.get("kubectl_binary", "kubectl"),
                                 duration=self.cfg.get("max_duration_seconds", 120))
 
+    def _worker_shard_input(self, env, values, role, digest):
+        from .common_consumption import load_input, worker_shards
+
+        record, scope = load_input(self.cfg[role]['worker_shard_input'],
+            environment_ref=env.ref().model_dump(mode='json'), target_sha256=digest,
+            prepared_sha256=values[f'supply_{role}_prepared_sha256'])
+        return record, scope, worker_shards(record, scope, values)
+
     def _collect_role(self, check, env, values, role, *, role_inputs=None):
         """역할 하나의 세션. 입력·연결 오류는 진단 코드로만 남기고 앞선 역할을 지우지 않는다."""
         from guard.collectors import native_model_file_reads
@@ -252,15 +273,11 @@ class KubernetesSupplyBootExecutor:
             return result
         target, prepared, digest = loaded
         if "worker_shard_input" in self.cfg[role]:
-            from .common_consumption import load_input, worker_shards
             try:
                 if check.id != "SUP-06":
                     raise ValueError("B_WORKER_SHARD_CHECK_UNSUPPORTED")
                 settings = self.cfg[role]["worker_shard_input"]
-                record, scope = load_input(settings,
-                    environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
-                    prepared_sha256=values[f"supply_{role}_prepared_sha256"])
-                result["worker_shards"] = worker_shards(record, scope, values)
+                record, scope, result["worker_shards"] = self._worker_shard_input(env, values, role, digest)
                 # Preserve the validated record's own worker/event binding. The
                 # local file check does not independently verify its live owner.
                 row["worker_shard_input"] = {

@@ -16,6 +16,7 @@ from guard.collectors.lifecycle import load_prepared, prepare_assets
 from guard.core.run import _normalize
 from guard.executors import registry
 from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+from guard.executors.supply_boot_contract import CHECK_PROFILES
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, sha256_hex
 from tests.builders import environment, evidence, policy
@@ -71,6 +72,59 @@ def _sup16_roles(root, version):
         model={'id': 'EXAMPLE-model', 'revision': 'EXAMPLE-revision', 'inventory_sha256': 'a' * 64})
     settings, pins, _, _ = _prepare_roles(root, env, late_owner_change=False)
     return env, settings, pins
+
+
+@pytest.mark.parametrize('version', ['0.30.0', '0.31.0'])
+def test_canonical_supply_prepares_paired_declarations(external, version):
+    env, settings, pins = _sup16_roles(external, version)
+    check_policy = {
+        'LIF-01': {'supply_stage_budget_ms': {'load': 100}, 'supply_stage_budget_bytes': {'load': 1024},
+                   'supply_total_budget_ms': 200},
+        'LIF-02': {'supply_max_attempts': 2, 'supply_max_fetch_bytes': 1024},
+        'PLT-03': {'supply_allowed_objects': ['EXAMPLE-object']},
+        'PLT-05': {'supply_allowed_identities': ['EXAMPLE-identity']},
+        'SUP-12': {'supply_allowed_readers': ['EXAMPLE-reader']},
+    }
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Static role validation dispatched runtime I/O')
+
+    executor = KubernetesSupplyBootExecutor(settings, runner=forbidden)
+    for check_id in CHECK_PROFILES:
+        values = base_values(env, check_id, {**pins, **check_policy.get(check_id, {})})
+        roles = executor.prepared_supply_roles(PACK.checks[check_id], env, values)
+        assert set(roles) == {'normal', 'challenge'}, check_id
+        assert roles['normal'][1]['session'] != roles['challenge'][1]['session'], check_id
+
+
+def test_sup06_preflight_checks_only_a_declared_worker_shard_file(external):
+    from guard.collectors import worker_shard_producer
+    from tests.test_b12_supply_consumers import fixture
+    from tests.test_worker_shard import POD, SCOPE
+
+    env, settings, pins = _sup16_roles(external, '0.31.0')
+    scope = {**SCOPE, 'environment_ref': env.ref().model_dump(mode='json'),
+             'target_sha256': pins['supply_normal_target_sha256'],
+             'prepared_sha256': pins['supply_normal_prepared_sha256']}
+    witness = fixture('worker_shard_k3d_20261108.json')['cases']['sharded']['rows']
+    record, source = worker_shard_producer.record(witness, pod=POD, **scope)
+    assert not source['supported'] and not source['producer_authenticated']
+    path = external / 'worker-shard-input.json'
+    raw = canonical_json(record)
+    path.write_bytes(raw)
+    settings['normal']['worker_shard_input'] = {'path': str(path), 'sha256': sha256_hex(raw), 'scope': scope}
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Static role validation dispatched runtime I/O')
+
+    executor = KubernetesSupplyBootExecutor(settings, runner=forbidden)
+    values = base_values(env, 'SUP-06', pins)
+    assert set(executor.prepared_supply_roles(PACK.checks['SUP-06'], env, values)) == {'normal', 'challenge'}
+    with pytest.raises(ValueError, match='^SUPPLY_BOOT_INPUT_UNAVAILABLE$'):
+        executor.prepared_supply_roles(PACK.checks['SUP-09'], env, values)
+    path.write_bytes(raw + b'\n')
+    with pytest.raises(ValueError, match='^B_WORKER_SHARD_INPUT_UNAVAILABLE$'):
+        executor.prepared_supply_roles(PACK.checks['SUP-06'], env, values)
 
 
 @pytest.mark.parametrize(('check_id', 'version'), [('SUP-09', '0.30.0'), ('SUP-11', '0.31.0')])

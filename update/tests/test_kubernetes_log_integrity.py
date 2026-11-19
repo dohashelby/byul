@@ -7,6 +7,7 @@ from copy import deepcopy
 from contextlib import redirect_stdout
 import io
 import json
+import logging
 import os
 import re
 import sys
@@ -27,6 +28,7 @@ from pathlib import Path
 from guard.models import load_pack
 from tests.builders import environment
 from tests.test_log_integrity import IMAGE, VALUES, World, check, judge, target
+from tests.test_log_integrity_parser import PREFIX
 
 DIGEST = IMAGE.rsplit('@', 1)[1]
 
@@ -157,6 +159,46 @@ def test_lines_after_the_window_end_are_dropped(tmp_path, monkeypatch):
             return {'stdout_bytes': b'no stamp\n', 'returncode': 0, 'capture': {'complete': True}}
     ctx.cprobe = Unstamped(fake.world)
     assert record._read(ctx, '2026-11-04T00:00:00Z', '2026-11-04T00:00:05+00:00', float('inf'))['source_complete'] is False
+
+
+@pytest.mark.parametrize('inside_attach', [True, False])
+def test_owned_writer_window_clips_both_sides_before_attach_alignment(inside_attach):
+    from guard.executors.log_integrity_parser import parse_native_info
+
+    output = io.StringIO()
+    handler = logging.StreamHandler(output)
+    handler.setFormatter(logging.Formatter(PREFIX + '%(message)s'))
+    writer = logging.Logger('EXAMPLE-ordinary-log', level=logging.INFO)
+    writer.addHandler(handler)
+    for message in ('EXAMPLE before window', 'EXAMPLE inclusive start', 'EXAMPLE inclusive end', 'EXAMPLE after window'):
+        writer.info(message)
+    physical = output.getvalue().split('\n')[:-1]
+    stamps = ('2026-11-04T00:00:01.099999999Z', '2026-11-04T00:00:01.100000000Z',
+              '2026-11-04T00:00:05.200000000Z', '2026-11-04T00:00:05.200000001Z')
+    lines = [f'{stamp} {line}\n' for stamp, line in zip(stamps, physical, strict=True)]
+    raw = ''.join(lines).encode()
+    stream_lines = physical[1:3] if inside_attach else [physical[0], physical[3]]
+    attach = ''.join(line + '\n' for line in stream_lines).encode()
+    state = {'complete': True}
+    record = module.KubernetesLogIntegrityExecutor({'target': 'unused'})
+    record._attach = SimpleNamespace(stop=lambda: {'returncode': 0, 'stdout_bytes': attach, 'capture': state})
+    calls = []
+
+    def engine_logs(since, cap):
+        calls.append((since, cap))
+        return {'returncode': 0, 'stdout_bytes': raw, 'capture': state}
+
+    since, until = '2026-11-04T09:00:01.100000+09:00', '2026-11-04T00:00:05.200000+00:00'
+    ctx = SimpleNamespace(cprobe=SimpleNamespace(engine_logs=engine_logs))
+    read = record._read(ctx, since, until, float('inf'))
+    assert calls == [(since, module.MAX_CAPTURE_BYTES)]
+    assert read['text'] == ''.join(lines[1:3]) and read['source_complete'] is inside_attach
+    assert read['window'] == {'since': since, 'until': until}
+    assert read['raw_retained_sha256'] == sha256_hex(attach if inside_attach else raw)
+    assert record._source['cri_raw_sha256'] == sha256_hex(raw)
+    assert record._source['alignment']['aligned'] is inside_attach
+    parsed = parse_native_info(read['text'])
+    assert [row['message'] for row in parsed['events']] == ['EXAMPLE inclusive start', 'EXAMPLE inclusive end']
 
 
 def gap_check():

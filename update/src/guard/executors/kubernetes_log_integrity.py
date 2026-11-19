@@ -114,10 +114,13 @@ def align_attach(lines, attach_raw):
 def _instant(value):
     text = value.replace("Z", "+00:00")
     head, _, rest = text.partition(".")
-    if rest:  # kubectl은 나노초까지 준다. datetime은 마이크로초까지만 받는다.
-        digits = re.match(r"\d+", rest).group()
-        text = head + "." + digits[:6] + rest[len(digits):]
-    return datetime.fromisoformat(text)
+    if not rest:
+        return datetime.fromisoformat(text), ""
+    digits = re.match(r"\d+", rest).group()
+    # Keep the sub-microsecond fraction for ordering. Removing trailing zeroes
+    # lets lexical comparison treat omitted and explicit zero digits alike.
+    text = head + "." + digits[:6] + rest[len(digits):]
+    return datetime.fromisoformat(text), digits[6:].rstrip("0")
 
 
 class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
@@ -206,7 +209,8 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
             result = ctx.cprobe.engine_logs(since, MAX_CAPTURE_BYTES)
             raw, pipe = result["stdout_bytes"], result.get("capture") or {}
             decoded = raw.decode("utf-8", "replace")
-            kept, unstamped, end = [], False, _instant(until)
+            kept, unstamped = [], False
+            start, end = _instant(since), _instant(until)
             # 런타임은 \n 단위로만 시각을 붙인다. \r은 메시지 안의 내용이므로 나누지 않는다(OBS-09가 보는 경계다).
             segments = decoded.split("\n")
             lines = [segment + "\n" for segment in segments[:-1]] + ([segments[-1]] if segments[-1] else [])
@@ -214,7 +218,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
                 found = _STAMP.match(line)
                 if found is None:
                     unstamped = unstamped or bool(line.strip()); continue
-                if _instant(found.group(1)) <= end:
+                if start <= _instant(found.group(1)) <= end:
                     kept.append(line)
             attached = self._stop_attach()
             source = {"cri_raw_bytes": len(raw), "cri_raw_sha256": hashlib.sha256(raw).hexdigest(),

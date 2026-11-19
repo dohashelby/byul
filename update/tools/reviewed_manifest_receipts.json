@@ -855,6 +855,11 @@
       "manifest_sha256": "516634f1531a3f30eb352b38853a8f5c7544a7a1f18e5201d7102671a7e309c7",
       "reviewed_by": "Codex / paired source-bound normal LIF01 startup load / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T02:06:47+00:00"
+    },
+    {
+      "manifest_sha256": "65046cbb3339335e913cfb2967d107d732164b644699abe3b1463a7b06e83822",
+      "reviewed_by": "Codex / paired startup compile cache metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T03:04:53+00:00"
     }
   ]
 }

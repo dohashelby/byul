@@ -56,6 +56,8 @@ SCHEMA_2 = 'guard-run-binding/2'
 SCHEMAS = (SCHEMA, SCHEMA_2)
 INITIALIZATION_CHECKS = frozenset({'LIF-07', 'LIF-09'})
 SUPPLY_RECORD_CHECKS = frozenset({'SUP-15', 'SUP-16'})
+# Pack 38 moved the OBS-06 subject plan from POL to binding at check revision 10.
+OBS06_STAGE4_MIN_CHECK_REVISION = 10
 _TARGET_ONLY_NORMAL_MODES = {
     'LIF-01': ('supply_boot', NORMAL_STARTUP_LOAD_OPTION, 'supply_target_sha256'),
     'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
@@ -373,6 +375,16 @@ def file_hash(check_id, key, executor_cfg, *, require_regular_json=False) -> str
     return sha256_hex(canonical_json(_load(node, loader)))
 
 
+def _verified_record_access_sha256(key, executor_cfg, expected_sha256, reason):
+    try:
+        digest = file_hash('OBS-06', key, executor_cfg, require_regular_json=True)
+    except (KeyError, OSError, TypeError, ValueError):
+        raise RunBindingUnavailable(reason) from None
+    if digest != expected_sha256:
+        raise RunBindingUnavailable(reason)
+    return digest
+
+
 def native_route_preparation_missing(executor_cfg) -> bool:
     """Check only whether the declared manifest itself is absent."""
     from .kubernetes_route_record import has_record_only_native_role
@@ -589,7 +601,7 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     record_digests = expected_record_access_digests
     if record_digests is not None:
         if (not is_record_access_binding(check) or type(record_digests) is not dict
-                or set(record_digests) != {'subjects', 'record_producer'}):
+                or set(record_digests) != {'target', 'subjects', 'record_producer'}):
             raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_FILE_SCOPE_INVALID')
         for digest in record_digests.values():
             _hex(digest)
@@ -671,12 +683,8 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 if record_digests is None:
                     digest = file_hash(check.id, key, executor_cfg)
                 else:
-                    try:
-                        digest = file_hash(check.id, key, executor_cfg, require_regular_json=True)
-                    except (KeyError, OSError, TypeError, ValueError):
-                        raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_SUBJECTS_CHANGED') from None
-                    if digest != record_digests['subjects']:
-                        raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_SUBJECTS_CHANGED')
+                    digest = _verified_record_access_sha256(key, executor_cfg, record_digests['subjects'],
+                                                            'RUN_BINDING_RECORD_ACCESS_SUBJECTS_CHANGED')
                 stage_values[key] = files[key] = digest
             if check.id in POLICY_DOCUMENT_KEYS:
                 key = POLICY_DOCUMENT_KEYS[check.id]
@@ -714,6 +722,9 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 values[key] = _stamp(start)
             elif key.endswith('validity_end'):
                 values[key] = _stamp(end)
+            elif key == 'record_target_sha256' and record_digests is not None:
+                values[key] = files[key] = _verified_record_access_sha256(
+                    key, executor_cfg, record_digests['target'], 'RUN_BINDING_RECORD_ACCESS_TARGET_CHANGED')
             elif key == 'rank_prepared_sha256' and expected_rank_prepared_file is not None:
                 from .lifecycle_common_input_consumption import _read
                 try:

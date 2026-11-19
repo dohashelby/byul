@@ -385,7 +385,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 target_options['expected_supply_record_digests'] = expected
                 raw = {**raw, '_supply_prepared_sha256_by_role': {role: expected[role] for role in ('normal', 'challenge')}}
             if (record_access_digests is not None and cfg.executors[item.executor] == 'kubernetes'
-                    and run_binding.is_record_access_binding(check)):
+                    and run_binding.is_record_access_binding(check)
+                    and item.check_revision >= run_binding.OBS06_STAGE4_MIN_CHECK_REVISION):
                 expected = record_access_digests.get(common['side'].value)
                 if expected is None:
                     raise run_binding.RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_FILES_UNAVAILABLE')

@@ -90,7 +90,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     from guard.executors.kubernetes_response_content import route_target_bytes
     from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, inputs_manifest, redeployment_side_reuse
     from guard.executors.rank_common_input import recipe_source_files
-    from guard.executors.run_binding import (INITIALIZATION_CHECKS, SUPPLY_RECORD_CHECKS,
+    from guard.executors.run_binding import (INITIALIZATION_CHECKS, OBS06_STAGE4_MIN_CHECK_REVISION, SUPPLY_RECORD_CHECKS,
                                              file_hash, initialization_recipe_digests, native_route_preparation_missing,
                                              producer_sha256, supply_record_recipe_digests)
     sides = {s: None for s in cfg.get('sides', {})}
@@ -132,7 +132,8 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     prebound = update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
     prebound_response = prebound and eligible.get('REQ-13') == 'response_content'
     prebound_route_record = prebound and eligible.get('REQ-02') == 'route_record'
-    prebound_record_access = prebound and eligible.get('OBS-06') == 'record_access'
+    prebound_record_access = (prebound and eligible.get('OBS-06') == 'record_access'
+                              and plan.item('OBS-06').check_revision >= OBS06_STAGE4_MIN_CHECK_REVISION)
     supply_checks = [check_id for check_id, executor in eligible.items()
                      if prebound and executor == 'supply_boot' and check_id in SUPPLY_RECORD_CHECKS]
     for side, env in sides.items():
@@ -197,6 +198,8 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                     settings = for_check(effective, 'record_access', 'OBS-06')['record_access']
                     if 'subjects' in settings:
                         record_access_inputs[side] = {
+                            'target': file_hash('OBS-06', 'record_target_sha256', settings,
+                                                require_regular_json=True),
                             'subjects': file_hash('OBS-06', 'record_subject_plan_sha256', settings,
                                                   require_regular_json=True),
                             'record_producer': producer_sha256(run_cfg['record_producer']),

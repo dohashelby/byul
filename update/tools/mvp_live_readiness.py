@@ -262,6 +262,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     role_digests = {}
     prepared_raw_digests = {}
     record_digests = {}
+    record_source_file = None
     if supply_record_roles:
         for role in SUPPLY_ROLES:
             for key in ('target', 'prepared'):
@@ -368,8 +369,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         run_cfg = run_binding.run_config(config, check.id)
         if record_digests and type(run_cfg) is dict and set(run_cfg) == run_binding.config_keys(check):
             path = run_cfg['record_producer']
-            raw, identity = _read(path)
-            bound_files.append((path, raw, identity))
+            raw, identity = _read(path, min_bytes=0, max_bytes=run_binding._MAX_PRODUCER_BYTES)
+            record_source_file = (path, raw, identity)
             key = 'record_inventory_source_sha256' if record_access else 'copy_record_source_sha256'
             record_digests[key] = sha256_hex(raw)
         if supply_record_binding and type(run_cfg) is dict and 'record_producer' in run_cfg:
@@ -438,6 +439,11 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             raise ValueError('MVP_INPUT_FILE_CHANGED')
     for path, before, identity in bound_files:
         after, current = _read(path)
+        if after != before or current != identity:
+            raise ValueError('MVP_INPUT_FILE_CHANGED')
+    if record_source_file is not None:
+        path, before, identity = record_source_file
+        after, current = _read(path, min_bytes=0, max_bytes=run_binding._MAX_PRODUCER_BYTES)
         if after != before or current != identity:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
     if generation_inputs and check.id in REDEPLOY_CHECKS:

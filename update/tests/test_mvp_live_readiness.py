@@ -592,7 +592,8 @@ def _record_declarations(tmp_path, record_access_context, check_id, damage=None)
             settings.update(copy_inventory=str(inventory_path), copy_record_snapshot_only=True)
         target_path.write_bytes(canonical_json(target))
         producer = tmp_path / f'{side}-producer-identity.txt'
-        producer.write_text(f'EXAMPLE producer identity for {side}\n', encoding='utf-8')
+        producer.write_text('' if side == 'candidate' and damage == 'empty_producer'
+                            else f'EXAMPLE producer identity for {side}\n', encoding='utf-8')
         cfg['sides'][side] = {check.executor: settings, 'run_binding': {check_id: {
             'record_session': f'{number:032x}', 'record_producer': str(producer),
         }}}
@@ -611,6 +612,7 @@ def _no_record_collection(*args, **kwargs):
     ('OBS-06', None, None),
     ('OBS-06', 'policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
     ('OBS-06', 'producer_changed', 'MVP_INPUT_FILE_CHANGED'),
+    ('OBS-06', 'empty_producer', None),
     ('PLT-12', None, None),
     ('PLT-12', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('PLT-12', 'inventory_changed', 'MVP_INPUT_FILE_CHANGED'),
@@ -670,7 +672,7 @@ def test_record_declarations_match_runtime_input_contracts(
 
 
 @pytest.mark.parametrize('late', [False, True])
-@pytest.mark.parametrize('source', ['subjects', 'record_producer'])
+@pytest.mark.parametrize('source', ['target', 'subjects', 'record_producer'])
 def test_obs06_rejects_changed_plan_inputs_before_collection(
         tmp_path, monkeypatch, record_access_context, late, source):
     from guard import application
@@ -689,7 +691,13 @@ def test_obs06_rejects_changed_plan_inputs_before_collection(
     store.put_many([*envs, pol, plan])
     candidate = cfg['sides']['candidate']
 
-    if source == 'subjects':
+    if source == 'target':
+        path = Path(candidate['record_access']['target'])
+        target = json.loads(path.read_bytes())
+        target['kubernetes']['engine']['restart_count'] += 1
+        replacement = canonical_json(target)
+        reason = 'RUN_BINDING_RECORD_ACCESS_TARGET_CHANGED'
+    elif source == 'subjects':
         path = Path(candidate['record_access']['subjects'])
         subjects = json.loads(path.read_bytes())
         subjects['subjects'][0]['username'] = 'example-replacement'
@@ -723,12 +731,14 @@ def test_obs06_rejects_changed_plan_inputs_before_collection(
         assert not list(store.iter_kind('EVD'))
 
 
-@pytest.mark.parametrize('scope', ['selected', 'unselected', 'staged'])
+@pytest.mark.parametrize('scope', ['selected', 'unselected', 'staged', 'legacy'])
 def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_access_context, scope):
     from guard.core.execution_recipe import configuration_sha256
     from guard.core.select import select
-    from guard.models import Mode, canonical_json
+    from guard.executors.run_binding import stages_for
+    from guard.models import CheckDef, Mode, canonical_json
     from tests.builders import policy
+    import yaml
 
     pack, envs, pol, cfg, _ = _record_declarations(tmp_path, record_access_context, 'OBS-06')
     if scope == 'unselected':
@@ -736,6 +746,14 @@ def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_acces
     if scope == 'staged':
         cfg['update']['kubernetes_candidate_binding'] = 'after_baseline'
     plan = select(pack, envs, pol, mode=Mode.update)
+    if scope == 'legacy':
+        legacy_path = tool.ROOT / 'tests/fixtures/run-binding-pack37/checks/OBS-06.yaml'
+        legacy = CheckDef.model_validate(yaml.safe_load(legacy_path.read_bytes()))
+        assert stages_for(legacy) == (1, 2, 3)
+        plan = plan.model_copy(update={'items': [
+            item.model_copy(update={'check_revision': legacy.revision}) if item.check_id == legacy.id else item
+            for item in plan.items
+        ]}).seal()
     original = configuration_sha256(cfg, envs, plan=plan)
     path = tmp_path / 'candidate-subjects.json'
     if scope == 'selected':

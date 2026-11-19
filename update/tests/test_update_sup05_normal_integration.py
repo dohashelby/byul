@@ -1,5 +1,6 @@
 """Exercise the normal SUP-05 executor through the canonical update pipeline."""
 
+from copy import deepcopy
 from pathlib import Path
 import socket
 import subprocess
@@ -52,10 +53,17 @@ def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, extern
     monkeypatch.setattr(subprocess, "Popen", forbid_external_runtime)
     monkeypatch.setattr(socket, "socket", forbid_external_runtime)
 
+    envs = [side.env for side in sides.values()]
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    assert next(item for item in ready["checks"] if item["check"] == "inputs")["ok"], ready
+    invalid = deepcopy(cfg)
+    invalid["sides"]["candidate"]["supply_boot"]["normal"]["reference_manifest"] = str(external / "missing-reference.json")
+    blocked = application.update_readiness(pack, envs, pol, invalid)
+    assert not next(item for item in blocked["checks"] if item["check"] == "inputs")["ok"]
+    assert all(not side.world.calls for side in sides.values())
+
     store = Store(tmp_path / "store")
-    report, failed = application.execute_update(
-        store, pack, [side.env for side in sides.values()], pol, cfg, tmp_path / "update", utcnow()
-    )
+    report, failed = application.execute_update(store, pack, envs, pol, cfg, tmp_path / "update", utcnow())
     assert not failed
     row = next(item for item in report.by_check if item.check_id == "SUP-05")
     assert row.selected and row.comparison == Comparison.UNKNOWN

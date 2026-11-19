@@ -1030,6 +1030,11 @@
       "manifest_sha256": "e67a04fae23bec7bcea4ad4da32038b91fa664b911b9d0718dd1a49b51f99117",
       "reviewed_by": "Codex / owned startup source and saved observation input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T20:13:00+00:00"
+    },
+    {
+      "manifest_sha256": "195132a89d9765ac30421e8cdd66592c823912004d54c5e52ecc70ad9714e6a1",
+      "reviewed_by": "Codex / LIF-03 effective normal latency input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T20:19:46+00:00"
     }
   ]
 }

@@ -23,7 +23,8 @@ from guard.adapters.base import EngineAdapter
 from guard.adapters.fake import FakeAdapter
 from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
-from guard.configuration import (INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
+from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR,
+                                 INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION)
@@ -76,6 +77,7 @@ from .kubernetes_profiler_observation import KubernetesProfilerObservationExecut
 from .kubernetes_observation_identity import KubernetesObservationIdentityExecutor
 from .kubernetes_ipc_product import KubernetesIPCProductExecutor
 from .kubernetes_egress_product import KubernetesEgressProductExecutor
+from .kubernetes_passive_egress_policy import KubernetesPassiveEgressPolicyExecutor
 from .kubernetes_usage_report import kubernetes_boundary_egress
 from .kubernetes_native_route import KubernetesNativeRouteExecutor
 from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
@@ -212,6 +214,13 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
         # A mixed update also has collectors with their own targets and
         # generations. Only the explicitly bound executors receive its hash.
         cfg = {**cfg, '_kubernetes_target_sha256': cfg['_kubernetes_target_sha256_by_executor'].get(executor)}
+    if executor == "boundary_egress":
+        settings = cfg.get(executor)
+        if type(settings) is dict and CILIUM_EGRESS_STATUS_OPTION in settings:
+            if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
+                raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+            return KubernetesPassiveEgressPolicyExecutor(
+                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if executor == "stream_buffer":
         settings = cfg.get(executor)
         if type(settings) is dict and NORMAL_REQUEST_LATENCY_OPTION in settings:

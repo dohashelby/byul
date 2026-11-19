@@ -177,7 +177,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
         row['code_available'] = True
-        if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-12', 'LIF-03', 'LIF-04',
+        if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-07', 'PLT-12', 'LIF-03', 'LIF-04',
                                  'REQ-09', 'REQ-10', 'SUP-10'}:
             effective = for_check(cfg, executor, check_id).get(executor, {})
             setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
@@ -196,6 +196,9 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 elif check_id == 'PLT-02':
                     row["scope"] = "approved IPC path presence and mode in the owned Pod mount namespace"
                     row["limitations"].append("no IPC connections, process-to-socket attribution or whole-access verdict")
+                elif check_id == 'PLT-07':
+                    row["scope"] = "reported Cilium egress policy state for the selected owned endpoint"
+                    row["limitations"].append("packet verdicts and process-level egress require separate observations")
                 elif check_id == 'SUP-10':
                     row["scope"] = "installed vLLM plugin entry-point metadata from the selected owned container"
                     row["limitations"].append("plugin load, invocation and allowlist enforcement require separate observations")

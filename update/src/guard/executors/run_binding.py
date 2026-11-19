@@ -42,7 +42,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from guard.configuration import (INSTALLED_PLUGIN_INVENTORY_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
+from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
+                                 NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_STREAM_OPTION)
 from guard.models import canonical_json, sha256_hex
 
@@ -52,6 +53,7 @@ SCHEMAS = (SCHEMA, SCHEMA_2)
 _TARGET_ONLY_NORMAL_MODES = {
     'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
     'OBS-02': ('observation_state', NORMAL_SERVING_READINESS_OPTION, 'observation_state_target_sha256'),
+    'PLT-07': ('boundary_egress', CILIUM_EGRESS_STATUS_OPTION, 'egress_target_sha256'),
     'SUP-10': ('supply_boot', INSTALLED_PLUGIN_INVENTORY_OPTION, 'supply_target_sha256'),
 }
 

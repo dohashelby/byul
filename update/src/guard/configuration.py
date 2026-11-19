@@ -12,6 +12,8 @@ def merge_config(base, override):
 CHECK_CONFIG = "check_config"
 UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
 GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
+CILIUM_EGRESS_STATUS_OPTION = "cilium_egress_status_only"
+CILIUM_EGRESS_STATUS_SCOPE_ERROR = "CILIUM_EGRESS_STATUS_EXECUTION_SCOPE_INVALID"
 INSTALLED_PLUGIN_INVENTORY_OPTION = "installed_plugin_inventory_only"
 INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR = "INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID"
 NORMAL_STREAM_OPTION = "normal_stream_only"
@@ -25,6 +27,7 @@ _NORMAL_ONLY_CASES = {
     "LIF-03": ("stream_buffer", NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR),
     "LIF-04": ("stream_buffer", NORMAL_STREAM_OPTION, "NORMAL_STREAM_EXECUTION_SCOPE_INVALID"),
     "OBS-02": ("observation_state", NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR),
+    "PLT-07": ("boundary_egress", CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR),
     "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
     "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
     "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
@@ -129,6 +132,10 @@ def installed_plugin_inventory_requested(raw):
     return next(_option_occurrences(raw, INSTALLED_PLUGIN_INVENTORY_OPTION), None) is not None
 
 
+def cilium_egress_status_requested(raw):
+    return next(_option_occurrences(raw, CILIUM_EGRESS_STATUS_OPTION), None) is not None
+
+
 def normal_serving_readiness_requested(raw):
     """Detect a serving-readiness opt-in before validating its placement or value."""
     return next(_option_occurrences(raw, NORMAL_SERVING_READINESS_OPTION), None) is not None
@@ -154,6 +161,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         _validate_normal_option_placement(raw, INSTALLED_PLUGIN_INVENTORY_OPTION, {
             (CHECK_CONFIG, "SUP-10", INSTALLED_PLUGIN_INVENTORY_OPTION),
         }, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, CILIUM_EGRESS_STATUS_OPTION, {
+            (CHECK_CONFIG, "PLT-07", CILIUM_EGRESS_STATUS_OPTION),
+        }, CILIUM_EGRESS_STATUS_SCOPE_ERROR)
         if type(overlays) is dict and any(
                 check_id != "REQ-09" and type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section
                 for check_id, section in overlays.items()):
@@ -187,15 +197,16 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                 continue
             settings = for_check(raw, executor, check_id).get(executor, {})
             if (settings[option] is not True or allowed_checks is None
-                    or (executor != "stream_buffer"
+                    or (executor not in {"stream_buffer", "boundary_egress"}
                         and {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {check_id})
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
-                    or (check_id in {"LIF-03", "OBS-02", "REQ-09", "REQ-10", "SUP-10"} and raw.get("record_attestation"))
-                    or (check_id in {"LIF-03", "OBS-02", "SUP-10"} and "run_binding" in raw
+                    or (check_id in {"LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10", "SUP-10"}
+                        and raw.get("record_attestation"))
+                    or (check_id in {"LIF-03", "OBS-02", "PLT-07", "SUP-10"} and "run_binding" in raw
                         and (type(bindings) is not dict or check_id in bindings))
-                    or (check_id == "SUP-10"
+                    or (check_id in {"PLT-07", "SUP-10"}
                         and set(settings) - {option, "target", "kubectl_binary", "max_duration_seconds"})):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
@@ -217,6 +228,25 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                                for settings in stream_cases.values())
                         or ("run_binding" in raw and (type(bindings) is not dict or set(stream_cases) & bindings.keys()))):
                     raise ValueError(stream_error)
+        if "PLT-07" in scoped:
+            executor = "boundary_egress"
+            egress_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == executor}
+            target = raw.get(executor, {}).get("target")
+            if (egress_checks not in ({"PLT-07"}, {"PLT-07", "OBS-04"})
+                    or type(target) is not str or not target or scoped["PLT-07"][0].get("target") != target):
+                raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+            local_option = KUBERNETES_BOUND_CHECK_OPTIONS["OBS-04"]
+            _validate_normal_option_placement(raw, local_option, {
+                (CHECK_CONFIG, "OBS-04", local_option),
+            }, CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+            if "OBS-04" in egress_checks:
+                local = for_check(raw, executor, "OBS-04").get(executor, {})
+                if (local.get(local_option) is not True or local.get("target") != target
+                        or set(local) - {local_option, "target", "kubectl_binary", "max_duration_seconds",
+                                         "usage_wait_seconds"}
+                        or (type(bindings) is dict and "OBS-04" in bindings)):
+                    raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+                scoped["OBS-04"] = (local, None)
         scopes.append(scoped)
         gateway_modes.append(scoped.get("OBS-01", ({}, None))[0].get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
     for check_id, (_, _, scope_error) in _NORMAL_ONLY_CASES.items():

@@ -11,10 +11,12 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
+from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECORD_SNAPSHOT_OPTION,
+                                 INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, NORMAL_SERVING_READINESS_SCOPE_ERROR,
-                                 bounded_metadata_scopes, for_check, installed_plugin_inventory_requested,
+                                 bounded_metadata_scopes, cilium_egress_status_requested, for_check,
+                                 installed_plugin_inventory_requested,
                                  normal_request_latency_requested,
                                  normal_serving_readiness_requested,
                                  normal_token_input_requested, update_allowed_checks)
@@ -151,7 +153,8 @@ def _update_config_for_execution(pack, cfg, allowed_checks):
 
 def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
     sides = cfg.get("sides", {})
-    if (installed_plugin_inventory_requested(cfg) or normal_request_latency_requested(cfg)
+    if (cilium_egress_status_requested(cfg) or installed_plugin_inventory_requested(cfg)
+            or normal_request_latency_requested(cfg)
             or normal_serving_readiness_requested(cfg)
             or normal_token_input_requested(cfg)
             or any(normal_token_input_requested(raw) for raw in sides.values())):
@@ -207,6 +210,9 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=
             elif scoped_check == "OBS-02":
                 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
                 normal_serving_readiness_transport(target, env, duration=1)
+            elif scoped_check == "PLT-07":
+                from guard.executors.kubernetes_passive_egress_policy import passive_egress_policy_transport
+                passive_egress_policy_transport(target, env, duration=1)
             elif scoped_check == "REQ-09":
                 from guard.executors.kubernetes_normal_token_input import normal_input_transports
                 normal_input_transports(target, env, duration=1)
@@ -420,6 +426,8 @@ def _validation_inputs(env, cfg: dict):
     """One managed engine, using the same launch contract as update."""
     if passive_api_hop.requested(cfg):
         raise ValueError("PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID")
+    if cilium_egress_status_requested(cfg):
+        raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
     if installed_plugin_inventory_requested(cfg):
         raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
     if normal_request_latency_requested(cfg):
@@ -610,7 +618,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 settings = c.get(item.executor, {})
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
-                explicit_observer = (item.check_id in {"LIF-03", "OBS-02", "REQ-09", "SUP-10"} and type(settings) is dict
+                explicit_observer = (item.check_id in {"LIF-03", "OBS-02", "PLT-07", "REQ-09", "SUP-10"}
+                                     and type(settings) is dict
                                      and option in settings)
                 if kube and option and type(settings) is dict and settings.get(option) is True:
                     path = Path(settings["target"])

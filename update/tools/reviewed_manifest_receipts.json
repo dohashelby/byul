@@ -920,6 +920,11 @@
       "manifest_sha256": "ee4a5dfb6a548b39f48a6274bbf2812dbff4627327790cba5f413d3dee6b2ce4",
       "reviewed_by": "Codex / paired SUP-05 offline inputs and OBS-02 and SUP-12 validation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T08:45:44+00:00"
+    },
+    {
+      "manifest_sha256": "1f3d612a1c33ed970b07a452b2be432b980d9641a883d89ac7708abfaa17c1ec",
+      "reviewed_by": "Codex / OBS-01 policy binding and OBS-09 and OBS-11 evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T08:59:14+00:00"
     }
   ]
 }

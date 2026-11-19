@@ -21,6 +21,7 @@ from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
 from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
+from guard.executors.kubernetes_normal_startup_load import normal_startup_load_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
 from guard.executors.kubernetes_passive_egress_policy import passive_egress_policy_transport
@@ -41,11 +42,11 @@ CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', '
                    'OBS-04': 'boundary_egress', 'PLT-07': 'boundary_egress', 'PLT-06': 'unix_ipc',
                    'OBS-01': 'required_event_record', 'OBS-02': 'observation_state',
                    'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
-                   'LIF-03': 'stream_buffer', 'LIF-04': 'stream_buffer',
+                   'LIF-01': 'supply_boot', 'LIF-03': 'stream_buffer', 'LIF-04': 'stream_buffer',
                    'REQ-09': 'input_validation', 'REQ-10': 'sampling_validation',
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
-               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-03', 'LIF-04',
+               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-01', 'LIF-03', 'LIF-04',
                               'PLT-07', 'REQ-09', 'REQ-10', 'SUP-10', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
@@ -243,6 +244,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
+        if check.id == 'LIF-01':
+            config[check.executor]['target'] = target_path
+            try:
+                normal_startup_load_transport(target, env, duration=1, runner=_detached_runner)
+            except (KubernetesBindingError, ValueError):
+                return 'NORMAL_STARTUP_LOAD_TARGET_UNAVAILABLE'
         if check.id == 'PLT-07':
             config[check.executor]['target'] = target_path
             try:
@@ -332,7 +339,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
              protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None,
              gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
              normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False,
-             cilium_egress_status=False):
+             cilium_egress_status=False, normal_startup_load=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -371,6 +378,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             raise ValueError('GATEWAY_RECORD_INPUT_MODE_CONFLICT')
         records['OBS-01'] = _gateway_record_inputs(gateway_record_inputs)
     optional = {passive_api_hop.CHECK: passive_plt08, 'PLT-02': protected_ipc_metadata,
+                'LIF-01': normal_startup_load,
                 'LIF-03': normal_request_latency, 'LIF-04': normal_stream_buffer,
                 'REQ-10': normal_sampling, 'REQ-09': normal_token_input,
                 'OBS-02': normal_serving_readiness,
@@ -423,7 +431,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
     bounded_metadata_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
-    shared_checks = ('SUP-03', 'SUP-10', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-03', 'LIF-04', 'REQ-09',
+    shared_checks = ('SUP-03', 'SUP-10', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03', 'LIF-04', 'REQ-09',
                      *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
@@ -477,6 +485,8 @@ def main():
                         help='Read installed plugin entry-point metadata in the owned SUP-10 container')
     parser.add_argument('--cilium-egress-status', action='store_true',
                         help='Read reported egress policy state for the owned PLT-07 endpoint')
+    parser.add_argument('--normal-startup-load', action='store_true',
+                        help='Read the source-checked model load timing for LIF-01')
     parser.add_argument('--copy-record-inputs', type=Path,
                         help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
@@ -497,7 +507,8 @@ def main():
                                         normal_serving_readiness=args.normal_serving_readiness,
                                         normal_request_latency=args.normal_request_latency,
                                         installed_plugin_inventory=args.installed_plugin_inventory,
-                                        cilium_egress_status=args.cilium_egress_status)
+                                        cilium_egress_status=args.cilium_egress_status,
+                                        normal_startup_load=args.normal_startup_load)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

@@ -44,13 +44,15 @@ from pathlib import Path
 
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
                                  NORMAL_REQUEST_LATENCY_OPTION,
-                                 NORMAL_SERVING_READINESS_OPTION, NORMAL_STREAM_OPTION)
+                                 NORMAL_SERVING_READINESS_OPTION, NORMAL_STARTUP_LOAD_OPTION,
+                                 NORMAL_STREAM_OPTION)
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
 SCHEMA_2 = 'guard-run-binding/2'
 SCHEMAS = (SCHEMA, SCHEMA_2)
 _TARGET_ONLY_NORMAL_MODES = {
+    'LIF-01': ('supply_boot', NORMAL_STARTUP_LOAD_OPTION, 'supply_target_sha256'),
     'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
     'OBS-02': ('observation_state', NORMAL_SERVING_READINESS_OPTION, 'observation_state_target_sha256'),
     'PLT-07': ('boundary_egress', CILIUM_EGRESS_STATUS_OPTION, 'egress_target_sha256'),

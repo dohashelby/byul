@@ -1143,6 +1143,163 @@ def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_
         run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
 
 
+def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, sources, monkeypatch):
+    from guard.adapters.vllm import VllmAdapter
+    from guard.core.run import run_plan
+    from guard.executors import run_binding
+    from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
+    from guard.executors.kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
+    from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+    from guard.models import Side
+    from guard.store.packs import put_pack
+
+    pack, sides, policy_path = sources
+    envs = []
+    pins = {}
+    for paths, line in zip(sides.values(), (5416, 5354)):
+        env = tool.Environment.model_validate_json(paths['environment'].read_bytes())
+        env = env.model_copy(update={'runtime': env.runtime.model_copy(update={'pp_size': 1, 'dp_size': 1})}).seal()
+        envs.append(env)
+        target = json.loads(paths['target'].read_bytes())
+        target['environment_ref'] = env.ref().model_dump(mode='json')
+        target['model_mapping']['environment_ref'] = target['environment_ref']
+        started = target['kubernetes']['engine']['started_at'] = '2026-11-18T08:00:00Z'
+        target['startup_log_prefix'] = {'byte_count': 400, 'sha256': 'a' * 64, 'container_started_at': started,
+                                        'ready_at': '2026-11-18T08:00:01Z'}
+        _write(paths['environment'], env.to_dict())
+        _write(paths['target'], target)
+        pins[env.id] = sha256_hex(canonical_json(target))
+        profile = VllmAdapter().startup_load_source(env)
+        assert profile['logger_call_linenumber'] == line and len(profile['file_sha256']) == 5
+        assert profile['required_env'] == {'VLLM_USE_V2_MODEL_RUNNER': '0'}
+        wrong = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': None})})
+        with pytest.raises(ValueError, match='LIF01_BOOT_SOURCE_UNQUALIFIED'):
+            VllmAdapter().startup_load_source(wrong)
+
+    budgets = {'supply_stage_budget_ms': {'load': 600000}, 'supply_stage_budget_bytes': {'load': 17179869184},
+               'supply_total_budget_ms': 1800000}
+    prior = tool.Policy.model_validate_json(policy_path.read_bytes())
+    policy = prior.model_copy(update={'values': {'LIF-01': budgets},
+        'scope': prior.scope.model_copy(update={'include': ['LIF-01', 'SUP-10', 'SUP-11']})}).seal()
+    _write(policy_path, policy.to_dict())
+    output, store_path, fresh = (tmp_path / name for name in ('startup', 'store', 'fresh-target.json'))
+    empty, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store_path)
+    assert not empty['executors']
+    without_prefix = deepcopy(sides)
+    incomplete = json.loads(sides['candidate']['target'].read_bytes())
+    incomplete.pop('startup_log_prefix')
+    without_prefix['candidate']['target'] = _write(tmp_path / 'candidate-no-prefix.json', incomplete)
+    fallback, _, decisions = tool.assemble(without_prefix, policy_path, pack=pack, store=store_path,
+        normal_startup_load=True, installed_plugin_inventory=True)
+    assert fallback['update']['allowed_checks'] == ['SUP-10']
+    assert decisions['LIF-01']['sides']['candidate'] == 'NORMAL_STARTUP_LOAD_TARGET_UNAVAILABLE'
+    args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store_path), '--output', str(output),
+            '--normal-startup-load', '--installed-plugin-inventory', '--candidate-target-after-baseline', str(fresh)]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            args.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', args)
+    tool.main()
+    cfg = tomllib.loads((output / 'preliminary-guard.toml').read_text())
+    assert cfg['executors'] == {'supply_boot': 'kubernetes'}
+    assert cfg['update']['allowed_checks'] == ['LIF-01', 'SUP-10']
+    assert cfg['check_config'] == {'LIF-01': {'normal_startup_load_only': True},
+                                    'SUP-10': {'installed_plugin_inventory_only': True}}
+    preflight = json.loads((output / 'readiness.json').read_bytes())
+    origins = [row for row in preflight['rows'] if row['check_id'] == 'LIF-01']
+    assert len(origins) == 2 and preflight['active_checks'] == 69
+    assert all(row['file_binding_valid'] and row['normal_startup_load_only']
+               and row['binding_schema'] == run_binding.SCHEMA and not row['engine_executed'] for row in origins), origins
+    prepared = application.update_readiness(pack, envs, policy, cfg)
+    assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
+
+    def sample(check, env, values, executor, option):
+        assert values == (budgets if check.id == 'LIF-01' else {})
+        assert executor._expected_target_sha256 == pins[env.id]
+        assert set(executor.cfg) == {'target', option}
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
+
+    startup_run = KubernetesNormalStartupLoadExecutor.run
+    monkeypatch.setattr(KubernetesNormalStartupLoadExecutor, 'run',
+        lambda self, check, env, values, *_: sample(check, env, values, self, 'normal_startup_load_only'))
+    monkeypatch.setattr(KubernetesInstalledPluginInventoryExecutor, 'run',
+        lambda self, check, env, values, *_: sample(check, env, values, self, 'installed_plugin_inventory_only'))
+
+    def forbid_legacy(*_args, **_kwargs):
+        raise AssertionError('The prepared boot or challenge collector must stay outside the paired scope')
+
+    monkeypatch.setattr(KubernetesSupplyBootExecutor, 'run', forbid_legacy)
+    store = Store(store_path)
+    report, _ = application.execute_update(store, pack, envs, policy, cfg, tmp_path / 'paired', utcnow())
+    for check_id in ('LIF-01', 'SUP-10'):
+        row = next(row for row in report.by_check if row.check_id == check_id)
+        assert row.baseline.security == row.candidate.security == 'UNKNOWN'
+        for side in (row.baseline, row.candidate):
+            evidence = store.resolve(store.resolve(side.result).evidence)
+            binding = evidence.execution.run_binding
+            assert evidence.execution.status == ExecStatus.COMPLETED and not run_binding.verify(binding, evidence)
+            assert binding['files'] == {'supply_target_sha256': pins[evidence.environment.id]}
+            assert 'values' not in binding
+
+    staged = tomllib.loads((output / 'guard.toml').read_text())
+    current, pointer = tool._source(sides['candidate']['target'])
+    for number, role in enumerate(('engine', 'probe'), 200):
+        current['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        current['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    current['kubernetes']['engine']['started_at'] = '2026-11-18T08:02:00Z'
+    current.pop('startup_log_prefix')
+    _write(fresh, current)
+    pins[envs[1].id] = sha256_hex(canonical_json(current))
+    run = application.run_config(staged)
+    run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_executor'] = (
+        tool.revalidate_candidate(staged, envs[1], pointer))
+    assert run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_executor'] == {
+        'supply_boot': pins[envs[1].id]}
+    staged_store = Store(tmp_path / 'staged-store')
+    put_pack(staged_store, pack.path)
+    for obj in (*envs, policy):
+        staged_store.put(obj)
+    plan = bind_recipe(select(pack, envs, policy, mode='update'), staged, envs)
+    staged_store.put(plan)
+    monkeypatch.setattr(KubernetesNormalStartupLoadExecutor, 'run', startup_run)
+    actual = {row.check_id: row for row in run_plan(staged_store, pack, plan, run, only_side=Side.candidate)}
+    assert actual['LIF-01'].execution.status == ExecStatus.ABORTED
+    assert actual['SUP-10'].execution.status == ExecStatus.COMPLETED
+    assert actual['SUP-11'].execution.status == ExecStatus.NOT_RUN
+
+
+def test_lif01_startup_load_cannot_enable_legacy_supply_checks(tmp_path, sources, monkeypatch):
+    from guard.core.run import run_plan
+
+    pack, sides, policy_path = sources
+    policy = tool.Policy.model_validate_json(policy_path.read_bytes())
+    envs = [tool.Environment.model_validate_json(paths['environment'].read_bytes()) for paths in sides.values()]
+    marker = 'normal_startup_load_only'
+    config = {'executors': {'supply_boot': 'kubernetes'}, 'update': {'allowed_checks': ['LIF-01', 'SUP-10']},
+              'sides': {side: {'supply_boot': {'target': str(paths['target'])}} for side, paths in sides.items()},
+              'check_config': {'LIF-01': {marker: True}, 'SUP-10': {'installed_plugin_inventory_only': True}}}
+    missing, wrong, false_marker, target_override = (deepcopy(config) for _ in range(4))
+    missing['check_config'].pop('SUP-10')
+    wrong['check_config']['SUP-11'] = wrong['check_config'].pop('LIF-01')
+    false_marker['sides']['candidate']['check_config'] = {'LIF-01': {marker: False}}
+    target_override['check_config']['SUP-10']['target'] = str(tmp_path / 'different-target.json')
+    sibling = {**config, 'update': {'allowed_checks': ['LIF-01', 'SUP-10', 'SUP-11']}}
+    mixed = {**config, 'run_binding': {'LIF-01': {}}}
+    wrapped = {**config, 'record_attestation': {'mode': 'example'}}
+
+    def forbid_prepare(*_args, **_kwargs):
+        raise AssertionError('Invalid startup scope reached target preparation')
+
+    monkeypatch.setattr(application, 'update_inputs', forbid_prepare)
+    store = Store(tmp_path / 'scope-store')
+    for invalid in (missing, wrong, false_marker, target_override, sibling, mixed, wrapped):
+        with pytest.raises(ValueError, match='NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID'):
+            application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
+    with pytest.raises(ValueError, match='NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(config))
+
+
 def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())

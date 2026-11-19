@@ -374,6 +374,10 @@ class VllmAdapter:
         from .vllm_runner_capture import profile
         return profile(version)
 
+    def startup_load_source(self, env: Environment):
+        from .vllm_startup_load import source_profile
+        return source_profile(env)
+
     def input_rejection_proof(self, **kwargs) -> dict:
         return _input_rejection_proof(**kwargs)
 

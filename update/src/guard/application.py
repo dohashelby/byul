@@ -15,10 +15,12 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECOR
                                  INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, NORMAL_SERVING_READINESS_SCOPE_ERROR,
+                                 NORMAL_STARTUP_LOAD_SCOPE_ERROR,
                                  bounded_metadata_scopes, cilium_egress_status_requested, for_check,
                                  installed_plugin_inventory_requested,
                                  normal_request_latency_requested,
                                  normal_serving_readiness_requested,
+                                 normal_startup_load_requested,
                                  normal_token_input_requested, update_allowed_checks)
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
@@ -156,6 +158,7 @@ def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
     if (cilium_egress_status_requested(cfg) or installed_plugin_inventory_requested(cfg)
             or normal_request_latency_requested(cfg)
             or normal_serving_readiness_requested(cfg)
+            or normal_startup_load_requested(cfg)
             or normal_token_input_requested(cfg)
             or any(normal_token_input_requested(raw) for raw in sides.values())):
         bounded_metadata_scopes((merge_config(cfg, sides.get(side, {})) for side in ("baseline", "candidate")),
@@ -204,7 +207,12 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=
             if gateway_snapshot:
                 from guard.executors.kubernetes_gateway_observation import snapshot_owner
                 snapshot_owner(target, binding)
-            if scoped_check == "LIF-03":
+            if scoped_check == "LIF-01":
+                from guard.executors.kubernetes_normal_startup_load import normal_startup_load_transport
+                if get_provider(env.engine.name).evidence_contract("startup_load_source", env) is None:
+                    raise ValueError("LIF01_BOOT_SOURCE_UNQUALIFIED")
+                normal_startup_load_transport(target, env, duration=1)
+            elif scoped_check == "LIF-03":
                 from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
                 normal_request_latency_transport(target, env, duration=1)
             elif scoped_check == "OBS-02":
@@ -434,6 +442,8 @@ def _validation_inputs(env, cfg: dict):
         raise ValueError(NORMAL_REQUEST_LATENCY_SCOPE_ERROR)
     if normal_serving_readiness_requested(cfg):
         raise ValueError(NORMAL_SERVING_READINESS_SCOPE_ERROR)
+    if normal_startup_load_requested(cfg):
+        raise ValueError(NORMAL_STARTUP_LOAD_SCOPE_ERROR)
     if normal_token_input_requested(cfg):
         raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
     effective = deepcopy(cfg)
@@ -618,7 +628,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 settings = c.get(item.executor, {})
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
-                explicit_observer = (item.check_id in {"LIF-03", "OBS-02", "PLT-07", "REQ-09", "SUP-10"}
+                explicit_observer = (item.check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "SUP-10"}
                                      and type(settings) is dict
                                      and option in settings)
                 if kube and option and type(settings) is dict and settings.get(option) is True:

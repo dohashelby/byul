@@ -27,6 +27,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STAT
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
+                                 NORMAL_STARTUP_LOAD_OPTION, NORMAL_STARTUP_LOAD_SCOPE_ERROR,
                                  NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION)
 
 from .base import Executor
@@ -84,6 +85,7 @@ from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .kubernetes_record_access_product import KubernetesRecordAccessExecutor
 from .kubernetes_supply_boot import KubernetesSupplyBootExecutor
+from .kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 from .template_source_cpu import TemplateSourceCPUExecutor
 from .engine_sensor import EngineSensorExecutor
@@ -245,6 +247,12 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
                 settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if executor == "supply_boot":
         settings = cfg.get(executor)
+        if type(settings) is dict and NORMAL_STARTUP_LOAD_OPTION in settings:
+            if (impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation")
+                    or INSTALLED_PLUGIN_INVENTORY_OPTION in settings):
+                raise ValueError(NORMAL_STARTUP_LOAD_SCOPE_ERROR)
+            return KubernetesNormalStartupLoadExecutor(
+                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
         if type(settings) is dict and INSTALLED_PLUGIN_INVENTORY_OPTION in settings:
             if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
                 raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)

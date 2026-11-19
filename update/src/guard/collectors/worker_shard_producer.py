@@ -3,7 +3,7 @@
 생산자 신원은 관측기(`adapters/vllm_worker_shard_callback.py`)와 이 변환의 소스 bytes 해시다. 등록은 GPU(TP2) 확인 뒤에 한다.
 
 프로세스(콜백 행의 process_sha256)마다 행에 남은 PID·시작 ticks와 rank(READY 후보 행의 worker rank, 없으면 TP rank)로 바인딩을 만든다.
-PID·시작 ticks를 읽지 못한 프로세스는 바인딩하지 않고 진단으로 남긴다(`WORKER_IDENTITY_UNOBSERVED`). rank를 모르면 0과 진단이다.
+PID·시작 ticks를 읽지 못하거나 rank가 확인되지 않은 프로세스는 바인딩하지 않고 진단으로 남긴다.
 필수 shard는 index의 weight_map 값, index가 없으면 배정된 파일 자체다(그 경우 `REQUIRED_FROM_ASSIGNED`).
 `shard_rows`는 기존 `supply_boot_contract._worker_shard`가 받는 `{rank, required_missing, ready_accepted}` 행을 낸다.
 """
@@ -16,7 +16,7 @@ from guard.adapters import vllm_worker_shard_callback as callback
 from . import gpu_common_inputs as contract
 
 PRODUCER_NAME = 'guard-engine-callback-worker-shard-load'
-PRODUCER_VERSION = '1'
+PRODUCER_VERSION = '2'
 
 
 def producer():
@@ -47,11 +47,17 @@ def events_from(rows):
             codes.add('WORKER_IDENTITY_UNOBSERVED'); continue
         if any(r.get('entry_qualified_before') is not True for r in items):
             codes.add('WORKER_SHARD_ENTRY_UNQUALIFIED')
-        rank = next((r['fields']['rank'] for r in ready if type(r['fields'].get('rank')) is int), None)
-        if rank is None:
-            rank = next((f['tp_rank'] for f in known if type(f.get('tp_rank')) is int), None)
-        if rank is None:
-            codes.add('WORKER_RANK_UNOBSERVED'); rank = 0
+        worker_ranks = {row['fields']['rank'] for row in ready if type(row['fields'].get('rank')) is int}
+        tp_ranks = {fields['tp_rank'] for fields in known if type(fields.get('tp_rank')) is int}
+        # Worker and TP ranks use different numbering scopes. Check consistency within each scope.
+        if len(worker_ranks) > 1 or len(tp_ranks) > 1:
+            codes.add('WORKER_RANK_CONFLICT')
+            continue
+        ranks = worker_ranks or tp_ranks
+        if not ranks:
+            codes.add('WORKER_RANK_UNOBSERVED')
+            continue
+        rank, = ranks
         binding = len(identities)
         identities.append({'pid': known[0]['pid'], 'start_ticks': known[0]['start_ticks'], 'rank': rank})
 
@@ -93,7 +99,7 @@ def record(rows, *, pod, environment_ref, target_sha256, prepared_sha256, sessio
                  'restart_count': pod['restart_count'], 'worker_pid': i['pid'], 'start_ticks': i['start_ticks'], 'rank': i['rank']}
                 for i in identities]
     blocking = {'WORKER_SHARD_ROWS_BOUND', 'WORKER_SHARD_ENTRY_UNQUALIFIED', 'WORKER_IDENTITY_UNOBSERVED',
-                'WORKER_SHARD_ASSIGNMENT_UNOBSERVED'}
+                'WORKER_SHARD_ASSIGNMENT_UNOBSERVED', 'WORKER_RANK_UNOBSERVED', 'WORKER_RANK_CONFLICT'}
     value = {'schema': contract.SCHEMA, 'kind': 'worker-shard-load', 'producer': producer(),
              'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
              'session': session, 'bindings': bindings, 'events': events,

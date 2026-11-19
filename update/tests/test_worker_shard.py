@@ -13,6 +13,7 @@ from guard.adapters import vllm_worker_shard_callback as callback
 from guard.collectors import engine_callbacks
 from guard.collectors import gpu_common_inputs as contract
 from guard.collectors import worker_shard_producer as producer
+from guard.executors import common_consumption
 from guard.executors import supply_boot_contract
 
 FIXTURE = Path(__file__).parent / 'fixtures/worker_shard_k3d_20261108.json'
@@ -98,6 +99,31 @@ def test_unqualified_entry_or_missing_identity_is_named():
         r['fields'] = {k: v for k, v in r.get('fields', {}).items() if k not in ('pid', 'start_ticks')}
     with pytest.raises(ValueError, match='WORKER_SHARD_NO_WORKER_IDENTITY'):
         build(stripped)
+
+
+@pytest.mark.parametrize('gap', ['WORKER_RANK_UNOBSERVED', 'WORKER_RANK_CONFLICT'])
+def test_unattributed_rank_rows_do_not_reach_the_supply_consumer(gap):
+    rows = case('single-file')['rows']
+    if gap == 'WORKER_RANK_UNOBSERVED':
+        for row in rows:
+            fields = row.get('fields') or {}
+            fields.pop('rank', None)
+            fields.pop('tp_rank', None)
+    else:
+        row = next(row for row in rows if (row.get('fields') or {}).get('tp_rank') == 0)
+        row['fields']['tp_rank'] = 1
+    with pytest.raises(ValueError, match='WORKER_SHARD_NO_WORKER_IDENTITY'):
+        build(rows)
+
+    observed = case('sharded')['rows']
+    record, result = build(observed + rows)
+    assert record['completeness'] == {'source_ended': False, 'dropped': 0, 'diagnostic_codes': [gap]}
+    assert result['generations'] == 1
+    projection = common_consumption.worker_shards(record, SCOPE, {})
+    assert projection['rows'] == [{'rank': 0, 'required_missing': False, 'ready_accepted': True}]
+    assert projection['load_facts'][0]['load_completed'] is True
+    assert f'GPU_INPUT_PRODUCER_DIAGNOSTIC:{gap}' in projection['missing']
+    assert not projection['complete'] and not projection['violations']
 
 
 def test_points_avoid_the_traced_decorators_and_assets_carry_the_flag(tmp_path):

@@ -98,6 +98,15 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
                     or any(type(row[key]) is not bool for key in ("stopped", "temporary_cleaned"))):
                 raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
             stages.add(stage)
+    if check_id == "LIF-02":
+        prior_attempt, prior_time = -1, 0
+        for row in packet["rows"]:
+            if (any(type(row[key]) is not int or row[key] < 0 for key in ("attempt", "at_ms", "bytes"))
+                    or row["attempt"] <= prior_attempt or row["at_ms"] < prior_time
+                    or type(row["outcome"]) is not str or not row["outcome"].strip()
+                    or type(row["temporary_left"]) is not bool):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+            prior_attempt, prior_time = row["attempt"], row["at_ms"]
     if check_id in {"SUP-07", "SUP-15"}:
         flags = _ROWS[check_id] - {"path_sha256"}
         for row in packet["rows"]:

@@ -288,6 +288,41 @@ def test_boot_record_binding_is_closed(damage):
         contract.validate_record(packet, check_id="SUP-07", role="normal", environment_ref={"id": 1}, target_sha256="t", source_sha256=SOURCE)
 
 
+@pytest.mark.parametrize("first_attempt", [0, 1])
+def test_lif02_valid_retry_records_keep_established_budget_counts(first_attempt):
+    env_ref, target = environment().ref().model_dump(mode="json"), "b" * 64
+    packet = good_packet(env_ref, target, "LIF-02")
+    binding = {"check_id": "LIF-02", "role": "normal", "environment_ref": env_ref,
+               "target_sha256": target, "source_sha256": SOURCE}
+    row = {"at_ms": 100, "bytes": 4, "outcome": "failed", "temporary_left": False}
+    packet["rows"] = [{**row, "attempt": first_attempt}, {**row, "attempt": first_attempt + 2, "outcome": "complete"}]
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("LIF-02", verified, VALUES) == ([], [])
+
+    packet["rows"].append({**row, "attempt": first_attempt + 3, "temporary_left": True})
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    violations, missing = contract.evaluate_record("LIF-02", verified, VALUES)
+    assert not missing
+    assert violations == [{"reason": "retry_attempts_exceeded", "attempts": 3},
+                          {"reason": "retry_bytes_exceeded"},
+                          {"reason": "temporary_file_left_after_stop"}]
+
+
+@pytest.mark.parametrize(("field", "invalid"), [
+    ("attempt", 0), ("attempt", -1), ("attempt", True), ("at_ms", 99), ("at_ms", False),
+    ("bytes", -1), ("bytes", True), ("bytes", "4"), ("outcome", []), ("outcome", " "),
+    ("temporary_left", "false"),
+])
+def test_lif02_rejects_invalid_attempt_rows_before_budget_evaluation(field, invalid):
+    env_ref, target = environment().ref().model_dump(mode="json"), "b" * 64
+    packet = good_packet(env_ref, target, "LIF-02")
+    row = {"attempt": 0, "at_ms": 100, "bytes": 4, "outcome": "failed", "temporary_left": False}
+    packet["rows"] = [row, {**row, "attempt": 1, field: invalid}]
+    with pytest.raises(ValueError, match="SUPPLY_BOOT_RECORD_INVALID"):
+        contract.validate_record(json.loads(json.dumps(packet)), check_id="LIF-02", role="normal",
+                                 environment_ref=env_ref, target_sha256=target, source_sha256=SOURCE)
+
+
 @pytest.mark.parametrize(("field", "invalid"), [
     ("path_sha256", "not-a-digest"), ("writer_allowed", 0), ("modified", "false"),
     ("consumed", "false"), ("verified_before_use", None),

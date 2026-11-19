@@ -960,6 +960,11 @@
       "manifest_sha256": "2bd474fd184b86a8f409a748cd62ef6f1767fb0bdbd49673ee8d8c4c101df6e8",
       "reviewed_by": "Codex / SUP-15 role isolation and OBS-06 provenance / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T11:11:52+00:00"
+    },
+    {
+      "manifest_sha256": "a50c8ac6237692359d49860ea634ecec11d19f21066ae5200c327bce4ef70619",
+      "reviewed_by": "Codex / SUP-15 prepared roles, OBS-01 runtime framing and LIF-06 generation-bound evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T11:45:58+00:00"
     }
   ]
 }

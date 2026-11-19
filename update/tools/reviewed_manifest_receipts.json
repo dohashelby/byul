@@ -950,6 +950,11 @@
       "manifest_sha256": "b27286bf36ba405f4e6b67c9189166c393efd068e4bd2aed6011e61dc4507ada",
       "reviewed_by": "Codex / immutable initialization inputs and scoped LIF-08 rank evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T10:47:38+00:00"
+    },
+    {
+      "manifest_sha256": "f38243977af3197a5e686eb3432b985d22f218bb543fd5e7bf3eecaeff053466",
+      "reviewed_by": "Codex / initialization file-binding compatibility and scoped evidence tests / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T10:54:03+00:00"
     }
   ]
 }

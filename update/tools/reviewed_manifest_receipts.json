@@ -1050,6 +1050,11 @@
       "manifest_sha256": "ab2863592ca424c01512b07d5df541220a1f131f319a2d920990d1ca5c300e94",
       "reviewed_by": "Codex / vLLM paired local declaration preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T21:42:44+00:00"
+    },
+    {
+      "manifest_sha256": "e2be25808d117f12d1aefc4ba9841bc9d84889d98748299380883c261275a997",
+      "reviewed_by": "Codex / SUP-05 paired saved preparation inputs / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T22:16:34+00:00"
     }
   ]
 }

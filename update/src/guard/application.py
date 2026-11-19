@@ -599,6 +599,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     from guard.executors import registry, run_binding
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
     from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
+    from guard.executors.kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
+    from guard.executors.kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
     from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
     from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
@@ -759,6 +761,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                             executor.prepared_normal_stream(check_def, selected_env, values,
                                                              expected_target_sha256=expected_target)
                             continue  # The validated normal stream uses no role keys.
+                        if (prebound and item.check_id == "OBS-02"
+                                and isinstance(executor, KubernetesNormalServingReadinessExecutor)):
+                            executor.prepared_normal_serving_readiness(check_def, selected_env, values,
+                                                                       expected_target_sha256=expected_target)
+                        if (prebound and item.check_id == "SUP-12"
+                                and isinstance(executor, KubernetesNormalSafetensorsReaderExecutor)):
+                            executor.prepared_normal_reader(check_def, selected_env, values,
+                                                            expected_target_sha256=expected_target)
                         if item.check_id == "OBS-04":
                             executor.prepared_local_observation(check_def, selected_env, values,
                                                                 expected_target_sha256=expected_target)

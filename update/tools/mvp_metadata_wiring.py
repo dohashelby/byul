@@ -20,12 +20,10 @@ from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snap
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
-from guard.executors.kubernetes_normal_compile_cache import normal_compile_cache_transport
 from guard.executors.kubernetes_normal_graph_capture import normal_graph_capture_transport
 from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
 from guard.executors.kubernetes_normal_safetensors_reader import normal_safetensors_reader_transport
 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
-from guard.executors.kubernetes_normal_startup_load import normal_startup_load_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
 from guard.executors.kubernetes_passive_egress_policy import passive_egress_policy_transport
@@ -152,22 +150,20 @@ def bind_staged_candidate(run: RunConfig, env, preliminary_ref):
     """Bind the verified candidate and return any check-specific preflight failure."""
     config = run.requested
     candidate = run.side_configs['candidate']
-    hashes, cilium_gap = _revalidate_candidate(config, env, preliminary_ref, allow_cilium_gap=True)
-    check_hashes, abort_reasons = {}, {}
-    if cilium_gap is not None:
-        # A failed PLT-07 binding must never borrow the shared OBS-04 target pin.
-        egress_hash = hashes.pop('boundary_egress')
-        check_hashes['PLT-07'] = None
-        if 'OBS-04' in config['update']['allowed_checks']:
-            check_hashes['OBS-04'] = egress_hash
-        abort_reasons['PLT-07'] = cilium_gap
+    hashes, abort_reasons = _revalidate_candidate(config, env, preliminary_ref, allow_check_gaps=True)
+    # Checks sharing an affected executor receive independent target pins.
+    affected_executors = {CHECK_EXECUTORS[check_id] for check_id in abort_reasons}
+    separated = {name: hashes.pop(name) for name in affected_executors}
+    check_hashes = {check_id: None if check_id in abort_reasons else separated[CHECK_EXECUTORS[check_id]]
+                    for check_id in (config['update'].get('allowed_checks') or ())
+                    if CHECK_EXECUTORS[check_id] in affected_executors}
     candidate.raw['_kubernetes_target_sha256_by_executor'] = hashes
     candidate.raw['_kubernetes_target_sha256_by_check'] = check_hashes
     candidate.check_abort_reasons = abort_reasons
     return abort_reasons
 
 
-def _revalidate_candidate(config, env, preliminary_ref, *, allow_cilium_gap=False):
+def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=False):
     executors = config.get('executors', {})
     candidate = config.get('sides', {}).get('candidate', {})
     allowed = config.get('update', {}).get('allowed_checks')
@@ -225,17 +221,17 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_cilium_gap=Fals
                 raise ValueError
         except ValueError:
             raise ValueError(error) from None
-    cilium_gap = None
+    gaps = {}
     if 'PLT-07' in (allowed or ()):
         try:
             passive_egress_policy_transport(current, env, duration=1, runner=_detached_runner)
         except (KubernetesBindingError, ValueError):
-            cilium_gap = 'CILIUM_EGRESS_STATUS_TARGET_UNAVAILABLE'
+            gaps['PLT-07'] = 'CILIUM_EGRESS_STATUS_TARGET_UNAVAILABLE'
         else:
             if current['cilium_agent'] != preliminary.get('cilium_agent'):
-                cilium_gap = 'CILIUM_AGENT_GENERATION_CHANGED'
-        if cilium_gap is not None and not allow_cilium_gap:
-            raise ValueError(cilium_gap)
+                gaps['PLT-07'] = 'CILIUM_AGENT_GENERATION_CHANGED'
+        if 'PLT-07' in gaps and not allow_check_gaps:
+            raise ValueError(gaps['PLT-07'])
     if 'SUP-10' in (allowed or ()):
         try:
             installed_plugin_inventory_transport(current, env, duration=1, runner=_detached_runner)
@@ -269,7 +265,15 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_cilium_gap=Fals
     if 'template_validation' in executors and (current.get('observed_version') != env.engine.version
             or current['engine'].get('command') != preliminary['engine'].get('command')):
         raise ValueError('METADATA_CANDIDATE_TEMPLATE_LAUNCH_CHANGED')
-    return dict.fromkeys(executors, new.target_sha256), cilium_gap
+    for check_id in readiness.STARTUP_OBSERVERS:
+        if check_id not in (allowed or ()):
+            continue
+        reason = readiness.startup_observer_reason(check_id, current, env, runner=_detached_runner)
+        if reason is not None:
+            if not allow_check_gaps:
+                raise ValueError(reason)
+            gaps[check_id] = reason
+    return dict.fromkeys(executors, new.target_sha256), gaps
 
 
 def _check_reason(check, env, target, transport, values, *, policy, side, target_path, record_inputs):
@@ -287,12 +291,11 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
-        if check.id == 'LIF-01':
+        if check.id in readiness.STARTUP_OBSERVERS:
             config[check.executor]['target'] = target_path
-            try:
-                normal_startup_load_transport(target, env, duration=1, runner=_detached_runner)
-            except (KubernetesBindingError, ValueError):
-                return 'NORMAL_STARTUP_LOAD_TARGET_UNAVAILABLE'
+            reason = readiness.startup_observer_reason(check.id, target, env, runner=_detached_runner)
+            if reason is not None:
+                return reason
         if check.id == 'REQ-20':
             config[check.executor]['target'] = target_path
             try:
@@ -316,12 +319,6 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
                 installed_plugin_inventory_transport(target, env, duration=1, runner=_detached_runner)
             except (KubernetesBindingError, ValueError):
                 return 'INSTALLED_PLUGIN_INVENTORY_TARGET_UNAVAILABLE'
-        if check.id == 'SUP-07':
-            config[check.executor]['target'] = target_path
-            try:
-                normal_compile_cache_transport(target, env, duration=1, runner=_detached_runner)
-            except (KubernetesBindingError, ValueError):
-                return 'NORMAL_COMPILE_CACHE_TARGET_UNAVAILABLE'
         if check.id == 'SUP-12':
             config[check.executor]['target'] = target_path
             try:

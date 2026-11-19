@@ -64,10 +64,29 @@ from tools.mvp_versions import versions
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = 'guard-mvp-live-input-sources/1'
 SIDES = ('baseline', 'candidate')
+STARTUP_OBSERVERS = {
+    'LIF-01': ('startup_load_source', normal_startup_load_transport, 'NORMAL_STARTUP_LOAD'),
+    'SUP-07': ('compile_cache_source', normal_compile_cache_transport, 'NORMAL_COMPILE_CACHE'),
+}
 
 
 def template(pack):
     return {'schema': SCHEMA, 'pack_ref': pack.ref().model_dump(mode='json'), 'inputs': []}
+
+
+def startup_observer_reason(check_id, target, env, *, runner=None):
+    """Check the selected startup source contract and its saved prefix without target I/O."""
+    contract, transport, reason = STARTUP_OBSERVERS[check_id]
+    try:
+        if get_provider(env.engine.name).evidence_contract(contract, env) is None:
+            raise ValueError
+    except ValueError:
+        return reason + '_SOURCE_UNAVAILABLE'
+    try:
+        transport(target, env, duration=1, runner=runner)
+    except (KubernetesBindingError, ValueError):
+        return reason + '_TARGET_UNAVAILABLE'
+    return None
 
 
 def _native_matrix_blockers(expected, profile):
@@ -343,16 +362,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             passive_egress_policy_transport(target_data, env, duration=1)
         except (KubernetesBindingError, ValueError):
             raise ValueError('CILIUM_EGRESS_STATUS_TARGET_UNAVAILABLE') from None
-    if normal_startup_load:
-        try:
-            normal_startup_load_transport(target_data, env, duration=1)
-        except (KubernetesBindingError, ValueError):
-            raise ValueError('NORMAL_STARTUP_LOAD_TARGET_UNAVAILABLE') from None
-    if normal_compile_cache:
-        try:
-            normal_compile_cache_transport(target_data, env, duration=1)
-        except (KubernetesBindingError, ValueError):
-            raise ValueError('NORMAL_COMPILE_CACHE_TARGET_UNAVAILABLE') from None
+    if normal_startup_load or normal_compile_cache:
+        reason = startup_observer_reason(check.id, target_data, env)
+        if reason is not None:
+            raise ValueError(reason)
     if normal_safetensors_reader:
         try:
             if get_provider(env.engine.name).evidence_contract('safetensors_reader_source', env) is None:
@@ -446,6 +459,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if collection_status:
             executor.prepared_collection_status(check, env, effective,
                                                 expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if normal_serving_readiness and prebound_kubernetes and check.executor == 'observation_state':
+            executor.prepared_normal_serving_readiness(check, env, effective,
+                                                       expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if normal_safetensors_reader and prebound_kubernetes and check.executor == 'supply_boot':
+            executor.prepared_normal_reader(check, env, effective,
+                                            expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if normal_sampling or normal_stream:
             expected = sha256_hex(canonical_json(target_data))
             if normal_sampling:

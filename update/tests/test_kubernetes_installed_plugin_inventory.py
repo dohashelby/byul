@@ -79,7 +79,9 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
             assert command[-2:] == [sha256_hex(canonical_json("vllm")), sha256_hex(canonical_json(["vllm", version]))]
             dispatches.append(command)
             self.after_exec = True
-            return capture_pipes([str(interpreter), *command[1:]], **kwargs)
+            capture = capture_pipes([str(interpreter), *command[1:]], **kwargs)
+            assert capture["stderr_bytes"] == b""
+            return capture
 
     def owned_api(role, document, after):
         if role == "namespaces":

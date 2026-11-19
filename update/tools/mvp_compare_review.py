@@ -101,6 +101,7 @@ def _verify_passive_hop(evd, source, env, policy, plan, artifact_store, values):
 def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, source=None, artifact_store=None):
     side = {'environment': _dump(env.ref()), 'evidence': _dump(evd.ref()) if evd else None,
             'result': _dump(result.ref()) if result else None, 'verdicts': None, 'blocking_codes': [],
+            'reported_security': None,
             'execution_status': evd.execution.status.value if evd else None}
     blockers = side['blocking_codes']
     if evd is None:
@@ -109,6 +110,9 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, s
         blockers.append('ORIGINAL_RESULT_MISSING')
     if shown is None or shown.result is None:
         blockers.append('ORIGINAL_RPT_SIDE_MISSING')
+    if result is None and shown is not None and shown.result is None and shown.security == 'UNKNOWN':
+        # The report represents a missing result with an explicit UNKNOWN.
+        side['reported_security'] = shown.security.value
     if evd is not None:
         execution = evd.execution
         if execution.status != 'COMPLETED':
@@ -153,8 +157,10 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, s
                 or any(getattr(result, key) != getattr(replay, key)
                        for key in ('judge', 'verdicts', 'verification_level', 'data_origin', 'missing_observations'))):
             blockers.append('ORIGINAL_RESULT_REPLAY_MISMATCH')
-        if not blockers:
-            side['verdicts'] = result.verdicts.model_dump(mode='json')
+        else:
+            side['reported_security'] = shown.security.value
+            if not blockers:
+                side['verdicts'] = result.verdicts.model_dump(mode='json')
     if evd is not None and (evd.execution.cleanup_errors
                             or evd.execution.status == 'COMPLETED' and evd.execution.abort_reason):
         blockers.append('EXECUTION_OR_CLEANUP_UNRESOLVED')
@@ -368,7 +374,7 @@ def review(run_inputs, *, pack, expected, assignments=None):
         if not row['selected']:
             inventory[check_id] = {'status': 'SELECTION_VERIFIED', **row}
             continue
-        unknown_sides = [side for side in SIDES if (row[side]['verdicts'] or {}).get('security') == 'UNKNOWN']
+        unknown_sides = [side for side in SIDES if row[side]['reported_security'] == 'UNKNOWN']
         if unknown_sides:
             unknown.append(check_id)
         blockers = row['blocking_codes']

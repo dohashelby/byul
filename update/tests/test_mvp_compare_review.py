@@ -59,7 +59,7 @@ def test_original_unknown_security_is_counted_once_per_id_across_sides_and_repla
     assert {path: path.read_bytes() for path in restored.rglob('*') if path.is_file()} == before
 
 
-@pytest.mark.parametrize('damage', ['missing-side', 'duplicate-row'])
+@pytest.mark.parametrize('damage', ['missing-side', 'duplicate-row', 'displayed-verdict'])
 def test_resealed_incomplete_or_duplicate_report_is_refused(damage):
     case = builders.build_pure_update_case()
 
@@ -67,6 +67,8 @@ def test_resealed_incomplete_or_duplicate_report_is_refused(damage):
         row = next(row for row in report['by_check'] if row['check_id'] == 'REQ-01')
         if damage == 'missing-side':
             row['baseline'] = None
+        elif damage == 'displayed-verdict':
+            row['baseline']['security'] = 'UNKNOWN'
         else:
             report['by_check'].append(deepcopy(row))
 
@@ -79,7 +81,11 @@ def test_resealed_incomplete_or_duplicate_report_is_refused(damage):
     else:
         assert result['reports'][0]['verified']
         assert row['status'] == 'ORIGINAL_ROW_UNRESOLVED'
-        assert row['baseline']['blocking_codes'] == ['ORIGINAL_RPT_SIDE_MISSING']
+        expected_blocker = ('ORIGINAL_RPT_SIDE_MISSING' if damage == 'missing-side'
+                            else 'ORIGINAL_RESULT_REPLAY_MISMATCH')
+        assert row['baseline']['blocking_codes'] == [expected_blocker]
+        assert row['baseline']['reported_security'] is None
+        assert 'REQ-01' not in result['unknown_security_check_ids']
         assert row['candidate']['verdicts']['security'] == 'PASS'
     assert not result['unknown_security_limit_met']
 
@@ -156,6 +162,9 @@ def test_unfinished_execution_retains_exact_refs_as_an_unresolved_side(status):
     assert row['baseline']['result']['kind'] == 'RES'
     assert 'EXECUTION_' + status in row['baseline']['blocking_codes']
     assert row['baseline']['verdicts'] is None
+    assert row['baseline']['reported_security'] == 'UNKNOWN'
+    assert row['security_unknown_sides'] == ['baseline']
+    assert result['unknown_security_check_ids'] == ['REQ-01']
     assert row['candidate']['verdicts']['security'] == 'PASS'
     assert row['baseline']['execution_status'] == status
     assert result['execution_coverage']['baseline'][status.lower()] == ['REQ-01']

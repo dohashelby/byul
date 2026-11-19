@@ -27,6 +27,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STAT
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
+                                 NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_OPTION, NORMAL_STARTUP_LOAD_SCOPE_ERROR,
                                  NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION)
@@ -87,6 +88,7 @@ from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .kubernetes_record_access_product import KubernetesRecordAccessExecutor
 from .kubernetes_supply_boot import KubernetesSupplyBootExecutor
 from .kubernetes_normal_compile_cache import KubernetesNormalCompileCacheExecutor
+from .kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
 from .kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 from .template_source_cpu import TemplateSourceCPUExecutor
@@ -253,6 +255,8 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
             modes = {
                 NORMAL_STARTUP_LOAD_OPTION: (KubernetesNormalStartupLoadExecutor, NORMAL_STARTUP_LOAD_SCOPE_ERROR),
                 NORMAL_COMPILE_CACHE_OPTION: (KubernetesNormalCompileCacheExecutor, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
+                NORMAL_SAFETENSORS_READER_OPTION: (
+                    KubernetesNormalSafetensorsReaderExecutor, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
                 INSTALLED_PLUGIN_INVENTORY_OPTION: (
                     KubernetesInstalledPluginInventoryExecutor, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
             }

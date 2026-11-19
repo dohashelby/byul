@@ -1,4 +1,4 @@
-"""Source pins for stock CUDA V1 model load and compile cache observations."""
+"""Source pins for stock CUDA V1 load, reader and compile cache observations."""
 
 from .vllm import REQUEST_BINDING_GPU_IMAGE
 
@@ -12,6 +12,17 @@ _SOURCE_PROFILES = {
         "commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
         "line": 5416,
         "compile_backend": ("fa4bff8920b363efbbde9456f135fa9d2c004a5bde1898877f177418b2d8b008", 1094),
+        "safetensors_reader": {
+            "file_sha256": {
+                "model_executor/model_loader/weight_utils.py":
+                    "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b",
+                "model_executor/model_loader/default_loader.py":
+                    "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
+            },
+            "filesystem_call_linenumber": 895,
+            "default_strategy_call_linenumber": 918,
+            "loader_completion_call_linenumber": 430,
+        },
         "files": {
             "v1/worker/gpu_model_runner.py": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51",
             "utils/mem_utils.py": "d2b5c90f643d9a4ae17cb68fac19032161bc83329db3c8b30db589620f25b5a7",
@@ -25,6 +36,17 @@ _SOURCE_PROFILES = {
         "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
         "line": 5354,
         "compile_backend": ("16af622b799f22f30eaa1c78f7ccca9d54c7c72785ad89e90c87e859bf8ef876", 1090),
+        "safetensors_reader": {
+            "file_sha256": {
+                "model_executor/model_loader/weight_utils.py":
+                    "7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
+                "model_executor/model_loader/default_loader.py":
+                    "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+            },
+            "filesystem_call_linenumber": 1063,
+            "default_strategy_call_linenumber": 1086,
+            "loader_completion_call_linenumber": 484,
+        },
         "files": {
             "v1/worker/gpu_model_runner.py": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
             "utils/mem_utils.py": "8b21755c8cae378b64d2d5c72c901135820072764218808191f266a65cf3aad5",
@@ -90,3 +112,12 @@ def compile_cache_profile(env):
         "relative_directory_pattern": "torch_compile_cache/[0-9a-f]{10}/rank_0_0/backbone",
         "artifact_name": "vllm_compile_cache.py",
     }
+
+
+def safetensors_reader_profile(env):
+    """Select the stock loader call sites and installed source pins for this image."""
+    profile = _reviewed_profile(env)
+    if profile is None:
+        raise ValueError("SUP12_SAFETENSORS_READER_SOURCE_UNQUALIFIED")
+    reader = profile["safetensors_reader"]
+    return {**reader, "file_sha256": dict(reader["file_sha256"])}

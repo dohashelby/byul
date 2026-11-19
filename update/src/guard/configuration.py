@@ -23,6 +23,8 @@ NORMAL_REQUEST_LATENCY_OPTION = "normal_request_latency_only"
 NORMAL_REQUEST_LATENCY_SCOPE_ERROR = "NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID"
 NORMAL_COMPILE_CACHE_OPTION = "normal_compile_cache_only"
 NORMAL_COMPILE_CACHE_SCOPE_ERROR = "NORMAL_COMPILE_CACHE_EXECUTION_SCOPE_INVALID"
+NORMAL_SAFETENSORS_READER_OPTION = "normal_safetensors_reader_only"
+NORMAL_SAFETENSORS_READER_SCOPE_ERROR = "NORMAL_SAFETENSORS_READER_EXECUTION_SCOPE_INVALID"
 NORMAL_SERVING_READINESS_OPTION = "normal_serving_readiness_only"
 NORMAL_SERVING_READINESS_SCOPE_ERROR = "NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID"
 NORMAL_STARTUP_LOAD_OPTION = "normal_startup_load_only"
@@ -36,6 +38,7 @@ _NORMAL_ONLY_CASES = {
     "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
     "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
     "SUP-07": ("supply_boot", NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
+    "SUP-12": ("supply_boot", NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
     "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
 }
 RECORD_SNAPSHOT_OPTIONS = {
@@ -138,6 +141,10 @@ def normal_compile_cache_requested(raw):
     return next(_option_occurrences(raw, NORMAL_COMPILE_CACHE_OPTION), None) is not None
 
 
+def normal_safetensors_reader_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_SAFETENSORS_READER_OPTION), None) is not None
+
+
 def normal_startup_load_requested(raw):
     return next(_option_occurrences(raw, NORMAL_STARTUP_LOAD_OPTION), None) is not None
 
@@ -178,6 +185,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         _validate_normal_option_placement(raw, NORMAL_COMPILE_CACHE_OPTION, {
             (CHECK_CONFIG, "SUP-07", NORMAL_COMPILE_CACHE_OPTION),
         }, NORMAL_COMPILE_CACHE_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_SAFETENSORS_READER_OPTION, {
+            (CHECK_CONFIG, "SUP-12", NORMAL_SAFETENSORS_READER_OPTION),
+        }, NORMAL_SAFETENSORS_READER_SCOPE_ERROR)
         _validate_normal_option_placement(raw, INSTALLED_PLUGIN_INVENTORY_OPTION, {
             (CHECK_CONFIG, "SUP-10", INSTALLED_PLUGIN_INVENTORY_OPTION),
         }, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
@@ -222,11 +232,13 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
-                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10", "SUP-07", "SUP-10"}
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10",
+                                     "SUP-07", "SUP-10", "SUP-12"}
                         and raw.get("record_attestation"))
-                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "SUP-07", "SUP-10"} and "run_binding" in raw
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "SUP-07", "SUP-10", "SUP-12"}
+                        and "run_binding" in raw
                         and (type(bindings) is not dict or check_id in bindings))
-                    or (check_id in {"LIF-01", "PLT-07", "SUP-07", "SUP-10"}
+                    or (check_id in {"LIF-01", "PLT-07", "SUP-07", "SUP-10", "SUP-12"}
                         and set(settings) - {option, "target", "kubectl_binary", "max_duration_seconds"})):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
@@ -248,7 +260,7 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                                for settings in stream_cases.values())
                         or ("run_binding" in raw and (type(bindings) is not dict or set(stream_cases) & bindings.keys()))):
                     raise ValueError(stream_error)
-        supply_cases = {cid: scoped[cid][0] for cid in ("LIF-01", "SUP-07", "SUP-10") if cid in scoped}
+        supply_cases = {cid: scoped[cid][0] for cid in ("LIF-01", "SUP-07", "SUP-12", "SUP-10") if cid in scoped}
         if supply_cases:
             anchor = next(iter(supply_cases))
             _, _, supply_error = _NORMAL_ONLY_CASES[anchor]

@@ -131,6 +131,9 @@ class VllmProvider(EngineProvider):
         if name == "compile_cache_source":
             from .vllm_startup_load import compile_cache_profile
             return compile_cache_profile(*args)
+        if name == "safetensors_reader_source":
+            from .vllm_startup_load import safetensors_reader_profile
+            return safetensors_reader_profile(*args)
         return super().evidence_contract(name, *args)
 
     def sandbox_arguments(self, options):

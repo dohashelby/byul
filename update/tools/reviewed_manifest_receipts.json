@@ -915,6 +915,11 @@
       "manifest_sha256": "dee2eb14108d849d32ac4084c3172240fbe8878181f2ad9d3ef6911972537811",
       "reviewed_by": "Codex / SUP-05 original recording bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T08:04:20+00:00"
+    },
+    {
+      "manifest_sha256": "ee4a5dfb6a548b39f48a6274bbf2812dbff4627327790cba5f413d3dee6b2ce4",
+      "reviewed_by": "Codex / paired SUP-05 offline inputs and OBS-02 and SUP-12 validation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T08:45:44+00:00"
     }
   ]
 }

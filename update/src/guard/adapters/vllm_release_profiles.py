@@ -35,6 +35,10 @@ def validate_initialization_preparation(env, profile):
     row = release_profile('0.30.0')
     commit = vllm_lifecycle_release_sensor.COMMIT
     engine = env.engine
+    observed_commit = engine.source_commit
+    abbreviated_match = (engine.source_commit_status == 'ABBREVIATED_MATCH'
+                         and engine.expected_source_commit == commit and bool(observed_commit)
+                         and len(observed_commit) < len(commit) and commit.startswith(observed_commit))
     requested_modes = []
     for field in (env.runtime.platform or '').split(';'):
         name, _, value = field.partition('=')
@@ -42,7 +46,8 @@ def validate_initialization_preparation(env, profile):
             requested_modes.append(value.strip())
     if (engine.name != 'vllm' or row is None or engine.version != row['version']
             or engine.image_digest not in row['images']
-            or engine.source_commit not in (None, commit) or engine.expected_source_commit not in (None, commit)
+            or (observed_commit not in (None, commit) and not abbreviated_match)
+            or engine.expected_source_commit not in (None, commit)
             or engine.source_commit_status == 'MISMATCH'
             or requested_modes and requested_modes != [row['launch']['engine']]):
         raise InitializationPreparationMismatch('INITIALIZATION_PREPARED_RELEASE_MISMATCH')

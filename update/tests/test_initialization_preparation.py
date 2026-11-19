@@ -47,6 +47,11 @@ def _paired_inputs(external, check_id, change):
                 engine['source_commit'] = 'a' * 40
             elif change == 'expected-commit':
                 engine['expected_source_commit'] = 'a' * 40
+            elif change in {'abbreviated', 'wrong-prefix', 'unanchored-prefix'}:
+                engine['source_commit'] = 'a' * 9 if change == 'wrong-prefix' else COMMIT[:9]
+                engine['source_commit_status'] = 'ABBREVIATED_MATCH'
+                if change != 'unanchored-prefix':
+                    engine['expected_source_commit'] = COMMIT
             elif change == 'mode':
                 runtime['platform'] = 'GPU; engine_requested=V0'
             elif change == 'duplicate-mode':
@@ -78,9 +83,12 @@ def _paired_inputs(external, check_id, change):
 @pytest.mark.parametrize(('check_id', 'change', 'error'), [
     ('LIF-09', None, None),
     ('LIF-07', 'explicit-v1', None),
+    ('LIF-09', 'abbreviated', None),
     ('LIF-09', 'version', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),
     ('LIF-09', 'image', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),
     ('LIF-09', 'commit', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),
+    ('LIF-09', 'wrong-prefix', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),
+    ('LIF-09', 'unanchored-prefix', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),
     ('LIF-07', 'expected-commit', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),
     ('LIF-07', 'mode', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),
     ('LIF-07', 'duplicate-mode', 'INITIALIZATION_PREPARED_RELEASE_MISMATCH'),

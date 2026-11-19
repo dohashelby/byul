@@ -581,6 +581,14 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 values[key] = _stamp(start)
             elif key.endswith('validity_end'):
                 values[key] = _stamp(end)
+            elif key == 'init_prepared_sha256':
+                from guard.adapters.vllm_release_profiles import InitializationPreparationMismatch
+                from guard.collectors.lifecycle import load_initialization_prepared
+                try:
+                    prepared = load_initialization_prepared(executor_cfg['prepared'], env)
+                except InitializationPreparationMismatch as exc:
+                    raise RunBindingUnavailable(str(exc)) from None
+                values[key] = files[key] = sha256_hex(canonical_json(prepared))
             elif normal_file_reads and expected_normal_file_sha256 is not None and key == 'supply_normal_prepared_sha256':
                 from guard.collectors.lifecycle import load_prepared
                 try:

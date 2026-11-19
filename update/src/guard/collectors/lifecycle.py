@@ -398,6 +398,15 @@ def load_prepared(path, *, expected_sha256=None):
     return manifest
 
 
+def load_initialization_prepared(path, env):
+    """Validate locally prepared initialization assets against the declared ENV."""
+    from guard.adapters.vllm_release_profiles import validate_initialization_preparation
+
+    prepared = load_prepared(path)
+    validate_initialization_preparation(env, prepared['profile'])
+    return prepared
+
+
 def request_header_fingerprint(manifest_path, prepared, header):
     """Derive a new-profile ASGI header HMAC from the validated private key.
 

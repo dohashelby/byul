@@ -22,6 +22,32 @@ def http_profile(version, image):
     return {**row['http'], 'pin_status': row['pin_status']}
 
 
+class InitializationPreparationMismatch(ValueError):
+    pass
+
+
+def validate_initialization_preparation(env, profile):
+    """Bind the exact release preparation to ENV before checking its installation."""
+    from . import vllm_initialization_release_sensor, vllm_lifecycle_release_sensor
+
+    if profile != vllm_initialization_release_sensor.PROFILE:
+        return
+    row = release_profile('0.30.0')
+    commit = vllm_lifecycle_release_sensor.COMMIT
+    engine = env.engine
+    requested_modes = []
+    for field in (env.runtime.platform or '').split(';'):
+        name, _, value = field.partition('=')
+        if name.strip() == 'engine_requested':
+            requested_modes.append(value.strip())
+    if (engine.name != 'vllm' or row is None or engine.version != row['version']
+            or engine.image_digest not in row['images']
+            or engine.source_commit not in (None, commit) or engine.expected_source_commit not in (None, commit)
+            or engine.source_commit_status == 'MISMATCH'
+            or requested_modes and requested_modes != [row['launch']['engine']]):
+        raise InitializationPreparationMismatch('INITIALIZATION_PREPARED_RELEASE_MISMATCH')
+
+
 def usage_report_profile(env):
     """Select the stock local-report source candidates for the exact image."""
     engine = env.engine

@@ -23,7 +23,8 @@ from tests.test_lifecycle_sensor import CONTEXT, FakeOS, SilentThread
 PACK_DIRECTORY = REPOSITORY / "update" / "packs" / "PACK-BASELINE"
 
 
-def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=None, model_root=None, engine_role=None):
+def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=None, model_root=None, engine_role=None,
+                engine_image=IMAGE, platform=None):
     root.mkdir()
     model_root = model_root or root / "approved-model"
     model_root.mkdir(exist_ok=True)
@@ -39,11 +40,11 @@ def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=
     reference = root / "reference.json"
     reference.write_bytes(manifest)
     env = environment(id=env_id, origin=DataOrigin.DECLARED,
-                      engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE},
-                      runtime={"gpu_count": 1, "gpu_model": "EXAMPLE GPU", "driver": "EXAMPLE driver"},
+                      engine={"name": "vllm", "version": "0.31.0", "image_digest": engine_image},
+                      runtime={"gpu_count": 1, "gpu_model": "EXAMPLE GPU", "driver": "EXAMPLE driver", "platform": platform},
                       model={"id": "example/approved", "revision": "safe-example", "inventory_sha256": inventory_sha})
     engine = {**sampling_inputs()["kubernetes"]["engine"], **(engine_role or {}),
-              "image": IMAGE, "image_id": "sha256:" + "c" * 64}
+              "image": engine_image, "image_id": "sha256:" + "c" * 64}
     target = {"schema": "guard-kubernetes-lifecycle-target/1", "lab": True, "run_id": "guard-fixture",
               "environment_ref": env.ref().model_dump(mode="json"),
               "kubernetes": {"context": "fixture-context", "engine": engine}}
@@ -173,4 +174,28 @@ def test_invalid_scoped_inputs_fail_before_transport(external, monkeypatch, chan
         values[key] = "0" * 64
     with pytest.raises(ValueError):
         run(case, external / "out", values=values, cfg=cfg, check_id=check_id)
+    assert not case.world.calls
+
+
+def test_other_release_prepared_cannot_use_current_target(external, monkeypatch):
+    from guard.adapters import vllm_lifecycle_catalog as catalog
+    from guard.adapters.vllm_approved_file_read_composition import PROFILES
+
+    matching_profile = PROFILES["0.31.0"]
+    row = catalog.row(matching_profile)
+    case = normal_case(external / "case", monkeypatch, engine_image=row["images"][0],
+                       platform=f"fixture; engine_requested={row['engine_mode']}")
+    executor = boot.KubernetesSupplyBootExecutor(case.cfg, runner=case.runner)
+    scope = external / "case" / "input-scope.json"
+
+    for profile in (matching_profile, PROFILES["0.30.0"]):
+        assets = external / profile.rsplit("/", 1)[1]
+        prepared = prepare_assets(assets, REPOSITORY, profile=profile, model_read_scope=scope)
+        case.cfg["normal"]["prepared"] = str(assets / "manifest.json")
+        case.values["supply_normal_prepared_sha256"] = sha256_hex(canonical_json(prepared))
+        if profile == matching_profile:
+            assert executor.normal_file_read_inputs(case.env, case.values)[1] == prepared
+        else:
+            with pytest.raises(ValueError, match="SUPPLY_BOOT_NORMAL_BINDING_INVALID"):
+                executor.normal_file_read_inputs(case.env, case.values)
     assert not case.world.calls

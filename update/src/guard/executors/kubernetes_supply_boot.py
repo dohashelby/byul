@@ -43,6 +43,11 @@ def _read_projection(captured, prepared, digest, prepared_sha256, analysis):
             "source_events": candidate["source_events"], "hash_status": candidate["hash_status"],
             "reference_sha256": candidate["reference_sha256"],
             "read_return_sha256": candidate["read_return_bytes_sha256"]}
+        if "loader_iterator_observation_sha256" in candidate:
+            binding = projection["source_binding"]
+            binding["open_event"] = binding.pop("root_event")
+            binding.update({key: candidate[key] for key in ("loader_iterator_observation_sha256",
+                                                             "loader_call_sha256", "model_object_sha256")})
     return native
 
 
@@ -285,10 +290,14 @@ class KubernetesSupplyBootExecutor:
         prepared = load_prepared(section["prepared"])
         target_sha256 = sha256_hex(canonical_json(target))
         prepared_sha256 = sha256_hex(canonical_json(prepared))
-        release = reviewed_release(env.engine.version)
-        if (prepared["profile"] != sensor.PROFILE or release is None or prepared["public_commit"] != release.source_commit
-                or env.engine.source_commit not in (None, release.source_commit)
-                or target_sha256 != values["supply_normal_target_sha256"]
+        if prepared["profile"] == sensor.PROFILE:
+            release = reviewed_release(env.engine.version)
+            profile_matches = (release is not None and prepared["public_commit"] == release.source_commit
+                               and env.engine.source_commit in (None, release.source_commit))
+        else:
+            from guard.adapters.vllm_lifecycle_catalog import approved_file_read_matches
+            profile_matches = approved_file_read_matches(env, prepared)
+        if (not profile_matches or target_sha256 != values["supply_normal_target_sha256"]
                 or prepared_sha256 != values["supply_normal_prepared_sha256"]
                 or self.expected_target is not None and self.expected_target != target_sha256):
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
@@ -296,13 +305,17 @@ class KubernetesSupplyBootExecutor:
         return target, prepared, target_sha256, prepared_sha256
 
     def _run_normal_read(self, check, env, values, workdir, started):
-        from guard.collectors import native_model_file_reads
+        from guard.adapters import vllm_file_read_sensor as sensor
         from .supply_boot_artifacts import persist
 
         start, end = _normal_validity(values)
         if not start <= started <= end:
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
         target, prepared, target_sha256, prepared_sha256 = self.normal_file_read_inputs(env, values)
+        if prepared["profile"] == sensor.PROFILE:
+            from guard.collectors import native_model_file_reads as model_reads
+        else:
+            from guard.collectors import approved_model_file_reads as model_reads
         reader = KubernetesLifecycleReader(target, env, prepared, runner=self.runner,
                                             binary=self.cfg.get("kubectl_binary", "kubectl"),
                                             duration=self.cfg.get("max_duration_seconds", 120))
@@ -318,13 +331,20 @@ class KubernetesSupplyBootExecutor:
                     or any(captured[key]["metadata"]["sealed"] is not True for key in ("before", "after"))
                     or _model_mount(reader.snapshot()) != mount):
                 raise ValueError(gap)
-            analysis = native_model_file_reads.analyze(captured, prepared)
-            analysis["candidates"] = [row for row in analysis["candidates"] if (
+            analysis = model_reads.analyze(captured, prepared)
+            candidates = [row for row in analysis["candidates"] if (
                 row["declared_reference_comparison_observed"] and row["recording_closed"]
                 and row["path_fd_metadata_match_observed"] and row["close_observed"]
                 and captured["recordings"][row["recording"]]["capture"]["provenance"]["owner_binding_verified"] is True
             )]
-            if analysis["candidates"]:
+            if candidates:
+                analysis["unjoined_read_count"] += len(analysis["candidates"]) - len(candidates)
+                analysis["candidates"] = candidates
+                declared_paths = {row["normalized_path_sha256"] for row in prepared["model_read_scope"]["files"]}
+                unread_paths = declared_paths - {row["normalized_path_sha256"] for row in candidates}
+                analysis["groups"] = [{"declared_paths_without_candidate_count": len(unread_paths)}]
+                if unread_paths:
+                    analysis["missing"] = sorted(set(analysis["missing"]) | {"declared_scope_file_read_candidates_unavailable"})
                 native = _read_projection(captured, prepared, target_sha256, prepared_sha256, analysis)
                 gap = None
             else:
@@ -339,7 +359,8 @@ class KubernetesSupplyBootExecutor:
                 cleanup.append("SUPPLY_BOOT_NORMAL_CAPTURE_INCOMPLETE")
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             cleanup.append("SUPPLY_BOOT_READER_REPORT_UNAVAILABLE")
-        session = {"role": "normal", "session": prepared["session"], "owner_bound_records": native is not None,
+        session = {"role": "normal", "session": prepared["session"], "producer_profile": prepared["profile"],
+                   "owner_bound_records": native is not None,
                    "target_sha256": target_sha256, "prepared_sha256": prepared_sha256,
                    "approved_reference_manifest_sha256": values[_REFERENCE_KEY], "producer_authenticated": False}
         missing = ["normal_serving_control_unobserved", "change_and_enforcement_unobserved", "producer_authentication_unavailable"]

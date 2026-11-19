@@ -152,8 +152,10 @@ def test_public_preparation_validates_declared_generation_files(external, monkey
 
 @pytest.mark.parametrize(("check_id", "change", "error"), [
     ("LIF-05", None, None),
+    ("LIF-06", "same-owner", None),
     ("LIF-16", "same-pod-restart", None),
     ("LIF-05", "cross-side-owner", "TRANSITION_GENERATION_SIDE_REUSE"),
+    ("LIF-06", "foreign-side-env", "TRANSITION_CONFIGURATION_INVALID"),
     ("LIF-16", "foreign-side-env", "TRANSITION_CONFIGURATION_INVALID"),
     ("LIF-05", "malformed-target", "TRANSITION_CONFIGURATION_INVALID"),
     ("LIF-16", "manifest-rewritten", "MVP_INPUT_FILE_CHANGED"),
@@ -161,8 +163,15 @@ def test_public_preparation_validates_declared_generation_files(external, monkey
 def test_mvp_readiness_checks_owned_generation_files(external, monkeypatch, check_id, change, error):
     monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", _forbidden)
     monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
-    pack, envs, pol, cfg = _configuration(external, check_id, change=change, mvp_inputs=True)
+    fixture_change = "same-owner" if check_id == "LIF-06" else change
+    pack, envs, pol, cfg = _configuration(external, check_id, change=fixture_change, mvp_inputs=True)
     candidate = cfg["sides"]["candidate"]["check_config"][check_id]["generations"]
+    if check_id == "LIF-06":
+        before, after = candidate
+        owners = [json.loads(Path(row["target"]).read_bytes())["kubernetes"]["engine"] for row in candidate]
+        sessions = {json.loads(Path(row["prepared"]).read_bytes())["session"] for row in candidate}
+        assert owners[0] == owners[1] and len(sessions) == 2
+        assert before["environment"] != after["environment"]
     if change == "foreign-side-env":
         envs[1] = load_environment(Path(candidate[1]["environment"]))
     report = application.update_readiness(pack, envs, pol, cfg)
@@ -172,6 +181,9 @@ def test_mvp_readiness_checks_owned_generation_files(external, monkeypatch, chec
     else:
         assert inputs["ok"], report
     assert all(not row["runtime_qualified"] for row in report["check_support"])
+    if check_id == "LIF-06" and error is None:
+        assert any("LIF-06 preparation" in note and "actual live transition" in note
+                   for note in report["limitations"])
     if change == "malformed-target":
         Path(candidate[1]["target"]).write_bytes(b"{")
 

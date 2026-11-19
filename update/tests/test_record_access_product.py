@@ -1,6 +1,7 @@
 """OBS-06 product and manual evidence with EXAMPLE Kubernetes replies."""
 from datetime import timedelta
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -9,9 +10,8 @@ from guard.adapters.vllm import VllmAdapter
 from guard.executors import kubernetes_record_access as collector
 from guard.executors import kubernetes_record_access_product as product
 from guard.executors import record_access_evidence as bridge
-from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
+from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
-from tests.builders import baseline_pack
 from tests.test_record_access_evidence import case as prepared_case
 from tests.test_kubernetes_record_access import World, PRIVATE, context as access_context
 
@@ -97,7 +97,8 @@ def test_canonical_obs06_artifact_keeps_qualified_ordinary_capture(access_contex
     monkeypatch.setattr(product.KubernetesRecordAccessExecutor, '_inventory', unavailable)
     executor = product.KubernetesRecordAccessExecutor(
         {'target': str(target_path), 'subjects': str(subjects_path)}, runner=world.runner)
-    draft = executor.run(baseline_pack().checks['OBS-06'], case.env, values, VllmAdapter(), case.work)
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['OBS-06']
+    draft = executor.run(check, case.env, values, VllmAdapter(), case.work)
     original, = produced
     ordinary_read_verified = change != 'unverified-owner'
     assert world.logs_calls == (2 if ordinary_read_verified else 0)

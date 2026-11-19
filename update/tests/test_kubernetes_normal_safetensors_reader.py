@@ -104,6 +104,59 @@ def _run(tmp_path, version, fault=None):
     return draft, json.loads(text), check, world
 
 
+@pytest.mark.parametrize(('version', 'damage'), [
+    ('0.30.0', None), ('0.31.0', None), ('0.30.0', 'reader-option'),
+    ('0.31.0', 'startup-option'), ('0.31.0', 'argv'), ('0.30.0', 'source'),
+    ('0.30.0', 'duration'), ('0.31.0', 'binary'), ('0.31.0', 'missing-prefix'),
+    ('0.30.0', 'caller-pin'), ('0.31.0', 'executor-pin'),
+])
+def test_sup12_prepares_the_saved_default_reader_without_collecting(tmp_path, monkeypatch, version, damage):
+    from tests.test_kubernetes_normal_startup_load import READY, STARTED
+    from tools.mvp_versions import versions
+
+    env, target, path, world = startup_inputs(tmp_path, version)
+    image = next(item['image'] for item in versions().values() if item['version'] == version)
+    engine = {'image_digest': image}
+    if damage == 'source':
+        engine['source_commit'] = '0' * 40
+    env = env.model_copy(update={'engine': env.engine.model_copy(update=engine)}).seal()
+    target['environment_ref'] = env.ref().model_dump(mode='json')
+    target['engine']['image_digest'] = image
+    target['kubernetes']['engine'].update(image=image, image_id=image)
+    if damage != 'missing-prefix':
+        target['startup_log_prefix'] = {'byte_count': len(world.raw), 'sha256': sha256_hex(world.raw),
+                                        'container_started_at': STARTED, 'ready_at': READY}
+    launch = target['comparison_config']['launch']
+    if damage == 'reader-option':
+        launch['argv'] = [*launch['argv'], '--safetensors_load_strategy=lazy']
+    elif damage == 'startup-option':
+        launch['argv'] = [*launch['argv'], '--logging_config=/example']
+    elif damage == 'argv':
+        launch['argv'] = None
+    path.write_bytes(canonical_json(target))
+    digest = sha256_hex(path.read_bytes())
+    config = {'normal_safetensors_reader_only': True, 'target': str(path)}
+    if damage == 'duration':
+        config['max_duration_seconds'] = 301
+    elif damage == 'binary':
+        config['kubectl_binary'] = ' '
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('SUP-12 declaration validation must not verify live owners or read logs or installed code')
+
+    for method in ('_verify', 'engine_logs', 'engine_supply_hashes'):
+        monkeypatch.setattr(safetensors.KubernetesHTTP, method, forbidden)
+    executor = safetensors.KubernetesNormalSafetensorsReaderExecutor(config, runner=forbidden,
+        expected_target_sha256='e' * 64 if damage == 'executor-pin' else None)
+    check = load_pack(UPDATE / 'packs/PACK-BASELINE').checks['SUP-12']
+    caller_pin = 'f' * 64 if damage == 'caller-pin' else digest
+    if damage is None:
+        executor.prepared_normal_reader(check, env, VALUES, expected_target_sha256=caller_pin)
+    else:
+        with pytest.raises(ValueError, match='^SUP12_READER_TARGET_OR_SOURCE_UNVERIFIED$'):
+            executor.prepared_normal_reader(check, env, VALUES, expected_target_sha256=caller_pin)
+
+
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
 def test_sup12_reports_scoped_actual_default_reader_branch_without_a_full_verdict(tmp_path, version):
     draft, artifact, check, world = _run(tmp_path, version)

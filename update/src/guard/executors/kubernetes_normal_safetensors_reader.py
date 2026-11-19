@@ -59,11 +59,14 @@ def _reader_profile(adapter, env):
     return profile
 
 
+def _verify_reader_args(argv, forbidden):
+    if any(arg.partition("=")[0].replace("_", "-") in forbidden for arg in argv if arg.startswith("--")):
+        raise ValueError("SUP12_READER_LAUNCH_UNQUALIFIED")
+
+
 def _verify_reader_launch(target, container, startup):
     _verify_launch(target, container, startup)
-    if any(arg.partition("=")[0].replace("_", "-") in _FORBIDDEN_ARGS
-           for arg in container["args"] if arg.startswith("--")):
-        raise ValueError("SUP12_READER_LAUNCH_UNQUALIFIED")
+    _verify_reader_args(container["args"], _FORBIDDEN_ARGS)
 
 
 def _verify_sources(transport, startup, profile):
@@ -140,23 +143,52 @@ class KubernetesNormalSafetensorsReaderExecutor:
                 or type(self.cfg.get("target")) is not str or not self.cfg["target"] or type(values) is not dict or values != _VALUES):
             raise ValueError("SUP12_READER_SCOPE_INVALID")
 
+    def _target_sha256(self, target, expected_target_sha256=None):
+        target_sha = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self._expected_target_sha256, expected_target_sha256) if pin is not None]
+        if not pins or any(pin != target_sha for pin in pins):
+            raise ValueError
+        return target_sha
+
+    def _configured_readers(self, target, env):
+        duration = self.cfg.get("max_duration_seconds", 20)
+        binary = self.cfg.get("kubectl_binary", "kubectl")
+        logs = normal_safetensors_reader_transport(target, env, duration=duration, binary=binary, runner=self.runner)
+        source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
+                                        profile=ENGINE_CALLBACK_PROFILE, clock=logs.clock)
+        source_reader.deadline = logs.deadline
+        return logs, source_reader
+
+    def prepared_normal_reader(self, check, env, values, *, expected_target_sha256=None):
+        """Check saved default-reader declarations without inspecting the live launch."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            self._target_sha256(target, expected_target_sha256)
+            adapter = get_provider(env.engine.name).adapter()
+            startup = _source_profile(adapter, env)
+            _reader_profile(adapter, env)
+            argv = target["comparison_config"]["launch"]["argv"]
+            if type(argv) is not list or any(type(arg) is not str for arg in argv):
+                raise ValueError
+            _verify_reader_args(argv, _FORBIDDEN_ARGS | set(startup["forbidden_args"]))
+            self._configured_readers(target, env)
+        except (AttributeError, KeyError, OSError, OverflowError, TypeError, ValueError, KubernetesBindingError):
+            raise ValueError("SUP12_READER_TARGET_OR_SOURCE_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 20)
-        binary = self.cfg.get("kubectl_binary", "kubectl")
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if target_sha != self._expected_target_sha256:
-                raise ValueError
+            target_sha = self._target_sha256(target)
             startup = _source_profile(adapter, env)
             profile = _reader_profile(adapter, env)
-            logs = normal_safetensors_reader_transport(target, env, duration=duration, binary=binary, runner=self.runner)
-            source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
-                                            profile=ENGINE_CALLBACK_PROFILE, clock=logs.clock)
-            source_reader.deadline = logs.deadline
+            logs, source_reader = self._configured_readers(target, env)
         except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
             raise ValueError("SUP12_READER_TARGET_OR_SOURCE_UNVERIFIED") from None
 

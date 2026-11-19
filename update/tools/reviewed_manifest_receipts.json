@@ -905,6 +905,11 @@
       "manifest_sha256": "04ebac5e554f190c4524f330a0033c04c70462227617a93cf99676beb0345afa",
       "reviewed_by": "Codex / SUP-05 approved file reads and SUP-15 ownership / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T07:27:43+00:00"
+    },
+    {
+      "manifest_sha256": "f2f08215b3b7f0708543493b1720a3a5a0d24a6dfdc520b887b69e28ed81fa3a",
+      "reviewed_by": "Codex / normal SUP-05 binding stages and mixed supply targets / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T07:51:49+00:00"
     }
   ]
 }

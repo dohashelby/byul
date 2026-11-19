@@ -1055,6 +1055,11 @@
       "manifest_sha256": "e2be25808d117f12d1aefc4ba9841bc9d84889d98748299380883c261275a997",
       "reviewed_by": "Codex / SUP-05 paired saved preparation inputs / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T22:16:34+00:00"
+    },
+    {
+      "manifest_sha256": "379ec8067c1737fb88bac5c82e40db518946bc97bed086c3b5d85cf4a1f2a211",
+      "reviewed_by": "Codex / SUP-05 receipt-bound product handoff and replay / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T22:46:41+00:00"
     }
   ]
 }

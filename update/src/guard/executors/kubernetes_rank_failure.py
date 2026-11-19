@@ -12,6 +12,35 @@ from .lifecycle_session import capture_session
 from .rank_failure_contract import PROFILE,normalize_policy,stamp
 
 
+ACTIVATION_OBSERVATIONS = {'activation_steps', 'activation_violations', 'activation_missing', 'activation_scope_complete'}
+
+
+def _activation_observations(projection, trials, diagnostics):
+    calls = {(row['recording'], row['pid'], row['start_ticks'], row['call_sha256']) for row in projection['calls']
+        if row['point'] == 'MultiprocExecutor.execute_model' and row['phase'] == 'RETURN'
+        and row['source_process_binding_observed']}
+    native = [row for row in projection['samples']
+        if row['point'] == 'MultiprocExecutor.execute_model' and row['phase'] == 'RETURN'
+        and row['returned_kind'] == 'value'
+        and (row['recording'], row['pid'], row['start_ticks'], row['call_sha256']) in calls]
+    controls = [row for row in trials if row['case_id'] in {'lif08-normal-before', 'lif08-normal-after'}
+        and row.get('binding_verified') is True and row.get('policy_window_verified') is True
+        and row.get('capture_complete') is True and row.get('normal_shape_verified') is True]
+    # These are independently observed facts. The native return did not identify the client control.
+    steps = [{'step': 'native-rank-executor-value-return', **{key: row[key] for key in (
+        'call_sha256', 'source_sha256', 'recording', 'seq', 'operation_started_ns', 'operation_finished_ns')}} for row in native]
+    steps += [{'step': 'direct-rank-normal-control', **row} for row in controls]
+    missing = set(diagnostics)
+    missing.update(f"{row['kind']}:{row['reason']}" if row.get('kind') is not None else row['reason']
+                   for row in projection['missing'])
+    if not native:
+        missing.add('RANK_NATIVE_EXECUTOR_VALUE_RETURN_UNAVAILABLE')
+    if len(controls) != 2:
+        missing.add('RANK_BOUNDED_NORMAL_CONTROL_PAIR_UNAVAILABLE')
+    return {'activation_steps': steps, 'activation_violations': [], 'activation_missing': sorted(missing),
+            'activation_scope_complete': False}
+
+
 class KubernetesRankFailureExecutor(HttpCheckExecutor):
     name='rank_failure';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
@@ -93,6 +122,8 @@ class KubernetesRankFailureExecutor(HttpCheckExecutor):
         observations={'rank_observation_trials':trials,'rank_native_samples':projection['samples'],'rank_native_calls':projection['calls'],
             'rank_failure_candidates':projection['source_failure_candidates'],'rank_fault_cases':projection['fault_cases'],'rank_missing':projection['missing'],
             'rank_producer_authenticated':False,'rank_normal_all_ranks_verified':False,'rank_upper_client_receipt_verified':False,'rank_scope_complete':False}
+        if ACTIVATION_OBSERVATIONS <= {item.key for item in ctx.check.required_observations}:
+            observations.update(_activation_observations(projection, trials, diagnostics))
         return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Closed normal probes and selected mp source facts; four independent fault activations, all-rank normal computation and upper receipt unverified.'},[],summary
 

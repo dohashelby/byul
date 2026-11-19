@@ -18,6 +18,41 @@ from .resource_recovery_contract import PROFILE,normalize_policy,stamp,validate_
 from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
 
 
+def _namespace_observations(censuses, selection, target_sha256, start, end):
+    from guard.runtime import resource_group_source
+
+    selection_sha256 = sha256_hex(canonical_json(selection))
+    steps = []
+    for row in censuses:
+        try:
+            if (not all(row[key] is True for key in ('collected', 'owner_binding_verified', 'clock_window_verified'))
+                    or not start <= stamp(row['started_at']) <= stamp(row['finished_at']) <= end
+                    or row['selection_sha256'] != selection_sha256
+                    or row['probe_source_sha256'] != resource_group_source.GROUP_SHA256
+                    or row['context_source_sha256'] != resource_group_source.SELECTED_SHA256):
+                continue
+            packet = group_probe.validate_result(row['packet'], selection)
+        except (KeyError, TypeError, ValueError):
+            continue
+        matched = {owner['id'] for owner in packet['owners'] if owner['status'] == 'match'}
+        if not matched:
+            continue
+        owners = {(owner['context']['pid'], owner['context']['start_ticks']): owner['id']
+                  for owner in selection['owners'] if owner['id'] in matched}
+        references = {(owners[(ref['pid'], ref['start_ticks'])], ref['kind'],
+                       sha256_hex(canonical_json([ref['kind'], ref['device'], ref['inode']])))
+                      for ref in packet['references'] if (ref['pid'], ref['start_ticks']) in owners}
+        steps.append({'step': 'owned-namespace-held-resource-census', 'stage': row['stage'],
+            'target_sha256': target_sha256, 'selection_sha256': selection_sha256,
+            'probe_source_sha256': row['probe_source_sha256'], 'context_source_sha256': row['context_source_sha256'],
+            'packet_sha256': sha256_hex(canonical_json(packet)), 'started_at': row['started_at'], 'finished_at': row['finished_at'],
+            'matched_owner_ids': sorted(matched), 'namespace_scan_complete': packet['namespace_scan_complete'],
+            'held_references': [{'owner_id': owner, 'kind': kind, 'resource_sha256': digest}
+                                for owner, kind, digest in sorted(references)],
+            'global_release_verified': False, 'producer_authenticated': False})
+    return steps
+
+
 class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='resource_recovery';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
@@ -59,9 +94,10 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         before_census = after_census = None
         group_selection={'schema':group_probe.SELECTION_SCHEMA,
             'owners':[{'id':row['id'],'context':row['context']}for row in ctx._recovery_selection['owners']]}
-        def collect_group():
+        def collect_group(stage):
             if self.cfg.get('namespace_resources',False):
-                row=reader.group_resource_census(group_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']);groups.append(row)
+                row=reader.group_resource_census(group_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
+                groups.append({**row, 'stage': stage})
                 if (not row.get('collected')or not row.get('owner_binding_verified')or not row.get('clock_window_verified')
                         or (row.get('packet')or{}).get('namespace_scan_complete')is not True):
                     diagnostics.append('RESOURCE_RECOVERY_NAMESPACE_CENSUS_INCOMPLETE')
@@ -95,7 +131,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
                 binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120));reader.snapshot()
             before_census = reader.resource_census(ctx._recovery_selection,
                 max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
-            collect_group()
+            collect_group('before')
             collect_gpu()
             for slot in SLOTS:
                 row={'case_id':'lif11-'+slot,'request_id_sha256':sha256_hex(('byul-lif11-'+token+'-'+slot).encode()),
@@ -119,7 +155,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
                     after_census = reader.resource_census(ctx._recovery_selection,
                         max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_CENSUS_UNAVAILABLE')
-                try:collect_group()
+                try:collect_group('after')
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_NAMESPACE_CENSUS_UNAVAILABLE')
                 collect_gpu()
                 try:sealed=reader.seal_session().get('sealed') is True
@@ -183,10 +219,16 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         # security finding about the entire failure and subsequent restart.
         selected = [row for row in projection['rows'] if row['before_status'] == 'match'
                     or row['after_status'] in {'match', 'absent', 'replaced'}]
-        step = {'step': 'selected-resource-census', 'resources': selected}
+        steps = [{'step': 'selected-resource-census', 'resources': selected}] if selected else []
+        missing = list(projection['missing'])
+        if self.cfg.get('namespace_resources', False):
+            held = _namespace_observations(groups, group_selection, ctx.policy_values['recovery_target_sha256'], start, end)
+            steps.extend(held)
+            if {row['stage'] for row in held} != {'before', 'after'}:
+                missing.append('owned_namespace_held_reference_census_incomplete')
         observations.update({
-            'activation_steps': {'value': [step] if selected else None, 'collected': bool(selected)},
-            'activation_missing': {'value': projection['missing'], 'collected': True},
+            'activation_steps': {'value': steps or None, 'collected': bool(steps)},
+            'activation_missing': {'value': missing, 'collected': True},
             'activation_violations': {'value': None, 'collected': False},
             'activation_scope_complete': {'value': False, 'collected': True},
         })

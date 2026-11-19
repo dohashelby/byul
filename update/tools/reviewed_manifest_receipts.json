@@ -1025,6 +1025,11 @@
       "manifest_sha256": "3c1126b201e236e28077088bfc2708006b1205481343e8c408b23d2c023cda1b",
       "reviewed_by": "Codex / REQ-10 optional collection profile preparation correction / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T19:34:32+00:00"
+    },
+    {
+      "manifest_sha256": "e67a04fae23bec7bcea4ad4da32038b91fa664b911b9d0718dd1a49b51f99117",
+      "reviewed_by": "Codex / owned startup source and saved observation input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T20:13:00+00:00"
     }
   ]
 }

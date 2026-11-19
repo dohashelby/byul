@@ -124,6 +124,12 @@ class VllmProvider(EngineProvider):
         from .vllm_release_profiles import release_profile
         return release_profile(version)
 
+    def evidence_contract(self, name, *args):
+        if name == "startup_load_source":
+            from .vllm_startup_load import source_profile
+            return source_profile(*args)
+        return super().evidence_contract(name, *args)
+
     def sandbox_arguments(self, options):
         # Published callers/fixtures retain their legacy keyword contract.
         return {'vllm': options}

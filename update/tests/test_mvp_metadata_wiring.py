@@ -1144,7 +1144,7 @@ def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_
 
 
 def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, sources, monkeypatch):
-    from guard.adapters.vllm import VllmAdapter
+    from guard.adapters.engine_provider import get_provider
     from guard.core.run import run_plan
     from guard.executors import run_binding
     from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
@@ -1154,6 +1154,7 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
     from guard.store.packs import put_pack
 
     pack, sides, policy_path = sources
+    provider = get_provider('vllm')
     envs = []
     pins = {}
     for paths, line in zip(sides.values(), (5416, 5354)):
@@ -1169,12 +1170,12 @@ def test_lif01_startup_load_and_sup10_prepare_separate_owned_checks(tmp_path, so
         _write(paths['environment'], env.to_dict())
         _write(paths['target'], target)
         pins[env.id] = sha256_hex(canonical_json(target))
-        profile = VllmAdapter().startup_load_source(env)
+        profile = provider.evidence_contract('startup_load_source', env)
         assert profile['logger_call_linenumber'] == line and len(profile['file_sha256']) == 5
         assert profile['required_env'] == {'VLLM_USE_V2_MODEL_RUNNER': '0'}
         wrong = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': None})})
         with pytest.raises(ValueError, match='LIF01_BOOT_SOURCE_UNQUALIFIED'):
-            VllmAdapter().startup_load_source(wrong)
+            provider.evidence_contract('startup_load_source', wrong)
 
     budgets = {'supply_stage_budget_ms': {'load': 600000}, 'supply_stage_budget_bytes': {'load': 17179869184},
                'supply_total_budget_ms': 1800000}

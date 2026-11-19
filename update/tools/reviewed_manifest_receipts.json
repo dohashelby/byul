@@ -935,6 +935,11 @@
       "manifest_sha256": "823f2961f2844a41b11634ac5a65c06a77c2e881778ad29cb279418dda2fa620",
       "reviewed_by": "Codex / external OBS-09 log support diagnosis / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T09:17:53+00:00"
+    },
+    {
+      "manifest_sha256": "2ab724b682a2973e56412c8e10795b78a703d913bf707278fe57ccb3acab72a3",
+      "reviewed_by": "Codex / deployment generation binding and SUP-06 rank evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T10:01:09+00:00"
     }
   ]
 }

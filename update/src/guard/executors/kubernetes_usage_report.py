@@ -19,6 +19,7 @@ from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesBin
 from .content_common import bounded_probe, control_state
 from .http_common import Ctx, functional_requests
 from .kubernetes_lifecycle_capture import KubernetesCaptureError, KubernetesLifecycleReader, supervised_source
+from .kubernetes_normal_startup_load import _source_profile, _verify_launch
 from .owned_capture import _FILE_READER, MAX_BYTES, validate_file_result
 from .usage_report import PROFILES, SETTINGS, SILENCE_PROFILE, START_SCHEMA, UsageReportExecutor, _READER, new_reports
 
@@ -135,11 +136,10 @@ if (sys.argv[1] != ','.join(OPTOUTS) or allow_cache not in ('0', '1')
 started = start_ticks()
 environment = selected_environment()
 root = report_root(environment)
-if root == 'cache-xdg' and allow_cache != '1':
-    print(json.dumps(dict(gap='effective-source-unverified')))
-    sys.exit()
 settings = {name: environment.get(name.encode()) == b'1' for name in OPTOUTS}
-files = [file_metadata(path) for path in dict.fromkeys([*paths, EFFECTIVE_PATHS[root]])]
+effective = EFFECTIVE_PATHS[root]
+files = [file_metadata(path) if path != effective or root != 'cache-xdg' or allow_cache == '1'
+         else dict(path=path, exists=None, readable=False) for path in dict.fromkeys([*paths, effective])]
 if selected_environment() != environment or start_ticks() != started:
     raise ValueError('usage process changed')
 print(json.dumps(dict(files=files, settings=settings, process_start_ticks=started, report_root=root)))
@@ -152,7 +152,6 @@ def _local_snapshot_value(value, paths, allow_cache):
             or type(value["settings"]) is not dict or set(value["settings"]) != set(_OPTOUT_SETTINGS)
             or any(type(setting) is not bool for setting in value["settings"].values())
             or type(value["report_root"]) is not str or value["report_root"] not in _EFFECTIVE_PATHS
-            or value["report_root"] == "cache-xdg" and not allow_cache
             or type(value["files"]) is not list):
         raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
     paths = list(dict.fromkeys([*paths, _EFFECTIVE_PATHS[value["report_root"]]]))
@@ -163,6 +162,8 @@ def _local_snapshot_value(value, paths, allow_cache):
             raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
         common = {"path", "exists", "readable"}
         exists, readable = row.get("exists"), row.get("readable")
+        if not allow_cache and path == _EFFECTIVE_PATHS["cache-xdg"] and (exists is not None or readable is not False):
+            raise ValueError("USAGE_LOCAL_SNAPSHOT_INVALID")
         if readable is True:
             common.add("directory_chain")
             chain = row.get("directory_chain")
@@ -210,12 +211,23 @@ def _usage_source(ctx):
     return source
 
 
-def _verify_usage_source(transport, source):
+def _verify_usage_launch(transport, target, startup):
+    pod = transport._verify(capture_snapshot=True)["engine"]
+    container_name = transport.binding["engine"]["container"]
+    container, = [row for row in pod["spec"]["containers"] if row["name"] == container_name]
+    _verify_launch(target, container, startup)
+
+
+def _verify_usage_source(transport, source, target, startup):
     if transport is None:
         return False
     try:
+        if startup["source_root"] != source["source_root"]:
+            return False
+        _verify_usage_launch(transport, target, startup)
         files = [{"root": 0, "relative": name} for name in _USAGE_SOURCE_FILES]
         rows = transport.engine_supply_hashes([source["source_root"]], files)
+        _verify_usage_launch(transport, target, startup)
         observed = {row["relative"]: row["sha256"] for row in rows if row["state"] == "hashed"
                     and type(row["root"]) is int and row["root"] == 0}
         report = transport.report()
@@ -371,16 +383,17 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         policy_paths = ctx.policy_values["usage_report_paths"]
         reader = self._reader(ctx, ctx.target, paths=policy_paths, local_transport=transport)
         source = _usage_source(ctx)
-        source_reader = None
+        source_reader = startup = None
         if source:
             try:
+                startup = _source_profile(ctx.adapter, ctx.env)
                 source_reader = KubernetesHTTP(ctx.target, ctx.env, duration=ctx._usage_duration,
                     binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner,
                     profile=ENGINE_CALLBACK_PROFILE, clock=transport.clock)
                 source_reader.deadline = transport.deadline
-            except (TypeError, ValueError, KubernetesBindingError):
+            except (AttributeError, TypeError, ValueError, KubernetesBindingError):
                 pass
-        qualified = _verify_usage_source(source_reader, source)
+        qualified = _verify_usage_source(source_reader, source, ctx.target, startup)
         source_gaps = []
         before = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
         after = None
@@ -397,7 +410,7 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
             if wait < transport.deadline - transport.clock():
                 time.sleep(wait)
                 if effective == _EFFECTIVE_PATHS["cache-xdg"]:
-                    qualified = _verify_usage_source(source_reader, source)
+                    qualified = _verify_usage_source(source_reader, source, ctx.target, startup)
                 after = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
 
         diagnostics = sorted(set(source_gaps))
@@ -472,11 +485,10 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                                          timeout=5, max_bytes=_SNAPSHOT_BYTES)
             if result.owner_binding_verified is not True:
                 raise KubernetesCaptureError()
-            value = strict_json(result.stdout.encode(), limit=_SNAPSHOT_BYTES)
-            if value == {"gap": "effective-source-unverified"}:
+            value = _local_snapshot_value(strict_json(result.stdout.encode(), limit=_SNAPSHOT_BYTES), paths, qualified)
+            if value["report_root"] == "cache-xdg" and not qualified:
                 source_gaps.append("USAGE_EFFECTIVE_REPORT_SOURCE_UNVERIFIED")
-                return None
-            return _local_snapshot_value(value, paths, qualified)
+            return value
         except (KubernetesCaptureError, AttributeError, ValueError, TypeError, OSError):
             return None
 

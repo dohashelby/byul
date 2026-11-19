@@ -218,6 +218,30 @@ def test_fails_closed_without_dispatch_on_wrong_opt_in_context(tmp_path, fault):
     _run(tmp_path, "0.31.0", fault)
 
 
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("settings,accepted", [
+    ({"max_duration_seconds": 30.5, "kubectl_binary": "example-kubectl"}, True),
+    ({"max_duration_seconds": 0}, False),
+    ({"kubectl_binary": " "}, False),
+])
+def test_prepares_saved_cilium_target_without_reading_status(tmp_path, version, settings, accepted):
+    env, target, path = _inputs(tmp_path, version)
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    check = baseline_pack().checks["PLT-07"]
+
+    def no_collection(*args, **kwargs):
+        pytest.fail("PLT-07 preparation must not collect agent status")
+
+    executor = KubernetesPassiveEgressPolicyExecutor(
+        {"cilium_egress_status_only": True, "target": str(path), **settings}, runner=no_collection)
+    if accepted:
+        executor.prepared_passive_egress_policy(check, env, VALUES, expected_target_sha256=sha256_hex(raw))
+    else:
+        with pytest.raises(ValueError, match="^PLT07_CILIUM_TARGET_UNVERIFIED$"):
+            executor.prepared_passive_egress_policy(check, env, VALUES, expected_target_sha256=sha256_hex(raw))
+
+
 def test_captures_named_agent_binding_with_only_kubernetes_api_reads(tmp_path):
     env, target, _ = _inputs(tmp_path, "0.30.0")
     cluster = Cluster(target)

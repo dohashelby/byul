@@ -209,6 +209,26 @@ class KubernetesPassiveEgressPolicyExecutor:
         if type(values) is not dict or values != _APPROVED_VALUES:
             raise ValueError("PLT07_CILIUM_POLICY_INVALID")
 
+    def _target_transport(self, target, env, *, duration, expected_target_sha256):
+        target_sha = sha256_hex(canonical_json(target))
+        if target_sha != expected_target_sha256 or self._expected_target_sha256 not in (None, target_sha):
+            raise ValueError
+        transport = passive_egress_policy_transport(target, env, duration=duration,
+            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner)
+        return target_sha, transport
+
+    def prepared_passive_egress_policy(self, check, env, values, *, expected_target_sha256):
+        """Validate the saved engine and agent declaration without reading status."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            self._target_transport(target, env, duration=self.cfg.get("max_duration_seconds", 30),
+                                   expected_target_sha256=expected_target_sha256)
+        except (KubernetesBindingError, KeyError, OSError, OverflowError, TypeError, ValueError):
+            raise ValueError("PLT07_CILIUM_TARGET_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
@@ -216,11 +236,10 @@ class KubernetesPassiveEgressPolicyExecutor:
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if adapter is None or target_sha != self._expected_target_sha256:
+            if adapter is None:
                 raise ValueError
-            transport = passive_egress_policy_transport(target, env, duration=duration,
-                binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self.runner)
+            target_sha, transport = self._target_transport(
+                target, env, duration=duration, expected_target_sha256=self._expected_target_sha256)
             agent = target["cilium_agent"]
         except (KubernetesBindingError, OSError, TypeError, ValueError):
             raise ValueError("PLT07_CILIUM_TARGET_UNVERIFIED") from None

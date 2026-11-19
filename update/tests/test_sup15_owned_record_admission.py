@@ -73,6 +73,28 @@ def _sup16_roles(root, version):
     return env, settings, pins
 
 
+@pytest.mark.parametrize(('check_id', 'version'), [('SUP-09', '0.30.0'), ('SUP-11', '0.31.0')])
+def test_dynamic_supply_prepares_distinct_declared_challenge_roles(external, check_id, version):
+    env, settings, pins = _sup16_roles(external, version)
+    settings['challenge']['target'] = settings['normal']['target']
+    pins['supply_challenge_target_sha256'] = pins['supply_normal_target_sha256']
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Static role validation dispatched runtime I/O')
+
+    check = PACK.checks[check_id]
+    executor = KubernetesSupplyBootExecutor(settings, runner=forbidden)
+    roles = executor.prepared_supply_roles(check, env, base_values(env, check_id, pins))
+    assert roles['normal'][0] == roles['challenge'][0]
+    assert roles['normal'][1]['session'] != roles['challenge'][1]['session']
+
+    settings['challenge']['prepared'] = settings['normal']['prepared']
+    pins['supply_challenge_prepared_sha256'] = pins['supply_normal_prepared_sha256']
+    alias = KubernetesSupplyBootExecutor(settings, runner=forbidden)
+    with pytest.raises(ValueError, match='^SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED$'):
+        alias.prepared_supply_roles(check, env, base_values(env, check_id, pins))
+
+
 @pytest.mark.parametrize(('version', 'mode', 'error'), [
     ('0.30.0', 'ordinary', None), ('0.31.0', 'same-owner-distinct-sessions', None),
     ('0.31.0', 'same-location', 'SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED'),

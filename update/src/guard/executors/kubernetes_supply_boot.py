@@ -207,11 +207,11 @@ class KubernetesSupplyBootExecutor:
         return self._prepared_roles(env, values, require_complete=require_complete, distinct_locations=True)
 
     def prepared_supply_roles(self, check, env, values):
-        """Validate both B3 role declarations locally, without verifying live owners or reading records."""
+        """Validate both role declarations locally, without verifying live owners or reading records."""
         self.validate_policy(check, values)
-        if check.id not in {'SUP-15', 'SUP-16'}:
+        if check.id not in {'SUP-09', 'SUP-11', 'SUP-15', 'SUP-16'}:
             raise ValueError('SUPPLY_BOOT_PROFILE_UNSUPPORTED')
-        if check.id == 'SUP-16' and any(type(self.cfg.get(role)) is not dict
+        if check.id != 'SUP-15' and any(type(self.cfg.get(role)) is not dict
                 or set(self.cfg[role]) != {'target', 'prepared'} for role in contract.ROLES):
             raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
         return self._prepared_roles(env, values, require_complete=True, distinct_locations=True)

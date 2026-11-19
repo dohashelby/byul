@@ -11,12 +11,14 @@ from types import SimpleNamespace
 
 import pytest
 
+from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE
 from guard.core import run as module
+from guard.core.execution_recipe import bind_recipe
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
 from guard.executors import registry
 from guard.executors.base import DraftArtifact, EvidenceDraft
-from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
+from guard.models import DataOrigin, ExecStatus, Side, canonical_json, sha256_hex
 from guard.store import Store
 from tests.builders import T0, baseline_pack, environment, policy, req01_obs
 
@@ -67,6 +69,61 @@ def case(tmp_path, monkeypatch):
         return rows
     return SimpleNamespace(store=store, pack=pack, plan=plan, env=env, draft=draft,
                            executor=executor, invoke=invoke, add_files=add_files)
+
+
+def test_check_abort_preserves_completed_evidence_and_respects_update_scope(case, monkeypatch):
+    scoped, sibling, outside_recipe, unselected = "REQ-01", "REQ-03", "REQ-02", "REQ-04"
+    candidate_env = environment(case.env.facts, id="ENV-EXAMPLE-CANDIDATE")
+    envs = [case.env, candidate_env]
+    pol = policy(case.pack.ref(), id="POL-EXAMPLE-SCOPED-ABORT",
+                 scope={"include": [scoped, sibling, outside_recipe], "exclude": []},
+                 values={scoped: {"allowed_callers": ["allowed"]},
+                         sibling: {"general_allowed_kinds": ["inference"]}})
+    executors = {"direct_route": "unit", "role_route": "unit"}
+    raw = {"executors": executors, "update": {"allowed_checks": [scoped, sibling, unselected]}}
+    cfg = RunConfig(executors=executors, raw=raw, side_configs={
+        side.value: RunConfig(executors=executors) for side in (Side.baseline, Side.candidate)
+    })
+    calls = []
+
+    def record_call(check, env, *_):
+        calls.append((check.id, env.id))
+        return case.draft
+
+    monkeypatch.setattr(case.executor, "run", record_call)
+    monkeypatch.setitem(registry.EXECUTORS, "role_route:unit", lambda _: case.executor)
+    plan = bind_recipe(select(case.pack, envs, pol, mode="update"), raw, envs)
+    case.store.put_many([candidate_env, pol, plan])
+    assert plan.item(outside_recipe).selected and not plan.item(unselected).selected
+
+    first = run_plan(case.store, case.pack, plan, cfg, only_side=Side.baseline)
+    original = next(evd for evd in first if evd.check_id == scoped)
+    assert original.execution.status == ExecStatus.COMPLETED
+    assert original.execution.attempt_id == cfg.attempt_id
+
+    calls.clear()
+    reason = "EXAMPLE_SCOPED_PREFLIGHT_FAILED"
+    for side_cfg in cfg.side_configs.values():
+        side_cfg.check_abort_reasons = {check_id: reason for check_id in (scoped, outside_recipe, unselected)}
+    result = {(evd.check_id, evd.side): evd for evd in run_plan(case.store, case.pack, plan, cfg)}
+
+    assert result[scoped, Side.baseline].ref() == original.ref()
+    assert case.store.revisions(original.id) == [original.revision]
+    aborted = result[scoped, Side.candidate]
+    assert aborted.execution.attempt_id == original.execution.attempt_id
+    assert aborted.execution.status == ExecStatus.ABORTED
+    assert aborted.execution.abort_reason == reason
+    assert aborted.data_origin == DataOrigin.EXAMPLE and aborted.execution.executor is None
+    assert not aborted.normal_control.attempted and not any(row.attempted for row in aborted.challenges)
+    assert not aborted.artifacts
+    assert result[sibling, Side.candidate].execution.status == ExecStatus.COMPLETED
+    assert calls == [(sibling, case.env.id), (sibling, candidate_env.id)]
+
+    for side in (Side.baseline, Side.candidate):
+        outside = result[outside_recipe, side]
+        assert outside.execution.status == ExecStatus.NOT_RUN
+        assert outside.execution.abort_reason == UPDATE_CHECK_OUTSIDE_SCOPE
+    assert all(evd.check_id != unselected for evd in case.store.iter_kind("EVD"))
 
 
 def assert_empty_aborted(evd):

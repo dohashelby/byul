@@ -850,6 +850,11 @@
       "manifest_sha256": "360c779e03953416796e5288577f924261944b7a4ce50bcd899c8e0fe41b52b7",
       "reviewed_by": "Codex / paired owned Cilium endpoint policy state / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T01:19:39+00:00"
+    },
+    {
+      "manifest_sha256": "516634f1531a3f30eb352b38853a8f5c7544a7a1f18e5201d7102671a7e309c7",
+      "reviewed_by": "Codex / paired source-bound normal LIF01 startup load / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T02:06:47+00:00"
     }
   ]
 }

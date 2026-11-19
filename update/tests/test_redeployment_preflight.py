@@ -9,6 +9,7 @@ import pytest
 
 from guard import application
 from guard.adapters.vllm_release_profiles import release_profile
+from guard.collectors.file import load_environment
 from guard.collectors.lifecycle import prepare_assets
 from guard.collectors.model_read_scope import build_scope
 from guard.core.execution_recipe import bind_recipe
@@ -22,6 +23,9 @@ from guard.store.packs import put_pack
 from tests.builders import environment, policy
 from tests.test_kubernetes_sampling import inputs as owned_targets
 from tests.test_lifecycle_capture import REPOSITORY, external
+from tools import mvp_live_readiness
+from tools.j02_run_config import write_config
+from tools.mvp_versions import versions
 
 
 def _write(path, value):
@@ -29,11 +33,18 @@ def _write(path, value):
     return str(path)
 
 
-def _generation(directory, name, identity, *, version, owner=None, profile=None, context="fixture-context"):
+def _generation(directory, name, identity, *, version, owner=None, profile=None, context="fixture-context",
+                mvp_inputs=False):
     directory.mkdir()
-    image = next(pin for pin in release_profile(version)["images"] if pin.startswith("vllm/"))
+    if mvp_inputs:
+        image = next(row["image"] for row in versions().values() if row["version"] == version)
+        runtime = {"gpu_count": 1, "gpu_model": "EXAMPLE GPU", "driver": "EXAMPLE driver"}
+    else:
+        image = next(pin for pin in release_profile(version)["images"] if pin.startswith("vllm/"))
+        runtime = {}
     files = [{"path": "weights.safetensors", "sha256": sha256_hex(b"EXAMPLE approved weight reference"), "bytes": 33}]
     env = environment(id=f"ENV-REDEPLOY-{identity}", engine={"name": "vllm", "version": version, "image_digest": image},
+        runtime=runtime,
         model={"id": "EXAMPLE-model", "revision": f"EXAMPLE-{name}", "inventory_sha256": sha256_hex(canonical_json(files))})
     target = owned_targets()
     target["kubernetes"]["context"] = context
@@ -57,7 +68,7 @@ def _generation(directory, name, identity, *, version, owner=None, profile=None,
                  "target": _write(directory / "target.json", target), "prepared": str(prepared / "manifest.json")}
 
 
-def _configuration(external, check_id, *, change=None):
+def _configuration(external, check_id, *, change=None, mvp_inputs=False):
     pack = load_pack(REPOSITORY / "update" / "packs" / "PACK-BASELINE")
     pol = policy(pack.ref(), scope={"include": [check_id]}, values={})
     cfg = {"adapter": {"name": "vllm"}, "executors": {"lifecycle_transition": "kubernetes"},
@@ -68,7 +79,8 @@ def _configuration(external, check_id, *, change=None):
     baseline_new = None
     for i, side in enumerate(("baseline", "candidate")):
         version = "0.30.0" if side == "baseline" and change not in {"same-release-owners", "reused-session"} else "0.31.0"
-        env, old = _generation(external / f"{side}-old", "old", 100 + 2 * i, version=version)
+        env, old = _generation(external / f"{side}-old", "old", 100 + 2 * i, version=version,
+                               mvp_inputs=mvp_inputs)
         owner = None
         after_version = version
         if side == "candidate":
@@ -87,7 +99,8 @@ def _configuration(external, check_id, *, change=None):
         else:
             _, new = _generation(external / f"{side}-new", "new", 101 + 2 * i, version=after_version,
                                  owner=owner, profile=lifecycle_transition.endpoint_sensor.PROFILE,
-                                 context="fixture-restore" if side == "candidate" and change == "restore-context" else "fixture-context")
+                                 context="fixture-restore" if side == "candidate" and change == "restore-context" else "fixture-context",
+                                 mvp_inputs=mvp_inputs)
         if side == "baseline":
             baseline_new = new
         elif change == "invalid-http-model":
@@ -135,6 +148,69 @@ def test_public_preparation_validates_declared_generation_files(external, monkey
         assert error in inputs["detail"]
     assert all(not row["runtime_qualified"] for row in report["check_support"])
     assert any("installed native producer" in reason for reason in report["limitations"])
+
+
+@pytest.mark.parametrize(("check_id", "change", "error"), [
+    ("LIF-05", None, None),
+    ("LIF-16", "same-pod-restart", None),
+    ("LIF-05", "cross-side-owner", "TRANSITION_GENERATION_SIDE_REUSE"),
+    ("LIF-16", "foreign-side-env", "TRANSITION_CONFIGURATION_INVALID"),
+    ("LIF-16", "manifest-rewritten", "MVP_INPUT_FILE_CHANGED"),
+])
+def test_mvp_readiness_checks_owned_generation_files(external, monkeypatch, check_id, change, error):
+    monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", _forbidden)
+    monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
+    pack, envs, pol, cfg = _configuration(external, check_id, change=change, mvp_inputs=True)
+    candidate = cfg["sides"]["candidate"]["check_config"][check_id]["generations"]
+    if change == "foreign-side-env":
+        envs[1] = load_environment(Path(candidate[1]["environment"]))
+    report = application.update_readiness(pack, envs, pol, cfg)
+    inputs = next(row for row in report["checks"] if row["check"] == "inputs")
+    if change in {"cross-side-owner", "foreign-side-env"}:
+        assert not inputs["ok"] and inputs["detail"] == error
+    else:
+        assert inputs["ok"], report
+    assert all(not row["runtime_qualified"] for row in report["check_support"])
+
+    policy_path = Path(_write(external / "policy.json", pol.to_dict()))
+    config_path = external / "guard.toml"
+    write_config(cfg, config_path)
+    index = mvp_live_readiness.template(pack)
+    for side, env in zip(("baseline", "candidate"), envs):
+        paths = {"environment": Path(_write(external / f"{side}-env.json", env.to_dict())),
+                 "policy": policy_path, "configuration": config_path}
+        index["inputs"].append({"check_id": check_id, "side": side, **{
+            role: {"path": str(path), "sha256": sha256_hex(path.read_bytes())} for role, path in paths.items()
+        }})
+    index_path = _write(external / "readiness.json", index)
+
+    if change == "manifest-rewritten":
+        read = lifecycle_transition.LifecycleTransitionExecutor.prepared_generations
+        manifest_path = Path(candidate[1]["prepared"])
+
+        def rewrite_after_read(executor, check, env, values):
+            generations = read(executor, check, env, values)
+            if env.ref() == envs[1].ref():
+                manifest_path.write_bytes(manifest_path.read_bytes() + b"\n")
+            return generations
+
+        monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "prepared_generations", rewrite_after_read)
+
+    report = mvp_live_readiness.audit(index_path, pack=pack)
+    assert report["sides"] == 138
+    rows = {row["side"]: row for row in report["rows"] if row["check_id"] == check_id}
+    assert set(rows) == {"baseline", "candidate"}
+    for side, row in rows.items():
+        assert row["live_target_verified"] is row["engine_executed"] is row["ready_for_execution"] is False
+        assert row["actual_results"] is None
+        if side == "candidate" and error is not None:
+            assert not row["file_binding_valid"]
+            assert error in row["blocking_codes"]
+        else:
+            assert row["file_binding_valid"] and row["executor_policy_valid"]
+            assert row["binding_schema"] == "guard-run-binding/2"
+            assert "EXAMPLE_ENV_NOT_ACTUAL" in row["blocking_codes"]
+            assert "LIVE_EXECUTOR_PREFLIGHT_REQUIRED" in row["blocking_codes"]
 
 
 def test_side_reuse_blocks_the_transition_and_leaves_unselected_inputs_nonblocking(external, tmp_path, monkeypatch):

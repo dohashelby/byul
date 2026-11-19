@@ -540,32 +540,14 @@ def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
             assert row['file_binding_valid'] and 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']
 
 
-@pytest.mark.parametrize(('check_id', 'damage', 'reason'), [
-    ('OBS-06', None, None),
-    ('OBS-06', 'policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
-    ('OBS-06', 'producer_changed', 'MVP_INPUT_FILE_CHANGED'),
-    ('PLT-12', None, None),
-    ('PLT-12', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
-    ('PLT-12', 'inventory_changed', 'MVP_INPUT_FILE_CHANGED'),
-])
-def test_record_declarations_match_runtime_input_contracts(
-        tmp_path, monkeypatch, record_access_context, check_id, damage, reason):
-    from guard import application
+def _record_declarations(tmp_path, record_access_context, check_id, damage=None):
     from guard.executors import credential_copy_contract as copy
-    from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
-    from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
     from guard.models import canonical_json, sha256_hex
     from tests.builders import environment, policy
     from tests.test_a1_credential_copy_contract import example as copy_example
     from tests.test_kubernetes_request_binding import target as http_target
-    from tools.j02_run_config import write_config
     from tools.mvp_versions import versions
 
-    def forbidden(*args, **kwargs):
-        pytest.fail('Record declaration checks must not contact the target')
-
-    monkeypatch.setattr(socket, 'socket', forbidden)
-    monkeypatch.setattr(subprocess, 'Popen', forbidden)
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
     check = pack.checks[check_id]
     record_access = check_id == 'OBS-06'
@@ -618,7 +600,32 @@ def test_record_declarations_match_runtime_input_contracts(
         env_path.write_bytes(canonical_json(env.to_dict()))
         envs.append(env)
         env_paths[side] = env_path
+    return pack, envs, pol, cfg, env_paths
 
+
+def _no_record_collection(*args, **kwargs):
+    pytest.fail('Record declaration checks must not contact the target')
+
+
+@pytest.mark.parametrize(('check_id', 'damage', 'reason'), [
+    ('OBS-06', None, None),
+    ('OBS-06', 'policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
+    ('OBS-06', 'producer_changed', 'MVP_INPUT_FILE_CHANGED'),
+    ('PLT-12', None, None),
+    ('PLT-12', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('PLT-12', 'inventory_changed', 'MVP_INPUT_FILE_CHANGED'),
+])
+def test_record_declarations_match_runtime_input_contracts(
+        tmp_path, monkeypatch, record_access_context, check_id, damage, reason):
+    from guard import application
+    from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
+    from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
+    from guard.models import canonical_json, sha256_hex
+    from tools.j02_run_config import write_config
+
+    monkeypatch.setattr(socket, 'socket', _no_record_collection)
+    monkeypatch.setattr(subprocess, 'Popen', _no_record_collection)
+    pack, envs, pol, cfg, env_paths = _record_declarations(tmp_path, record_access_context, check_id, damage)
     ready = application.update_readiness(pack, envs, pol, cfg)
     inputs = next(row for row in ready['checks'] if row['check'] == 'inputs')
     assert inputs['ok'] is (reason in {None, 'MVP_INPUT_FILE_CHANGED'}), ready
@@ -626,7 +633,7 @@ def test_record_declarations_match_runtime_input_contracts(
         assert inputs['detail'] == reason
 
     if reason == 'MVP_INPUT_FILE_CHANGED':
-        if record_access:
+        if check_id == 'OBS-06':
             executor, method = KubernetesRecordAccessExecutor, 'prepared_record_access'
             candidate_file = tmp_path / 'candidate-producer-identity.txt'
         else:
@@ -660,3 +667,82 @@ def test_record_declarations_match_runtime_input_contracts(
         else:
             assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'
             assert 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']
+
+
+@pytest.mark.parametrize('late', [False, True])
+@pytest.mark.parametrize('source', ['subjects', 'record_producer'])
+def test_obs06_rejects_changed_plan_inputs_before_collection(
+        tmp_path, monkeypatch, record_access_context, late, source):
+    from guard import application
+    from guard.core import run as core_run
+    from guard.core.execution_recipe import bind_recipe
+    from guard.core.select import select
+    from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
+    from guard.models import ExecStatus, Mode, Side, canonical_json
+    from guard.store import Store
+    from guard.store.packs import put_pack
+
+    pack, envs, pol, cfg, _ = _record_declarations(tmp_path, record_access_context, 'OBS-06')
+    store = Store(tmp_path / 'store')
+    put_pack(store, pack.path)
+    plan = bind_recipe(select(pack, envs, pol, mode=Mode.update), cfg, envs)
+    store.put_many([*envs, pol, plan])
+    candidate = cfg['sides']['candidate']
+
+    if source == 'subjects':
+        path = Path(candidate['record_access']['subjects'])
+        subjects = json.loads(path.read_bytes())
+        subjects['subjects'][0]['username'] = 'example-replacement'
+        replacement = canonical_json(subjects)
+        reason = 'RUN_BINDING_RECORD_ACCESS_SUBJECTS_CHANGED'
+    else:
+        path = Path(candidate['run_binding']['OBS-06']['record_producer'])
+        replacement = path.read_bytes() + b'\n'
+        reason = 'RUN_BINDING_RECORD_ACCESS_PRODUCER_CHANGED'
+
+    monkeypatch.setattr(KubernetesRecordAccessExecutor, 'run', _no_record_collection)
+    monkeypatch.setattr(subprocess, 'Popen', _no_record_collection)
+    rc = application.run_config(cfg)
+    if late:
+        original = core_run._run_one
+
+        def replace_after_recipe(*args, **kwargs):
+            path.write_bytes(replacement)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(core_run, '_run_one', replace_after_recipe)
+        evidence, = core_run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+        assert evidence.execution.status == ExecStatus.NOT_RUN
+        assert evidence.execution.abort_reason == reason
+        assert evidence.execution.run_binding is None
+        assert not evidence.artifacts and not evidence.normal_control.attempted
+    else:
+        path.write_bytes(replacement)
+        with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+            core_run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+        assert not list(store.iter_kind('EVD'))
+
+
+@pytest.mark.parametrize('scope', ['selected', 'unselected', 'staged'])
+def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_access_context, scope):
+    from guard.core.execution_recipe import configuration_sha256
+    from guard.core.select import select
+    from guard.models import Mode, canonical_json
+    from tests.builders import policy
+
+    pack, envs, pol, cfg, _ = _record_declarations(tmp_path, record_access_context, 'OBS-06')
+    if scope == 'unselected':
+        pol = policy(pack.ref(), scope={'include': ['OBS-11']}, values={})
+    if scope == 'staged':
+        cfg['update']['kubernetes_candidate_binding'] = 'after_baseline'
+    plan = select(pack, envs, pol, mode=Mode.update)
+    original = configuration_sha256(cfg, envs, plan=plan)
+    path = tmp_path / 'candidate-subjects.json'
+    if scope == 'selected':
+        replacement = path.read_bytes() + b'\n'
+    else:
+        subjects = json.loads(path.read_bytes())
+        subjects['subjects'][0]['username'] = 'example-replacement'
+        replacement = canonical_json(subjects)
+    path.write_bytes(replacement)
+    assert configuration_sha256(cfg, envs, plan=plan) == original

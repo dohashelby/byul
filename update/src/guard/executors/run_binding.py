@@ -307,6 +307,10 @@ def is_paired_supply_role_preflight(check, settings, update: dict) -> bool:
             and {1, 3}.issubset(stages_for(check)))
 
 
+def is_record_access_binding(check) -> bool:
+    return check.id == 'OBS-06' and check.executor == 'record_access' and stages_for(check) == (1, 2, 3, 4)
+
+
 def is_lifecycle_generation_binding(check) -> bool:
     """The canonical definition binds declared generation files in stage 2."""
     return (check.executor == 'lifecycle_transition'
@@ -347,7 +351,7 @@ def _load(path, loader):
     raise RunBindingUnavailable('RUN_BINDING_LOADER_UNSUPPORTED')
 
 
-def file_hash(check_id, key, executor_cfg) -> str:
+def file_hash(check_id, key, executor_cfg, *, require_regular_json=False) -> str:
     """Canonical JSON hash of the configured file, loaded the way the executor loads it."""
     path, loader = _source(check_id, key)
     if (check_id == 'LIF-08' and key == 'rank_prepared_sha256'
@@ -361,6 +365,11 @@ def file_hash(check_id, key, executor_cfg) -> str:
         raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE')
     if loader == 'bytes':
         return producer_sha256(node)
+    if loader == 'json' and require_regular_json:
+        from guard.adapters.vllm_file_read_sensor import dependency
+        from guard.runtime.bounded import strict_json
+
+        return sha256_hex(canonical_json(strict_json(dependency(node, None), limit=_MAX_JSON)))
     return sha256_hex(canonical_json(_load(node, loader)))
 
 
@@ -558,7 +567,7 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None,
             expected_transition_manifest_sha256=None, expected_initialization_digests=None,
             expected_supply_record_digests=None, native_route_prepared_absent: bool = False,
-            expected_rank_prepared_file=None):
+            expected_rank_prepared_file=None, expected_record_access_digests=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
@@ -576,6 +585,13 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
         raise RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_FILE_SCOPE_INVALID')
     if supply_digests is not None:
         for digest in supply_digests.values():
+            _hex(digest)
+    record_digests = expected_record_access_digests
+    if record_digests is not None:
+        if (not is_record_access_binding(check) or type(record_digests) is not dict
+                or set(record_digests) != {'subjects', 'record_producer'}):
+            raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_FILE_SCOPE_INVALID')
+        for digest in record_digests.values():
             _hex(digest)
     normal = _TARGET_ONLY_NORMAL_MODES.get(check.id)
     if normal is not None and type(executor_cfg) is dict and normal[1] in executor_cfg:
@@ -643,13 +659,25 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             if (supply_digests is not None
                     and stage_values['supply_record_source_sha256'] != supply_digests['record_producer']):
                 raise RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_PRODUCER_CHANGED')
+            if (record_digests is not None
+                    and stage_values['record_inventory_source_sha256'] != record_digests['record_producer']):
+                raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_PRODUCER_CHANGED')
             files.update(stage_files)
             extra = {**extra, **stage_values}
         if 4 in stages:
             stage_values = {}
             if check.id in RUN_FILE_KEYS:
                 key = RUN_FILE_KEYS[check.id]
-                stage_values[key] = files[key] = file_hash(check.id, key, executor_cfg)
+                if record_digests is None:
+                    digest = file_hash(check.id, key, executor_cfg)
+                else:
+                    try:
+                        digest = file_hash(check.id, key, executor_cfg, require_regular_json=True)
+                    except (KeyError, OSError, TypeError, ValueError):
+                        raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_SUBJECTS_CHANGED') from None
+                    if digest != record_digests['subjects']:
+                        raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_SUBJECTS_CHANGED')
+                stage_values[key] = files[key] = digest
             if check.id in POLICY_DOCUMENT_KEYS:
                 key = POLICY_DOCUMENT_KEYS[check.id]
                 stage_values[key] = policy_document_sha256(check.id, key, policy_row)

@@ -202,6 +202,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             initialization_digests = {} if bound_external_update else None
             response_route_digests = {} if prebound_external_update else None
             supply_record_digests = {} if prebound_external_update else None
+            record_access_digests = {} if prebound_external_update else None
             missing_route_prepared = set()
             rank_common_files = {}
             if plan.inputs.execution_recipe_sha256 is not None:
@@ -211,7 +212,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                                         response_route_digests=response_route_digests,
                                         supply_record_digests=supply_record_digests,
                                         missing_native_route_prepared_sides=missing_route_prepared,
-                                        rank_common_files=rank_common_files) != plan.inputs.execution_recipe_sha256:
+                                        rank_common_files=rank_common_files,
+                                        record_access_digests=record_access_digests) != plan.inputs.execution_recipe_sha256:
                     raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
@@ -242,7 +244,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                            transition_manifests=transition_manifests, initialization_digests=initialization_digests,
                            response_route_digests=response_route_digests, supply_record_digests=supply_record_digests,
                            native_route_prepared_absent=side.value in missing_route_prepared,
-                           rank_common_files=rank_common_files.get(side.value))
+                           rank_common_files=rank_common_files.get(side.value),
+                           record_access_digests=record_access_digests)
             try:
                 store.put(evd)
             except Exception:
@@ -264,7 +267,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
              policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
              transition_manifests=None, initialization_digests=None, response_route_digests=None,
-             supply_record_digests=None, native_route_prepared_absent=False, rank_common_files=None) -> Evidence:
+             supply_record_digests=None, native_route_prepared_absent=False, rank_common_files=None,
+             record_access_digests=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -380,6 +384,12 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                     raise run_binding.RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_FILES_UNAVAILABLE')
                 target_options['expected_supply_record_digests'] = expected
                 raw = {**raw, '_supply_prepared_sha256_by_role': {role: expected[role] for role in ('normal', 'challenge')}}
+            if (record_access_digests is not None and cfg.executors[item.executor] == 'kubernetes'
+                    and run_binding.is_record_access_binding(check)):
+                expected = record_access_digests.get(common['side'].value)
+                if expected is None:
+                    raise run_binding.RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_FILES_UNAVAILABLE')
+                target_options['expected_record_access_digests'] = expected
             if native_route_prepared_absent and check.id == 'REQ-02' and cfg.executors[item.executor] == 'kubernetes':
                 target_options['native_route_prepared_absent'] = True
             if (check.id == 'LIF-08' and cfg.executors[item.executor] == 'common-input'

@@ -218,8 +218,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     cfg = config.get(check.executor, {})
     gateway_snapshot = check.id == 'OBS-01' and cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True
     external_kubernetes = implementation == 'kubernetes' and requested_update.get('mode', 'external') == 'external'
-    record_access = (external_kubernetes and check.id == 'OBS-06' and check.executor == 'record_access'
-                     and run_binding.stages_for(check) == (1, 2, 3, 4))
+    record_access = external_kubernetes and run_binding.is_record_access_binding(check)
     copy_snapshot = (external_kubernetes and check.id == 'PLT-12' and check.executor == 'required_event_record'
                      and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['PLT-12']) is True
                      and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'

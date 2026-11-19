@@ -764,8 +764,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     if (kube and item.check_id == "OBS-11" and isinstance(executor, KubernetesLogIntegrityExecutor)
                             and 2 in run_binding.stages_for(check_def)):
                         executor.prepared_collection_status(check_def, selected_env, values)
-                    if (kube and item.check_id == "OBS-06" and isinstance(executor, KubernetesRecordAccessExecutor)
-                            and run_binding.stages_for(check_def) == (1, 2, 3, 4)):
+                    if (kube and isinstance(executor, KubernetesRecordAccessExecutor)
+                            and run_binding.is_record_access_binding(check_def)):
                         executor.prepared_record_access(check_def, selected_env, values)
                     if (kube and isinstance(executor, LifecycleTransitionExecutor)
                             and run_binding.is_lifecycle_generation_binding(check_def)):

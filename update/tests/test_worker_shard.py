@@ -71,6 +71,32 @@ def test_registered_producer_makes_the_sharded_record_complete(monkeypatch):
     assert result['complete'] is True and result['producer_authenticated'] is False
 
 
+def test_relative_index_symlink_preserves_observed_required_and_assigned_shards(tmp_path):
+    shard = tmp_path / 'fixture.safetensors'
+    content = b'EXAMPLE shard metadata fixture'
+    shard.write_bytes(content)
+    index = tmp_path / 'fixture.index.json'
+    index.write_text(json.dumps({'weight_map': {'fixture.weight': shard.name}}), encoding='utf-8')
+    link = tmp_path / 'selected.index.json'
+    link.symlink_to(index.name)
+
+    observer = callback.WorkerShardObserver(SCOPE['session'], context_provider=lambda: {})
+    observed = observer._prepared((str(tmp_path), [str(shard)], True, link.name))
+    assert observed['index_present'] is True and not observer.gaps
+    assert observed['required'] == observed['files']
+    rows = case('sharded')['rows']
+    prepared = next(r for r in rows if r.get('point') == 'DefaultModelLoader._prepare_weights' and r['phase'] == 'RETURN')
+    prepared['fields'].update(observed)
+
+    record, result = build(rows)
+    required, = [row for row in record['events'] if row['event'] == 'shard_required']
+    assigned, = [row for row in record['events'] if row['event'] == 'shard_assigned']
+    assert required['shard_sha256'] == assigned['shard_sha256'] == observed['files'][0]
+    assert assigned['bytes'] == len(content)
+    assert record['completeness'] == {'source_ended': True, 'dropped': 0, 'diagnostic_codes': []}
+    assert result['violation_candidates'] == []
+
+
 @pytest.mark.parametrize('index_state,index_present,diagnostic', [
     ('unknown', None, 'WORKER_SHARD_INDEX_UNOBSERVED'),
     ('unrecorded', None, 'WORKER_SHARD_INDEX_UNOBSERVED'),

@@ -178,7 +178,7 @@ def _load_cost(raw, window, line_number):
 
 class KubernetesNormalStartupLoadExecutor:
     name = "supply_boot"
-    version = "0.1.0+k8s-normal-startup-load"
+    version = "0.1.1+k8s-normal-startup-load"
 
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         self.cfg = cfg
@@ -198,8 +198,10 @@ class KubernetesNormalStartupLoadExecutor:
             raise ValueError("LIF01_BOOT_POLICY_INVALID")
         for param in check.policy_params:
             check_policy_value(check.id, param.key, param.type, values[param.key])
-        if ("load" not in values["supply_stage_budget_ms"]
-                or values["supply_stage_budget_ms"].keys() != values["supply_stage_budget_bytes"].keys()):
+        milliseconds, bytes_by_stage = values["supply_stage_budget_ms"], values["supply_stage_budget_bytes"]
+        if ("load" not in milliseconds or milliseconds.keys() != bytes_by_stage.keys()
+                or any(value < 0 for budget in (milliseconds, bytes_by_stage) for value in budget.values())
+                or values["supply_total_budget_ms"] < 1):
             raise ValueError("LIF01_BOOT_POLICY_INVALID")
 
     def run(self, check, env, values, adapter, workdir):
@@ -249,6 +251,17 @@ class KubernetesNormalStartupLoadExecutor:
 
         cleanup = sorted(set(transport.report()["cleanup_errors"] + source_reader.report()["cleanup_errors"]))
         missing = _MISSING + ([] if observed else ["ordinary_model_load_report"])
+        time_budget, violations = None, []
+        if observed:
+            # The reviewed log is emitted after the load continues to completion.
+            # Its six-decimal seconds can prove a strict overrun of an integer-ms
+            # limit. The reported allocation delta cannot prove a peak-byte overrun.
+            elapsed_us = cost["elapsed_us"]
+            limit_us = values["supply_stage_budget_ms"]["load"] * 1000
+            exceeded = elapsed_us > limit_us
+            time_budget = {"elapsed_us": elapsed_us, "limit_us": limit_us, "exceeded": exceeded}
+            if exceeded:
+                violations.append({"reason": "stage_budget_exceeded_without_stop", "stage": "load"})
         settings = {NORMAL_OPTION: True, "max_duration_seconds": duration, "boot_log_cap": _LIMIT,
                     "source_file_roles": sorted(_SOURCE_FILES)}
         conditions_sha = (sha256_hex(canonical_json(execution_conditions(target, settings, [])))
@@ -258,6 +271,7 @@ class KubernetesNormalStartupLoadExecutor:
                    "installed_source_sha256": source["file_sha256"] if observed else None,
                    "source_log_call_linenumber": source["logger_call_linenumber"] if observed else None,
                    "observation": observed, "conditions_sha256": conditions_sha, "missing": missing,
+                   "reported_load_time_budget": time_budget,
                    "gap": None if observed else failure}
         error = None if observed else failure
         artifacts = []
@@ -279,7 +293,7 @@ class KubernetesNormalStartupLoadExecutor:
             challenges=[{"step": step, "attempted": index == 0 and observed is not None}
                         for index, step in enumerate(check.challenge_steps)],
             observations={"supply_boot_sessions": {"value": [observed] if observed else None, "collected": observed is not None},
-                          "supply_boot_violations": {"value": None, "collected": False},
+                          "supply_boot_violations": {"value": violations or None, "collected": bool(violations)},
                           "supply_boot_missing": {"value": missing, "collected": True},
                           "supply_boot_complete": {"value": False, "collected": True},
                           "supply_boot_record_authenticated": {"value": False, "collected": True}},

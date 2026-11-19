@@ -127,7 +127,7 @@ def _inputs(tmp_path, version, fault=None):
     return env, target, path, world
 
 
-def _run(tmp_path, version, fault=None):
+def _run(tmp_path, version, fault=None, *, values=VALUES):
     env, target, path, world = _inputs(tmp_path, version, fault)
     original_fault = world.fault
     world.fault = None
@@ -145,10 +145,10 @@ def _run(tmp_path, version, fault=None):
     check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["LIF-01"]
     if fault in {"disabled", "wrong-target-pin"}:
         with pytest.raises(ValueError, match=r"^LIF01_BOOT_(SCOPE_INVALID|TARGET_OR_SOURCE_UNVERIFIED)$"):
-            executor.run(check, env, VALUES, world.adapter, tmp_path / "work")
+            executor.run(check, env, values, world.adapter, tmp_path / "work")
         assert not world.log_calls and not world.hash_calls
         return
-    draft = executor.run(check, env, VALUES, world.adapter, tmp_path / "work")
+    draft = executor.run(check, env, values, world.adapter, tmp_path / "work")
     if fault in {"source-mount", "v2-runner", "wrong-source", *CUSTOM_ARGS}:
         assert not world.log_calls
         if fault in CUSTOM_ARGS:
@@ -179,6 +179,25 @@ def test_lif01_observes_only_current_startup_elapsed_and_reported_gpu_delta(tmp_
     assert projected["supply_boot_normal_verified"]["collected"] is False
     evd = evidence(check_id=check.id, observations=projected)
     assert RuleTableJudge().judge(check, evd, check.judge.params, VALUES).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("budget_ms,exceeded", [(4463, True), (4464, False)])
+def test_lif01_consumes_verified_elapsed_against_the_approved_load_time_budget(tmp_path, version, budget_ms, exceeded):
+    values = {**VALUES, "supply_stage_budget_ms": {**VALUES["supply_stage_budget_ms"], "load": budget_ms},
+              "supply_stage_budget_bytes": {**VALUES["supply_stage_budget_bytes"], "load": 0}}
+    draft, artifact, check, _ = _run(tmp_path, version, values=values)
+    assert artifact["reported_load_time_budget"] == {"elapsed_us": 4463586, "limit_us": budget_ms * 1000,
+                                                      "exceeded": exceeded}
+    observations = _normalize(check, draft)["observations"]
+    assert observations["supply_boot_violations"] == {
+        "value": [{"reason": "stage_budget_exceeded_without_stop", "stage": "load"}] if exceeded else None,
+        "collected": exceeded,
+    }
+    assert observations["supply_boot_complete"]["value"] is False
+    evd = evidence(check_id=check.id, observations=observations)
+    result = RuleTableJudge().judge(check, evd, check.judge.params, values)
+    assert result.verdicts["security"] == (Verdict.FAIL if exceeded else Verdict.UNKNOWN)
 
 
 @pytest.mark.parametrize("fault", ["source-mount", "v2-runner", "wrong-source", *CUSTOM_ARGS, "changed-prefix", "short-replay",

@@ -388,6 +388,7 @@ def test_req02_record_only_binding_requires_the_declared_preparation_itself_to_b
 
 def _supply_pair(external, check_id):
     from tests.test_sup15_owned_record_admission import _prepare_roles
+    from tests.test_supply_boot_record_access import VALUES as example_policy_values
     from tools.mvp_versions import versions
 
     cfg = {'adapter': {'name': 'vllm'}, 'executors': {'supply_boot': 'kubernetes'},
@@ -405,15 +406,17 @@ def _supply_pair(external, check_id):
         producer.write_bytes(b'# EXAMPLE identity only\n')
         cfg['sides'][side] = {'check_config': {check_id: settings},
                              'run_binding': {check_id: {'record_producer': str(producer)}}}
-    return envs, policy(PACK.ref(), scope={'include': [check_id]}, values={}), cfg
+    row = {param.key: example_policy_values[param.key] for param in PACK.checks[check_id].policy_params}
+    values = {check_id: row} if row else {}
+    return envs, policy(PACK.ref(), scope={'include': [check_id]}, values=values), cfg
 
 
 @pytest.mark.parametrize(('check_id', 'candidate_issue', 'reason'), [
-    ('SUP-09', None, None),
+    *((check_id, None, None) for check_id, check in PACK.checks.items()
+      if check.executor == 'supply_boot' and not check.retired),
+    ('SUP-06', 'foreign-environment', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
     ('SUP-09', 'foreign-environment', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
-    ('SUP-11', None, None),
     ('SUP-11', 'same-record-location', 'SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED'),
-    ('SUP-16', None, None),
 ])
 def test_offline_readiness_validates_nested_supply_roles(external, monkeypatch, check_id, candidate_issue, reason):  # noqa: F811
     from tools import mvp_live_readiness
@@ -461,6 +464,24 @@ def test_offline_readiness_validates_nested_supply_roles(external, monkeypatch, 
                 assert row['file_binding_valid'], row
             assert row['live_target_verified'] is False
             assert row['engine_executed'] is row['ready_for_execution'] is False
+
+
+def test_paired_supply_readiness_does_not_reinterpret_normal_legacy_or_unpaired_settings():
+    from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS
+    from guard.models.checkdef import PolicyParam
+
+    roles = {'normal': {}, 'challenge': {}}
+    for check in PACK.checks.values():
+        if check.executor == 'supply_boot' and (option := KUBERNETES_BOUND_CHECK_OPTIONS.get(check.id)):
+            assert run_binding.is_paired_supply_role_preflight(check, roles, {})
+            for value in (True, False):
+                assert not run_binding.is_paired_supply_role_preflight(check, {**roles, option: value}, {})
+    check = PACK.checks['SUP-06']
+    old = check.model_copy(update={'policy_params': [PolicyParam(key='supply_environment_sha256', type='str')]})
+    assert not run_binding.is_paired_supply_role_preflight(old, roles, {})
+    assert not run_binding.is_paired_supply_role_preflight(check, {'target': 'unused'}, {})
+    assert not run_binding.is_paired_supply_role_preflight(check, roles, {'kubernetes_candidate_binding': 'after_baseline'})
+    assert not run_binding.is_paired_supply_role_preflight(check, roles, {'mode': 'managed'})
 
 
 @pytest.mark.parametrize('check_id', ['SUP-15', 'SUP-16'])

@@ -48,9 +48,12 @@ from guard.executors.kubernetes_normal_serving_readiness import normal_serving_r
 from guard.executors.kubernetes_normal_startup_load import normal_startup_load_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_passive_egress_policy import passive_egress_policy_transport
+from guard.executors.lifecycle_transition import (REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, _manifest_row,
+                                                   endpoint_sensor, generation_identity, generation_sensor,
+                                                   redeployment_side_reuse)
 from guard.executors.supply_boot_contract import ROLES as SUPPLY_ROLES
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
-from guard.models import canonical_json, load_pack, sha256_hex
+from guard.models import Environment, canonical_json, load_pack, sha256_hex
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
 from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
 from tools.mvp_a_input_preflight import _code, _pairs, _read
@@ -115,7 +118,37 @@ def _check_native_prepared(spec, target, env):
         raise ValueError('NATIVE_INPUT_CAPTURE_BINDING_CHANGED')
 
 
-def _inspect(source, check, pack, issued_at):
+def _redeployment_manifest(cfg, bound_files):
+    rows = cfg['generations']
+    if type(rows) is not list or not 1 <= len(rows) <= 4:
+        raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+    manifest = []
+    for row in rows:
+        if (type(row) is not dict or set(row) != {'id', 'environment', 'target', 'prepared'}
+                or any(type(value) is not str or not value for value in row.values())):
+            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+        files = {}
+        for key in ('environment', 'target', 'prepared'):
+            path = row[key]
+            raw, identity = _read(path)
+            bound_files.append((path, raw, identity))
+            files[key] = raw
+        if len(files['target']) > 65536 or len(files['prepared']) > 262144:
+            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+        declared = yaml.safe_load(files['environment'])
+        if type(declared) is not dict or declared.get('kind') != 'ENV':
+            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+        env = Environment.model_validate(declared)
+        target = json.loads(files['target'], object_pairs_hook=_pairs)
+        prepared = json.loads(files['prepared'], object_pairs_hook=_pairs)
+        if (not env.hash_ok() or type(target) is not dict or type(prepared) is not dict
+                or prepared.get('profile') not in (generation_sensor.PROFILE, endpoint_sensor.PROFILE)):
+            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+        manifest.append(_manifest_row(row['id'], env, target, prepared))
+    return manifest
+
+
+def _inspect(source, check, pack, issued_at, redeployment_identities):
     files, identities = {}, {}
     for role in ('environment', 'policy', 'configuration'):
         pointer = source[role]
@@ -189,7 +222,10 @@ def _inspect(source, check, pack, issued_at):
                              and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
     supply_record_roles = implementation == 'kubernetes' and (
         supply_record_binding or check.id == 'SUP-15'
-        or run_binding.is_dynamic_supply_role_preflight(check, requested_update))
+        or run_binding.is_paired_supply_role_preflight(check, cfg, requested_update))
+    redeployment = (implementation == 'kubernetes' and check.executor == 'lifecycle_transition'
+                    and check.id in REDEPLOY_CHECKS and 2 in run_binding.stages_for(check)
+                    and requested_update.get('mode', 'external') == 'external' and 'generations' in cfg)
     initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
                       and check.id in run_binding.INITIALIZATION_CHECKS
                       and {1, 2}.issubset(run_binding.stages_for(check)))
@@ -206,7 +242,7 @@ def _inspect(source, check, pack, issued_at):
     normal_serving_readiness = check.id == 'OBS-02' and cfg.get(NORMAL_SERVING_READINESS_OPTION) is True
     normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
     target = cfg['normal']['target'] if normal_file_reads else cfg.get('target')
-    if implementation == 'kubernetes' and target is None and not supply_record_roles:
+    if implementation == 'kubernetes' and target is None and not (supply_record_roles or redeployment):
         raise ValueError('MVP_CURRENT_TARGET_REQUIRED')
     bound_files = []
     binding_options = {}
@@ -222,6 +258,8 @@ def _inspect(source, check, pack, issued_at):
                 role_digests[f'supply_{role}_{key}_sha256'] = sha256_hex(canonical_json(document))
                 if key == 'prepared':
                     prepared_raw_digests[role] = sha256_hex(raw)
+    elif redeployment:
+        generation_manifest = _redeployment_manifest(cfg, bound_files)
     elif target is not None:
         raw_target, identity = _read(target)
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
@@ -334,6 +372,12 @@ def _inspect(source, check, pack, issued_at):
             if any(effective.get(key) != digest for key, digest in role_digests.items()):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             executor.prepared_supply_roles(check, env, effective)
+        if redeployment:
+            if sha256_hex(canonical_json(generation_manifest)) != effective['transition_inputs_sha256']:
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            generations, verified_manifest = executor.prepared_generations(check, env, effective)
+            if verified_manifest != generation_manifest:
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
         if initialization:
             if effective['init_target_sha256'] != sha256_hex(canonical_json(target_data)):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
@@ -350,6 +394,11 @@ def _inspect(source, check, pack, issued_at):
         after, current = _read(path)
         if after != before or current != identity:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
+    if redeployment:
+        declared_identities = {generation_identity(row.target, row.env, row.prepared) for row in generations.values()}
+        if redeployment_side_reuse(redeployment_identities, declared_identities):
+            raise ValueError(REDEPLOY_SIDE_REUSE)
+        redeployment_identities.update(declared_identities)
     blockers = ['LIVE_EXECUTOR_PREFLIGHT_REQUIRED']
     if passive_hop:
         blockers.append('SAME_ATTEMPT_PLT01_CONTROL_REQUIRED')
@@ -403,6 +452,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
         collection_profile = getattr(check, 'collection_profile', None)
         requires_native_matrix = collection_profile in (INPUT_MATRIX, REUSED_MATRIX)
         active_implementations = ('kubernetes',) if requires_native_matrix else ('real', 'kubernetes')
+        redeployment_identities = set()
         for selected_side in selected_sides:
             expected = expected_versions[selected_side]
             implementations = [impl for impl in active_implementations if registry.resolve_executor(
@@ -418,7 +468,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
                 row['blocking_codes'] = ['ACTUAL_INPUT_FILES_MISSING']
             else:
                 try:
-                    row.update(_inspect(sources[cid, selected_side], check, pack, now))
+                    row.update(_inspect(sources[cid, selected_side], check, pack, now, redeployment_identities))
                 except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as error:
                     row['blocking_codes'] = [_code(error)]
             if requires_native_matrix and not row.get(NORMAL_TOKEN_INPUT_OPTION):

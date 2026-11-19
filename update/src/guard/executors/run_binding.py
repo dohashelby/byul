@@ -43,6 +43,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
+                                 KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_FILE_READS_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
@@ -296,9 +297,11 @@ def is_supply_record_binding(check) -> bool:
             and {1, 3}.issubset(stages_for(check)))
 
 
-def is_dynamic_supply_role_preflight(check, update: dict) -> bool:
-    """Both role declarations can be checked offline for existing prebound inputs."""
-    return (check.id in {'SUP-09', 'SUP-11'} and check.executor == 'supply_boot'
+def is_paired_supply_role_preflight(check, settings, update: dict) -> bool:
+    """Existing canonical role files are separate from explicit normal-only modes."""
+    return (check.id in _SUPPLY_CHECKS and check.executor == 'supply_boot'
+            and type(settings) is dict and ('normal' in settings or 'challenge' in settings)
+            and KUBERNETES_BOUND_CHECK_OPTIONS.get(check.id) not in settings
             and update.get('mode', 'external') == 'external'
             and update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
             and {1, 3}.issubset(stages_for(check)))

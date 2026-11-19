@@ -15,7 +15,7 @@ from guard.runtime.bounded import strict_json
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .kubernetes_record_access import PROFILE as ACCESS_CAPTURE_PROFILE, SCHEMA as ACCESS_CAPTURE_SCHEMA
-from .kubernetes_record_access import capture_record_access, _policy_ref
+from .kubernetes_record_access import capture_record_access, _inputs, _policy_ref
 from .owned_capture import _FILE_READER, MAX_BYTES
 from .rank_failure_contract import stamp
 
@@ -38,6 +38,11 @@ _SHA = re.compile(r"[0-9a-f]{64}")
 
 def inventory_path(session):
     return "/guard-record-access/data/" + session + "/copy-inventory.json"
+
+
+def _read_declared_json(path, limit):
+    with Path(path).open("rb") as stream:
+        return strict_json(stream.read(limit + 1), limit=limit)
 
 
 def normalize_policy(values):
@@ -173,28 +178,52 @@ class KubernetesRecordAccessExecutor:
         return validate_inventory(strict_json(raw, limit=MAX_BYTES), environment_ref=env.ref().model_dump(mode="json"),
                                   target_sha256=digest, source_sha256=values["record_inventory_source_sha256"])
 
+    def _bound_inputs(self, env, values, *, read=_read_declared_json, expected_target_sha256=None):
+        try:
+            if set(self.cfg) - {"target", "subjects", "kubectl_binary", "max_duration_seconds"}:
+                raise ValueError
+            target = read(self.cfg["target"], 65536)
+            subjects = read(self.cfg["subjects"], 262144)
+            digest = sha256_hex(canonical_json(target))
+            if (digest != values["record_target_sha256"] or env.ref().sha256 != values["record_environment_sha256"]
+                    or sha256_hex(canonical_json(subjects)) != values["record_subject_plan_sha256"]
+                    or any(pin is not None and pin != digest for pin in (self.expected_target, expected_target_sha256))):
+                raise ValueError
+            # @38 (RB3-Q4): compare with the policy's reference instead of the plan file's own claim.
+            expected_policy_ref = values.get(DECISION_KEY, subjects["policy_ref"])
+            if expected_policy_ref != subjects["policy_ref"]:
+                raise ValueError
+            return target, subjects, digest, expected_policy_ref
+        except (KeyError, TypeError, ValueError, OSError):
+            raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID") from None
+
+    def prepared_record_access(self, check, env, values, *, expected_target_sha256=None):
+        """Validate canonical saved declarations locally without creating a reader."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+        from .run_binding import stages_for
+
+        self.validate_policy(check, values)
+        if check.executor != self.name or stages_for(check) != (1, 2, 3, 4) or DECISION_KEY not in values:
+            raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID")
+
+        def read(path, limit):
+            return strict_json(dependency(path, None), limit=limit)
+
+        target, subjects, _, policy_ref = self._bound_inputs(env, values, read=read,
+                                                             expected_target_sha256=expected_target_sha256)
+        try:
+            _inputs(env, target, subjects, policy_ref, self.cfg.get("kubectl_binary", "kubectl"),
+                    self.cfg.get("max_duration_seconds", 60), 5, False)
+        except OverflowError:
+            raise ValueError("RECORD_ACCESS_BUDGET_INVALID") from None
+
     def run(self, check, env, policy_values, adapter, workdir):
         started = utcnow()
         self.validate_policy(check, policy_values)
         begin, end = normalize_policy(policy_values)
-        try:
-            if set(self.cfg) - {"target", "subjects", "kubectl_binary", "max_duration_seconds"}:
-                raise ValueError
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
-            with Path(self.cfg["subjects"]).open("rb") as stream:
-                subjects = strict_json(stream.read(262145), limit=262144)
-            digest = sha256_hex(canonical_json(target))
-            if (digest != policy_values["record_target_sha256"] or env.ref().sha256 != policy_values["record_environment_sha256"]
-                    or sha256_hex(canonical_json(subjects)) != policy_values["record_subject_plan_sha256"]
-                    or self.expected_target is not None and self.expected_target != digest or not begin <= started <= end):
-                raise ValueError
-            # @38 (RB3-Q4): compare with the policy's reference instead of the plan file's own claim.
-            expected_policy_ref = policy_values.get(DECISION_KEY, subjects["policy_ref"])
-            if expected_policy_ref != subjects["policy_ref"]:
-                raise ValueError
-        except (KeyError, TypeError, ValueError, OSError):
-            raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID") from None
+        target, subjects, digest, expected_policy_ref = self._bound_inputs(env, policy_values)
+        if not begin <= started <= end:
+            raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID")
         workdir = Path(workdir)
         workdir.mkdir(parents=True, exist_ok=True)
         diagnostics, capture, packet, evaluated = [], None, None, None

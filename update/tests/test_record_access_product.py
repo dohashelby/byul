@@ -10,8 +10,10 @@ from guard.adapters.vllm import VllmAdapter
 from guard.executors import kubernetes_record_access as collector
 from guard.executors import kubernetes_record_access_product as product
 from guard.executors import record_access_evidence as bridge
+from guard.executors import run_binding
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
+from tests.builders import policy
 from tests.test_record_access_evidence import case as prepared_case
 from tests.test_kubernetes_record_access import World, PRIVATE, context as access_context
 
@@ -60,6 +62,53 @@ def test_real_collector_reaches_original_pack_evidence_and_restored_verdict(prep
         assert PRIVATE not in serialized and 'content_sha256' not in serialized
         assert all(subject['username'] not in serialized for subject in case['subjects']['subjects'])
         assert record['data_origin'] == 'EXAMPLE' and record['storage_encryption'] == 'UNKNOWN'
+
+
+@pytest.mark.parametrize(('issue', 'reason'), [
+    (None, None),
+    ('stale-environment', 'RECORD_ACCESS_SUBJECT_PLAN_INVALID'),
+    ('stale-policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
+    ('stale-target', 'RECORD_ACCESS_SUBJECT_PLAN_INVALID'),
+    ('wrong-target-pin', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
+    ('duration', 'RECORD_ACCESS_BUDGET_INVALID'),
+])
+def test_obs06_preparation_uses_bound_subject_source_without_collection(access_context, tmp_path, monkeypatch, issue, reason):
+    case = access_context
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    check = pack.checks['OBS-06']
+    pol = policy(pack.ref(), scope={'include': ['OBS-06']}, values={})
+    subjects = {**case.subjects, 'policy_ref': pol.ref().model_dump(mode='json')}
+    if issue == 'stale-environment':
+        subjects['environment_ref'] = {**subjects['environment_ref'], 'sha256': 'd' * 64}
+    elif issue == 'stale-policy':
+        subjects['policy_ref'] = {**subjects['policy_ref'], 'sha256': 'd' * 64}
+    elif issue == 'stale-target':
+        subjects['target_sha256'] = 'd' * 64
+    target_path, subjects_path, producer_path = (tmp_path / name for name in ('target.json', 'subjects.json', 'producer.py'))
+    target_bytes = canonical_json(case.target)
+    target_path.write_bytes(target_bytes)
+    subjects_bytes = canonical_json(subjects)
+    subjects_path.write_bytes(subjects_bytes)
+    producer_path.write_bytes(b'# EXAMPLE metadata only\n')
+    settings = {'target': str(target_path), 'subjects': str(subjects_path)}
+    if issue == 'duration':
+        settings['max_duration_seconds'] = 301
+    _, values = run_binding.effective_values(check, settings, case.env, {}, side='candidate', attempt_id=None,
+        issued_at=utcnow(), policy_ref=pol.ref(), run_cfg={'record_session': 'a' * 32, 'record_producer': str(producer_path)})
+    assert values['record_subject_plan_sha256'] == sha256_hex(subjects_bytes)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Static OBS-06 admission must not collect logs or inventory')
+
+    monkeypatch.setattr(product, 'capture_record_access', forbidden)
+    monkeypatch.setattr(product.KubernetesRecordAccessExecutor, '_inventory', forbidden)
+    executor = product.KubernetesRecordAccessExecutor(settings, runner=forbidden)
+    expected = 'f' * 64 if issue == 'wrong-target-pin' else sha256_hex(target_bytes)
+    if reason is None:
+        executor.prepared_record_access(check, case.env, values, expected_target_sha256=expected)
+    else:
+        with pytest.raises(ValueError, match=f'^{reason}$'):
+            executor.prepared_record_access(check, case.env, values, expected_target_sha256=expected)
 
 
 @pytest.mark.parametrize('change', ['matching', 'wrong-target', 'after-window', 'unverified-owner'])

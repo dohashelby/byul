@@ -74,9 +74,10 @@ def _sup16_roles(root, version):
 
 
 @pytest.mark.parametrize(('version', 'mode', 'error'), [
-    ('0.30.0', 'ordinary', None), ('0.31.0', 'same-location', None),
+    ('0.30.0', 'ordinary', None), ('0.31.0', 'same-owner-distinct-sessions', None),
+    ('0.31.0', 'same-location', 'SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED'),
     ('0.31.0', 'native-scope', None), ('0.31.0', 'foreign-native-scope', 'MODEL_READ_SCOPE_TARGET_MISMATCH'),
-    ('0.30.0', 'foreign-owner', 'KUBERNETES_CAPTURE_TARGET_INVALID'),
+    ('0.30.0', 'foreign-owner', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
     ('0.31.0', 'missing-prepared', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
 ])
 def test_sup16_prepares_both_native_role_declarations_without_runtime(external, version, mode, error):
@@ -85,6 +86,9 @@ def test_sup16_prepares_both_native_role_declarations_without_runtime(external, 
         settings['challenge'] = dict(settings['normal'])
         for kind in ('target', 'prepared'):
             pins[f'supply_challenge_{kind}_sha256'] = pins[f'supply_normal_{kind}_sha256']
+    if mode == 'same-owner-distinct-sessions':
+        settings['challenge']['target'] = settings['normal']['target']
+        pins['supply_challenge_target_sha256'] = pins['supply_normal_target_sha256']
     if mode == 'foreign-owner':
         path = Path(settings['challenge']['target'])
         target = json.loads(path.read_bytes())
@@ -121,6 +125,40 @@ def test_sup16_prepares_both_native_role_declarations_without_runtime(external, 
         assert all(not row[1]['engine_started'] and not row[1]['image_contents_verified'] for row in roles.values())
         if mode == 'native-scope':
             assert roles['challenge'][1]['profile'] == vllm_file_read_sensor.PROFILE
+        if mode == 'same-owner-distinct-sessions':
+            assert roles['normal'][0] == roles['challenge'][0]
+            assert roles['normal'][1]['session'] != roles['challenge'][1]['session']
+
+
+@pytest.mark.parametrize('sealed', [False, True])
+def test_sup16_only_sealed_runtime_rejects_same_location_before_reads(external, tmp_path, monkeypatch, sealed):
+    env, settings, pins = _sup16_roles(external, '0.31.0')
+    challenge = Path(settings['challenge']['target'])
+    target = json.loads(Path(settings['normal']['target']).read_bytes())
+    target['kubernetes']['context'] = 'EXAMPLE-context-alias'
+    challenge.write_bytes(canonical_json(target))
+    settings['challenge']['prepared'] = settings['normal']['prepared']
+    pins['supply_challenge_target_sha256'] = sha256_hex(challenge.read_bytes())
+    pins['supply_challenge_prepared_sha256'] = pins['supply_normal_prepared_sha256']
+    raw_pins = {role: sha256_hex(Path(entry['prepared']).read_bytes()) for role, entry in settings.items()}
+    executor = KubernetesSupplyBootExecutor(settings, expected_prepared_sha256_by_role=raw_pins if sealed else None)
+    check = PACK.checks['SUP-16']
+    values = base_values(env, check.id, pins)
+    attempted = []
+
+    def unavailable(target, selected_env, prepared):
+        attempted.append(target['kubernetes']['context'])
+        raise ValueError('EXAMPLE no runtime')
+
+    monkeypatch.setattr(executor, '_role_reader', unavailable)
+    if sealed:
+        with pytest.raises(ValueError, match='^SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED$'):
+            executor.run(check, env, values, None, tmp_path / 'evidence')
+        assert attempted == []
+    else:
+        draft = executor.run(check, env, values, None, tmp_path / 'evidence')
+        assert attempted == ['fixture-context', 'EXAMPLE-context-alias']
+        assert draft.status is ExecStatus.ABORTED and draft.data_origin is DataOrigin.EXAMPLE
 
 
 def test_sup16_raw_prepared_pin_checks_exact_read_and_preserves_other_role(external, tmp_path, monkeypatch):

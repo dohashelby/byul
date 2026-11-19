@@ -214,7 +214,7 @@ class KubernetesSupplyBootExecutor:
         if check.id == 'SUP-16' and any(type(self.cfg.get(role)) is not dict
                 or set(self.cfg[role]) != {'target', 'prepared'} for role in contract.ROLES):
             raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
-        return self._prepared_roles(env, values, require_complete=True, distinct_locations=check.id == 'SUP-15')
+        return self._prepared_roles(env, values, require_complete=True, distinct_locations=True)
 
     def _prepared_roles(self, env, values, *, require_complete, distinct_locations):
         if require_complete:
@@ -224,7 +224,7 @@ class KubernetesSupplyBootExecutor:
             normal, challenge = (_record_location(roles[role], env) if roles[role] is not None else None
                                  for role in contract.ROLES)
             if normal is not None and normal == challenge:
-                # A record replaced between reads cannot supply two separate SUP-15 roles.
+                # A record replaced between reads cannot supply two separate role sessions.
                 raise ValueError('SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED')
             if require_complete and (normal is None or challenge is None):
                 raise ValueError('SUPPLY_BOOT_INPUT_UNAVAILABLE')
@@ -324,9 +324,12 @@ class KubernetesSupplyBootExecutor:
         begin, end = contract.normalize_policy(check.id, policy_values)
         if not begin <= started <= end:
             raise ValueError("SUPPLY_BOOT_POLICY_WINDOW_EXPIRED")
-        if check.id in {"SUP-05", "SUP-15"}:
+        sealed_sup16 = check.id == 'SUP-16' and bool(self.expected_prepared_sha256_by_role)
+        if check.id in {"SUP-05", "SUP-15"} or sealed_sup16:
             if check.id == "SUP-15":
                 role_inputs = self.sup15_prepared_roles(env, policy_values)
+            elif sealed_sup16:
+                role_inputs = self._prepared_roles(env, policy_values, require_complete=False, distinct_locations=True)
             else:
                 role_inputs = {role: self._load_available(env, policy_values, role) for role in contract.ROLES}
                 normal, challenge = (role_inputs[role] for role in contract.ROLES)

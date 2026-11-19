@@ -995,6 +995,11 @@
       "manifest_sha256": "d1b3e5b54a452765b44129d797aab2e5eb437eaec3c7c4fc0e50bf19d2e48a0b",
       "reviewed_by": "Codex / canonical LIF-06 generation file readiness / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T16:58:38+00:00"
+    },
+    {
+      "manifest_sha256": "b9f2aa51d61e921522832627b6a2edadd78c6b902b60d2231372945a277f840b",
+      "reviewed_by": "Codex / LIF-08 passive source integrity and OBS-11/LIF-11 declared evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T17:34:36+00:00"
     }
   ]
 }

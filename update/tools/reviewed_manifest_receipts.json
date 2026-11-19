@@ -875,6 +875,11 @@
       "manifest_sha256": "d06414b946b69cb3d3b227b4d316066e068508fc45fc5a109574802506410526",
       "reviewed_by": "Codex / paired candidate scope and effective usage report / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T05:21:13+00:00"
+    },
+    {
+      "manifest_sha256": "a05cbd4fe245fd129d3c035f4e62027555b93e1eb097c252fb7fee223147d63c",
+      "reviewed_by": "Codex / paired readiness and stock usage launch / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T05:24:54+00:00"
     }
   ]
 }

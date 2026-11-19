@@ -443,7 +443,7 @@
   "update/src/guard/executors/kubernetes_supply_boot.py": "f237b29283444b12c4eaaefae28cb97435852cc66e8903d3e3e681fd83364398",
   "update/src/guard/executors/kubernetes_template_supply.py": "846211faa9963b07c2c436e4ba95b09091010c21b43c98fab600b5c00d43185a",
   "update/src/guard/executors/kubernetes_unix_ipc.py": "9e0839b8166402093d3abc16b35d442bbb07ec59cef96ed43d44f813e59df37e",
-  "update/src/guard/executors/kubernetes_usage_report.py": "ab1b8b3ea65bcae4be0efe8fc3122fbbb5a0db056904fe20d91778c7cfeb807a",
+  "update/src/guard/executors/kubernetes_usage_report.py": "14219fd91254cc9bd7ace57187cdc4e739106127e542be1de93aa7df7f728bcb",
   "update/src/guard/executors/kubernetes_worker_trust.py": "0abc161bc3c57e74342b25ef2049734568a4bbddb830cad501681106a0f0866a",
   "update/src/guard/executors/lab_activation.py": "05a711db775e19b30f551b05a17e90bd6169621fbf339e84946f9a2d256dfa9f",
   "update/src/guard/executors/lifecycle_capture.py": "e6de0699f33dc06408a91e5c3ac5211c6e65b44e8eb1ed1d7d691dc2a0717524",

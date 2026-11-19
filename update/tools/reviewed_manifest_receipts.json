@@ -980,6 +980,11 @@
       "manifest_sha256": "8abb2a392c9dcf46c95a68efaedbbcd60f7120b73fd04601c66c64fc02af1d81",
       "reviewed_by": "Codex / SUP-15 and SUP-16 prebound prepared-role and producer integrity / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T12:50:05+00:00"
+    },
+    {
+      "manifest_sha256": "e4c91db25dffd3fe08a515dcc48b7148c0b30978e845d6bfe4b8ebd3a638abdc",
+      "reviewed_by": "Codex / paired supply role readiness and REQ-02 partial record / SUP-06 provenance / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T16:25:57+00:00"
     }
   ]
 }

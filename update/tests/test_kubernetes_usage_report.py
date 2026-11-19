@@ -283,6 +283,39 @@ class LocalUsageWorld(FullWorld):
                 'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
 
 
+@pytest.mark.parametrize('case,error', [
+    ('ordinary', None),
+    ('foreign-model-revision', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('over-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('factory-target-changed', 'KUBERNETES_USAGE_CONFIGURATION_INVALID'),
+])
+def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path, monkeypatch, case, error):
+    def forbidden(*args, **kwargs):
+        pytest.fail('OBS-04 preparation must not contact the target or start a reader')
+
+    monkeypatch.setattr(KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(module.KubernetesUsageReportExecutor, '_reader', forbidden)
+    env, target = full_inputs()
+    target['lab'] = False
+    if case == 'foreign-model-revision':
+        target['model_mapping']['revision'] = ('1' if env.model.revision == '0' * 40 else '0') * 40
+    raw = canonical_json(target)
+    path = tmp_path / 'saved-target.json'
+    path.write_bytes(raw)
+    digest = sha256_hex(raw)
+    cfg = {'target': str(path), 'local_observation_only': True,
+           'max_duration_seconds': 301 if case == 'over-budget' else 30}
+    executor = module.kubernetes_boundary_egress(
+        cfg, expected_target_sha256='f' * 64 if case == 'factory-target-changed' else digest)
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['OBS-04']
+    if error is None:
+        executor.prepared_local_observation(check, env, LOCAL_VALUES, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_local_observation(check, env, LOCAL_VALUES, expected_target_sha256=digest)
+
+
 @pytest.mark.parametrize('mode,completed,collected,verdict', [
     ('absent', True, True, 'UNKNOWN'), ('new', True, True, 'FAIL'), ('one-unreadable', True, False, 'UNKNOWN'),
     ('all-unreadable', False, False, 'UNKNOWN'), ('optout-missing', False, False, 'UNKNOWN'),

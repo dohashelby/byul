@@ -325,6 +325,45 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                 or not set(values["usage_report_paths"]) <= _REPORT_PATHS):
             raise ValueError("KUBERNETES_USAGE_LOCAL_SCOPE_UNSUPPORTED")
 
+    def _validate_targets(self, target, sink, env, *, expected_target_sha256=None):
+        local = self.cfg.get("local_observation_only") is True
+        pins = [pin for pin in (self.expected_target, expected_target_sha256) if pin is not None]
+        if (target.get("lab") is not (not local) or local and not pins
+                or sink is not None and sink.get("run_id") != target["kubernetes"]["run_id"]):
+            raise ValueError
+        if pins:
+            digest = sha256_hex(canonical_json(target))
+            if any(pin != digest for pin in pins):
+                raise ValueError
+        if sink is not None:
+            validate_capture_target(sink, env)
+        return local
+
+    def _transport(self, target, env, duration):
+        return KubernetesHTTP(target, env, duration=duration, binary=self.cfg.get("kubectl_binary", "kubectl"),
+                              runner=self.runner, profile=USAGE_CONTROL_PROFILE)
+
+    def prepared_local_observation(self, check, env, values, *, expected_target_sha256=None):
+        """Qualify only the saved OBS-04 local target declaration, without a collection."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        try:
+            self.validate_policy(check, values)
+            if self.cfg.get("local_observation_only") is not True:
+                raise ValueError
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            if type(target) is not dict:
+                raise ValueError
+            self._validate_targets(target, None, env, expected_target_sha256=expected_target_sha256)
+        except (KeyError, TypeError, ValueError, OSError):
+            raise ValueError("KUBERNETES_USAGE_CONFIGURATION_INVALID") from None
+        try:
+            self._transport(target, env, self.cfg.get("max_duration_seconds", 120))
+        except KubernetesBindingError as error:
+            raise ValueError(str(error)) from None
+        except OverflowError:
+            raise ValueError("KUBERNETES_USAGE_CONFIGURATION_INVALID") from None
+
     def run(self, check, env, policy_values, adapter, workdir):
         try:
             if getattr(check, "collection_profile", None) not in PROFILES or adapter is None:
@@ -335,19 +374,11 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                     return strict_json(stream.read(65537), limit=65536)
             target = load("target")
             sink = load("sink_target") if "sink_target" in self.cfg else None
-            local = self.cfg.get("local_observation_only") is True
-            expected_lab = not local
-            if (target.get("lab") is not expected_lab or local and self.expected_target is None
-                    or sink is not None and sink.get("run_id") != target["kubernetes"]["run_id"]
-                    or self.expected_target is not None and sha256_hex(canonical_json(target)) != self.expected_target):
-                raise ValueError
-            if sink is not None:
-                validate_capture_target(sink, env)
+            local = self._validate_targets(target, sink, env)
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("KUBERNETES_USAGE_CONFIGURATION_INVALID") from None
         duration = self.cfg.get("max_duration_seconds", 120)
-        transport = KubernetesHTTP(target, env, duration=duration, binary=self.cfg.get("kubectl_binary", "kubectl"),
-                                   runner=self.runner, profile=USAGE_CONTROL_PROFILE)
+        transport = self._transport(target, env, duration)
         ctx = Ctx(check=check, env=env, adapter=adapter, target=target, policy_values=policy_values,
                   timeout=10.0, allow_mutating=False, keys={}, secrets=[], cprobe=_ControlAlias(transport), workdir=workdir, started=utcnow())
         ctx._usage_duration = duration
@@ -538,6 +569,11 @@ def kubernetes_boundary_egress(cfg, *, environ=None, expected_target_sha256=None
             if getattr(check, "collection_profile", None) in PROFILES:
                 return KubernetesUsageReportExecutor(self.cfg, environ=environ).validate_policy(check, values)
             return super().validate_policy(check, values)
+
+        def prepared_local_observation(self, check, env, values, *, expected_target_sha256=None):
+            executor = KubernetesUsageReportExecutor(self.cfg, runner=self.runner, environ=environ,
+                                                     expected_target_sha256=self.expected_target)
+            executor.prepared_local_observation(check, env, values, expected_target_sha256=expected_target_sha256)
 
         def run(self, check, env, policy_values, adapter, workdir):
             if getattr(check, "collection_profile", None) not in PROFILES:

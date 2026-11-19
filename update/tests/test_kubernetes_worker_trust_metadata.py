@@ -119,3 +119,38 @@ def test_worker_metadata_opt_in_never_activates_ipc_actor_scope(tmp_path, change
     with pytest.raises(ValueError):
         executor.run(check, env, VALUES, VllmAdapter(), tmp_path / 'work')
     assert not calls
+
+
+@pytest.mark.parametrize('case,error', [
+    ('ordinary', None),
+    ('foreign-model-revision', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('over-budget', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+    ('captured-target-changed', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+])
+def test_worker_preparation_checks_saved_target_without_collecting(tmp_path, monkeypatch, case, error):
+    from guard.runtime.engine_http import KubernetesHTTP
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('PLT-06 preparation must not contact the target or read processes')
+
+    monkeypatch.setattr(KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(KubernetesHTTP, 'process_snapshot', forbidden)
+    env, target = full_inputs()
+    target['lab'] = False
+    if case == 'foreign-model-revision':
+        target['model_mapping']['revision'] = ('1' if env.model.revision == '0' * 40 else '0') * 40
+    raw = canonical_json(target)
+    path = tmp_path / 'saved-target.json'
+    path.write_bytes(raw)
+    digest = sha256_hex(raw)
+    cfg = {'target': str(path), 'worker_trust_metadata_only': True,
+           'max_duration_seconds': 301 if case == 'over-budget' else 30}
+    executor = KubernetesIPCProductExecutor(cfg, runner=forbidden, expected_target_sha256=digest)
+    expected = 'f' * 64 if case == 'captured-target-changed' else digest
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['PLT-06']
+    if error is None:
+        executor.prepared_worker_trust(check, env, VALUES, expected_target_sha256=expected)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_worker_trust(check, env, VALUES, expected_target_sha256=expected)

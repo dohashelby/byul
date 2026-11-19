@@ -5,7 +5,7 @@ from pathlib import Path
 import math
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
-from guard.runtime.engine_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
+from guard.runtime.engine_http import KubernetesBindingError,KubernetesHTTP,REQUEST_BINDING_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from . import kubernetes_ipc_metadata as path_metadata
 from . import kubernetes_worker_trust as worker_trust
@@ -46,24 +46,59 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
                 total_timeout=self.cfg['total_timeout'])
         except (KeyError,TypeError):raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None
 
+    def _duration(self, env, metadata_only):
+        duration = self.cfg.get('max_duration_seconds', 120)
+        minimum = 0 if metadata_only else self.cfg['total_timeout'] + 2 + NORMAL_TIMEOUT
+        if ((not metadata_only and set(self.cfg) - CONFIG_KEYS)
+                or type(duration) not in (int, float) or not math.isfinite(duration) or not minimum < duration <= 300
+                or not supports(env.engine.name, env.engine.version, 'unix_ipc')
+                or any(type(value) is not str or not value for value in (env.model.id, env.model.revision))):
+            raise ValueError
+        return duration
+
+    def _validate_target(self, target, metadata_only, *, expected_target_sha256=None):
+        pins = [pin for pin in (self.expected_target, expected_target_sha256) if pin is not None]
+        if target.get('lab') is not (not metadata_only) or metadata_only and not pins:
+            raise ValueError
+        if pins:
+            digest = sha256_hex(canonical_json(target))
+            if any(pin != digest for pin in pins):
+                raise ValueError
+
+    def _transport(self, target, env, duration):
+        return KubernetesHTTP(target, env, duration=duration, binary=self.cfg.get('kubectl_binary', 'kubectl'),
+                              runner=self.runner, profile=REQUEST_BINDING_PROFILE)
+
+    def prepared_worker_trust(self, check, env, values, *, expected_target_sha256=None):
+        """Qualify only the saved PLT-06 marker metadata declaration, without a collection."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        if not self.worker_metadata:
+            raise ValueError('KUBERNETES_WORKER_TRUST_METADATA_CONFIGURATION_INVALID')
+        self.validate_policy(check, values)
+        try:
+            duration = self._duration(env, metadata_only=True)
+            target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+            if type(target) is not dict:
+                raise ValueError
+            self._validate_target(target, metadata_only=True, expected_target_sha256=expected_target_sha256)
+        except (KeyError, ValueError, TypeError, OverflowError, OSError, RuntimeError):
+            raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None
+        try:
+            self._transport(target, env, duration)
+        except KubernetesBindingError as error:
+            raise ValueError(str(error)) from None
+
     def run(self,check,env,policy_values,adapter,workdir):
         self.validate_policy(check,policy_values)
         metadata_only = self.worker_metadata or self.path_metadata
         try:
-            duration=self.cfg.get('max_duration_seconds',120)
-            minimum=0 if metadata_only else self.cfg['total_timeout']+2+NORMAL_TIMEOUT
-            if ((not metadata_only and set(self.cfg)-CONFIG_KEYS) or adapter is None
-                    or type(duration) not in (int,float) or not math.isfinite(duration) or not minimum<duration<=300
-                    or not supports(env.engine.name, env.engine.version, 'unix_ipc')
-                    or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
+            if adapter is None:raise ValueError
+            duration = self._duration(env, metadata_only)
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            expected_lab=not metadata_only
-            if (target.get('lab') is not expected_lab or metadata_only and self.expected_target is None
-                    or self.expected_target is not None
-                    and sha256_hex(canonical_json(target))!=self.expected_target):raise ValueError
+            self._validate_target(target, metadata_only)
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None
-        transport=KubernetesHTTP(target,env,duration=duration,binary=self.cfg.get('kubectl_binary','kubectl'),
-            runner=self.runner,profile=REQUEST_BINDING_PROFILE)
+        transport = self._transport(target, env, duration)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=NORMAL_TIMEOUT,
             allow_mutating=False,keys={},secrets=[],cprobe=transport,workdir=workdir,started=utcnow(),http_probe_profile=REQUEST_BINDING_PROFILE)
         return self._finish(ctx)

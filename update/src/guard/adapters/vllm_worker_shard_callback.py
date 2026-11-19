@@ -1,8 +1,8 @@
 """SUP-06: worker·rank별 배정 shard·필수 shard·적재 완료/실패·READY 후보 (개발 담당, B 의존 반환 5, 2026-11-08).
 
-vLLM 0.30.0과 0.31.0의 두 모듈을 원 소스 해시로 고정해 감싼다. 소스 고정값은 GPU 생산자 등록이 아니다.
-- `model_loader.default_loader`(9c9d54b1… / d17ab549…): `DefaultModelLoader._prepare_weights`의 반환(이 프로세스가 읽을 가중치 파일 목록과
-  index 파일)과 `DefaultModelLoader.track_weights_loading`의 반환/예외(가중치 적재 직후 불리며 누락 텐서가 있으면 예외를 낸다).
+vLLM 0.30.0과 0.31.0의 두 모듈을 설치 소스 해시로 고정해 감싼다. GPU 생산자 등록에는 실제 TP2 관측이 필요하다.
+- `model_loader.default_loader`(9c9d54b1… / d17ab549…): `DefaultModelLoader._prepare_weights`의 반환(가중치 파일 목록과 제공된 index 파일)과
+  `DefaultModelLoader.track_weights_loading`의 반환/예외(가중치 적재 직후 불리며 누락 텐서가 있으면 예외를 낸다).
 - `v1.executor.multiproc_executor`(3ed0149a… / 11a15543…): `WorkerProc.monitor_death_pipe`의 호출.
   worker 생성(모델 적재 포함)이 끝난 뒤 READY를 보내기 직전에 항상 불린다(READY 후보).
 `load_weights`·`WorkerProc.__init__`은 `@instrument` 추적 장식자로 감싸여 원 코드 자격을 얻지 못하므로 감싸지 않는다(k3d 실측).

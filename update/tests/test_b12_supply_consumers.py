@@ -156,7 +156,8 @@ def test_optional_worker_file_is_consumed_before_transport_failure(tmp_path, mon
              "target_sha256": sha256_hex(canonical_json(target)), "prepared_sha256": values["supply_normal_prepared_sha256"]}
     raw = fixture("worker_shard_k3d_20261108.json")["cases"]["sharded"]["rows"]
     record, _ = worker_shard_producer.record(raw, pod=POD, **scope)
-    path = tmp_path / "worker-record.json"; path.write_bytes(canonical_json(record))
+    path = tmp_path / "worker-record.json"
+    path.write_bytes(canonical_json(record) + b"\n")
     settings = {"path": str(path), "sha256": sha256_hex(path.read_bytes()), "scope": scope}
     if damaged:
         settings["sha256"] = "0" * 64
@@ -164,11 +165,38 @@ def test_optional_worker_file_is_consumed_before_transport_failure(tmp_path, mon
     # Simulate only unavailable pre-existing runtime assets, never an A source
     # gate or producer registration. A valid role/reader is not claimed.
     monkeypatch.setattr(executor, "_load", lambda *args: (target, {}, scope["target_sha256"]))
-    part = executor._collect_role(PACK.checks["SUP-06"], env, values, "normal")
+    check = PACK.checks["SUP-06"]
+    part = executor._collect_role(check, env, values, "normal")
+    assert "SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE" in part["row"]["diagnostic_codes"]
     if damaged:
         assert part["row"]["worker_shard_input_error"] == {"type": "ValueError", "message": "B_COMMON_INPUT_BYTES_MISMATCH"}
         assert "B_WORKER_SHARD_INPUT_UNAVAILABLE" in part["row"]["diagnostic_codes"]
-    else:
-        assert part["worker_shards"]["supported"] is False
-        assert part["row"]["worker_shard_input"]["load_facts"][0]["load_completed"] is True
-    assert "SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE" in part["row"]["diagnostic_codes"]
+        assert "worker_shard_input" not in part["row"]
+        return
+
+    challenge = executor._collect_role(check, env, values, "challenge", role_inputs={"challenge": None})
+    draft = executor._draft(check, env, values, tmp_path, utcnow(), {"normal": part, "challenge": challenge})
+    evd = Evidence(id="EVD-B12-SHARD", data_origin=draft.data_origin, plan=dummy_ref("PLAN"),
+        environment=env.ref(), check_id=check.id, side="single", execution={"status": draft.status},
+        **_normalize(check, draft)).seal()
+    retained = evd.observations["supply_boot_sessions"].value[0]["worker_shard_input"]
+    assert retained["supported"] is False and retained["producer_authenticated"] is False
+    assert retained["load_facts"][0]["load_completed"] is True
+    assert retained["record_sha256"] == sha256_hex(canonical_json(record)) != settings["sha256"]
+    source = retained["reported_source"]
+    assert source["file_sha256"] == settings["sha256"]
+    assert source["producer"] == record["producer"]
+    assert source["owner_binding_verified"] is False
+    assert all(source[key] == scope[key] for key in ("environment_ref", "target_sha256", "prepared_sha256"))
+    assert source["session_sha256"] == sha256_hex(scope["session"].encode())
+    binding = record["bindings"][0]
+    assert source["bindings"][0] == {
+        "generation_sha256": sha256_hex(canonical_json([binding[key] for key in ("pod_uid", "container_id", "restart_count")])),
+        **{key: binding[key] for key in ("worker_pid", "start_ticks", "rank")},
+    }
+    assert source["events"] == record["events"]
+    saved = next(artifact for artifact in draft.artifacts if artifact.name == "supply_boot_summary.json")
+    assert json.loads(saved.path.read_bytes())["sessions"][0]["worker_shard_input"] == retained
+    result = judge_evidence(check, evd, policy(PACK.ref(), values={check.id: values}), utcnow())
+    assert evd.data_origin.value == "EXAMPLE" and evd.execution.status.value == "ABORTED"
+    assert result.verdicts.security.value == "UNKNOWN"

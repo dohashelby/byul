@@ -256,12 +256,33 @@ class KubernetesSupplyBootExecutor:
             try:
                 if check.id != "SUP-06":
                     raise ValueError("B_WORKER_SHARD_CHECK_UNSUPPORTED")
-                record, scope = load_input(self.cfg[role]["worker_shard_input"],
+                settings = self.cfg[role]["worker_shard_input"]
+                record, scope = load_input(settings,
                     environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
                     prepared_sha256=values[f"supply_{role}_prepared_sha256"])
                 result["worker_shards"] = worker_shards(record, scope, values)
-                row["worker_shard_input"] = {**result["worker_shards"], "data_origin": "EXAMPLE",
-                                            "record_sha256": sha256_hex(canonical_json(record))}
+                # Preserve the validated record's own worker/event binding. The
+                # local file check does not independently verify its live owner.
+                row["worker_shard_input"] = {
+                    **result["worker_shards"], "data_origin": "EXAMPLE",
+                    "record_sha256": sha256_hex(canonical_json(record)),
+                    "reported_source": {
+                        "schema": record["schema"], "producer": record["producer"],
+                        "file_sha256": settings["sha256"],
+                        "environment_ref": scope["environment_ref"],
+                        "target_sha256": scope["target_sha256"], "prepared_sha256": scope["prepared_sha256"],
+                        "session_sha256": sha256_hex(scope["session"].encode()),
+                        "owner_binding_verified": False,
+                        "bindings": [
+                            {"generation_sha256": sha256_hex(canonical_json([
+                                binding["pod_uid"], binding["container_id"], binding["restart_count"]])),
+                             "worker_pid": binding["worker_pid"], "start_ticks": binding["start_ticks"],
+                             "rank": binding["rank"]}
+                            for binding in record["bindings"]
+                        ],
+                        "events": record["events"],
+                    },
+                }
             except (KeyError, TypeError, ValueError, OSError) as exc:
                 row["diagnostic_codes"].append("B_WORKER_SHARD_INPUT_UNAVAILABLE")
                 row["worker_shard_input_error"] = {"type": type(exc).__name__, "message": str(exc)[:1024]}

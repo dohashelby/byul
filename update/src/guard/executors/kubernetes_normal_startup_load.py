@@ -132,7 +132,8 @@ def _verify_launch(target, container, source):
     mounts = [PurePosixPath(row["mountPath"]) for row in container.get("volumeMounts", [])]
     if (container.get("command") != source["entrypoint"]
             or type(args) is not list or args != target["comparison_config"]["launch"]["argv"]
-            or any(arg.partition("=")[0] in source["forbidden_args"] for arg in args)
+            or any(arg.partition("=")[0].replace("_", "-") in source["forbidden_args"]
+                   for arg in args if arg.startswith("--"))
             or container.get("envFrom") or container.get("tty", False) is not False
             or not source["required_env"].keys() <= selected_env.keys()
             or any(mount.is_relative_to(path) or path.is_relative_to(mount) for mount in mounts for path in protected)):

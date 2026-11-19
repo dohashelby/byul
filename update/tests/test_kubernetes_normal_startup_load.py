@@ -24,6 +24,7 @@ VALUES = {"supply_stage_budget_ms": {"resolve": 60000, "load": 600000},
           "supply_total_budget_ms": 1800000}
 SOURCE_FILES = ("v1/worker/gpu_model_runner.py", "utils/mem_utils.py", "platforms/cuda.py", "logger.py",
                 "logging_utils/formatter.py")
+CUSTOM_ARGS = {"custom-args": "--logging-config=/example", "custom-args-underscored": "--logging_config=/example"}
 
 
 class Adapter:
@@ -75,8 +76,8 @@ class StartupWorld(World):
             container["volumeMounts"][0]["mountPath"] = ROOT
         if self.fault == "v2-runner":
             container["env"][0]["value"] = "1"
-        if self.fault == "custom-args":
-            container["args"] = [*ARGS, "--logging-config=/example"]
+        if self.fault in CUSTOM_ARGS:
+            container["args"] = [*ARGS, CUSTOM_ARGS[self.fault]]
 
     def runner(self, argv, **kwargs):
         assert argv[:2] == ["kubectl", "--context=fixture-context"]
@@ -119,7 +120,7 @@ def _inputs(tmp_path, version, fault=None):
     env = env.model_copy(update={"runtime": env.runtime.model_copy(update={"tp_size": 1, "pp_size": 1, "dp_size": 1})}).seal()
     target["environment_ref"] = env.ref().model_dump(mode="json")
     target["kubernetes"]["engine"]["started_at"] = STARTED
-    target["comparison_config"] = {"launch": {"argv": [*ARGS, "--logging-config=/example"] if fault == "custom-args" else ARGS}}
+    target["comparison_config"] = {"launch": {"argv": [*ARGS, CUSTOM_ARGS[fault]] if fault in CUSTOM_ARGS else ARGS}}
     adapter = Adapter(5354 if modern else 5416)
     world = StartupWorld(target, adapter, modern, fault)
     return env, target, path, world
@@ -147,8 +148,10 @@ def _run(tmp_path, version, fault=None):
         assert not world.log_calls and not world.hash_calls
         return
     draft = executor.run(check, env, VALUES, world.adapter, tmp_path / "work")
-    if fault in {"source-mount", "v2-runner", "wrong-source", "custom-args"}:
+    if fault in {"source-mount", "v2-runner", "wrong-source", *CUSTOM_ARGS}:
         assert not world.log_calls
+        if fault in CUSTOM_ARGS:
+            assert not world.hash_calls
     else:
         assert world.log_calls == [len(world.raw)]
     raw = draft.artifacts[0].path.read_text()
@@ -177,7 +180,7 @@ def test_lif01_observes_only_current_startup_elapsed_and_reported_gpu_delta(tmp_
     assert RuleTableJudge().judge(check, evd, check.judge.params, VALUES).verdicts["security"] == Verdict.UNKNOWN
 
 
-@pytest.mark.parametrize("fault", ["source-mount", "v2-runner", "wrong-source", "custom-args", "changed-prefix", "short-replay",
+@pytest.mark.parametrize("fault", ["source-mount", "v2-runner", "wrong-source", *CUSTOM_ARGS, "changed-prefix", "short-replay",
                                    "missing-newline", "truncated", "duplicate", "out-of-window", "wrong-call-site",
                                    "owner-changed", "source-changed", "ready-changed"])
 def test_lif01_rejects_unbound_sources_without_a_load_observation(tmp_path, fault):

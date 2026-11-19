@@ -56,6 +56,11 @@ def validate_record(packet, *, environment_ref, session):
     return packet
 
 
+def selected_record_timeline(packet, required_records):
+    """Keep only closed, validated status rows for policy-selected record IDs."""
+    return [row for row in packet["events"] if row["record"] in required_records]
+
+
 def evaluate(packet, values):
     """기록별 정상 도착과 누락 처리 위반을 나눈다. 시각 오차를 넘긴 행은 판단하지 않는다."""
     violations, unverified, missing, normal = [], [], [], []
@@ -108,6 +113,7 @@ def collect(ctx, docker, cfg):
     summary = {"profile": PROFILE, "diagnostic_codes": diagnostics,
                "record_sha256": sha256_hex(canonical_json(packet)) if packet is not None else None,
                "file_sha256": provenance["capture_sha256"] if provenance else None,
+               "selected_record_timeline": selected_record_timeline(packet, values["required_records"]) if collected else None,
                "fixture": {"profile": PROFILE, "schema": SCHEMA}}
     normal = {"attempted": collected, "succeeded": None, "detail": "상태 기록의 정상 도착은 생산자 미인증 주장이다."}
     return obs, normal, [{"step": step, "attempted": False} for step in ctx.check.challenge_steps], summary

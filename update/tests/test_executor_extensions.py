@@ -474,6 +474,45 @@ def test_obs11_unverified_timeline_preserves_an_independent_observed_violation(t
     assert result.verdicts.security.value == "FAIL"
 
 
+def test_obs11_docker_retains_selected_status_timestamps_and_original_byte_hash(tmp_path):
+    from guard.models import canonical_json, sha256_hex
+    from tests.test_native_observations import CaptureWorld, IMAGE
+
+    class Collector(CaptureWorld):
+        def inspect_json(self, container, timeout):
+            detail = super().inspect_json(container, timeout)
+            detail["Config"]["Labels"]["guard.run"] = "run"
+            return detail
+
+    env = environment(model={"id": "test"})
+    normal = gap_row(arrived_at_ms=1050)
+    unverified = gap_row(arrived_at_ms=999)
+    unselected = gap_row(record="EXAMPLE-unselected", alert_at_ms=9486)
+    packet = {"schema": log_collection_gap.SCHEMA, "session": GAP["collection_session"],
+              "environment_ref": env.ref().model_dump(mode="json"), "events": [normal, unverified, unselected]}
+    collector = Collector(packet)
+
+    def unexpected_probe(*args):
+        pytest.fail("collector status receipt should not send requests")
+
+    evidence, result = pipeline(tmp_path, "OBS-11",
+        lambda cfg: LogIntegrityExecutor(cfg, container_probe=unexpected_probe, docker=collector),
+        GAP, extra_cfg={"collection_status": {"container": "collector", "image": IMAGE}})
+    artifact, = evidence.artifacts
+    saved = (tmp_path / "store" / artifact.path).read_bytes()
+    summary = json.loads(saved.splitlines()[-1])
+
+    assert collector.calls == ["inspect", "read", "inspect"]
+    assert summary["selected_record_timeline"] == [normal, unverified]
+    assert summary["file_sha256"] == sha256_hex(json.dumps(packet).encode())
+    assert summary["record_sha256"] == sha256_hex(canonical_json(packet)) != summary["file_sha256"]
+    assert artifact.sha256 == sha256_hex(saved) and b"EXAMPLE-unselected" not in saved
+    assert evidence.observations["collection_normal_arrivals"].value == ["access"]
+    assert evidence.observations["collection_records_unverified"].value == ["access"]
+    assert evidence.observations["collection_producer_authenticated"].value is False
+    assert result.verdicts.security.value == "UNKNOWN"
+
+
 def test_obs11_unavailable_status_record_is_unknown(tmp_path, monkeypatch):
     evd, result = gap_run(tmp_path, monkeypatch, None)
     assert evd.observations["collection_gap_violations"].collected is False and result.verdicts.security.value == "UNKNOWN"

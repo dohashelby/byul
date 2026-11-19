@@ -294,7 +294,8 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         summary = {"profile": log_collection_gap.PROFILE, "diagnostic_codes": diagnostics,
                    "record_sha256": sha256_hex(canonical_json(packet)) if packet is not None else None,
                    "file_sha256": file_sha256, "source": "owned probe Pod /guard-collection/data/<session>/collection-status.json",
-                   "selected_record_timeline": [row for row in packet["events"] if row["record"] in values["required_records"]] if collected else None,
+                   "selected_record_timeline": log_collection_gap.selected_record_timeline(
+                       packet, values["required_records"]) if collected else None,
                    "producer_authenticated": False, "independent_event_verified": False,
                    "fixture": {"profile": log_collection_gap.PROFILE, "schema": log_collection_gap.SCHEMA}}
         normal = {"attempted": collected, "succeeded": None, "detail": "상태 기록의 정상 도착은 생산자 미인증 주장이다."}

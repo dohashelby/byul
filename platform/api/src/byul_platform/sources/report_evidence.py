@@ -9,6 +9,7 @@ from contextlib import closing
 from pathlib import Path
 
 from ..contracts import canonical_sha256
+from .report_rules import archived_check, archived_manifest, explain_rules
 
 
 def _object(conn, ref, kind):
@@ -132,8 +133,9 @@ def _observation_summary(evd, key):
     return {"key": key, "kind": "recorded"}
 
 
-def _decisions(view, result, evd):
-    traces = result.get("decision_trace")
+def _decisions(view, result, evd, traces=None):
+    if traces is None:
+        traces = result.get("decision_trace")
     if not isinstance(traces, dict) or evd.get("execution", {}).get("operator") is not None:
         return []
     verdicts = result.get("verdicts", {})
@@ -173,13 +175,18 @@ def enrich_report(report, vr, store: Path | None):
         return
     try:
         with closing(sqlite3.connect(store.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
-            _enrich(conn, report, vr)
+            _enrich(conn, report, vr, store.parent / "artifacts")
     except sqlite3.Error:
         # Old reports remain readable when the optional object store is unavailable.
         return
 
 
-def _enrich(conn, report, vr):
+def _enrich(conn, report, vr, artifacts):
+    from functools import lru_cache
+
+    @lru_cache(maxsize=16)
+    def manifest(pack_id, revision, sha):
+        return archived_manifest(artifacts, {"kind": "PACK", "id": pack_id, "revision": revision, "sha256": sha})
     sides = ("baseline", "candidate") if report["mode"] == "update" else ("single",)
     plan = _object(conn, vr.get("plan_ref"), "PLAN")
     refs = plan.get("inputs", {}).get("environments", [])
@@ -211,4 +218,15 @@ def _enrich(conn, report, vr):
                 if _observed(evd, key) is False
             ]
             view["finding"] = _finding(check["check_id"], view, result, evd)
-            view["decisions"] = _decisions(view, result, evd)
+            evidence_plan = _object(conn, evd.get("plan"), "PLAN")
+            inputs = evidence_plan.get("inputs", {})
+            ref = inputs.get("pack") or {}
+            policy_ref = inputs.get("policy")
+            traces = None
+            if ref.get("kind") == "PACK" and policy_ref in result.get("refs", []):
+                files = manifest(ref.get("id"), ref.get("revision"), ref.get("sha256"))
+                definition = archived_check(artifacts, files, check["check_id"])
+                policy = _object(conn, policy_ref, "POL")
+                if definition and policy:
+                    traces = explain_rules(definition, result, evd, policy)
+            view["decisions"] = _decisions(view, result, evd, traces)

@@ -119,15 +119,23 @@ describe("검증 보고서 화면", () => {
     mockApi({});
     const row = check("SUP-03", {
       headline: "UNKNOWN", baseline: null, candidate: null,
-      single: { ...side("UNKNOWN"), missing_observations: ["selected_template_sha256"], unverified_observations: ["template_consumer_verified"] },
+      single: { ...side("UNKNOWN"), functional: "UNKNOWN", missing_observations: ["selected_template_sha256"],
+        unverified_observations: ["template_consumer_verified"], decisions: (["security", "functional"] as const).map((axis) => ({
+          axis, verdict: "UNKNOWN", observations: [], unmet: [],
+          missing: ["selected_template_sha256"], policy_missing: ["internal_policy_key"], limits: ["no_pass_rule"],
+        })) },
     });
     const audit = { ...report, mode: "audit", checks: [row], targets: { single: { name: "sglang", version: "0.5.1" } } };
     renderAt("/update/results", "/update/results", <FullReport report={audit} rawChecks={null} selected="SUP-03" onSelect={() => {}} />);
     const drawer = within(screen.getByLabelText("상세"));
     expect(drawer.getByText("검증 대상 · sglang 0.5.1")).toBeTruthy();
     expect(drawer.getByText("보안 미확인")).toBeTruthy();
-    expect(drawer.getByText(/선택된 템플릿의 해시 관측이 누락/)).toBeTruthy();
+    expect(drawer.getByText(/수집 기록이 빠진 관측은 선택된 템플릿의 해시입니다/)).toBeTruthy();
     expect(drawer.getByText(/템플릿의 실제 소비 확인입니다/)).toBeTruthy();
+    expect(drawer.getAllByText(/선택된 템플릿의 해시입니다/)).toHaveLength(1);
+    expect(drawer.getAllByText(/보안·기능 — 이 축의 충족을 확인할 판정 규칙이 없습니다/)).toHaveLength(1);
+    expect(drawer.getByText(/필요한 정책 설정값 1개/)).toBeTruthy();
+    expect(drawer.getByText("상세 근거").closest("details")?.textContent).toContain("internal_policy_key");
   });
 
   it("평문 API 요청의 관측과 미확인 범위를 함께 표시한다", () => {
@@ -150,7 +158,8 @@ describe("검증 보고서 화면", () => {
     const row = check("REQ-01", {
       baseline: null, candidate: null, single: { ...side("PASS"), decisions: [
         { axis: "security", verdict: "PASS", criterion: "시험 대상에 보호 정책이 적용된다.",
-          observations: [{ key: "functional_probe_results", kind: "count", value: 2, operators: ["nonempty"] }],
+          observations: [{ key: "routes_tested", kind: "count", value: 2, operators: ["nonempty"] },
+            { key: "unknown_technical_key", kind: "recorded" }],
           missing: [], unmet: [], policy_missing: [], limits: [] },
         { axis: "performance", verdict: "UNKNOWN", observations: [], missing: [], unmet: [],
           policy_missing: [], limits: ["cpu_performance_unverified"] },
@@ -159,8 +168,13 @@ describe("검증 보고서 화면", () => {
     renderAt("/update/results", "/update/results", <FullReport report={{ ...report, mode: "audit", checks: [row] }} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
     const drawer = within(screen.getByLabelText("상세"));
     expect(drawer.getByRole("heading", { name: "검증 대상 · 보안 충족 근거" })).toBeTruthy();
-    expect(drawer.getByText(/정상 동작 시험 결과 · 2건 기록 · 항목이 기록됨/)).toBeTruthy();
-    expect(drawer.getByText("이 CPU 비교에서는 성능을 검증하지 않았습니다.")).toBeTruthy();
+    expect(drawer.getByText(/실제로 시험한 요청 경로 · 2건 기록 · 항목이 기록됨/)).toBeTruthy();
+    expect(drawer.getByText("성능 — 이 CPU 비교에서는 성능을 검증하지 않았습니다.")).toBeTruthy();
+    const details = drawer.getByText("상세 근거").closest("details")!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain("unknown_technical_key");
+    expect(Array.from(drawer.getByText(/실제로 시험한 요청 경로/).closest("ul")!.children)
+      .every((item) => !item.textContent?.includes("unknown_technical_key"))).toBe(true);
   });
 
   it("미확인 점검을 충족처럼 보이게 하지 않는다", () => {

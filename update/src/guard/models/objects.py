@@ -529,16 +529,6 @@ class ExceptionMark(Strict):
     expires_at: datetime
 
 
-class DecisionTrace(Strict):
-    observations: list[str] = Field(default_factory=list)
-    operators: dict[str, list[str]] = Field(default_factory=dict)
-    missing: list[str] = Field(default_factory=list)
-    unmet: list[str] = Field(default_factory=list)
-    policy_missing: list[str] = Field(default_factory=list)
-    limits: list[str] = Field(default_factory=list)
-    criterion: str | None = None
-
-
 class Result(GuardObject):
     kind: Literal[Kind.RES] = Kind.RES
     evidence: Ref
@@ -550,11 +540,6 @@ class Result(GuardObject):
     missing_observations: list[str] = Field(default_factory=list)
     exception: ExceptionMark | None = None
     verification_level: DataOrigin | None = None
-    decision_trace: dict[str, DecisionTrace] | None = None
-
-    @model_serializer(mode="wrap")
-    def _ser(self, handler):
-        return _drop_none(handler(self), ("decision_trace",))
 
 
 # --- 4.7 RPT -----------------------------------------------------------------

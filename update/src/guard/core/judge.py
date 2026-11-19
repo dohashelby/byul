@@ -29,7 +29,7 @@ from guard.models import (
     sha256_hex,
     weakest_origin,
 )
-from guard.models.objects import DecisionTrace, ExceptionMark, JudgeInfo, Verdicts
+from guard.models.objects import ExceptionMark, JudgeInfo, Verdicts
 from guard.store import Store
 
 _ALLOWED = {Verdict.PASS, Verdict.FAIL, Verdict.UNKNOWN}
@@ -89,7 +89,6 @@ def judge_evidence(
         o.key for o in check.required_observations if not (o.key in evd.observations and evd.observations[o.key].collected)
     )
     verdicts = {axis: Verdict.UNKNOWN for axis in AXES}
-    traces: dict[str, DecisionTrace] = {}
     judge_info = JudgeInfo(name="none", version="0", params_sha256=sha256_hex(canonical_json({})))
 
     # 판정기: 증거에 기록된 실행기의 기본 판정기가 있으면 그것, 없으면 CheckDef.judge
@@ -122,12 +121,10 @@ def judge_evidence(
                         reasons.append(f"{axis}: plugin returned {v.value}; treated as UNKNOWN")
                         v = Verdict.UNKNOWN
                     verdicts[axis] = v
-                traces = out.decision_trace
                 reasons.extend(out.reasons)
                 missing = sorted(set(missing) | set(out.missing_observations))
             except Exception:  # noqa: BLE001 - INV-15
                 # Never serialize arbitrary plugin exceptions into evidence reports.
-                traces = {}
                 reasons.append("JUDGE_PLUGIN_FAILURE")
                 # A later invalid field must not leave an earlier PASS in place.
                 # Already obtained FAIL remains independent of that collection gap.
@@ -139,24 +136,12 @@ def judge_evidence(
         for axis in AXES:
             if verdicts[axis] == Verdict.PASS and blocks:
                 verdicts[axis] = Verdict.UNKNOWN
-                trace = traces.get(axis)
-                if trace is not None:
-                    if evd.execution.status != ExecStatus.COMPLETED:
-                        trace.limits.append("execution_incomplete")
-                    if evd.normal_control.succeeded is not True or not evd.normal_control.attempted:
-                        trace.limits.append("normal_control_unverified")
-                    attempted = {challenge.step for challenge in evd.challenges if challenge.attempted}
-                    if any(step not in attempted for step in check.challenge_steps):
-                        trace.limits.append("challenge_incomplete")
-                    trace.missing.extend(missing)
                 reasons.append(f"{axis}: PASS withheld: {'; '.join(blocks)}")
             elif verdicts[axis] == Verdict.FAIL and blocks:
                 reasons.append(f"{axis}: FAIL kept despite: {'; '.join(blocks)}")
 
     if evd.comparability.cpu is not None:
         verdicts["performance"] = Verdict.UNKNOWN
-        if "performance" in traces:
-            traces["performance"].limits.append("cpu_performance_unverified")
         reasons.append("performance: explicit CPU comparison covers security/function only; performance unverified")
 
     mark, exc_reasons = _exception(check.id, policy, as_of)
@@ -181,7 +166,6 @@ def judge_evidence(
         missing_observations=missing,
         exception=mark,
         verification_level=level,
-        decision_trace=traces or None,
     ).seal()
 
 

@@ -235,6 +235,10 @@ const OBSERVATION_NAMES: Record<string, string> = {
   log_coverage_gaps: "로그에서 관측이 빠진 범위",
   process_scan_complete: "대상 프로세스 전체의 확인",
   routes_registered: "등록된 요청 경로",
+  routes_tested: "실제로 시험한 요청 경로",
+  direct_outcomes: "게이트웨이를 거치지 않은 요청의 처리 결과",
+  gateway_outcomes: "게이트웨이를 거친 요청의 처리 결과",
+  trusted_origin_reachable: "정상 호출 경로의 연결 여부",
   running_image_unapproved: "실행 이미지의 승인 목록 일치 여부",
   supply_execution_scope_complete: "실행 코드와 의존성 전체의 승인 여부",
   log_security_violations: "요청 입력이 신뢰 로그에 미치는 영향",
@@ -293,31 +297,14 @@ function decisionAxis(decision: NonNullable<ReportSide["decisions"]>[number]) {
 }
 
 function describeDecisionKeys(keys: string[]) {
-  return keys.map((key) => OBSERVATION_NAMES[key] ?? key).join(", ");
+  return keys.flatMap((key) => Object.hasOwn(OBSERVATION_NAMES, key) ? [OBSERVATION_NAMES[key]] : []).join(", ");
 }
 
 function RecordedDecisions({ side, target }: { side: ReportSide; target: string }) {
   const explainedAxis = side.finding && (isFunctionalFinding(side.finding) ? "functional" : "security");
-  const decisions = (side.decisions ?? []).filter((decision) => decision.axis !== explainedAxis || decision.verdict === "UNKNOWN");
+  const decisions = (side.decisions ?? []).filter((decision) => decision.axis !== explainedAxis && decision.verdict !== "UNKNOWN");
   return decisions.map((decision) => {
     const axis = decisionAxis(decision);
-    if (decision.verdict === "UNKNOWN") {
-      const limits = decision.limits.flatMap((code) => Object.hasOwn(DECISION_LIMITS, code) ? [DECISION_LIMITS[code]] : []);
-      const hasDetails = limits.length || decision.missing.length || decision.unmet.length || decision.policy_missing.length;
-      if (!hasDetails && (side.missing_observations?.length || side.unverified_observations?.length)) return null;
-      return (
-        <section key={decision.axis}>
-          <h4>{target} · {axis} 미확인 범위</h4>
-          <ul>
-            {limits.map((limit) => <li key={limit}>{limit}</li>)}
-            {decision.missing.length > 0 && <li>수집 기록이 빠진 관측은 {describeDecisionKeys(decision.missing)}입니다.</li>}
-            {decision.unmet.length > 0 && <li>충족 조건을 확인하지 못한 관측은 {describeDecisionKeys(decision.unmet)}입니다.</li>}
-            {decision.policy_missing.length > 0 && <li>필요한 정책 설정값이 기록되지 않았습니다 ({decision.policy_missing.join(", ")}).</li>}
-            {!hasDetails && <li>확인하지 못한 조건을 특정할 기록이 없습니다.</li>}
-          </ul>
-        </section>
-      );
-    }
     return (
       <section key={decision.axis}>
         <h4>{target} · {axis} {decision.verdict === "PASS" ? "충족 근거" : "미충족 근거"}</h4>
@@ -326,7 +313,7 @@ function RecordedDecisions({ side, target }: { side: ReportSide; target: string 
         <ul>
           {decision.observations.map(({ key, kind, value, operators }) => (
             <li key={key}>
-              {describeDecisionKeys([key])} · {kind === "boolean" ? (value ? "참으로 기록" : "거짓으로 기록")
+              {describeDecisionKeys([key]) || "판정에 사용된 관측값"} · {kind === "boolean" ? (value ? "참으로 기록" : "거짓으로 기록")
                 : kind === "count" ? `${value}건 기록` : kind === "number" ? `${value}로 기록` : "수집값 확인"}
               {operators?.flatMap((operator) => Object.hasOwn(OPERATOR_DESCRIPTIONS, operator)
                 ? [` · ${OPERATOR_DESCRIPTIONS[operator]}`] : []).join("")}
@@ -336,6 +323,31 @@ function RecordedDecisions({ side, target }: { side: ReportSide; target: string 
       </section>
     );
   });
+}
+
+function unconfirmedReasons(side: ReportSide) {
+  const unknown = side.decisions?.filter((decision) => decision.verdict === "UNKNOWN") ?? [];
+  const reasons = new Map<string, string[]>();
+  for (const decision of unknown) {
+    for (const code of new Set(decision.limits)) {
+      if (!Object.hasOwn(DECISION_LIMITS, code)) continue;
+      reasons.set(code, [...(reasons.get(code) ?? []), decisionAxis(decision)]);
+    }
+  }
+  const missing = [...new Set([...(side.missing_observations ?? []), ...unknown.flatMap((decision) => decision.missing)])];
+  const unverified = [...new Set([...(side.unverified_observations ?? []), ...unknown.flatMap((decision) => decision.unmet)])]
+    .filter((key) => !missing.includes(key));
+  const policy = new Set(unknown.flatMap((decision) => decision.policy_missing));
+  const messages = [...reasons].map(([code, axes]) => `${axes.join("·")} — ${DECISION_LIMITS[code]}`);
+  for (const [keys, description] of [[missing, "수집 기록이 빠진 관측"], [unverified, "추가 확인이 필요한 관측"]] as const) {
+    const names = describeDecisionKeys(keys);
+    if (names) messages.push(`${description}은 ${names}입니다.`);
+    const unnamed = keys.filter((key) => !Object.hasOwn(OBSERVATION_NAMES, key)).length;
+    if (unnamed) messages.push(`${description} ${unnamed}개를 상세 근거에서 확인할 수 있습니다.`);
+  }
+  if (policy.size) messages.push(`판정에 필요한 정책 설정값 ${policy.size}개가 기록되지 않았습니다.`);
+  if (unknown.length && !messages.length) messages.push("확인하지 못한 조건을 특정할 기록이 없습니다.");
+  return messages;
 }
 
 function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Report; raw: unknown; onClose: () => void }) {
@@ -399,19 +411,17 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
               {present.map((key) => (
                 <RecordedDecisions key={key} side={c[key]!} target={SIDE_LABEL[key]} />
               ))}
-              {present.some((key) => needsEvidenceNote(c[key]!) || c[key]?.missing_observations?.length || c[key]?.unverified_observations?.length) && (
+              {present.some((key) => needsEvidenceNote(c[key]!) || unconfirmedReasons(c[key]!).length) && (
                 <section>
                   <h4>미확인 범위</h4>
                   {present.map((key) => {
                     const side = c[key]!;
-                    const missing = side.missing_observations ?? [];
-                    const named = missing.flatMap((obs) => Object.hasOwn(OBSERVATION_NAMES, obs) ? [OBSERVATION_NAMES[obs]] : []);
-                    const unverified = side.unverified_observations?.map((obs) => OBSERVATION_NAMES[obs]).filter(Boolean) ?? [];
-                    if (missing.length || unverified.length) {
+                    const messages = unconfirmedReasons(side);
+                    if (messages.length) {
                       return (
                         <div key={key}>
-                          {missing.length > 0 && <p>{SIDE_LABEL[key]}에서 {named.length ? `${named.join(", ")} 관측이 누락되었습니다.` : "필수 관측이 누락되었습니다."}{named.length < missing.length && " 누락 항목의 원문은 상세 근거에 있습니다."}</p>}
-                          {unverified.length > 0 && <p>{SIDE_LABEL[key]}에서 추가 확인이 필요한 관측은 {unverified.join(", ")}입니다.</p>}
+                          <strong>{SIDE_LABEL[key]}</strong>
+                          <ul>{messages.map((message) => <li key={message}>{message}</li>)}</ul>
                         </div>
                       );
                     }
@@ -453,6 +463,8 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                       )}
                       {side.reasons.length > 0 && <JsonView value={side.reasons} />}
                       {!!side.missing_observations?.length && <JsonView value={side.missing_observations} />}
+                      {!!side.unverified_observations?.length && <JsonView value={side.unverified_observations} />}
+                      {!!side.decisions?.length && <JsonView value={side.decisions} />}
                     </div>
                   );
                 })}

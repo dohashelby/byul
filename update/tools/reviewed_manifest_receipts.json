@@ -975,6 +975,11 @@
       "manifest_sha256": "f8e6862cf8ddbd7a50da1bbb17f1445f7167bee4d1f8d1de24991b6cd98ae275",
       "reviewed_by": "Codex / REQ-13 prebound Gateway inputs, LIF-11 namespace observations and OBS-09 capture window / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T12:36:38+00:00"
+    },
+    {
+      "manifest_sha256": "8abb2a392c9dcf46c95a68efaedbbcd60f7120b73fd04601c66c64fc02af1d81",
+      "reviewed_by": "Codex / SUP-15 and SUP-16 prebound prepared-role and producer integrity / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T12:50:05+00:00"
     }
   ]
 }

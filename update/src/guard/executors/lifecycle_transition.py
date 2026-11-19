@@ -290,6 +290,11 @@ def project(samples, trials, *, retain_receipts=False):
     """
     facts = []; bindings = []; seen = set(); binding_seen = set(); missing = []
     request_ids = {t['request_id_sha256'] for t in trials}
+    planned_generations = {}
+    if retain_receipts:
+        for trial in trials:
+            request = trial['request_id_sha256']
+            planned_generations[request] = None if request in planned_generations else trial['generation']
     for sample_number, sample in enumerate(samples):
         packet = sample.get('native')
         if packet is None:
@@ -313,7 +318,7 @@ def project(samples, trials, *, retain_receipts=False):
         for domain_id, domain in index['domains'].items():
             for request in request_ids:
                 if retain_receipts:
-                    if request in ambiguous_requests:
+                    if request in ambiguous_requests or planned_generations[request] != sample['generation']:
                         continue
                     assignment, selection_event = _chat_assignment(domain, chat, request)
                     if assignment is None:

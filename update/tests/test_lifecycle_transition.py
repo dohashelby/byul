@@ -238,7 +238,7 @@ def test_lif05_normalization_keeps_observed_request_facts_and_transition_gaps(mo
     assert observed['activation_scope_complete']['value'] is False
 
 
-@pytest.mark.parametrize('case_kind', ['bound', 'owner-unbound', 'ambiguous-invocation'])
+@pytest.mark.parametrize('case_kind', ['bound', 'owner-unbound', 'ambiguous-invocation', 'wrong-generation'])
 def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_provenance(
         monkeypatch, tmp_path, group, native_target, writer_factory, case_kind):
     from guard.adapters import vllm_lifecycle_sensor as sensor
@@ -250,8 +250,9 @@ def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_pr
     from tests.test_lifecycle_sensor import RecordingObserver
 
     packets = {}
+    observed_generation = 'new' if case_kind == 'wrong-generation' else 'old'
     def observed_packet(generation, request):
-        if generation.key != 'old' or request is None:
+        if generation.key != observed_generation or request is None:
             return None
         if request not in packets:
             prepared = group.prepared
@@ -279,11 +280,12 @@ def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_pr
 
     executor, env, _ = harness(monkeypatch, failure='recovery', observed_packet=observed_packet)
     generations, _ = subject.load_generations({}, env, policy())
-    generations['old'].prepared = group.prepared
-    generations['old'].env = group.env
-    generations['old'].target = native_target
+    selected = generations[observed_generation]
+    selected.prepared = group.prepared
+    selected.env = group.env
+    selected.target = native_target
     for key, generation in generations.items():
-        if key != 'old':
+        if key != observed_generation:
             generation.target['example_generation'] = key
     manifest = [subject._manifest_row(g.key, g.env, g.target, g.prepared) for g in generations.values()]
     monkeypatch.setattr(subject, 'load_generations', lambda *args: (generations, manifest))
@@ -317,6 +319,12 @@ def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_pr
         assert selection['recording_sha256'] == source['recording_sha256']
     else:
         assert row['request_generation_bindings'] == []
+        assert row['request_configuration_facts'] == []
+        assert 'inflight:native_request_generation_unlinked' in observed['activation_missing']
+        if case_kind == 'wrong-generation':
+            assert any(event['phase'] == 'RETURN'
+                and event['metadata']['asgi_request_sha256'] == sha256_hex(request.encode())
+                for event in packet['request_selection_index']['events'])
     assert request.encode() not in canonical_json(evd.to_dict())
     judgment = judge_evidence(definition, evd, sealed_policy(pack.ref()), T0)
     assert evd.data_origin is DataOrigin.EXAMPLE and judgment.verdicts.security.value == 'UNKNOWN'

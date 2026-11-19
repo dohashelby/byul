@@ -310,6 +310,54 @@ def normal_sampling_inputs(tmp_path, version):
     return selected, value, definition, path
 
 
+@pytest.mark.parametrize(('version', 'damage'), [
+    ('0.30.0', None), ('0.31.0', None),
+    ('0.30.0', 'model'), ('0.31.0', 'schema'), ('0.31.0', 'duration'),
+    ('0.30.0', 'synthetic'), ('0.30.0', 'missing-pin'),
+    ('0.31.0', 'caller-pin'), ('0.31.0', 'executor-pin'),
+])
+def test_req10_prepares_only_the_saved_normal_target_without_building_requests(tmp_path, monkeypatch, version, damage):
+    from guard.executors import kubernetes_sampling as sampling
+    from guard.models import canonical_json, sha256_hex
+    from tools.mvp_versions import versions
+
+    env, target, check, path = normal_sampling_inputs(tmp_path, version)
+    image = next(item['image'] for item in versions().values() if item['version'] == version)
+    env = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': image})}).seal()
+    target['environment_ref'] = env.ref().model_dump(mode='json')
+    target['engine']['image_digest'] = image
+    target['kubernetes']['engine'].update(image=image, image_id=image)
+    cfg = {'target': str(path), 'normal_sampling_only': True}
+    if damage == 'model':
+        target['model_mapping']['revision'] = 'EXAMPLE-other-revision'
+    elif damage == 'schema':
+        target['schema'] = 'EXAMPLE-other-target'
+    elif damage == 'duration':
+        cfg['max_duration_seconds'] = 301
+    elif damage == 'synthetic':
+        target['synthetic'] = True
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    target_sha256 = sha256_hex(raw)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('REQ-10 declaration validation must not resolve role keys or construct or dispatch requests')
+
+    monkeypatch.setattr(sampling.SamplingValidationExecutor, 'keys', forbidden)
+    monkeypatch.setattr(sampling.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(sampling.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(sampling.KubernetesHTTP, 'declare_input_contract', forbidden)
+    executor = KubernetesSamplingExecutor(cfg, runner=forbidden,
+        expected_target_sha256='e' * 64 if damage == 'executor-pin' else None)
+    expected = None if damage == 'missing-pin' else 'f' * 64 if damage == 'caller-pin' else target_sha256
+    if damage is None:
+        executor.prepared_normal_sampling(check, env, APPROVED_NORMAL, expected_target_sha256=expected)
+        assert executor.keys() == {}
+    else:
+        with pytest.raises(ValueError, match='^KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED$'):
+            executor.prepared_normal_sampling(check, env, APPROVED_NORMAL, expected_target_sha256=expected)
+
+
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
 @pytest.mark.parametrize("owner_changed", [False, True])
 def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combination(tmp_path, version, owner_changed):

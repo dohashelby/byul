@@ -31,6 +31,11 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         self._kubectl_runner = runner
         self._expected_target_sha256 = expected_target_sha256
 
+    def keys(self):
+        if self.cfg.get(NORMAL_OPTION) is True:
+            return {}
+        return super().keys()
+
     def validate_configuration(self, check):
         if NORMAL_OPTION not in self.cfg:
             return super().validate_configuration(check)
@@ -60,19 +65,40 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
                 or len(set(codes)) != len(codes)):
             raise ValueError("KUBERNETES_SAMPLING_NORMAL_POLICY_INVALID")
 
+    def _normal_transport(self, target, env, *, expected_target_sha256=None):
+        if (not supports(env.engine.name, env.engine.version, "sampling") or type(target) is not dict
+                or target["lab"] is not False or target.get("synthetic") is True):
+            raise ValueError
+        target_sha = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self._expected_target_sha256, expected_target_sha256) if pin is not None]
+        if not pins or any(pin != target_sha for pin in pins):
+            raise ValueError
+        transport = KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 120),
+            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=INPUT_VALIDATION_PROFILE)
+        return target_sha, transport
+
+    def prepared_normal_sampling(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the saved normal control declaration without building or dispatching a request."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        if self.cfg.get(NORMAL_OPTION) is not True:
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_SCOPE_INVALID")
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            self._normal_transport(target, env, expected_target_sha256=expected_target_sha256)
+        except (KeyError, TypeError, ValueError, OSError, OverflowError, KubernetesBindingError):
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED") from None
+
     def _run_normal(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if (adapter is None or not supports(env.engine.name, env.engine.version, "sampling")
-                    or type(target) is not dict or target["lab"] is not False
-                    or target.get("synthetic") is True or self._expected_target_sha256 != target_sha):
+            if adapter is None:
                 raise ValueError
-            transport = KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 120),
-                binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=INPUT_VALIDATION_PROFILE)
+            target_sha, transport = self._normal_transport(target, env)
             options = values["allowed_sampling_options"]
             body = {"model": transport.api_model, "prompt": NORMAL_FIXTURE["prompt"],
                     **{key: NORMAL_OPTIONS[key] for key in options}}

@@ -46,7 +46,7 @@ def validate_sample(v,source_sha256=None):
     except (KeyError,TypeError,ValueError):raise ValueError('INITIALIZATION_SAMPLE_INVALID') from None
 
 
-def project(packet,limits):
+def project(packet,limits,*,source_sha256=None):
     result={'samples':[],'calls':[],'correspondence':[],'missing':[],
         'producer_authenticated':False,'whole_scope_complete':False,'failure_activation_verified':False,
         'all_preparation_stages_verified':False,'cross_phase_lineage_verified':False,'service_gate_verified':False}
@@ -56,7 +56,7 @@ def project(packet,limits):
         context=capture['records'][0]['payload']['context']
         for row in capture['records']:
             if row['event']!='INITIALIZATION':continue
-            value=row['payload'];validate_sample(value)
+            value=row['payload'];validate_sample(value,source_sha256=source_sha256)
             result['samples'].append({'recording':index,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],
                 **{k:context[k] for k in ('pid','start_ticks','boot_sha256','pid_namespace','time_namespace','time_offsets_sha256')},
                 'safe_file_claim_retained':True,'process_binding_verified':bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match')),

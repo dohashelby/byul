@@ -11,6 +11,7 @@ from guard.core.run import _normalize
 from guard.executors.kubernetes_normal_request_latency import KubernetesNormalRequestLatencyExecutor
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
+from guard.runtime.kubernetes_http import KubernetesHTTP
 from tests.builders import evidence
 from tests.test_gpu_a_run_inputs import UPDATE
 from tests.test_kubernetes_sampling import World, normal_sampling_inputs
@@ -124,3 +125,54 @@ def test_lif03_normal_rejects_unapproved_scope_before_transport(tmp_path, fault)
         expected_target_sha256=None if fault == "unbound" else sha256_hex(path.read_bytes()))
     with pytest.raises(ValueError, match="LIF03_NORMAL_(?:SCOPE_INVALID|TARGET_UNVERIFIED)"):
         executor.run(check, env, VALUES, VllmAdapter(), tmp_path / "work")
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("settings,error", [
+    ({}, None),
+    ({"max_duration_seconds": 12.5, "kubectl_binary": "example-kubectl", "request_timeout": 3.5}, None),
+    ({"max_duration_seconds": 0}, "^LIF03_NORMAL_TARGET_UNVERIFIED$"),
+    ({"max_duration_seconds": True}, "^LIF03_NORMAL_TARGET_UNVERIFIED$"),
+    ({"max_duration_seconds": 301}, "^LIF03_NORMAL_TARGET_UNVERIFIED$"),
+    ({"kubectl_binary": " "}, "^LIF03_NORMAL_TARGET_UNVERIFIED$"),
+    ({"request_timeout": 31}, "^request_timeout must be a finite number"),
+])
+def test_lif03_prepares_effective_settings_without_building_requests(tmp_path, monkeypatch, version, settings, error):
+    env, target, _, path = normal_sampling_inputs(tmp_path, version)
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["LIF-03"]
+
+    def no_request(*args, **kwargs):
+        pytest.fail("LIF-03 preparation must not build or dispatch requests")
+
+    monkeypatch.setattr(KubernetesHTTP, "declare_input_contract", no_request)
+    executor = KubernetesNormalRequestLatencyExecutor({"normal_request_latency_only": True,
+        "target": str(path), **settings}, runner=no_request)
+    digest = sha256_hex(raw)
+    if error is None:
+        executor.prepared_normal_request_latency(check, env, VALUES, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match=error):
+            executor.prepared_normal_request_latency(check, env, VALUES, expected_target_sha256=digest)
+
+
+@pytest.mark.parametrize("damage", ["wrong-model", "caller-pin", "executor-pin", "no-pin"])
+def test_lif03_prepares_only_the_selected_target(tmp_path, damage):
+    env, target, _, path = normal_sampling_inputs(tmp_path, "0.30.0")
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["LIF-03"]
+    if damage == "wrong-model":
+        target["model_mapping"]["revision"] = "another-revision"
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    digest = sha256_hex(raw)
+    wrong = sha256_hex(b"different-owned-target")
+
+    def no_request(*args, **kwargs):
+        pytest.fail("LIF-03 preparation must not dispatch")
+
+    executor = KubernetesNormalRequestLatencyExecutor({"normal_request_latency_only": True, "target": str(path)},
+        runner=no_request, expected_target_sha256=wrong if damage == "executor-pin" else None)
+    pin = {"caller-pin": wrong, "no-pin": None}.get(damage, digest)
+    with pytest.raises(ValueError, match="^LIF03_NORMAL_TARGET_UNVERIFIED$"):
+        executor.prepared_normal_request_latency(check, env, VALUES, expected_target_sha256=pin)

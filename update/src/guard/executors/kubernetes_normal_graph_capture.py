@@ -141,9 +141,15 @@ class KubernetesNormalGraphCaptureExecutor:
         try:
             target = strict_json(dependency(self.cfg["target"], None), limit=65536)
             adapter = get_provider(env.engine.name).adapter()
-            self._target_inputs(target, env, adapter, duration=self.cfg.get("max_duration_seconds", 20),
-                                expected_target_sha256=expected_target_sha256)
-            _verify_graph_argv(target["comparison_config"]["launch"]["argv"])
+            _, source, _, _, _ = self._target_inputs(
+                target, env, adapter, duration=self.cfg.get("max_duration_seconds", 20),
+                expected_target_sha256=expected_target_sha256,
+            )
+            args = target["comparison_config"]["launch"]["argv"]
+            _verify_graph_argv(args)
+            if any(arg.partition("=")[0].replace("_", "-") in source["forbidden_args"]
+                   for arg in args if arg.startswith("--")):
+                raise ValueError("LIF01_BOOT_LAUNCH_UNQUALIFIED")
         except (AttributeError, KeyError, OSError, OverflowError, TypeError, ValueError, KubernetesBindingError):
             raise ValueError("REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED") from None
 

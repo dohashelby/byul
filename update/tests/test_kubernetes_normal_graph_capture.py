@@ -142,7 +142,7 @@ def test_req20_rejects_nonstock_capture_options_before_reading_logs_or_sources(t
 @pytest.mark.parametrize("version,damage", [
     ("0.30.0", None), ("0.31.0", None), ("0.31.0", "duration"), ("0.30.0", "binary"),
     ("0.30.0", "missing-argv"), ("0.31.0", "invalid-argv"), ("0.31.0", "graph-override"),
-    ("0.30.0", "prefix"), ("0.31.0", "image"), ("0.30.0", "pin"),
+    ("0.30.0", "source-override"), ("0.30.0", "prefix"), ("0.31.0", "image"), ("0.30.0", "pin"),
 ])
 def test_req20_prepares_the_selected_boot_declaration_without_collection(tmp_path, version, damage):
     from tools.mvp_versions import versions
@@ -168,6 +168,8 @@ def test_req20_prepares_the_selected_boot_declaration_without_collection(tmp_pat
         target["comparison_config"]["launch"]["argv"] = [*ARGS, 1]
     elif damage == "graph-override":
         target["comparison_config"]["launch"]["argv"] = [*ARGS, "--compilation_config.cudagraph_mode=FULL"]
+    elif damage == "source-override":
+        target["comparison_config"]["launch"]["argv"] = [*ARGS, "--logging_config=/example"]
 
     raw = canonical_json(target)
     path.write_bytes(raw)

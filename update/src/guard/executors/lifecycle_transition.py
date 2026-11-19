@@ -22,6 +22,7 @@ from guard.adapters import vllm_worker_generation_sensor as generation_sensor
 from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor
 from guard.adapters import vllm_worker_generation_metadata as generation_metadata
 from guard.adapters import vllm_ready_endpoint_metadata as endpoint_metadata
+from guard.adapters.vllm_route_authentication import selection_index
 from guard.collectors.file import load_environment
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -243,7 +244,45 @@ def load_generations(cfg, env, values, check_id=None):
     return generations, manifest
 
 
-def project(samples, trials):
+def _record_receipt(recordings, event):
+    capture = recordings[event[0]]['capture']
+    provenance = capture['provenance']
+    context = capture['records'][0]['payload']['context']
+    return {'event': event, 'pid': context['pid'], 'start_ticks': context['start_ticks'],
+        'source_sha256': capture['records'][event[1]]['payload']['source_sha256'],
+        'recording_sha256': provenance['capture_sha256'],
+        'file_identity_sha256': sha256_hex(canonical_json(provenance['file_identity']))}
+
+
+def _chat_selection(recordings):
+    selection = selection_index(recordings)
+    if not selection['stored_index_complete']:
+        return [], set()
+    path = sha256_hex(b'/v1/chat/completions')
+    method = sha256_hex(b'POST')
+    chat = [row for row in selection['events']
+        if row['point'] == 'InputProcessor.assign_request_id' and row['phase'] == 'RETURN'
+        and row['metadata']['entry_path_sha256'] == path and row['metadata']['entry_method_sha256'] == method
+        and row['metadata']['request_id_observed'] is True and _sha(row['metadata']['selected_request_id_sha256'])]
+    return chat, set(selection['ambiguous_asgi_request_sha256'])
+
+
+def _chat_assignment(domain, chat, request):
+    selected = [row for row in chat if row['metadata']['asgi_request_sha256'] == request]
+    if len(selected) != 1:
+        return None, None
+    row = selected[0]
+    recording, seq = row['event']
+    internal = row['metadata']['selected_request_id_sha256']
+    if sum(other['event'][0] == recording and other['metadata']['selected_request_id_sha256'] == internal
+            for other in chat) != 1:
+        return None, None
+    assignments = [candidate for candidate in domain['assignments'] if candidate['internal_sha256'] == internal
+        and candidate['event'][0] == recording and candidate['event'][1] < seq]
+    return (assignments[0], row['event']) if len(assignments) == 1 else (None, None)
+
+
+def project(samples, trials, *, retain_receipts=False):
     """Rebuild the existing producer index from individually verified recordings.
 
     A configured model/revision is not consumed weights or cache identity. Keep the
@@ -262,23 +301,42 @@ def project(samples, trials):
             good = bool(capture and recording.get('session_owner_match') is True
                 and recording.get('listed_file_identity_match') is True and capture.get('process_context_verified') is True
                 and capture.get('provenance', {}).get('owner_binding_verified') is True)
+            if good and retain_receipts:
+                provenance = capture['provenance']
+                good = _sha(provenance.get('capture_sha256')) and type(provenance.get('file_identity')) is dict
             recordings.append(recording if good else {'capture': None})
         index = request_index(recordings)
+        if retain_receipts:
+            if not index['stored_record_index_complete']:
+                continue
+            chat, ambiguous_requests = _chat_selection(recordings)
         for domain_id, domain in index['domains'].items():
             for request in request_ids:
-                assignments = {a['internal_sha256'] for a in domain['assignments']
-                    if a.get('asgi_request_sha256') == request}
-                if len(assignments) != 1:
-                    continue
-                internal = next(iter(assignments))
+                if retain_receipts:
+                    if request in ambiguous_requests:
+                        continue
+                    assignment, selection_event = _chat_assignment(domain, chat, request)
+                    if assignment is None:
+                        continue
+                    internal = assignment['internal_sha256']
+                else:
+                    assignments = {a['internal_sha256'] for a in domain['assignments']
+                        if a.get('asgi_request_sha256') == request}
+                    if len(assignments) != 1:
+                        continue
+                    internal = next(iter(assignments))
                 binding_key = (sample['generation'], packet['session'], domain_id, request, internal)
                 if binding_key not in binding_seen:
                     binding_seen.add(binding_key)
-                    bindings.append({'generation': sample['generation'], 'session': packet['session'],
+                    binding = {'generation': sample['generation'], 'session': packet['session'],
                         'domain': domain_id, 'request_id_sha256': request, 'internal_request_sha256': internal,
-                        'sample': sample_number, 'actual_consumption_verified': False})
+                        'sample': sample_number, 'actual_consumption_verified': False}
+                    if retain_receipts:
+                        binding['source_receipt'] = _record_receipt(recordings, assignment['event'])
+                        binding['selection_source_receipt'] = _record_receipt(recordings, selection_event)
+                    bindings.append(binding)
                 for row in domain['model_observations']:
-                    if internal not in row['request_sha256']:
+                    if internal not in row['request_sha256'] or retain_receipts and row['event'][0] != assignment['event'][0]:
                         continue
                     metadata = row['metadata']
                     configured = [metadata.get('configured_model_sha256'), metadata.get('configured_revision_sha256')]
@@ -289,10 +347,13 @@ def project(samples, trials):
                     if key in seen:
                         continue
                     seen.add(key)
-                    facts.append({'generation': sample['generation'], 'session': packet['session'], 'domain': domain_id,
+                    fact = {'generation': sample['generation'], 'session': packet['session'], 'domain': domain_id,
                         'request_id_sha256': request, 'internal_request_sha256': internal,
                         'configured_generation': configured, 'point': row['point'], 'phase': row['phase'],
-                        'sample': sample_number, 'event': row['event'], 'actual_consumption_verified': False})
+                        'sample': sample_number, 'event': row['event'], 'actual_consumption_verified': False}
+                    if retain_receipts:
+                        fact['source_receipt'] = _record_receipt(recordings, row['event'])
+                    facts.append(fact)
         if not packet.get('recorded_files_covered'):
             missing.append(f"{sample['phase']}:{sample['generation']}:session_coverage_unavailable")
     grouped = {}
@@ -307,6 +368,30 @@ def project(samples, trials):
             missing.append(trial['case_id'] + ':native_request_generation_unlinked')
     return {'request_generation_bindings': bindings, 'request_configuration_facts': facts, 'request_configuration_conflicts': conflicts,
         'missing': sorted(set(missing)), 'actual_weights_cache_consumption_verified': False}
+
+
+def _canonical_live_observations(projection, trials, manifest, missing):
+    controls = []
+    for trial in trials:
+        transport = trial.get('transport', {})
+        requests = transport.get('requests', [])
+        if (trial['case_id'] in PHASES and trial['normal_shape_verified'] and trial.get('capture_complete') is True
+                and transport.get('collection_gap') is False and not transport.get('cleanup_errors')
+                and len(requests) == 1 and requests[0].get('binding_verified_before_after') is True):
+            controls.append({key: trial[key] for key in ('case_id', 'generation', 'request_id_sha256',
+                'started_at', 'finished_at', 'normal_shape_verified')})
+    if {row['case_id'] for row in controls} != set(PHASES):
+        missing = [*missing, 'selected_phase_normal_control_incomplete']
+    bindings = projection['request_generation_bindings']
+    facts = projection['request_configuration_facts']
+    if not facts:
+        missing = [*missing, 'selected_request_configuration_observation_unavailable']
+    steps = [{'step': 'passive-selected-transition-observation', 'prepared_scopes': manifest,
+        'normal_controls': controls, 'request_generation_bindings': bindings, 'request_configuration_facts': facts,
+        'request_configuration_conflict_candidates': projection['request_configuration_conflicts'],
+        'transition_activation_verified': False, 'actual_consumption_verified': False}] if controls or bindings or facts else []
+    return {'activation_steps': steps, 'activation_missing': sorted(set(missing)),
+        'activation_violations': [], 'activation_scope_complete': False}
 
 
 class LifecycleTransitionExecutor:
@@ -516,7 +601,7 @@ class LifecycleTransitionExecutor:
             except Exception:
                 cleanup.append('TRANSITION_READER_REPORT_UNAVAILABLE:' + generation.key)
         sample('sealed', retired_generation=retired_generation)
-        projection = project(samples, trials)
+        projection = project(samples, trials, retain_receipts=check.id == 'LIF-06')
         before = next(t for t in trials if t['case_id'] == 'before')
         inflight_row = next(t for t in trials if t['case_id'] == 'inflight')
         # A label/time overlap is only scheduling coverage, never a native join.
@@ -568,6 +653,8 @@ class LifecycleTransitionExecutor:
                 activation_violations=[],
                 activation_scope_complete=False,
             )
+        elif check.id == 'LIF-06':
+            observations.update(_canonical_live_observations(projection, trials, manifest, missing))
         summary = {'profile': check.collection_profile, 'manifest': manifest, 'samples': samples,
             'observations': observations, 'engine_started': False, 'transition_control_implemented': False,
             'producer_authenticated': False, 'whole_run_coverage_verified': False}

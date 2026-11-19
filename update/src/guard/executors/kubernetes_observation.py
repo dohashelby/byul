@@ -6,7 +6,7 @@ import uuid
 from guard.configuration import GATEWAY_RECORD_SNAPSHOT_OPTION
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP,REQUEST_BINDING_PROFILE,REQUIRED_EVENT_PROFILE
+from guard.runtime.kubernetes_http import KubernetesBindingError,KubernetesHTTP,REQUEST_BINDING_PROFILE,REQUIRED_EVENT_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader,KubernetesCaptureError
 from .owned_capture import _FILE_READER,MAX_BYTES
@@ -48,7 +48,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             self.version=SNAPSHOT_VERSION
 
     def keys(self):
-        if (self.cfg.get('copy_record_snapshot_only') is True
+        if (self.cfg.get('record_snapshot_only') is True or self.cfg.get('copy_record_snapshot_only') is True
                 or self.cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True):
             return {}
         return super().keys()
@@ -88,6 +88,43 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         if check.id!='OBS-01' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('OBSERVATION_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
+    def _validate_target(self, target, env, values, snapshot_only, *, expected_target_sha256=None):
+        digest = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self.expected_target, expected_target_sha256) if pin is not None]
+        if (target.get('lab') is not (not snapshot_only) or digest != values['observation_target_sha256']
+                or snapshot_only and not pins or any(pin != digest for pin in pins)
+                or env.ref().sha256 != values['observation_environment_sha256']
+                or any(type(value) is not str or not value for value in (env.model.id, env.model.revision))):
+            raise ValueError
+
+    def _transport(self, target, env, profile):
+        return KubernetesHTTP(target, env, duration=self.cfg.get('max_duration_seconds', 120),
+                              binary=self.cfg.get('kubectl_binary', 'kubectl'), runner=self.runner, profile=profile)
+
+    def prepared_record_snapshot(self, check, env, values, *, expected_target_sha256=None):
+        """Validate only the saved engine-owned OBS-01 target, without collecting its record."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+        from .run_binding import stages_for
+
+        if (check.id != 'OBS-01' or check.executor != self.name or stages_for(check) != (1, 2, 3, 4)
+                or self.cfg.get('record_snapshot_only') is not True
+                or GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg or 'copy_record_snapshot_only' in self.cfg):
+            raise ValueError('OBSERVATION_RECORD_SNAPSHOT_CONFIGURATION_INVALID')
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+            if type(target) is not dict:
+                raise ValueError
+            self._validate_target(target, env, values, True, expected_target_sha256=expected_target_sha256)
+        except (KeyError, ValueError, TypeError, OSError, RuntimeError):
+            raise ValueError('OBSERVATION_CONFIGURATION_INVALID') from None
+        try:
+            self._transport(target, env, REQUEST_BINDING_PROFILE)
+        except KubernetesBindingError as error:
+            raise ValueError(str(error)) from None
+        except OverflowError:
+            raise ValueError('OBSERVATION_CONFIGURATION_INVALID') from None
+
     def run(self,check,env,policy_values,adapter,workdir):
         if GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg:
             return self._gateway_snapshot().run(check,env,policy_values,adapter,workdir)
@@ -112,15 +149,12 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
                     or set(self.roles())!={'allowed','denied'}):raise ValueError
             keys={} if snapshot_only else self.keys()
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            digest=sha256_hex(canonical_json(target));start,end=normalize_policy(policy_values)
-            if (target.get('lab') is not (not snapshot_only) or digest!=policy_values['observation_target_sha256']
-                    or snapshot_only and self.expected_target is None
-                    or env.ref().sha256!=policy_values['observation_environment_sha256']
-                    or self.expected_target is not None and self.expected_target!=digest or not start<=utcnow()<=end):raise ValueError
+            start,end=normalize_policy(policy_values)
+            self._validate_target(target,env,policy_values,snapshot_only)
+            if not start<=utcnow()<=end:raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('OBSERVATION_CONFIGURATION_INVALID') from None
         profile=REQUEST_BINDING_PROFILE if snapshot_only else REQUIRED_EVENT_PROFILE
-        transport=KubernetesHTTP(target,env,duration=self.cfg.get('max_duration_seconds',120),
-            binary=self.cfg.get('kubectl_binary','kubectl'),runner=self.runner,profile=profile)
+        transport=self._transport(target,env,profile)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,
             allow_mutating=False,keys=keys,secrets=[v for v in keys.values() if v],cprobe=transport,workdir=workdir,started=utcnow())
         ctx._obs_snapshot_only=snapshot_only

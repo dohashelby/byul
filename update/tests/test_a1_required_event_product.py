@@ -192,6 +192,53 @@ def test_canonical_obs01_snapshot_rejects_unsafe_configuration_before_read(tmp_p
     assert not world.calls and not world.sent and not world.reads
 
 
+@pytest.mark.parametrize(('damage', 'reason'), [
+    (None, None),
+    ('foreign-model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('schema', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('duration', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('missing-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
+    ('binding-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
+    ('executor-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
+    ('gateway', 'OBSERVATION_RECORD_SNAPSHOT_CONFIGURATION_INVALID'),
+])
+def test_canonical_obs01_prepares_only_the_bound_engine_snapshot(tmp_path, monkeypatch, damage, reason):
+    environment, world, values, _, _ = inputs(tmp_path)
+    world.target['lab'] = False
+    if damage == 'foreign-model':
+        world.target['model_mapping']['revision'] = 'EXAMPLE-other-revision'
+    elif damage == 'schema':
+        world.target['schema'] = 'EXAMPLE-other-target'
+    target_path = tmp_path / 'target.json'
+    raw = canonical_json(world.target)
+    target_path.write_bytes(raw)
+    digest = values['observation_target_sha256'] = sha256_hex(raw)
+    cfg = {'target': str(target_path), 'record_snapshot_only': True}
+    if damage == 'duration':
+        cfg['max_duration_seconds'] = 301
+    elif damage == 'gateway':
+        cfg['gateway_record_snapshot_only'] = True
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Snapshot declaration validation must not resolve role keys or open a runtime reader')
+
+    monkeypatch.setattr(observation.HttpCheckExecutor, 'keys', forbidden)
+    monkeypatch.setattr(http.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(http.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(observation.RequiredEventReader, '__init__', forbidden)
+    executor = observation.KubernetesRequiredEventExecutor(cfg, runner=forbidden,
+        expected_target_sha256='f' * 64 if damage == 'executor-pin' else None)
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    check = pack.checks['OBS-01']
+    pin = 'e' * 64 if damage == 'binding-pin' else None if damage == 'missing-pin' else digest
+    if reason is None:
+        executor.prepared_record_snapshot(check, environment, values, expected_target_sha256=pin)
+        assert executor.keys() == {}
+    else:
+        with pytest.raises(ValueError, match=f'^{reason}$'):
+            executor.prepared_record_snapshot(check, environment, values, expected_target_sha256=pin)
+
+
 @pytest.mark.parametrize('mode',['normal','wrong-actor','wrong-record-target','missing-field','duplicate-record','empty','missing','recovered',
     'final-missing','unclosed','dropped','bad-source','producer-trust-claim','raw-field','bad-control','denied-allowed','after-error',
     'http-cleanup','record-cleanup','restart','pod-replaced','attachment','required-unimplemented',

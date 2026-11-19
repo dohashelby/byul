@@ -890,6 +890,11 @@
       "manifest_sha256": "eb894f7f19633fa7e5e8dacf30de24ee0ae41522ab6a65ece795fa6139614980",
       "reviewed_by": "Codex / owned LIF-11 census phase binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T06:00:10+00:00"
+    },
+    {
+      "manifest_sha256": "689c49c8b8c845ca93e44612e99fbd3f5eede153ba164e8858cce65816e6846e",
+      "reviewed_by": "Codex / owned OBS-11 status bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T06:03:50+00:00"
     }
   ]
 }

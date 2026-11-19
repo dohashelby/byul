@@ -13,6 +13,7 @@ from guard.collectors.lifecycle import prepare_assets
 from guard.collectors.model_read_scope import build_scope
 from guard.executors import kubernetes_supply_boot as boot
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
+from guard.store import Store
 from tests.builders import environment
 from tests.test_a1_file_read_sensor import MODEL_BYTES, make_world
 from tests.test_kubernetes_lifecycle import World
@@ -157,8 +158,52 @@ def test_retains_exact_source_read_and_reference_without_challenge(external, mon
     assert draft.observations["supply_boot_complete"].value is False
     assert draft.observations["supply_boot_record_authenticated"].value is False
     assert set(case.world.execs) == {"file", "context", "inventory"}
-    artifact, = draft.artifacts
-    assert MODEL_BYTES.decode() not in artifact.path.read_text() and "approved-model" not in artifact.path.read_text()
+    artifacts = {artifact.name: artifact for artifact in draft.artifacts}
+    assert set(artifacts) == {"supply_boot_summary.json", "supply_boot_normal_source_000.jsonl"}
+    original = artifacts[source["recording_artifact"]].path.read_bytes()
+    assert original == case.raw
+    stored = Store(external / "store").put_artifact(original)
+    assert stored.sha256 == source["recording_sha256"] and stored.bytes == len(case.raw)
+    summary = artifacts["supply_boot_summary.json"].path.read_text()
+    assert json.loads(summary)["native"][0]["rows"][0]["source_binding"] == source
+    for artifact in artifacts.values():
+        retained = artifact.path.read_bytes()
+        assert MODEL_BYTES not in retained and b"approved-model" not in retained
+
+
+@pytest.mark.parametrize("failure", ["noncanonical", "existing-file"])
+def test_missing_exact_source_artifact_preserves_verified_read(external, monkeypatch, failure):
+    case = normal_case(external / "case", monkeypatch)
+    out = external / "out"
+    name = "supply_boot_normal_source_000.jsonl"
+    if failure == "noncanonical":
+        # Only the terminal line has extra whitespace. Its contents and hash-chain
+        # predecessor still validate, but the canonical serialization differs.
+        original = case.raw[:-1] + b" \n"
+        case.world.group.raw_by_pid[CONTEXT["pid"]] = original
+        expected = "SUPPLY_BOOT_NORMAL_SOURCE_BYTES_UNVERIFIED"
+    else:
+        out.mkdir()
+        (out / name).write_bytes(b"Existing private output")
+        original = case.raw
+        expected = "SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_UNAVAILABLE"
+
+    draft = run(case, out)
+    assert draft.status == ExecStatus.ABORTED
+    assert draft.abort_reason == expected
+    assert expected in draft.observations["supply_boot_missing"].value
+    native, = draft.observations["supply_boot_native_consumption"].value
+    row, = native["rows"]
+    assert row["matches_approved"] is True
+    assert row["source_binding"]["recording_sha256"] == sha256_hex(original)
+    assert "recording_artifact" not in row["source_binding"]
+    summary, = draft.artifacts
+    assert expected in json.loads(summary.path.read_bytes())["missing"]
+    assert not draft.observations["supply_boot_violations"].collected
+    if failure == "existing-file":
+        assert (out / name).read_bytes() == b"Existing private output"
+    else:
+        assert not (out / name).exists()
 
 
 @pytest.mark.parametrize("mode", ["unsealed", "late-file-owner", "writable-model", "nested-shadow", "cleanup"])

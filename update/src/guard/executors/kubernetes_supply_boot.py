@@ -306,7 +306,7 @@ class KubernetesSupplyBootExecutor:
 
     def _run_normal_read(self, check, env, values, workdir, started):
         from guard.adapters import vllm_file_read_sensor as sensor
-        from .supply_boot_artifacts import persist
+        from .supply_boot_artifacts import persist, persist_normal_file_read_sources
 
         start, end = _normal_validity(values)
         if not start <= started <= end:
@@ -365,10 +365,21 @@ class KubernetesSupplyBootExecutor:
                    "approved_reference_manifest_sha256": values[_REFERENCE_KEY], "producer_authenticated": False}
         missing = ["normal_serving_control_unobserved", "change_and_enforcement_unobserved", "producer_authentication_unavailable"]
         missing.extend(native["missing"] if native is not None else [gap])
+        collector = f"{self.name}/{self.version}"
+        original_artifacts, source_errors = [], []
+        if native is not None:
+            bindings = [row["source_binding"] for row in native["rows"]]
+            recording_numbers = [binding["source_events"][0][0] for binding in bindings]
+            original_artifacts, source_errors, names = persist_normal_file_read_sources(
+                workdir, captured, recording_numbers, collector)
+            for recording, binding in zip(recording_numbers, bindings, strict=True):
+                if recording in names:
+                    binding["recording_artifact"] = names[recording]
         rows = [{"role": "normal", **native}] if native is not None else []
         summary = {"profile": NORMAL_FILE_READS_PROFILE, "sessions": [session], "native": rows, "gap": gap,
-                   "missing": sorted(set(missing + cleanup))}
-        artifacts, errors = persist(workdir, summary, {"normal": {}, "challenge": {}}, f"{self.name}/{self.version}")
+                   "missing": sorted(set(missing + cleanup + source_errors))}
+        summary_artifacts, errors = persist(workdir, summary, {"normal": {}, "challenge": {}}, collector)
+        errors = source_errors + errors
         observed = {"supply_boot_sessions": [session], "supply_boot_missing": sorted(set(missing + cleanup + errors)),
                     "supply_boot_complete": False, "supply_boot_normal_verified": False,
                     "supply_boot_change_applied": False, "supply_boot_record_authenticated": False}
@@ -381,7 +392,7 @@ class KubernetesSupplyBootExecutor:
             status=ExecStatus.ABORTED if gap or cleanup or errors else ExecStatus.COMPLETED, data_origin=origin,
             normal_control={"attempted": False, "succeeded": None, "detail": "Existing startup file reads only."},
             challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
-            observations=observations, artifacts=artifacts, started_at=started, finished_at=utcnow(),
+            observations=observations, artifacts=original_artifacts + summary_artifacts, started_at=started, finished_at=utcnow(),
             abort_reason="; ".join(([gap] if gap else []) + cleanup + errors) or None, cleanup_errors=cleanup + errors,
             comparability={"fixture_sha256": sha256_hex(canonical_json(settings)),
                            "config_sha256": sha256_hex(canonical_json({"model_root": _MODEL_ROOT, "strategy": "eager"})),

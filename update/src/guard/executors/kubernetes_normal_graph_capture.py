@@ -46,11 +46,16 @@ def _capture_callsite(adapter, env):
     return profile[key]
 
 
+def _verify_graph_argv(args):
+    if (type(args) is not list or any(type(arg) is not str for arg in args)
+            or any(arg.partition("=")[0].partition(".")[0].replace("_", "-") in _GRAPH_OVERRIDES
+                   for arg in args if arg.startswith("-"))):
+        raise ValueError("REQ20_CAPTURE_LAUNCH_UNQUALIFIED")
+
+
 def _verify_graph_launch(target, container, source):
     _verify_launch(target, container, source)
-    if any(arg.partition("=")[0].partition(".")[0].replace("_", "-") in _GRAPH_OVERRIDES
-           for arg in container["args"] if arg.startswith("-")):
-        raise ValueError("REQ20_CAPTURE_LAUNCH_UNQUALIFIED")
+    _verify_graph_argv(container["args"])
 
 
 def _capture_observation(raw, window, callsite):
@@ -114,23 +119,42 @@ class KubernetesNormalGraphCaptureExecutor:
                 or type(values) is not dict or values or check.policy_params):
             raise ValueError("REQ20_CAPTURE_SCOPE_INVALID")
 
+    def _target_inputs(self, target, env, adapter, *, duration, expected_target_sha256=None):
+        target_sha = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self._expected_target_sha256, expected_target_sha256) if pin is not None]
+        if not pins or any(pin != target_sha for pin in pins):
+            raise ValueError
+        source = _source_profile(adapter, env)
+        callsite = _capture_callsite(adapter, env)
+        binary = self.cfg.get("kubectl_binary", "kubectl")
+        logs = normal_graph_capture_transport(target, env, duration=duration, binary=binary, runner=self.runner)
+        source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
+                                        profile=ENGINE_CALLBACK_PROFILE, clock=logs.clock)
+        source_reader.deadline = logs.deadline
+        return target_sha, source, callsite, logs, source_reader
+
+    def prepared_normal_graph_capture(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the selected boot-prefix declaration and reviewed source without collection."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            adapter = get_provider(env.engine.name).adapter()
+            self._target_inputs(target, env, adapter, duration=self.cfg.get("max_duration_seconds", 20),
+                                expected_target_sha256=expected_target_sha256)
+            _verify_graph_argv(target["comparison_config"]["launch"]["argv"])
+        except (AttributeError, KeyError, OSError, OverflowError, TypeError, ValueError, KubernetesBindingError):
+            raise ValueError("REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 20)
-        binary = self.cfg.get("kubectl_binary", "kubectl")
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if target_sha != self._expected_target_sha256:
-                raise ValueError
-            source = _source_profile(adapter, env)
-            callsite = _capture_callsite(adapter, env)
-            logs = normal_graph_capture_transport(target, env, duration=duration, binary=binary, runner=self.runner)
-            source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
-                                            profile=ENGINE_CALLBACK_PROFILE, clock=logs.clock)
-            source_reader.deadline = logs.deadline
+            target_sha, source, callsite, logs, source_reader = self._target_inputs(target, env, adapter, duration=duration)
         except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
             raise ValueError("REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED") from None
 

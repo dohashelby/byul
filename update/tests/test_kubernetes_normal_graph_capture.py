@@ -137,3 +137,49 @@ def test_req20_rejects_nonstock_capture_options_before_reading_logs_or_sources(t
     draft, summary, _, world = _run(tmp_path, "0.31.0", graph_option=graph_option)
     assert draft.status == ExecStatus.ABORTED
     assert summary["observation"] is None and not world.log_calls and not world.hash_calls
+
+
+@pytest.mark.parametrize("version,damage", [
+    ("0.30.0", None), ("0.31.0", None), ("0.31.0", "duration"), ("0.30.0", "binary"),
+    ("0.30.0", "missing-argv"), ("0.31.0", "invalid-argv"), ("0.31.0", "graph-override"),
+    ("0.30.0", "prefix"), ("0.31.0", "image"), ("0.30.0", "pin"),
+])
+def test_req20_prepares_the_selected_boot_declaration_without_collection(tmp_path, version, damage):
+    from tools.mvp_versions import versions
+
+    env, target, path, world = startup_inputs(tmp_path, version)
+    image = next(item["image"] for item in versions().values() if item["version"] == version)
+    if damage == "image":
+        image = image.partition("@sha256:")[0] + "@sha256:" + "0" * 64
+    env = env.model_copy(update={"engine": env.engine.model_copy(update={"image_digest": image})}).seal()
+    target["environment_ref"] = env.ref().model_dump(mode="json")
+    target["engine"]["image_digest"] = image
+    target["kubernetes"]["engine"].update(image=image, image_id=image)
+    if damage != "prefix":
+        target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=world.runner)
+    config = {graph.NORMAL_OPTION: True, "target": str(path)}
+    if damage == "duration":
+        config["max_duration_seconds"] = 301
+    elif damage == "binary":
+        config["kubectl_binary"] = " "
+    elif damage == "missing-argv":
+        del target["comparison_config"]["launch"]["argv"]
+    elif damage == "invalid-argv":
+        target["comparison_config"]["launch"]["argv"] = [*ARGS, 1]
+    elif damage == "graph-override":
+        target["comparison_config"]["launch"]["argv"] = [*ARGS, "--compilation_config.cudagraph_mode=FULL"]
+
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    pin = sha256_hex(raw) if damage != "pin" else sha256_hex(b"different-owned-target")
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["REQ-20"]
+
+    def no_collection(*args, **kwargs):
+        pytest.fail("REQ-20 declaration validation must not collect from the target")
+
+    executor = graph.KubernetesNormalGraphCaptureExecutor(config, runner=no_collection)
+    if damage is None:
+        executor.prepared_normal_graph_capture(check, env, {}, expected_target_sha256=pin)
+    else:
+        with pytest.raises(ValueError, match="^REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED$"):
+            executor.prepared_normal_graph_capture(check, env, {}, expected_target_sha256=pin)

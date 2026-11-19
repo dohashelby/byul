@@ -235,7 +235,8 @@ def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mo
         world.copy_packet['events']=[first_claim,unselected,second_claim] if mode=='interleaved-sequence' else [first_claim,second_claim]
     if mode=='hidden-event-conflict':
         inventory_claim,unselected,*_=world.copy_packet['events']
-        hidden_actor='b'*32
+        hidden_actor=sha256_hex(b'EXAMPLE PLT-12 hidden conflict actor')[:32]
+        assert hidden_actor.encode() not in canonical_json([world.copy_packet,world.target,values])
         world.copy_packet['events'].append({
             **unselected,'event_id':inventory_claim['event_id'],'seq':inventory_claim['seq'],'actor_id':hidden_actor})
 
@@ -295,6 +296,7 @@ def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mo
         assert 'copy_declared_event_sequence_gap' not in draft.observations['copy_missing'].value
         assert source_checksums==[(attachment['file_bytes'],attachment['file_bytes_sha256'])]
         assert draft.abort_reason=='COPY_RECORD_SNAPSHOT_INCOMPLETE'
+        assert draft.artifacts
         assert all(hidden_actor.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
     if mode in {'missing','wrong-source','pod-replaced'}:
         assert draft.observations['copy_record_snapshots'].collected is False

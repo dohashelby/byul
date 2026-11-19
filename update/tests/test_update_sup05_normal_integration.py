@@ -1,11 +1,16 @@
 """Exercise the normal SUP-05 executor through the canonical update pipeline."""
 
 from copy import deepcopy
+import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
+
+import pytest
 
 from guard import application
+from guard.adapters.vllm_approved_file_read_composition import PROFILES
 from guard.executors import kubernetes_supply_boot, run_binding
 from guard.models import Comparison, DataOrigin, ExecStatus, Verdict, load_pack, sha256_hex, utcnow
 from guard.store import Store
@@ -17,15 +22,19 @@ from tests.test_sup05_normal_file_reads import normal_case
 PACK = Path(__file__).resolve().parents[1] / "packs" / "PACK-BASELINE"
 
 
-def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, external, monkeypatch):
-    # The immutable /17 producer supports this synthetic release on both sides.
-    # Different target, ENV and prepared-session identities must survive routing.
+@pytest.mark.parametrize("releases", [
+    pytest.param((None, None), id="native17"),
+    pytest.param(("0.30.0", "0.31.0"), id="reviewed-release-pair", marks=pytest.mark.skipif(
+        sys.platform != "linux" or os.uname().machine != "x86_64" or sys.version_info[:3] != (3, 12, 3)
+        or sys.flags.optimize != 0, reason="the selected producer ABI is Linux x86_64 CPython 3.12.3")),
+])
+def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, external, monkeypatch, releases):
     model_root = external / "approved-model"
     sides = {
         "baseline": normal_case(external / "baseline", monkeypatch, model_root=model_root,
-                                env_id="ENV-EXAMPLE-SUP05-BASELINE"),
+                                env_id="ENV-EXAMPLE-SUP05-BASELINE", release=releases[0]),
         "candidate": normal_case(external / "candidate", monkeypatch, model_root=model_root,
-                                 env_id="ENV-EXAMPLE-SUP05-CANDIDATE", engine_role={
+                                 env_id="ENV-EXAMPLE-SUP05-CANDIDATE", release=releases[1], engine_role={
                                      "pod_uid": "00000000-0000-0000-0000-000000000099",
                                      "container_id": "containerd://" + "c" * 64,
                                  }),
@@ -56,6 +65,8 @@ def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, extern
     envs = [side.env for side in sides.values()]
     ready = application.update_readiness(pack, envs, pol, cfg)
     assert next(item for item in ready["checks"] if item["check"] == "inputs")["ok"], ready
+    if all(releases):
+        assert ready["ready"], ready
     invalid = deepcopy(cfg)
     invalid["sides"]["candidate"]["supply_boot"]["normal"]["reference_manifest"] = str(external / "missing-reference.json")
     blocked = application.update_readiness(pack, envs, pol, invalid)
@@ -88,7 +99,11 @@ def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, extern
         receipt, = evidence.observations["supply_boot_sessions"].value
         manifest = Path(expected.cfg["normal"]["reference_manifest"]).read_bytes()
         assert receipt["approved_reference_manifest_sha256"] == sha256_hex(manifest)
+        assert evidence.execution.run_binding["files"]["supply_normal_reference_manifest_sha256"] == sha256_hex(manifest)
         assert receipt["target_sha256"] == expected.values["supply_normal_target_sha256"]
         assert receipt["prepared_sha256"] == expected.values["supply_normal_prepared_sha256"]
         assert receipt["producer_authenticated"] is False
+        if all(releases):
+            assert receipt["producer_profile"] == PROFILES[expected.env.engine.version]
+            assert read["source_binding"]["open_event"] == read["source_binding"]["source_events"][0]
         assert not any(step.attempted for step in evidence.challenges)

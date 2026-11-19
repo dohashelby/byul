@@ -481,6 +481,9 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
     ('PLT-06', 'unix_ipc', None, None),
     ('PLT-06', 'unix_ipc', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('PLT-06', 'unix_ipc', 'duration', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+    ('PLT-02', 'unix_ipc', None, None),
+    ('PLT-02', 'unix_ipc', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('PLT-02', 'unix_ipc', 'duration', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
     ('OBS-02', 'observation_state', None, None),
     ('OBS-02', 'observation_state', 'duration', 'OBS02_NORMAL_TARGET_UNVERIFIED'),
     ('REQ-10', 'sampling_validation', None, None),
@@ -512,7 +515,8 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
     monkeypatch.setattr(socket, 'socket', forbidden)
     monkeypatch.setattr(subprocess, 'Popen', forbidden)
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
-    policy_values = {'OBS-04': LOCAL_VALUES, 'PLT-06': WORKER_VALUES}
+    policy_values = {'OBS-04': LOCAL_VALUES, 'PLT-06': WORKER_VALUES,
+                     'PLT-02': {'protected_unix_paths': ['/run/fixture/engine.sock'], 'allowed_ipc_uids': ['1000']}}
     if check_id == 'REQ-10':
         policy_values[check_id] = {'allowed_sampling_options': ['max_tokens', 'temperature'],
                                    'rejection_codes': ['400', '422']}
@@ -522,7 +526,7 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
     elif check_id in {'LIF-03', 'LIF-04'}:
         _, _, _, effective = stream_configuration(tmp_path)
         policy_values[check_id] = {field.key: effective[field.key] for field in pack.checks[check_id].policy_params}
-    if check_id in {'REQ-10', 'LIF-04'}:
+    if check_id in {'REQ-10', 'LIF-04', 'PLT-02'}:
         monkeypatch.setattr(HttpCheckExecutor, 'keys', forbidden)
     pol = policy(pack.ref(), scope={'include': [check_id]}, values={check_id: policy_values[check_id]})
     option = {check_id: {KUBERNETES_BOUND_CHECK_OPTIONS[check_id]: True}}

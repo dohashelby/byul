@@ -291,6 +291,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     local_metadata = (check.id in {'OBS-04', 'PLT-06'} and implementation == 'kubernetes'
                       and requested_update.get('mode', 'external') == 'external'
                       and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS[check.id]) is True)
+    protected_paths = (prebound_kubernetes and check.id == 'PLT-02' and check.executor == 'unix_ipc'
+                       and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['PLT-02']) is True
+                       and not config.get('record_attestation') and not config.get('lab_activation'))
     gateway_response = (check.id == 'REQ-13' and check.executor == 'response_content'
                         and implementation == 'kubernetes' and 'gateway' in values['required_targets']
                         and config.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
@@ -495,6 +498,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
                 executor.prepared_local_observation(check, env, effective, expected_target_sha256=expected)
             else:
                 executor.prepared_worker_trust(check, env, effective, expected_target_sha256=expected)
+        if protected_paths:
+            executor.prepared_protected_paths(check, env, effective,
+                                              expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if gateway_response:
             executor.prepared_gateway(env, expected_target_sha256=sha256_hex(canonical_json(target_data)))
     if requires_native_matrix and not normal_token_input:

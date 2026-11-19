@@ -598,6 +598,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry, run_binding
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
+    from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
     from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
     from guard.executors.kubernetes_normal_graph_capture import KubernetesNormalGraphCaptureExecutor
     from guard.executors.kubernetes_normal_request_latency import KubernetesNormalRequestLatencyExecutor
@@ -779,6 +780,11 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                                 and isinstance(executor, KubernetesNormalGraphCaptureExecutor)):
                             executor.prepared_normal_graph_capture(check_def, selected_env, values,
                                                                    expected_target_sha256=expected_target)
+                        if (prebound and item.check_id == "PLT-02" and isinstance(executor, KubernetesIPCProductExecutor)
+                                and not c.get("record_attestation") and not c.get("lab_activation")):
+                            executor.prepared_protected_paths(check_def, selected_env, values,
+                                                              expected_target_sha256=expected_target)
+                            continue  # The validated metadata reader has no role keys.
                         if item.check_id == "OBS-04":
                             executor.prepared_local_observation(check_def, selected_env, values,
                                                                 expected_target_sha256=expected_target)

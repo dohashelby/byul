@@ -845,6 +845,11 @@
       "manifest_sha256": "373c30b8f47addecc69df0e2f8745621b18427adab44bbca6fbfc0089204ef33",
       "reviewed_by": "Codex / closed installed distribution metadata interface / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T00:45:11+00:00"
+    },
+    {
+      "manifest_sha256": "360c779e03953416796e5288577f924261944b7a4ce50bcd899c8e0fe41b52b7",
+      "reviewed_by": "Codex / paired owned Cilium endpoint policy state / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T01:19:39+00:00"
     }
   ]
 }

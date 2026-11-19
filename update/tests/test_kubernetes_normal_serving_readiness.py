@@ -18,6 +18,7 @@ from tests.test_kubernetes_sampling import World, normal_sampling_inputs
 VALUES = {"observation_state_required_components": ["http_listener", "request_selection", "engine_core", "worker"],
           "profiler_backend_kind": "torch", "profiler_required_ranks": ["0", "1"]}
 PRIVATE = "EXAMPLE-private-pod-or-response-data"
+READY_TRANSITION = "2026-10-26T00:00:11Z"
 
 
 @pytest.mark.parametrize("version,fault", [
@@ -78,6 +79,9 @@ def test_obs02_compares_owned_ready_with_exact_normal_response(tmp_path, version
             container["env"].append({"name": "EXAMPLE_ONLY", "value": PRIVATE})
             if fault == "missing-ready":
                 obj["status"]["conditions"] = []
+            else:
+                condition, = obj["status"]["conditions"]
+                condition["lastTransitionTime"] = READY_TRANSITION
             if fault == "owner-changed" and after:
                 obj["metadata"]["uid"] = "replacement"
 
@@ -118,10 +122,74 @@ def test_obs02_compares_owned_ready_with_exact_normal_response(tmp_path, version
         row, = observations["activation_steps"]["value"]
         assert row["component"] == "http_listener"
         assert row["readiness_before"]["readiness_probe"] == row["readiness_after"]["readiness_probe"]
+        assert row["readiness_before"]["pod_ready_last_transition_at"] == "2026-10-26T00:00:11+00:00"
         assert row["ordinary_completion"]["outcome"] == 200
     sealed = evidence(check_id=check.id, observations=observations, normal=draft.normal_control.model_dump())
     assessed = RuleTableJudge().judge(check, sealed, check.judge.params, VALUES)
     assert assessed.verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("after_transition,matched", [
+    ("2026-10-26T00:00:11+00:00", True),
+    ("2026-10-26T00:00:12Z", False),
+    (None, False),
+    ("2026-10-25T23:59:59Z", False),
+])
+def test_obs02_keeps_response_and_ready_samples_without_matching_transition(tmp_path, after_transition, matched):
+    env, target, _, path = normal_sampling_inputs(tmp_path, "0.31.0")
+    path.write_bytes(canonical_json(target))
+    world = World(target)
+
+    def pod_readback(role, document, after):
+        if role == "namespaces":
+            for row in document["items"]:
+                row["kind"] = "Namespace"
+            return
+        document["kind"] = "Pod"
+        if role != "engine":
+            return
+        container, = document["spec"]["containers"]
+        container["readinessProbe"] = {"httpGet": {"path": "/health", "port": 8000}}
+        condition, = document["status"]["conditions"]
+        timestamp = after_transition if after else READY_TRANSITION
+        if timestamp is not None:
+            condition["lastTransitionTime"] = timestamp
+
+    raw_response = canonical_json({"model": "fixture-model", "choices": [{"text": PRIVATE, "finish_reason": "length"}],
+                                   "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}})
+
+    def runner(argv, **kwargs):
+        result = world.runner(argv, **kwargs)
+        if "exec" in argv:
+            reply, = json.loads(result["stdout_bytes"])
+            result["stdout_bytes"] = canonical_json([{
+                "id": reply["id"], "method": "POST", "mode": "json", "outcome": 200,
+                "body": raw_response.decode(), "body_bytes": len(raw_response), "body_sha256": sha256_hex(raw_response),
+                "capture_complete": True, "eof": True, "body_truncated": False, "utf8_valid": True, "stop_reason": "eof",
+            }])
+        return result
+
+    world.mutate = pod_readback
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["OBS-02"]
+    executor = KubernetesNormalServingReadinessExecutor(
+        {"normal_serving_readiness_only": True, "target": str(path)},
+        runner=runner, expected_target_sha256=sha256_hex(path.read_bytes()))
+    draft = executor.run(check, env, VALUES, VllmAdapter(), tmp_path / "work")
+    artifact, = draft.artifacts
+    summary_text = artifact.path.read_text()
+    summary = json.loads(summary_text)
+    scope = summary["observed_scope"]
+    assert PRIVATE not in summary_text
+    assert len(world.execs) == 1 and draft.data_origin is DataOrigin.EXAMPLE
+    assert scope["readiness_before"]["pod_ready"] is scope["readiness_after"]["pod_ready"] is True
+    assert scope["ordinary_completion"]["response_sha256"] == sha256_hex(raw_response)
+    assert summary["readiness_correspondence_observed"] is matched
+    assert draft.observations["activation_steps"].collected is matched
+    assert draft.normal_control.succeeded is (True if matched else None)
+    assert draft.status is (ExecStatus.COMPLETED if matched else ExecStatus.ABORTED)
+    if not matched:
+        assert draft.abort_reason == "OBS02_NORMAL_READY_TRANSITION_UNVERIFIED"
+        assert "pod_ready_transition_unverified" in draft.observations["activation_missing"].value
 
 
 @pytest.mark.parametrize("fault", ["unbound", "disabled", "wrong-policy-scope"])

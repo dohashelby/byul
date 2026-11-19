@@ -1,6 +1,6 @@
 """OBS-02 observation of owned Pod readiness during ordinary serving."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from guard.adapters.engine_profiles import supports
@@ -28,11 +28,23 @@ def normal_serving_readiness_transport(target, env, *, duration, binary="kubectl
     return KubernetesHTTP(target, env, duration=duration, binary=binary, runner=runner, profile=REQUEST_BINDING_PROFILE)
 
 
+def _pod_ready_transition(value, engine_started_at, observed_at):
+    try:
+        changed_at = datetime.fromisoformat(value)
+        started_at = datetime.fromisoformat(engine_started_at)
+        if started_at <= changed_at <= observed_at:
+            return changed_at.astimezone(timezone.utc).isoformat()
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
 def _owned_ready(transport):
-    # The existing snapshot projection omits readinessProbe. Read it from the
+    # The existing snapshot projection omits the probe and transition time. Read them from the
     # same identity-verified in-memory document and keep only the selected state.
     pod = transport._verify(capture_snapshot=True)["engine"]
-    name = transport.binding["engine"]["container"]
+    engine = transport.binding["engine"]
+    name = engine["container"]
     container, = [row for row in pod["spec"]["containers"] if row["name"] == name]
     state, = [row for row in pod["status"]["containerStatuses"] if row["name"] == name]
     condition, = [row for row in pod["status"]["conditions"] if row.get("type") == "Ready"]
@@ -57,14 +69,17 @@ def _owned_ready(transport):
     if any(type(value) is not int or value < (0 if key == "initialDelaySeconds" else 1)
            for key, value in timing.items()):
         raise ValueError("OBS02_HEALTH_READINESS_UNVERIFIED")
-    return {"observed_at": utcnow().isoformat(), "pod_ready": True, "engine_container_ready": True,
+    observed_at = utcnow()
+    transition = _pod_ready_transition(condition.get("lastTransitionTime"), engine["started_at"], observed_at)
+    return {"observed_at": observed_at.isoformat(), "pod_ready": True, "engine_container_ready": True,
+            "pod_ready_last_transition_at": transition,
             "readiness_probe": {"method": "GET", "path": "/health", "scheme": "HTTP", "bound_engine_port": port,
                                 "timing": timing}}
 
 
 class KubernetesNormalServingReadinessExecutor:
     name = "observation_state"
-    version = "0.1.0+k8s-normal-ready"
+    version = "0.1.1+k8s-normal-ready"
 
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         self.cfg = cfg
@@ -106,6 +121,7 @@ class KubernetesNormalServingReadinessExecutor:
         body = {"model": transport.api_model, "prompt": "ping", "max_tokens": 1}
         before = after = completion = None
         attempted = matched = False
+        transition_gap = False
         failure = "OBS02_NORMAL_BEFORE_READY_UNVERIFIED"
         try:
             before = _owned_ready(transport)
@@ -131,7 +147,12 @@ class KubernetesNormalServingReadinessExecutor:
             after = _owned_ready(transport)
             times = [before["observed_at"], completion["started_at"], completion["finished_at"], after["observed_at"]]
             instants = [datetime.fromisoformat(value) for value in times]
+            transition = before["pod_ready_last_transition_at"]
+            transition_gap = transition is None or transition != after["pod_ready_last_transition_at"]
             matched = before["readiness_probe"] == after["readiness_probe"] and instants == sorted(instants)
+            if matched and transition_gap:
+                failure = "OBS02_NORMAL_READY_TRANSITION_UNVERIFIED"
+                matched = False
         except (AttributeError, KubernetesBindingError, KeyError, TypeError, ValueError):
             pass
 
@@ -141,6 +162,8 @@ class KubernetesNormalServingReadinessExecutor:
         missing = [component for component in values["observation_state_required_components"]
                    if component != _COMPONENT or not matched]
         missing += ["startup_transition", "failure", "termination", "profiler"]
+        if transition_gap:
+            missing.append("pod_ready_transition_unverified")
         step = {"component": _COMPONENT, "scope": "normal_serving_readiness_correspondence",
                 "readiness_before": before, "ordinary_completion": completion, "readiness_after": after}
         fixture = {"profile": PROFILE, "request": {"method": "POST", "path": _CONTROL_PATH,
@@ -170,7 +193,7 @@ class KubernetesNormalServingReadinessExecutor:
             origin = DataOrigin.DECLARED
         return EvidenceDraft(status=ExecStatus.ABORTED if error else ExecStatus.COMPLETED, data_origin=origin,
             normal_control={"attempted": attempted, "succeeded": True if matched else None,
-                            "detail": "Correspondence of Ready and ordinary serving on one stable Pod generation."},
+                            "detail": "Ready samples and ordinary serving on one stable Pod generation."},
             challenges=[{"step": item, "attempted": False} for item in check.challenge_steps],
             observations={"activation_steps": {"value": [step] if matched else None, "collected": matched},
                           "activation_violations": {"value": None, "collected": False},

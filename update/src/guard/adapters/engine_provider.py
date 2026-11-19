@@ -134,6 +134,9 @@ class VllmProvider(EngineProvider):
         if name == "safetensors_reader_source":
             from .vllm_startup_load import safetensors_reader_profile
             return safetensors_reader_profile(*args)
+        if name == "approved_file_read_preparation":
+            from .vllm_lifecycle_catalog import approved_file_read_preparation
+            return approved_file_read_preparation(*args)
         if name == "graph_capture_source":
             from .vllm_startup_load import graph_capture_profile
             return graph_capture_profile(*args)

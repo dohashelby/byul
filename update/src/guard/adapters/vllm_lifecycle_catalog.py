@@ -135,6 +135,13 @@ def approved_file_read_matches(env, prepared):
             and env.engine.source_commit in {None, row(profile)['commit']})
 
 
+def approved_file_read_preparation(env):
+    profile = file_read.PROFILES.get(env.engine.version)
+    if approved_file_read_matches(env, {'profile': profile}):
+        return {'profile': profile, 'model_root': file_read.MODEL_ROOT}
+    return None
+
+
 def startup_assets(profile):
     dependencies = {filename: (logical, digest) for logical, (filename, digest) in startup.DEPENDENCIES.items()} if startup_observation(profile) or profiler_observation(profile) else {}
     return dependencies | (direct_profiler.EXTRA_ASSETS if profiler_observation(profile) else {})

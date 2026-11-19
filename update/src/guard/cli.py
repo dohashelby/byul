@@ -523,6 +523,30 @@ def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output"),
                           "profile":value["profile"]}))
 
 
+@app.command("prepare-sup05-normal")
+def prepare_sup05_normal(
+    env: Path = typer.Option(..., "--env"),
+    target: Path = typer.Option(..., "--target"),
+    owner_snapshot: Path = typer.Option(..., "--owner-snapshot"),
+    owner_snapshot_sha256: str = typer.Option(..., "--owner-snapshot-sha256"),
+    model_manifest: Path = typer.Option(..., "--model-manifest"),
+    model_manifest_sha256: str = typer.Option(..., "--model-manifest-sha256"),
+    output: Path = typer.Option(..., "--output"),
+    nonsecret_model_weights: bool = typer.Option(False, "--nonsecret-model-weights"),
+) -> None:
+    """저장된 소유 관계와 승인 참조로 SUP-05 정상 읽기 입력을 준비한다."""
+    from guard.collectors.sup05_normal_preparation import prepare
+    try:
+        value = prepare(output, Path(__file__).resolve().parents[3], environment=env, target=target,
+                        owner_snapshot=owner_snapshot, owner_snapshot_sha256=owner_snapshot_sha256,
+                        model_manifest=model_manifest, model_manifest_sha256=model_manifest_sha256,
+                        nonsecret_model_weights=nonsecret_model_weights)
+    except (OSError, ValueError, TypeError):
+        typer.echo("SUP05_NORMAL_PREPARATION_FAILED")
+        raise typer.Exit(2)
+    typer.echo(json.dumps(value, ensure_ascii=False))
+
+
 @app.command("capture-lifecycle-observations")
 def capture_lifecycle_observations(
     env: Path = typer.Option(..., "--env"),

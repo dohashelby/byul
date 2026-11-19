@@ -591,7 +591,15 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
         assert row['engine_executed'] is row['live_target_verified'] is row['ready_for_execution'] is False
         assert row['actual_results'] is None
         if row['side'] in invalid_sides:
-            assert row['blocking_codes'] == [reason]
+            expected_codes = [reason]
+            if check_id == 'REQ-09' and damage == 'duration':
+                expected_codes += [
+                    'NATIVE_INPUT_PROFILE_UNAVAILABLE',
+                    'NATIVE_REJECTION_PROFILE_UNAVAILABLE',
+                    'NATIVE_INPUT_CAPTURE_GPU_UNQUALIFIED',
+                    'NATIVE_REJECTION_PROJECTION_GPU_UNQUALIFIED',
+                ]
+            assert row['blocking_codes'] == expected_codes
         else:
             assert row['file_binding_valid'] and 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']
 

@@ -215,6 +215,55 @@ def status(env, rows):
                          'environment_ref': env.ref().model_dump(mode='json'), 'events': rows}}
 
 
+@pytest.mark.parametrize(('case', 'error'), [
+    ('baseline', None),
+    ('candidate', None),
+    ('owner-alias', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('configured-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('offline-digest', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
+    ('executor-digest', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
+    ('non-object', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
+    ('unbound-session', 'COLLECTION_GAP_POLICY_INVALID'),
+])
+def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_path, monkeypatch, case, error):
+    from tests.test_kubernetes_request_binding import target as owned_target
+    from tools.mvp_versions import versions
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('OBS-11 preparation must not contact the target or load its status file')
+
+    monkeypatch.setattr(KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(module, '_read_collection_status', forbidden)
+    release = versions()['baseline' if case == 'baseline' else 'candidate']
+    env = environment(engine={'name': release['engine'], 'version': release['version'], 'image_digest': release['image']},
+                      model={'id': 'EXAMPLE-repository-id', 'revision': 'EXAMPLE-revision'})
+    target = owned_target(env)
+    target['observed_version'] = release['version']
+    target['engine']['image_digest'] = release['image']
+    target['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])
+    if case == 'owner-alias':
+        roles = target['kubernetes']
+        roles['probe']['pod_uid'] = roles['engine']['pod_uid']
+    elif case == 'non-object':
+        target = []
+    raw = canonical_json(target)
+    path = tmp_path / 'saved-target.json'
+    path.write_bytes(raw)
+    digest = sha256_hex(raw)
+    settings = {'target': str(path), 'max_duration_seconds': 301 if case == 'configured-budget' else 30}
+    executor = module.KubernetesLogIntegrityExecutor(
+        settings, runner=forbidden, expected_target_sha256='0' * 64 if case == 'executor-digest' else digest)
+    values = {key: value for key, value in GAP_VALUES.items()
+              if case != 'unbound-session' or key != 'collection_session'}
+    expected = 'f' * 64 if case == 'offline-digest' else digest
+    if error is None:
+        executor.prepared_collection_status(gap_check(), env, values, expected_target_sha256=expected)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_collection_status(gap_check(), env, values, expected_target_sha256=expected)
+
+
 def test_obs11_record_from_the_probe_pod_reuses_the_original_evaluation(tmp_path, monkeypatch):
     env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE}, model={'id': 'fixture-model'})
     late = {'record': 'request', 'event_at_ms': 0, 'arrived_at_ms': None, 'gap_marked_at_ms': 5000, 'alert_at_ms': None,

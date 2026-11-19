@@ -139,6 +139,32 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
             return
         super().validate_policy(check, values)
 
+    def _transport(self, target, env):
+        return KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 300),
+            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=LOG_INTEGRITY_PROFILE)
+
+    def prepared_collection_status(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the saved OBS-11 target and session before any status collection."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        if check.id != "OBS-11" or check.collection_profile != log_collection_gap.PROFILE:
+            raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID")
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None))
+            if type(target) is not dict:
+                raise ValueError
+            digest = sha256_hex(canonical_json(target))
+            if any(pin is not None and pin != digest for pin in
+                   (expected_target_sha256, self._expected_target_sha256)):
+                raise ValueError
+        except (KeyError, TypeError, ValueError, OSError):
+            raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID") from None
+        try:
+            self._transport(target, env)
+        except KubernetesBindingError as error:
+            raise ValueError(str(error)) from None
+
     def run(self, check, env, policy_values, adapter, workdir):
         try:
             if adapter is None:
@@ -149,8 +175,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
                 raise ValueError
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID") from None
-        transport = KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 300),
-            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=LOG_INTEGRITY_PROFILE)
+        transport = self._transport(target, env)
         view = {k: v for k, v in target.items() if k != "gateway"}
         view["origins"] = {"trusted": {"network": "kubernetes-probe"}, "external": {"network": "kubernetes-probe"}}
         view["run_id"] = target["kubernetes"]["run_id"]

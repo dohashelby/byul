@@ -865,6 +865,11 @@
       "manifest_sha256": "9ec6d9f964024d0ef7cc2dee7623dabe9a44bd9fa6e9a78f5f8f01336c274791",
       "reviewed_by": "Codex / paired stock Safetensors reader branch / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T04:27:07+00:00"
+    },
+    {
+      "manifest_sha256": "81ebe39df1346b42983b004d4332e260b42fd1f006bc6d98b1a443cc9d413667",
+      "reviewed_by": "Codex / paired stock CUDA graph capture / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T04:48:01+00:00"
     }
   ]
 }

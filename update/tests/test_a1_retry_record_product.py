@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from guard.cli import app
 from guard.executors import kubernetes_retry_records as retry_executor
+from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from guard.executors.owned_capture import _FILE_READER, MAX_BYTES
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
@@ -85,6 +86,56 @@ def inputs(tmp_path,mode='normal'):
     world.values=values;world.retry_packet=packet
     receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
     return environment,world,scope,values,pack,receipt,path
+
+
+@pytest.mark.parametrize('case,error', [
+    ('ordinary', None),
+    ('foreign-run', 'RETRY_CONFIGURATION_INVALID'),
+    ('foreign-source', 'RETRY_CONFIGURATION_INVALID'),
+    ('malformed-scope', 'RETRY_CONFIGURATION_INVALID'),
+    ('target-pin', 'RETRY_CONFIGURATION_INVALID'),
+    ('over-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('legacy-stage', 'RETRY_PROFILE_UNSUPPORTED'),
+])
+def test_retry_readiness_uses_the_exact_owned_scope_without_collecting(tmp_path, monkeypatch, case, error):
+    from guard.models.checkdef import PolicyParam
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('LIF-12 readiness must not contact the target or read retry records')
+
+    monkeypatch.setattr(http.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(http.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(retry_executor.RequiredEventReader, 'read_file', forbidden)
+    environment, world, scope, values, _, _, scope_path = inputs(tmp_path)
+    decision_key = retry_executor.contract.DECISION_KEY
+    values[decision_key] = deepcopy(scope['limits'])
+    policy_row = {key: values[key] for key in (decision_key, 'retry_policy_mode', 'retry_max_record_delay_ms')}
+    scope['policy_sha256'] = values['retry_policy_sha256'] = sha256_hex(canonical_json(policy_row))
+    if case == 'foreign-run':
+        scope['run_id'] = 'another-example-run'
+    elif case == 'foreign-source':
+        scope['producer_source_sha256'] = 'f' * 64
+    raw_scope = b'{' if case == 'malformed-scope' else canonical_json(scope)
+    scope_path.write_bytes(raw_scope)
+    values['retry_scope_sha256'] = sha256_hex(raw_scope)
+
+    target_path = tmp_path / 'saved-target.json'
+    target_path.write_bytes(canonical_json(world.target))
+    digest = sha256_hex(target_path.read_bytes())
+    cfg = {'target': str(target_path), 'retry_scope': str(scope_path),
+           'prepared': str(tmp_path / 'inert-prepared-declaration.json'),
+           'max_duration_seconds': 301 if case == 'over-budget' else 30}
+    executor = KubernetesRequestTerminationExecutor(
+        cfg, runner=forbidden, expected_target_sha256='0' * 64 if case == 'target-pin' else None)
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['LIF-12']
+    if case == 'legacy-stage':
+        check = check.model_copy(update={'policy_params': [
+            *check.policy_params, PolicyParam(key='retry_session', type='str')]})
+    if error is None:
+        executor.prepared_retry_records(check, environment, values, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_retry_records(check, environment, values, expected_target_sha256=digest)
 
 
 @pytest.mark.parametrize('mode',['normal','unresolved','declared-forbidden','declared-cost','manual-only','missing-event',

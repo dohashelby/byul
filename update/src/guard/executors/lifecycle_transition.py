@@ -257,14 +257,14 @@ def _record_receipt(recordings, event):
 def _chat_selection(recordings):
     selection = selection_index(recordings)
     if not selection['stored_index_complete']:
-        return [], set()
+        return [], selection['invocations']
     path = sha256_hex(b'/v1/chat/completions')
     method = sha256_hex(b'POST')
     chat = [row for row in selection['events']
         if row['point'] == 'InputProcessor.assign_request_id' and row['phase'] == 'RETURN'
         and row['metadata']['entry_path_sha256'] == path and row['metadata']['entry_method_sha256'] == method
         and row['metadata']['request_id_observed'] is True and _sha(row['metadata']['selected_request_id_sha256'])]
-    return chat, set(selection['ambiguous_asgi_request_sha256'])
+    return chat, selection['invocations']
 
 
 def _chat_assignment(domain, chat, request):
@@ -291,6 +291,8 @@ def project(samples, trials, *, retain_receipts=False):
     facts = []; bindings = []; seen = set(); binding_seen = set(); missing = []
     request_ids = {t['request_id_sha256'] for t in trials}
     planned_generations = {}
+    observed_invocations = {}
+    ambiguous_requests = set()
     if retain_receipts:
         for trial in trials:
             request = trial['request_id_sha256']
@@ -312,9 +314,14 @@ def project(samples, trials, *, retain_receipts=False):
             recordings.append(recording if good else {'capture': None})
         index = request_index(recordings)
         if retain_receipts:
+            chat, invocations = _chat_selection(recordings)
+            for invocation, row in invocations.items():
+                request = row['asgi_request_sha256']
+                if (planned_generations.get(request) == sample['generation']
+                        and observed_invocations.setdefault(request, invocation) != invocation):
+                    ambiguous_requests.add(request)
             if not index['stored_record_index_complete']:
                 continue
-            chat, ambiguous_requests = _chat_selection(recordings)
         for domain_id, domain in index['domains'].items():
             for request in request_ids:
                 if retain_receipts:
@@ -361,6 +368,10 @@ def project(samples, trials, *, retain_receipts=False):
                     facts.append(fact)
         if not packet.get('recorded_files_covered'):
             missing.append(f"{sample['phase']}:{sample['generation']}:session_coverage_unavailable")
+    # A later qualified invocation supersedes the uniqueness of earlier samples.
+    if ambiguous_requests:
+        bindings = [row for row in bindings if row['request_id_sha256'] not in ambiguous_requests]
+        facts = [row for row in facts if row['request_id_sha256'] not in ambiguous_requests]
     grouped = {}
     for fact in facts:
         key = (fact['generation'], fact['session'], fact['domain'], fact['request_id_sha256'])
@@ -371,6 +382,8 @@ def project(samples, trials, *, retain_receipts=False):
     for trial in trials:
         if trial['request_id_sha256'] not in linked:
             missing.append(trial['case_id'] + ':native_request_generation_unlinked')
+        if trial['request_id_sha256'] in ambiguous_requests:
+            missing.append(trial['case_id'] + ':native_request_generation_ambiguous')
     return {'request_generation_bindings': bindings, 'request_configuration_facts': facts, 'request_configuration_conflicts': conflicts,
         'missing': sorted(set(missing)), 'actual_weights_cache_consumption_verified': False}
 

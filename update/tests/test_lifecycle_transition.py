@@ -238,7 +238,7 @@ def test_lif05_normalization_keeps_observed_request_facts_and_transition_gaps(mo
     assert observed['activation_scope_complete']['value'] is False
 
 
-@pytest.mark.parametrize('case_kind', ['bound', 'owner-unbound', 'ambiguous-invocation', 'wrong-generation'])
+@pytest.mark.parametrize('case_kind', ['bound', 'owner-unbound', 'ambiguous-invocation', 'wrong-generation', 'late-ambiguity'])
 def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_provenance(
         monkeypatch, tmp_path, group, native_target, writer_factory, case_kind):
     from guard.adapters import vllm_lifecycle_sensor as sensor
@@ -250,6 +250,7 @@ def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_pr
     from tests.test_lifecycle_sensor import RecordingObserver
 
     packets = {}
+    prefixes = []
     observed_generation = 'new' if case_kind == 'wrong-generation' else 'old'
     def observed_packet(generation, request):
         if generation.key != observed_generation or request is None:
@@ -267,15 +268,21 @@ def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_pr
                 assigned(observer, request)
             async def noop(*args):
                 return None
-            for _ in range(2 if case_kind == 'ambiguous-invocation' else 1):
+            for index in range(2 if case_kind in {'ambiguous-invocation', 'late-ambiguity'} else 1):
                 asyncio.run(sensor.Middleware(app)(
                     {**scope(request.encode()), 'path': '/v1/chat/completions', 'method': 'POST'}, noop, noop))
+                if case_kind == 'late-ambiguity' and index == 0:
+                    group.raw_by_pid[42] = bytes(raw.data)
+                    earlier, _ = capture_existing(group, native_target)
+                    prefixes.append(earlier)
             writer.close('SEALED')
             group.raw_by_pid[42] = bytes(raw.data)
             packet, _ = capture_existing(group, native_target)
             if case_kind == 'owner-unbound':
                 packet['recordings'][0]['session_owner_match'] = False
             packets[request] = packet
+            if prefixes:
+                return prefixes[0]
         return packets[request]
 
     executor, env, _ = harness(monkeypatch, failure='recovery', observed_packet=observed_packet)
@@ -325,6 +332,13 @@ def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_pr
             assert any(event['phase'] == 'RETURN'
                 and event['metadata']['asgi_request_sha256'] == sha256_hex(request.encode())
                 for event in packet['request_selection_index']['events'])
+        if case_kind == 'late-ambiguity':
+            prefix, = prefixes
+            trial = {'case_id': 'inflight', 'generation': 'old', 'request_id_sha256': sha256_hex(request.encode())}
+            early = subject.project([sample(prefix), sample(prefix, 'after')], [trial], retain_receipts=True)
+            assert len(early['request_generation_bindings']) == 1
+            assert trial['request_id_sha256'] in packet['request_selection_index']['ambiguous_asgi_request_sha256']
+            assert 'inflight:native_request_generation_ambiguous' in observed['activation_missing']
     assert request.encode() not in canonical_json(evd.to_dict())
     judgment = judge_evidence(definition, evd, sealed_policy(pack.ref()), T0)
     assert evd.data_origin is DataOrigin.EXAMPLE and judgment.verdicts.security.value == 'UNKNOWN'

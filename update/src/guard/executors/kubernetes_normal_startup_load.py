@@ -106,6 +106,10 @@ def _source_profile(adapter, env):
     method = getattr(adapter, "startup_load_source", None)
     source = (method(env) if callable(method) else
               get_provider(env.engine.name).evidence_contract("startup_load_source", env))
+    return _validate_source_profile(source)
+
+
+def _validate_source_profile(source):
     if (type(source) is not dict or set(source) != _SOURCE_KEYS
             or type(source["source_root"]) is not str or not source["source_root"].startswith("/")
             or ".." in PurePosixPath(source["source_root"]).parts
@@ -204,22 +208,43 @@ class KubernetesNormalStartupLoadExecutor:
                 or values["supply_total_budget_ms"] < 1):
             raise ValueError("LIF01_BOOT_POLICY_INVALID")
 
+    def _target_setup(self, raw, env, *, expected_target_sha256, duration, adapter=None):
+        target = strict_json(raw, limit=_LIMIT)
+        target_sha = sha256_hex(canonical_json(target))
+        if target_sha != expected_target_sha256 or self._expected_target_sha256 not in (None, target_sha):
+            raise ValueError
+        source = (_source_profile(adapter, env) if adapter is not None else
+                  _validate_source_profile(get_provider(env.engine.name).evidence_contract("startup_load_source", env)))
+        binary = self.cfg.get("kubectl_binary", "kubectl")
+        transport = normal_startup_load_transport(target, env, duration=duration, binary=binary, runner=self.runner)
+        source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
+            profile=ENGINE_CALLBACK_PROFILE, clock=transport.clock)
+        source_reader.deadline = transport.deadline
+        return target, target_sha, source, transport, source_reader
+
+    def prepared_normal_startup_load(self, check, env, values, *, expected_target_sha256):
+        """Validate the saved target, source profile and transport settings without collecting."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            raw = dependency(self.cfg["target"], None)
+            self._target_setup(raw, env, expected_target_sha256=expected_target_sha256,
+                               duration=self.cfg.get("max_duration_seconds", 20))
+        except (AttributeError, KubernetesBindingError, KeyError, OSError, OverflowError, TypeError, ValueError):
+            raise ValueError("LIF01_BOOT_TARGET_OR_SOURCE_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 20)
-        binary = self.cfg.get("kubectl_binary", "kubectl")
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if target_sha != self._expected_target_sha256:
+                raw = stream.read(_LIMIT + 1)
+            if adapter is None:
                 raise ValueError
-            source = _source_profile(adapter, env)
-            transport = normal_startup_load_transport(target, env, duration=duration, binary=binary, runner=self.runner)
-            source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
-                profile=ENGINE_CALLBACK_PROFILE, clock=transport.clock)
-            source_reader.deadline = transport.deadline
+            target, target_sha, source, transport, source_reader = self._target_setup(
+                raw, env, expected_target_sha256=self._expected_target_sha256, duration=duration, adapter=adapter)
         except (AttributeError, KubernetesBindingError, KeyError, OSError, TypeError, ValueError):
             raise ValueError("LIF01_BOOT_TARGET_OR_SOURCE_UNVERIFIED") from None
 

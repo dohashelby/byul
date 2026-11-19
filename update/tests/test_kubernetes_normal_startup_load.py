@@ -215,6 +215,35 @@ def test_lif01_pre_io_requires_explicit_scope_and_exact_target(tmp_path, fault):
     _run(tmp_path, "0.30.0", fault)
 
 
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("settings", [{}, {"max_duration_seconds": 0}, {"kubectl_binary": " "}])
+def test_lif01_preparation_validates_effective_transport_without_collecting(tmp_path, version, settings):
+    from tools.mvp_versions import versions
+
+    env, target, path, world = _inputs(tmp_path, version)
+    image = next(row["image"] for row in versions().values() if row["version"] == version)
+    env = env.model_copy(update={"engine": env.engine.model_copy(update={"image_digest": image})}).seal()
+    target["environment_ref"] = env.ref().model_dump(mode="json")
+    target["engine"]["image_digest"] = image
+    target["kubernetes"]["engine"].update(image=image, image_id=image)
+    target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=world.runner)
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    digest = sha256_hex(raw)
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["LIF-01"]
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("LIF-01 preparation must not collect logs or installed source")
+
+    cfg = {"normal_startup_load_only": True, "target": str(path), **settings}
+    executor = KubernetesNormalStartupLoadExecutor(cfg, runner=forbidden, expected_target_sha256=digest)
+    if not settings:
+        executor.prepared_normal_startup_load(check, env, VALUES, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match="^LIF01_BOOT_TARGET_OR_SOURCE_UNVERIFIED$"):
+            executor.prepared_normal_startup_load(check, env, VALUES, expected_target_sha256=digest)
+
+
 def test_prefix_capture_refuses_cap_boundary_and_does_not_supply_measured_values(tmp_path):
     env, target, _, world = _inputs(tmp_path, "0.31.0")
     world.raw = b"x" * 65535 + b"\n"

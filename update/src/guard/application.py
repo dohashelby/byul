@@ -597,6 +597,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                      change=None, previous_plan=None, source_store=None) -> dict:
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry
+    from guard.executors.lifecycle_transition import (LifecycleTransitionExecutor, REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE,
+                                                      generation_identity, redeployment_side_reuse)
     from guard.core.preflight import validate_pack
     from guard.readiness_support import assess_check_support
 
@@ -614,6 +616,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     check_support = []
     kube_only = False
     transition_requested = False
+    redeploy_preflight = False
     try:
         allowed_checks = None if single else update_allowed_checks(cfg, pack)
         execution_config = _update_config_for_execution(pack, cfg, allowed_checks)
@@ -660,6 +663,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         for item in executable:
             if item.gaps:
                 raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
+            seen_generation_identities = set()
             for side, c in prepared[1].items():
                 selected_env = envs[0] if side in {'single', 'baseline'} else envs[-1]
                 if passive_hop and item.check_id == passive_api_hop.CHECK:
@@ -714,6 +718,15 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     executor.validate_policy(check_def, values)
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
+                    if (kube and item.check_id in REDEPLOY_CHECKS and isinstance(executor, LifecycleTransitionExecutor)
+                            and 2 in run_binding.stages_for(check_def)):
+                        redeploy_preflight = True
+                        generations, _ = executor.prepared_generations(check_def, selected_env, values)
+                        identities = {generation_identity(generation.target, generation.env, generation.prepared)
+                                      for generation in generations.values()}
+                        if redeployment_side_reuse(seen_generation_identities, identities):
+                            raise ValueError(REDEPLOY_SIDE_REUSE)
+                        seen_generation_identities.update(identities)
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
     except Exception as exc:
@@ -723,6 +736,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     if kube_only:
         limitations = ["Static Kubernetes preparation only; no kubectl, Docker, engine or GPU execution.",
                        "Existing inspected image/source limits remain; unreviewed GPU images are unsupported."]
+        if redeploy_preflight:
+            limitations.append("LIF-05/LIF-16 preparation checks declared generation files. The installed native producer, actual transition and admission require separate observations.")
         if transition_requested:
             record("kubernetes-static-binding", prepared is not None,
                    "Exact target/ENV declarations checked; actual cluster, Pods, template and GPU remain unverified")

@@ -489,7 +489,8 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 
 
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
-            run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None):
+            run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None,
+            expected_transition_manifest_sha256=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
@@ -543,6 +544,14 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     try:
         if 2 in stages:
             stage_files, extra = _stage_2(check, executor_cfg, run_cfg, issued_at)
+            if expected_transition_manifest_sha256 is not None:
+                if extra.get('transition_inputs_sha256') != expected_transition_manifest_sha256:
+                    raise RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_CHANGED')
+                from guard.executors.lifecycle_transition import LifecycleTransitionExecutor
+                try:
+                    LifecycleTransitionExecutor(executor_cfg).prepared_generations(check, env, extra)
+                except ValueError:
+                    raise RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_INVALID') from None
             files.update(stage_files)
         if 3 in stages:
             stage_files, stage_values, validity = _stage_3(check, run_cfg or {}, issued_at, valid_from, valid_until)

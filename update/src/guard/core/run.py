@@ -171,6 +171,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
         if actual != expected:
             raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")
     passive_hop = passive_api_hop.validate_run_scope(pack, plan, cfg, allowed_checks)
+    bound_external_update = (plan.mode == Mode.update and plan.inputs.execution_recipe_sha256 is not None
+                             and requested.get('update', {}).get('mode', 'external') == 'external')
 
     plan_ref = plan.ref()
     pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
@@ -193,9 +195,10 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
         for side, env in _sides(plan, envs):
             if only_side is not None and side != only_side:
                 continue
+            transition_manifests = {} if bound_external_update else None
             if plan.inputs.execution_recipe_sha256 is not None:
                 from .execution_recipe import configuration_sha256
-                if configuration_sha256(cfg.requested if cfg.requested is not None else cfg.raw, envs) != plan.inputs.execution_recipe_sha256:
+                if configuration_sha256(requested, envs, transition_manifests=transition_manifests) != plan.inputs.execution_recipe_sha256:
                     raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
@@ -222,7 +225,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,
                            policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks,
                            passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
-                           source_ref=source_refs.get(side))
+                           source_ref=source_refs.get(side),
+                           transition_manifests=transition_manifests)
             try:
                 store.put(evd)
             except Exception:
@@ -242,7 +246,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
 
 
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
-             policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None) -> Evidence:
+             policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
+             transition_manifests=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -304,6 +309,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             **_normalize(check, draft),
         ).seal()
     from guard.executors import run_binding
+    from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE
     if run_binding.keys_for(check):
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
@@ -321,6 +327,15 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                             or any(digest is None for digest in cfg.normal_file_read_sha256.values())):
                         raise run_binding.RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_FILES_UNAVAILABLE')
                     target_options["expected_normal_file_sha256"] = cfg.normal_file_read_sha256
+            if (transition_manifests is not None and check.id in REDEPLOY_CHECKS
+                    and check.executor == 'lifecycle_transition' and cfg.executors[item.executor] == 'kubernetes'
+                    and 2 in run_binding.stages_for(check)):
+                expected_manifest = transition_manifests.get(common["side"].value + ":" + check.id)
+                if expected_manifest == REDEPLOY_SIDE_REUSE:
+                    raise run_binding.RunBindingUnavailable("RUN_BINDING_" + REDEPLOY_SIDE_REUSE)
+                if expected_manifest is None:
+                    raise run_binding.RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_UNAVAILABLE')
+                target_options["expected_transition_manifest_sha256"] = expected_manifest
             binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],

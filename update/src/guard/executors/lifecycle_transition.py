@@ -25,8 +25,8 @@ from guard.adapters import vllm_ready_endpoint_metadata as endpoint_metadata
 from guard.collectors.file import load_environment
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
-from guard.runtime.engine_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
-from guard.runtime.kubernetes_binding import verify_owned_pod
+from guard.runtime.engine_http import KubernetesBindingError, KubernetesHTTP, REQUEST_BINDING_PROFILE
+from guard.runtime.kubernetes_binding import validate_container_binding, verify_owned_pod
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader, validate_target
 from .lifecycle_session import capture_session, request_index
@@ -40,6 +40,8 @@ PROFILES = {
     'lif16-restore-redeploy-v1': 'LIF-16',
 }
 PHASES = ('before', 'during', 'after', 'recovered')
+REDEPLOY_CHECKS = frozenset({'LIF-05', 'LIF-16'})
+REDEPLOY_SIDE_REUSE = 'TRANSITION_GENERATION_SIDE_REUSE'
 POLICY_TYPES = {'transition_inputs_sha256': 'str',
     **{f'transition_{phase}_at': 'str' for phase in PHASES},
     **{f'transition_{phase}_generation': 'str' for phase in PHASES}}
@@ -115,7 +117,22 @@ def _manifest_row(key, env, target, prepared):
         'target_sha256': sha256_hex(canonical_json(target)), 'prepared_sha256': sha256_hex(canonical_json(prepared))}
 
 
-def inputs_manifest(cfg):
+def generation_identity(target, env, prepared):
+    """Declared owner, release and producer session for side separation."""
+    binding = target['kubernetes']
+    engine = binding['engine']
+    validate_container_binding(engine)
+    release = env.engine
+    return ((binding['context'], engine['namespace_uid'], engine['pod_uid'], engine['container_id']),
+            (release.name, release.version, release.image_digest), prepared['session'])
+
+
+def redeployment_side_reuse(before, after):
+    return any(session == prior_session or owner == prior_owner and release != prior_release
+               for owner, release, session in after for prior_owner, prior_release, prior_session in before)
+
+
+def inputs_manifest(cfg, *, generation_identities=None):
     """`transition_inputs_sha256` source for guard-run-binding/2: the same rows load_generations hashes.
 
     Only loads the configured files; load_generations still validates them and
@@ -126,20 +143,60 @@ def inputs_manifest(cfg):
         rows = cfg['generations']
         if type(rows) is not list or not 1 <= len(rows) <= 4:
             raise ValueError
-        manifest = []
+        manifest, identities = [], set()
         for row in rows:
             if type(row) is not dict or set(row) != {'id', 'target', 'prepared', 'environment'}:
                 raise ValueError
             with Path(row['target']).open('rb') as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            manifest.append(_manifest_row(row['id'], load_environment(Path(row['environment'])), target,
-                                          load_prepared(row['prepared'])))
+            env = load_environment(Path(row['environment']))
+            prepared = load_prepared(row['prepared'])
+            manifest.append(_manifest_row(row['id'], env, target, prepared))
+            if generation_identities is not None:
+                identities.add(generation_identity(target, env, prepared))
+        if generation_identities is not None:
+            generation_identities.update(identities)
         return manifest
     except (KeyError, TypeError, ValueError, OSError, RuntimeError):
         raise ValueError('TRANSITION_CONFIGURATION_INVALID') from None
 
 
-def load_generations(cfg, env, values):
+def _validate_redeployment(generations, phases):
+    before = generations[phases['before']]
+    if before.key in (phases['after'], phases['recovered']):
+        raise ValueError('TRANSITION_DISTINCT_GENERATIONS_REQUIRED')
+    release = before.env.engine
+    slots = {}
+    containers = set()
+    restarts = set()
+    old_binding = before.native_target['kubernetes']
+    old = old_binding['engine']
+    old_pod = (old_binding['context'], old['pod_uid'])
+    for generation in generations.values():
+        engine = generation.env.engine
+        if (engine.name, engine.version, engine.image_digest) != (release.name, release.version, release.image_digest):
+            raise ValueError('TRANSITION_GENERATION_RELEASE_MISMATCH')
+        target = generation.native_target['kubernetes']
+        owner = target['engine']
+        pod = (target['context'], owner['pod_uid'])
+        container = (target['context'], owner['container_id'])
+        slot = tuple(owner[key] for key in ('namespace', 'namespace_uid', 'pod', 'node', 'container'))
+        restart = (pod, owner['restart_count'])
+        if (slots.setdefault(pod, slot) != slot or restart in restarts or container in containers
+                or pod == old_pod and generation.key in (phases['after'], phases['recovered'])
+                and owner['restart_count'] <= old['restart_count']):
+            raise ValueError('TRANSITION_DISTINCT_GENERATIONS_REQUIRED')
+        restarts.add(restart)
+        containers.add(container)
+        # Validate the existing HTTP target and model mapping before any incoming
+        # request. Constructing the transport only verifies local inputs.
+        try:
+            KubernetesHTTP(generation.target, generation.env, duration=1, profile=REQUEST_BINDING_PROFILE)
+        except (KubernetesBindingError, OSError):
+            raise ValueError('TRANSITION_GENERATION_HTTP_TARGET_INVALID') from None
+
+
+def load_generations(cfg, env, values, check_id=None):
     """Load only already prepared targets. No discovery or replacement fallback."""
     from guard.collectors.lifecycle import load_prepared
     values = normalize_policy_values(values)
@@ -179,9 +236,11 @@ def load_generations(cfg, env, values):
             raise ValueError
         if generations[values['transition_phase_generation']['before']].env.ref() != env.ref():
             raise ValueError
-        return generations, manifest
     except (KeyError, TypeError, ValueError, OSError, RuntimeError):
         raise ValueError('TRANSITION_CONFIGURATION_INVALID') from None
+    if check_id in REDEPLOY_CHECKS:
+        _validate_redeployment(generations, values['transition_phase_generation'])
+    return generations, manifest
 
 
 def project(samples, trials):
@@ -265,6 +324,13 @@ class LifecycleTransitionExecutor:
         if PROFILES.get(getattr(check, 'collection_profile', None)) != check.id:
             raise ValueError('TRANSITION_PROFILE_UNSUPPORTED')
         normalize_policy(values)
+
+    def keys(self):
+        return {}
+
+    def prepared_generations(self, check, env, values):
+        """Validate local generation files and scope without sampling or dispatch."""
+        return load_generations(self.cfg, env, values, check.id)
 
     def _reader(self, generation):
         return KubernetesLifecycleReader(generation.native_target, generation.env, generation.prepared,

@@ -6,7 +6,8 @@ import inspect
 from guard.models import canonical_json, sha256_hex, utcnow
 
 
-def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None):
+def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None,
+                         transition_manifests=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
@@ -82,18 +83,54 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                         ({'name': Path(path).name, 'sha256': sha256_hex(Path(path).read_bytes())} for path in closure),
                         key=lambda item: (item['name'], item['sha256']))
     factories(cfg, 'root', environments[0] if len(environments) == 1 else None)
-    from guard.configuration import merge_config
+    from guard.configuration import for_check, merge_config
+    from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, inputs_manifest, redeployment_side_reuse
     sides = {s: None for s in cfg.get('sides', {})}
     if len(environments) == 2: sides.update(zip(('baseline', 'candidate'), environments))
+    redeploy_inputs = {}
+    redeploy_identities = {}
+    redeploy_conflicts = set()
+    update = cfg.get('update', {})
+    permitted = update.get('allowed_checks')
+    paired_external = len(environments) == 2 and update.get('mode', 'external') == 'external'
     for side, env in sides.items():
-        factories(merge_config(cfg, cfg.get('sides', {}).get(side, {})), side, env)
+        effective = merge_config(cfg, cfg.get('sides', {}).get(side, {}))
+        factories(effective, side, env)
+        # Stage-2 redeploy inputs use a list of per-generation files rather
+        # than the one target path committed by the generic recipe visitor.
+        if paired_external and side in ('baseline', 'candidate') and effective.get('executors', {}).get('lifecycle_transition') == 'kubernetes':
+            bindings = effective.get('run_binding')
+            for check_id in sorted(REDEPLOY_CHECKS):
+                if (type(bindings) is not dict or check_id not in bindings
+                        or type(permitted) is list and check_id not in permitted):
+                    continue
+                identities = set()
+                try:
+                    settings = for_check(effective, 'lifecycle_transition', check_id)['lifecycle_transition']
+                    digest = sha256_hex(canonical_json(inputs_manifest(settings, generation_identities=identities)))
+                except (KeyError, TypeError, ValueError, OSError):
+                    digest = None
+                previous = redeploy_identities.setdefault(check_id, set())
+                if redeployment_side_reuse(previous, identities):
+                    redeploy_conflicts.add(check_id)
+                previous.update(identities)
+                redeploy_inputs[side + ':' + check_id] = digest
+    if transition_manifests is not None:
+        # Commit even stale declarations. Only a selected execution consumes
+        # this diagnostic, so unused bindings cannot block another check.
+        transition_manifests.update({
+            key: REDEPLOY_SIDE_REUSE if key.split(':')[1] in redeploy_conflicts else digest
+            for key, digest in redeploy_inputs.items()})
     # Commit the actual installed common implementation, not a manifest's
     # assertion about its own bytes. This is outside the measured trial.
     package = Path(__file__).parents[1]
     software = {p.relative_to(package).as_posix(): sha256_hex(p.read_bytes())
         for p in sorted(package.rglob('*')) if p.is_file() and p.suffix in {'.py', '.json', '.yaml', '.txt'}}
-    return sha256_hex(canonical_json({'schema': 'guard-execution-recipe/1', 'requested': normalize(cfg),
-        'inputs': inputs, 'implementations': implementations, 'software_sha256': sha256_hex(canonical_json(software))}))
+    recipe = {'schema': 'guard-execution-recipe/1', 'requested': normalize(cfg),
+              'inputs': inputs, 'implementations': implementations, 'software_sha256': sha256_hex(canonical_json(software))}
+    if redeploy_inputs:
+        recipe['transition_manifest_sha256_by_side_check'] = redeploy_inputs
+    return sha256_hex(canonical_json(recipe))
 
 
 def validate_policy_time(policy):

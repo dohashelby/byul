@@ -14,7 +14,7 @@ from guard.adapters.vllm_approved_file_read_composition import PROFILES
 from guard.cli import app
 from guard.collectors.lifecycle import load_prepared
 from guard.executors import registry, run_binding
-from guard.executors.kubernetes_sup05_normal_preparation import prepare
+from guard.executors.kubernetes_sup05_normal_preparation import prepare, read_normal_preparation
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
 from tests.builders import environment
 from tests.test_kubernetes_sampling import inputs as sampling_inputs
@@ -93,6 +93,11 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     assert prepared["session"] == receipt["session"]
     assert prepared["assets"]["model-read-scope.json"]["sha256"] == receipt["deployed_scope_sha256"]
     assert sha256_hex(Path(normal["prepared"]).read_bytes()) == receipt["prepared_file_sha256"]
+    receipt_path = case.output / "preparation.json"
+    assert read_normal_preparation(receipt_path, case.env, expected_sha256=sha256_hex(receipt_path.read_bytes())) == {
+        "normal": normal, "target_sha256": receipt["target_sha256"],
+        "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
+                                        "reference_manifest": args["model_manifest_sha256"]}}
     assert all(receipt[key] is False for key in ("approval_verified", "live_owner_verified", "pre_import_verified",
         "asset_publication_verified", "engine_started", "model_files_read", "native_consumption_observed"))
     assert all(b"/private-model-location" not in path.read_bytes() for path in case.output.rglob("*") if path.is_file())
@@ -107,6 +112,32 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     factory.validate_policy(check, values)
     _, reloaded, target_hash, prepared_hash = factory.normal_file_read_inputs(case.env, values)
     assert (reloaded, target_hash, prepared_hash) == (prepared, receipt["target_sha256"], receipt["prepared_sha256"])
+
+
+@pytest.mark.parametrize("damage", ("environment", "receipt-pin", "promoted", "missing-flag",
+                                    "target-bytes", "reference-bytes", "prepared-bytes", "missing-asset"))
+def test_read_normal_preparation_rejects_unbound_receipt_or_input(external, damage):
+    case = _case(external, "0.30.0")
+    receipt = prepare(case.output, REPOSITORY, **case.args)
+    receipt_path = case.output / "preparation.json"
+    env = case.env
+    if damage == "environment":
+        env = env.model_copy(update={"id": "ENV-EXAMPLE-OTHER"}).seal()
+    elif damage in {"promoted", "missing-flag"}:
+        if damage == "promoted":
+            receipt["native_consumption_observed"] = True
+        else:
+            del receipt["live_owner_verified"]
+        receipt_path.write_bytes(canonical_json(receipt))
+    elif damage in {"target-bytes", "reference-bytes", "prepared-bytes"}:
+        key = {"target-bytes": "target", "reference-bytes": "reference_manifest", "prepared-bytes": "prepared"}[damage]
+        path = Path(receipt["normal"][key])
+        path.write_bytes(path.read_bytes() + b"\n")
+    elif damage == "missing-asset":
+        (case.output / "lifecycle" / "model-read-scope.json").unlink()
+    pin = "b" * 64 if damage == "receipt-pin" else sha256_hex(receipt_path.read_bytes())
+    with pytest.raises(ValueError, match="^SUP05_PREPARATION_RECEIPT_INVALID$"):
+        read_normal_preparation(receipt_path, env, expected_sha256=pin)
 
 
 @pytest.mark.parametrize("damage", ("owner-pin", "reference-pin", "wrong-pod", "already-ready", "writable-model", "v2-mode"))

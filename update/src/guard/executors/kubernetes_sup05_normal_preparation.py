@@ -2,17 +2,83 @@
 
 import os
 from pathlib import Path
+import stat
 from tempfile import TemporaryDirectory
 
 from guard.adapters.engine_provider import get_provider
-from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES, dependency, fingerprint
+from guard.adapters.vllm_lifecycle_catalog import asset_names
+from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES, dependency, fingerprint, validate_scope
 from guard.collectors.lifecycle import load_prepared, prepare_assets
-from guard.collectors.model_read_scope import build_scope
+from guard.collectors.model_read_scope import build_scope, deploy_scope
 from guard.executors.kubernetes_supply_boot import _approved_reference, _model_mount
 from guard.models import Environment, canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import project_owned_snapshot, validate_capture_target
-from guard.update_validation import reserve_output
+from guard.update_validation import _plain_path, reserve_output
+
+
+_PREPARATION_ONLY = {"approval_verified", "live_owner_verified", "pre_import_verified",
+                     "asset_publication_verified", "engine_started", "model_files_read", "native_consumption_observed"}
+_RECEIPT_DIGESTS = {"model_mount_projection_sha256", "scope_input_sha256", "deployed_scope_sha256",
+                    "target_sha256", "prepared_sha256", "prepared_file_sha256"}
+_RECEIPT_FIELDS = {"schema", "environment", "environment_ref", "input_data_origin", "producer_profile",
+                   "session", "normal", "input_sha256"} | _PREPARATION_ONLY | _RECEIPT_DIGESTS
+
+
+def read_normal_preparation(path, env, *, expected_sha256):
+    """Read an independently pinned local preparation receipt for configuration assembly."""
+    try:
+        if not fingerprint(expected_sha256):
+            raise ValueError
+        path = _plain_path(Path(path))
+        receipt = strict_json(dependency(path, expected_sha256), limit=MAX_SCOPE_BYTES)
+        if (type(receipt) is not dict or receipt.keys() != _RECEIPT_FIELDS
+                or receipt["schema"] != "guard-sup05-normal-preparation/1"
+                or any(receipt[key] is not False for key in _PREPARATION_ONLY)
+                or any(not fingerprint(receipt[key]) for key in _RECEIPT_DIGESTS)
+                or not env.hash_ok() or receipt["environment_ref"] != env.ref().model_dump(mode="json")
+                or receipt["input_data_origin"] != env.data_origin.value):
+            raise ValueError
+
+        directory = path.parent
+        normal = {"target": str(directory / "target.json"), "prepared": str(directory / "lifecycle" / "manifest.json"),
+                  "reference_manifest": str(directory / "reference-manifest.json")}
+        environment_path = directory / "environment.json"
+        hashes = receipt["input_sha256"]
+        if (receipt["normal"] != normal or receipt["environment"] != str(environment_path)
+                or type(hashes) is not dict or hashes.keys() != {"environment", "target", "owner_snapshot", "reference_manifest"}
+                or any(not fingerprint(value) for value in hashes.values())):
+            raise ValueError
+
+        saved_env = Environment.model_validate(strict_json(dependency(environment_path, hashes["environment"]),
+                                                          limit=MAX_SCOPE_BYTES))
+        if not saved_env.hash_ok() or saved_env.ref() != env.ref():
+            raise ValueError
+        target = strict_json(dependency(normal["target"], hashes["target"]), limit=65536)
+        validate_capture_target(target, env)
+        source = get_provider(env.engine.name).evidence_contract("approved_file_read_preparation", env)
+        if type(source) is not dict or source.get("profile") != receipt["producer_profile"]:
+            raise ValueError
+        manifest = _plain_path(Path(normal["prepared"]))
+        if any(not stat.S_ISREG((manifest.parent / name).lstat().st_mode) for name in asset_names(source["profile"])):
+            raise ValueError
+        prepared = load_prepared(manifest, expected_sha256=receipt["prepared_file_sha256"])
+        if (sha256_hex(canonical_json(target)) != receipt["target_sha256"]
+                or sha256_hex(canonical_json(prepared)) != receipt["prepared_sha256"]
+                or prepared["profile"] != receipt["producer_profile"] or prepared["session"] != receipt["session"]
+                or prepared["assets"]["model-read-scope.json"]["sha256"] != receipt["deployed_scope_sha256"]):
+            raise ValueError
+        _approved_reference(normal["reference_manifest"], hashes["reference_manifest"], env, target, prepared)
+        scope_raw = dependency(directory / "model-read-scope.json", receipt["scope_input_sha256"])
+        scope = validate_scope(strict_json(scope_raw, limit=MAX_SCOPE_BYTES), session=None)
+        if sha256_hex(deploy_scope(scope, scope_raw, prepared["session"])) != receipt["deployed_scope_sha256"]:
+            raise ValueError
+    except (AttributeError, KeyError, OSError, TypeError, ValueError):
+        raise ValueError("SUP05_PREPARATION_RECEIPT_INVALID") from None
+
+    return {"normal": normal, "target_sha256": receipt["target_sha256"],
+            "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
+                                            "reference_manifest": hashes["reference_manifest"]}}
 
 
 def _owned_snapshot(snapshot, binding):

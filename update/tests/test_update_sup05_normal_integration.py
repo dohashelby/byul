@@ -95,7 +95,11 @@ def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, extern
         native, = observation.value
         read, = native["rows"]
         assert native["role"] == "normal" and read["matches_approved"] is True
-        assert read["source_binding"]["recording_owner_binding_verified"] is True
+        source = read["source_binding"]
+        assert source["recording_owner_binding_verified"] is True
+        artifact = next(item for item in evidence.artifacts if item.name == source["recording_artifact"])
+        assert artifact.sha256 == source["recording_sha256"] == sha256_hex(expected.raw)
+        assert artifact.bytes == len(expected.raw) and (store.root / artifact.path).read_bytes() == expected.raw
         receipt, = evidence.observations["supply_boot_sessions"].value
         manifest = Path(expected.cfg["normal"]["reference_manifest"]).read_bytes()
         assert receipt["approved_reference_manifest_sha256"] == sha256_hex(manifest)

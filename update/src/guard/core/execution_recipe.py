@@ -8,7 +8,8 @@ from guard.models import Mode, canonical_json, sha256_hex, utcnow
 
 def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None,
                          transition_manifests=None, plan=None, initialization_digests=None,
-                         response_route_digests=None, supply_record_digests=None):
+                         response_route_digests=None, supply_record_digests=None,
+                         missing_native_route_prepared_sides=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
@@ -88,7 +89,8 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     from guard.executors.kubernetes_response_content import route_target_bytes
     from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, inputs_manifest, redeployment_side_reuse
     from guard.executors.run_binding import (INITIALIZATION_CHECKS, SUPPLY_RECORD_CHECKS,
-                                             initialization_recipe_digests, supply_record_recipe_digests)
+                                             initialization_recipe_digests, native_route_preparation_missing,
+                                             supply_record_recipe_digests)
     sides = {s: None for s in cfg.get('sides', {})}
     if len(environments) == 2: sides.update(zip(('baseline', 'candidate'), environments))
     transition_inputs = {}
@@ -109,8 +111,10 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     init_inputs = {}
     response_routes = {}
     supply_inputs = {}
+    missing_route_prepared = set()
     prebound = update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
     prebound_response = prebound and eligible.get('REQ-13') == 'response_content'
+    prebound_route_record = prebound and eligible.get('REQ-02') == 'route_record'
     supply_checks = [check_id for check_id, executor in eligible.items()
                      if prebound and executor == 'supply_boot' and check_id in SUPPLY_RECORD_CHECKS]
     for side, env in sides.items():
@@ -155,6 +159,16 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                     response_routes[side] = sha256_hex(route_target_bytes(settings['route_target']))
             except (KeyError, OSError, TypeError, ValueError):
                 response_routes[side] = None
+        if (prebound_route_record and side in ('baseline', 'candidate') and type(bindings) is dict
+                and effective.get('executors', {}).get('route_record') == 'kubernetes'):
+            run_cfg = bindings.get('REQ-02')
+            if type(run_cfg) is dict and set(run_cfg) == {'record_session'}:
+                try:
+                    settings = for_check(effective, 'route_record', 'REQ-02').get('route_record', {})
+                    if type(settings) is dict and native_route_preparation_missing(settings):
+                        missing_route_prepared.add(side)
+                except (OSError, TypeError, ValueError):
+                    pass  # Invalid or unreadable declarations do not qualify as absent.
         if (supply_checks and side in ('baseline', 'candidate') and type(bindings) is dict
                 and effective.get('executors', {}).get('supply_boot') == 'kubernetes'):
             for check_id in supply_checks:
@@ -193,6 +207,10 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
         recipe['supply_record_file_sha256_by_side_check'] = supply_inputs
     if supply_record_digests is not None:
         supply_record_digests.update(supply_inputs)
+    if missing_route_prepared:
+        recipe['missing_native_route_prepared_sides'] = sorted(missing_route_prepared)
+    if missing_native_route_prepared_sides is not None:
+        missing_native_route_prepared_sides.update(missing_route_prepared)
     return sha256_hex(canonical_json(recipe))
 
 

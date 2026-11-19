@@ -202,12 +202,14 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             initialization_digests = {} if bound_external_update else None
             response_route_digests = {} if prebound_external_update else None
             supply_record_digests = {} if prebound_external_update else None
+            missing_route_prepared = set()
             if plan.inputs.execution_recipe_sha256 is not None:
                 from .execution_recipe import configuration_sha256
                 if configuration_sha256(requested, envs, plan=plan, transition_manifests=transition_manifests,
                                         initialization_digests=initialization_digests,
                                         response_route_digests=response_route_digests,
-                                        supply_record_digests=supply_record_digests) != plan.inputs.execution_recipe_sha256:
+                                        supply_record_digests=supply_record_digests,
+                                        missing_native_route_prepared_sides=missing_route_prepared) != plan.inputs.execution_recipe_sha256:
                     raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
@@ -236,7 +238,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                            passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
                            source_ref=source_refs.get(side),
                            transition_manifests=transition_manifests, initialization_digests=initialization_digests,
-                           response_route_digests=response_route_digests, supply_record_digests=supply_record_digests)
+                           response_route_digests=response_route_digests, supply_record_digests=supply_record_digests,
+                           native_route_prepared_absent=side.value in missing_route_prepared)
             try:
                 store.put(evd)
             except Exception:
@@ -258,7 +261,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
              policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
              transition_manifests=None, initialization_digests=None, response_route_digests=None,
-             supply_record_digests=None) -> Evidence:
+             supply_record_digests=None, native_route_prepared_absent=False) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -374,6 +377,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                     raise run_binding.RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_FILES_UNAVAILABLE')
                 target_options['expected_supply_record_digests'] = expected
                 raw = {**raw, '_supply_prepared_sha256_by_role': {role: expected[role] for role in ('normal', 'challenge')}}
+            if native_route_prepared_absent and check.id == 'REQ-02' and cfg.executors[item.executor] == 'kubernetes':
+                target_options['native_route_prepared_absent'] = True
             binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],

@@ -354,6 +354,20 @@ def file_hash(check_id, key, executor_cfg) -> str:
     return sha256_hex(canonical_json(_load(node, loader)))
 
 
+def native_route_preparation_missing(executor_cfg) -> bool:
+    """Check only whether the declared manifest itself is absent."""
+    from .kubernetes_route_record import has_record_only_native_role
+
+    native_cfg = executor_cfg.get('native_route')
+    if not has_record_only_native_role(native_cfg):
+        return False
+    try:
+        Path(native_cfg['prepared']).lstat()
+    except FileNotFoundError:
+        return True
+    return False
+
+
 def policy_document_sha256(check_id, key, policy_row) -> str:
     """RB3-Q3: the policy document is this check's values as written in the POL (canonical JSON)."""
     if type(policy_row) is not dict or key in policy_row:
@@ -533,7 +547,7 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
             run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None,
             expected_transition_manifest_sha256=None, expected_initialization_digests=None,
-            expected_supply_record_digests=None):
+            expected_supply_record_digests=None, native_route_prepared_absent: bool = False):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
@@ -633,6 +647,23 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             extra = {**extra, **stage_values}
         if any(k.endswith(('validity_start', 'validity_end')) for k in keys):
             start, end, basis = window(check.executor, issued_at, valid_from, valid_until)
+        if (native_route_prepared_absent is True and check.id == 'REQ-02' and check.executor == 'route_record'
+                and stages == (1, 2)):
+            from guard.runtime.kubernetes_http import _validate as validate_target
+            from .kubernetes_route_record import has_record_only_native_role
+            from .native_route_contract import POLICY_TYPES
+
+            # The sealed recipe chose record-only. A later-created native file
+            # cannot add a subcollection, and the declared owner must still match.
+            native_cfg = executor_cfg.get('native_route')
+            if not has_record_only_native_role(native_cfg):
+                raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE')
+            target = _load(native_cfg['target'], 'json')
+            if (type(target) is not dict or target.get('schema') != 'guard-kubernetes-request-binding-target/1'
+                    or target.get('environment_ref') != env.ref().model_dump(mode='json')):
+                raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE')
+            validate_target(target, env)
+            keys = tuple(key for key in keys if key not in POLICY_TYPES)
         for key in keys:
             if key.endswith('environment_sha256'):
                 values[key] = env.ref().sha256

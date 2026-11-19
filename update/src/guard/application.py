@@ -199,7 +199,11 @@ def _pin_prebound_kubernetes_targets(raw, env, paths, target_snapshots):
         if content is None:
             continue
         try:
-            hashes[check_id] = _scoped_target_sha256(content, env, scoped_check=check_id)
+            gateway_snapshot = (check_id == "OBS-01"
+                and for_check(raw, "required_event_record", check_id).get("required_event_record", {}).get(
+                    GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
+            hashes[check_id] = _scoped_target_sha256(
+                content, env, scoped_check=check_id, gateway_snapshot=gateway_snapshot)
         except ValueError:
             continue  # The scoped executor will withhold dispatch without a verified hash.
 

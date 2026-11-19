@@ -17,11 +17,12 @@ import yaml
 
 from guard.adapters import vllm_native_input_profiles, vllm_native_input_rejection
 from guard.adapters.engine_provider import get_provider
+from guard.application import _scoped_target_sha256
 from guard.collectors import native_input, native_input_qualification
 from guard.collectors import native_input_rejection_qualification, reused_input_qualification
 from guard.collectors.file import load_environment, load_policy
-from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
-                                 NORMAL_COMPILE_CACHE_OPTION,
+from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNAPSHOT_OPTION,
+                                 INSTALLED_PLUGIN_INVENTORY_OPTION, NORMAL_COMPILE_CACHE_OPTION,
                                  NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
@@ -176,6 +177,9 @@ def _inspect(source, check, pack, issued_at):
                                  version=env.engine.version) is None:
         raise ValueError('MVP_EXECUTOR_UNAVAILABLE')
     cfg = config.get(check.executor, {})
+    gateway_snapshot = check.id == 'OBS-01' and cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True
+    if gateway_snapshot:
+        bounded_metadata_scopes(side_configs.values(), pack, allowed)
     normal_graph_capture = check.id == 'REQ-20' and cfg.get(NORMAL_GRAPH_CAPTURE_OPTION) is True
     normal_safetensors_reader = check.id == 'SUP-12' and cfg.get(NORMAL_SAFETENSORS_READER_OPTION) is True
     normal_compile_cache = check.id == 'SUP-07' and cfg.get(NORMAL_COMPILE_CACHE_OPTION) is True
@@ -192,8 +196,10 @@ def _inspect(source, check, pack, issued_at):
     if target is not None:
         raw_target, identity = _read(target)
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
-        if target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
+        if type(target_data) is not dict or target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
+        if gateway_snapshot:
+            _scoped_target_sha256(raw_target, env, gateway_snapshot=True, scoped_check=check.id)
         target_state = (target, raw_target, identity)
     if cilium_egress_status:
         try:

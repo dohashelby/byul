@@ -1160,14 +1160,56 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
             'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64},
             'gateway_record_source': {'environment': preparation.GATEWAY_ENV, 'target_id': 'fixture-target',
                 'runtime_policy_sha256': 'f' * 64, 'request_sha256': f'{number:064x}'}}
-    cfg, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
-                                       gateway_record_inputs=gateway_inputs)
+    cfg, bindings, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
+                                             gateway_record_inputs=gateway_inputs)
     assert cfg['update']['allowed_checks'] == ['OBS-01'], decisions
     assert cfg['check_config']['OBS-01'] == {'record_snapshot_only': True, 'gateway_record_snapshot_only': True}
     assert decisions['OBS-01']['shared_executor_checks']['PLT-12']['baseline']['transport_dispatched'] is False
     envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
     ready = application.update_readiness(pack, envs, pol, cfg)
     assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('The Gateway receipt preflight must not contact a running service')
+
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    configuration = tmp_path / 'guard.toml'
+    tool.write_config(cfg, configuration)
+    config_ref = {'path': str(configuration), 'sha256': sha256_hex(configuration.read_bytes())}
+    index = _write(tmp_path / 'inputs.json', {**tool.readiness.template(pack),
+        'inputs': [{**binding, 'configuration': config_ref} for binding in bindings]})
+
+    def gateway_rows():
+        return {row['side']: row for row in tool.readiness.audit(index, pack=pack)['rows']
+                if row['check_id'] == 'OBS-01'}
+
+    rows = gateway_rows()
+    assert all(row['file_binding_valid'] and row['executor_policy_valid']
+               and not row['ready_for_execution'] and not row['engine_executed']
+               and row['actual_results'] is None for row in rows.values())
+    baseline = sides['baseline']['target']
+    original = baseline.read_bytes()
+    raw = merge_config(cfg, cfg['sides']['baseline'])
+    paths = application._bounded_kubernetes_targets(raw, {'OBS-01': 'required_event_record'})
+    assert paths == {'OBS-01': baseline}
+    application._pin_prebound_kubernetes_targets(raw, envs[0], paths, {baseline: original})
+    assert raw['_kubernetes_target_sha256_by_check'] == {'OBS-01': sha256_hex(canonical_json(json.loads(original)))}
+
+    for problem in ('missing', 'wrong_namespace'):
+        malformed = json.loads(original)
+        if problem == 'missing':
+            malformed.pop('kubernetes_gateway')
+        else:
+            malformed['kubernetes_gateway']['namespace_uid'] = '00000000-0000-0000-0002-000000000001'
+        _write(baseline, malformed)
+        rows = gateway_rows()
+        assert not rows['baseline']['file_binding_valid']
+        assert 'KUBERNETES_SCOPED_TARGET_INVALID' in rows['baseline']['blocking_codes']
+        assert rows['candidate']['file_binding_valid'] and not rows['candidate']['engine_executed']
+        application._pin_prebound_kubernetes_targets(raw, envs[0], paths, {baseline: baseline.read_bytes()})
+        assert raw['_kubernetes_target_sha256_by_check'] == {'OBS-01': None}
+    baseline.write_bytes(original)
     with pytest.raises(ValueError, match='GATEWAY_RECORDS_REQUIRE_PREBOUND_PAIR'):
         tool.staged_config(cfg, tmp_path / 'unbound-candidate.json')
     bad_mode = deepcopy(cfg)

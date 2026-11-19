@@ -323,6 +323,9 @@ def test_plt09_handshake_results(tmp_path, reply, security):
     evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=HelperDocker([reply])), TRANSPORT,
                            extra_cfg={"record_segments": [SEGMENT]})
     assert result.verdicts.security.value == security
+    assert evd.execution.status.value == "COMPLETED"
+    assert evd.observations["record_transport_segments_tested"].value == (
+        [SEGMENT["name"]] if reply["expected"]["tcp"] else [])
     assert evd.observations["record_transport_sender_verified"].value is False
 
 
@@ -333,6 +336,33 @@ def test_plt09_expected_peer_rejection_is_not_an_unprotected_transfer(tmp_path, 
                            extra_cfg={"record_segments": [SEGMENT]})
     assert evd.observations["record_transport_trials"].value[0]["state"] == "peer_rejected"
     assert evd.observations["record_transport_unprotected"].value == []
+    assert evd.observations["record_transport_sender_verified"].value is False
+    assert evd.normal_control.succeeded is None
+    assert result.verdicts.security.value == security
+
+
+@pytest.mark.parametrize("reply,expected_state,wrong_state,security", [
+    (handshake(OK, {**REFUSED_PEER, "tls": "false"}), "protected", None, "UNKNOWN"),
+    ({"expected": OK}, "protected", None, "UNKNOWN"),
+    (handshake({**PLAIN, "tcp": 1}, REFUSED_PEER), None, "peer_rejected", "UNKNOWN"),
+    (handshake({**GONE, "tcp": True}, REFUSED_PEER), None, "peer_rejected", "UNKNOWN"),
+    (handshake({**OK, "version": None}, REFUSED_PEER), None, "peer_rejected", "UNKNOWN"),
+    ({"expected": PLAIN}, "no_tls", None, "FAIL"),
+])
+def test_plt09_partial_receipt_preserves_only_valid_legs(tmp_path, reply, expected_state, wrong_state, security):
+    docker = HelperDocker([reply])
+    evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), TRANSPORT,
+                           extra_cfg={"record_segments": [SEGMENT]})
+    assert evd.data_origin.value == "EXAMPLE"
+    assert evd.execution.status.value == "ABORTED"
+    assert evd.execution.abort_reason == "RECORD_TRANSPORT_SEGMENT_UNAVAILABLE"
+    trial, = evd.observations["record_transport_trials"].value
+    assert trial["state"] == expected_state
+    assert trial["wrong_peer_state"] == wrong_state
+    assert trial["tls_version"] == ("TLSv1.3" if expected_state == "protected" else None)
+    assert evd.observations["record_transport_segments_tested"].value == []
+    assert evd.observations["record_transport_wrong_peer_accepted"].value == []
+    assert evd.observations["record_transport_unreachable"].value == []
     assert evd.observations["record_transport_sender_verified"].value is False
     assert evd.normal_control.succeeded is None
     assert result.verdicts.security.value == security

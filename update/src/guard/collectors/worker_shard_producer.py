@@ -67,12 +67,14 @@ def events_from(rows):
         for row in prepared:
             f = row['fields']
             index_present = f.get('index_present')
-            if index_present is False:
+            required = f.get('required')
+            if index_present is False and 'required' in f and required is None:
                 required = f.get('files') or []
                 codes.add('REQUIRED_FROM_ASSIGNED')
             elif index_present is True:
-                required = f.get('required')
-                if required is None:
+                if (type(required) is not list or not 0 < len(required) <= callback.MAX_FILES
+                        or any(not contract._check(shard, 'sha') for shard in required)):
+                    required = None
                     codes.add('WORKER_SHARD_INDEX_UNREADABLE')
             else:
                 required = None

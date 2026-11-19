@@ -71,31 +71,46 @@ def test_registered_producer_makes_the_sharded_record_complete(monkeypatch):
     assert result['complete'] is True and result['producer_authenticated'] is False
 
 
-@pytest.mark.parametrize('index_state,diagnostic', [
-    ('unknown', 'WORKER_SHARD_INDEX_UNOBSERVED'),
-    ('unrecorded', 'WORKER_SHARD_INDEX_UNOBSERVED'),
-    ('malformed', 'WORKER_SHARD_INDEX_UNOBSERVED'),
-    ('unreadable', 'WORKER_SHARD_INDEX_UNREADABLE'),
+@pytest.mark.parametrize('index_state,index_present,diagnostic', [
+    ('unknown', None, 'WORKER_SHARD_INDEX_UNOBSERVED'),
+    ('unrecorded', None, 'WORKER_SHARD_INDEX_UNOBSERVED'),
+    ('malformed', None, 'WORKER_SHARD_INDEX_UNOBSERVED'),
+    ('conflicting-requirement', False, 'WORKER_SHARD_INDEX_UNOBSERVED'),
+    ('unreadable', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
+    ('empty-requirements', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
+    ('malformed-digest', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
+    ('directory-index', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
 ])
 def test_unverified_shard_index_keeps_assignments_without_required_claims(
-        tmp_path, monkeypatch, index_state, diagnostic):
+        tmp_path, monkeypatch, index_state, index_present, diagnostic):
     shard = tmp_path / 'fixture.safetensors'
     content = b'EXAMPLE shard metadata fixture'
     shard.write_bytes(content)
     observer = callback.WorkerShardObserver(SCOPE['session'], context_provider=lambda: {})
     native_result = (str(tmp_path), [str(shard)], True)
-    if index_state == 'unreadable':
+    if index_present is True:
         index = tmp_path / 'fixture.index.json'
-        index.write_text('{}', encoding='utf-8')
+        if index_state == 'directory-index':
+            index.mkdir()
+        else:
+            index.write_text('{}', encoding='utf-8')
         native_result += (index.name,)
+    elif index_present is False:
+        native_result += (None,)
     observed = observer._prepared(native_result)
-    assert observed['index_present'] is (True if index_state == 'unreadable' else None)
+    assert observed['index_present'] is index_present
     assert observed['required'] is None
     if index_state == 'unrecorded':
         del observed['index_present']
         observed['required'] = ['f' * 64]
     elif index_state == 'malformed':
         observed.update(index_present=1, required=['f' * 64])
+    elif index_state == 'conflicting-requirement':
+        observed['required'] = ['f' * 64]
+    elif index_state == 'empty-requirements':
+        observed['required'] = []
+    elif index_state == 'malformed-digest':
+        observed['required'] = ['f' * 64, 'not-a-sha256']
 
     rows = case('sharded')['rows']
     prepared = next(r for r in rows if r.get('point') == 'DefaultModelLoader._prepare_weights' and r['phase'] == 'RETURN')

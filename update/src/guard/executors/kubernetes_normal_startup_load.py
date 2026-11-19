@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 import re
 
 from guard.adapters.engine_profiles import supports
+from guard.adapters.engine_provider import get_provider
 from guard.core.select import check_policy_value
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -100,7 +101,11 @@ def capture_startup_log_prefix(target, env, *, duration=15, binary="kubectl", ru
 
 
 def _source_profile(adapter, env):
-    source = adapter.startup_load_source(env)
+    if adapter is None:
+        raise ValueError("LIF01_BOOT_SOURCE_UNQUALIFIED")
+    method = getattr(adapter, "startup_load_source", None)
+    source = (method(env) if callable(method) else
+              get_provider(env.engine.name).evidence_contract("startup_load_source", env))
     if (type(source) is not dict or set(source) != _SOURCE_KEYS
             or type(source["source_root"]) is not str or not source["source_root"].startswith("/")
             or ".." in PurePosixPath(source["source_root"]).parts

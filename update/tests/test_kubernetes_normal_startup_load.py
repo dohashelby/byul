@@ -201,3 +201,22 @@ def test_prefix_capture_refuses_cap_boundary_and_does_not_supply_measured_values
     with pytest.raises(ValueError, match="^LIF01_BOOT_PREFIX_UNVERIFIED$"):
         capture_startup_log_prefix(target, env, runner=world.runner)
     assert world.log_calls == [65536] and not world.hash_calls
+
+
+def test_stock_adapter_uses_registered_engine_source_contract(tmp_path, monkeypatch):
+    from guard.executors import kubernetes_normal_startup_load as startup
+
+    env, _, _, world = _inputs(tmp_path, "0.31.0")
+    source = world.adapter.startup_load_source(env)
+
+    class Provider:
+        def evidence_contract(self, name, bound_env):
+            assert name == "startup_load_source" and bound_env is env
+            return source
+
+    def provider(engine):
+        assert engine == env.engine.name
+        return Provider()
+
+    monkeypatch.setattr(startup, "get_provider", provider)
+    assert startup._source_profile(object(), env) == source

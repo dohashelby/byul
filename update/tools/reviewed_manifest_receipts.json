@@ -910,6 +910,11 @@
       "manifest_sha256": "f2f08215b3b7f0708543493b1720a3a5a0d24a6dfdc520b887b69e28ed81fa3a",
       "reviewed_by": "Codex / normal SUP-05 binding stages and mixed supply targets / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T07:51:49+00:00"
+    },
+    {
+      "manifest_sha256": "dee2eb14108d849d32ac4084c3172240fbe8878181f2ad9d3ef6911972537811",
+      "reviewed_by": "Codex / SUP-05 original recording bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T08:04:20+00:00"
     }
   ]
 }

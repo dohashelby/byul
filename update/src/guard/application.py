@@ -625,8 +625,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     transition_requested = False
     generation_preflight = set()
     try:
-        prebound = cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"
         allowed_checks = None if single else update_allowed_checks(cfg, pack)
+        prebound = not single and cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound"
         execution_config = _update_config_for_execution(pack, cfg, allowed_checks)
         if not single and cfg.get("update", {}).get("mode", "external") == "external":
             requested = run_config(execution_config)

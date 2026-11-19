@@ -230,6 +230,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
                       and check.id in run_binding.INITIALIZATION_CHECKS
                       and {1, 2}.issubset(run_binding.stages_for(check)))
+    collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
+                         and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
     gateway_response = (check.id == 'REQ-13' and check.executor == 'response_content'
                         and implementation == 'kubernetes' and 'gateway' in values['required_targets']
                         and config.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
@@ -383,6 +385,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             if effective['init_target_sha256'] != sha256_hex(canonical_json(target_data)):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             executor.prepared_inputs(check, env, effective)
+        if collection_status:
+            executor.prepared_collection_status(check, env, effective,
+                                                expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if gateway_response:
             executor.prepared_gateway(env, expected_target_sha256=sha256_hex(canonical_json(target_data)))
     if requires_native_matrix and not normal_token_input:

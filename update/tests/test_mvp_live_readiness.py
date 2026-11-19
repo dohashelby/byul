@@ -390,3 +390,70 @@ def test_initialization_readiness_uses_the_declared_startup_inputs(
         else:
             assert row['binding_schema'] == 'guard-run-binding/2'
             assert set(row['blocking_codes']) == {'EXAMPLE_ENV_NOT_ACTUAL', 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'}
+
+
+@pytest.mark.parametrize('candidate_wrong_owner', [False, True])
+def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, monkeypatch, candidate_wrong_owner):
+    from guard import application
+    from guard.models import canonical_json, sha256_hex
+    from tests.builders import environment, policy
+    from tests.test_kubernetes_log_integrity import GAP_VALUES
+    from tests.test_kubernetes_request_binding import target as owned_target
+    from tools.j02_run_config import write_config
+    from tools.mvp_versions import versions
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('OBS-11 preparation must not access the declared status probe')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    check_id = 'OBS-11'
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    values = {key: value for key, value in GAP_VALUES.items() if key != 'collection_session'}
+    pol = policy(pack.ref(), scope={'include': [check_id]}, values={check_id: values})
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {'log_integrity': 'kubernetes'},
+           'update': {'allowed_checks': [check_id]}, 'sides': {}}
+    envs, env_paths = [], {}
+    for index, (side, row) in enumerate(versions().items(), start=1):
+        env = environment(id=f'ENV-OBS11-{side.upper()}', model={'id': 'EXAMPLE', 'revision': 'r1'},
+            engine={'name': row['engine'], 'version': row['version'], 'image_digest': row['image']},
+            runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE', 'driver': 'EXAMPLE'})
+        declaration = owned_target(env)
+        declaration['observed_version'] = row['version']
+        declaration['engine']['image_digest'] = row['image']
+        declaration['kubernetes']['engine'].update(image=row['image'], image_id=row['image'])
+        if side == 'candidate' and candidate_wrong_owner:
+            declaration['kubernetes']['probe']['pod_uid'] = declaration['kubernetes']['engine']['pod_uid']
+        target_path = tmp_path / f'{side}-target.json'
+        target_path.write_bytes(canonical_json(declaration))
+        cfg['sides'][side] = {'check_config': {check_id: {'target': str(target_path)}},
+                             'run_binding': {check_id: {'record_session': f'{index:032x}'}}}
+        env_path = tmp_path / f'{side}-env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        envs.append(env)
+        env_paths[side] = env_path
+
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    inputs = next(row for row in ready['checks'] if row['check'] == 'inputs')
+    assert inputs['ok'] is not candidate_wrong_owner, ready
+    if candidate_wrong_owner:
+        assert inputs['detail'] == 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'
+
+    policy_path, config_path = tmp_path / 'policy.json', tmp_path / 'guard.toml'
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    write_config(cfg, config_path)
+    index = tool.template(pack)
+    index['inputs'] = [{'check_id': check_id, 'side': side, **{
+        key: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+        for key, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()
+    }} for side, env in env_paths.items()]
+    report = run(tmp_path, index)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == (1 if candidate_wrong_owner else 2)
+    for row in report['rows']:
+        if row['check_id'] != check_id:
+            continue
+        assert row['engine_executed'] is row['live_target_verified'] is row['ready_for_execution'] is False
+        if row['side'] == 'candidate' and candidate_wrong_owner:
+            assert row['blocking_codes'] == ['KUBERNETES_HTTP_BINDING_UNAVAILABLE']
+        else:
+            assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'

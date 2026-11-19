@@ -598,6 +598,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry, run_binding
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
+    from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
     from guard.executors.kubernetes_response_content import KubernetesResponseContentExecutor
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
     from guard.executors.lifecycle_transition import (LifecycleTransitionExecutor, REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE,
@@ -746,6 +747,9 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                             and isinstance(executor, KubernetesInitializationExecutor)
                             and {1, 2}.issubset(run_binding.stages_for(check_def))):
                         executor.prepared_inputs(check_def, selected_env, values)
+                    if (kube and item.check_id == "OBS-11" and isinstance(executor, KubernetesLogIntegrityExecutor)
+                            and 2 in run_binding.stages_for(check_def)):
+                        executor.prepared_collection_status(check_def, selected_env, values)
                     if (kube and isinstance(executor, LifecycleTransitionExecutor)
                             and run_binding.is_lifecycle_generation_binding(check_def)):
                         generation_preflight.add(item.check_id)

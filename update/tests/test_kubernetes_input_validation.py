@@ -151,6 +151,62 @@ def test_req09_normal_rejects_unapproved_scope_before_any_io(tmp_path, fault):
         executor.run(check, env, policy, object(), tmp_path / 'work')
 
 
+@pytest.mark.parametrize('version', ['0.30.0', '0.31.0'])
+@pytest.mark.parametrize('settings,accepted', [
+    ({}, True),
+    ({'max_duration_seconds': 12.5, 'kubectl_binary': 'example-kubectl'}, True),
+    ({'max_duration_seconds': 0}, False),
+    ({'max_duration_seconds': True}, False),
+    ({'max_duration_seconds': 301}, False),
+    ({'kubectl_binary': ' '}, False),
+])
+def test_req09_prepares_effective_settings_without_building_requests(
+        tmp_path, monkeypatch, version, settings, accepted):
+    from tests.test_model_preparation_integration import full_inputs
+    from tools.mvp_versions import versions
+
+    env, target = full_inputs()
+    image = next(item['image'] for item in versions().values() if item['version'] == version)
+    env = env.model_copy(update={'engine': env.engine.model_copy(update={'version': version, 'image_digest': image})}).seal()
+    env_ref = env.ref().model_dump(mode='json')
+    target.update(lab=False, environment_ref=env_ref, observed_version=version)
+    target['model_mapping']['environment_ref'] = env_ref
+    target['engine']['image_digest'] = image
+    target['kubernetes']['engine'].update(image=image, image_id=image)
+    target['comparison_config']['launch']['max_model_len'] = 2048
+    raw = canonical_json(target)
+    path = tmp_path / 'normal-target.json'
+    path.write_bytes(raw)
+    check = load_pack(UPDATE / 'packs/PACK-BASELINE').checks['REQ-09']
+
+    monkeypatch.setattr(KubernetesHTTP, 'declare_input_contract', _no_kubectl)
+    monkeypatch.setattr(KubernetesHTTP, '_verify', _no_kubectl)
+    executor = KubernetesNormalTokenInputExecutor({'normal_token_input_only': True,
+        'target': str(path), **settings}, runner=_no_kubectl)
+    pin = sha256_hex(raw)
+    if accepted:
+        executor.prepared_normal_token_input(check, env, NORMAL_INPUT_POLICY, expected_target_sha256=pin)
+    else:
+        with pytest.raises(ValueError, match='^KUBERNETES_INPUT_NORMAL_TARGET_UNVERIFIED$'):
+            executor.prepared_normal_token_input(check, env, NORMAL_INPUT_POLICY, expected_target_sha256=pin)
+
+
+@pytest.mark.parametrize('damage', ['missing-file', 'missing-pin', 'different-pin', 'invalid-window'])
+def test_req09_preparation_requires_saved_selected_target(tmp_path, damage):
+    env, target, _, path = normal_sampling_inputs(tmp_path, '0.30.0')
+    target['comparison_config']['launch']['max_model_len'] = True if damage == 'invalid-window' else 2048
+    raw = canonical_json(target)
+    if damage != 'missing-file':
+        path.write_bytes(raw)
+    pin = None if damage == 'missing-pin' else sha256_hex(raw)
+    constructor_pin = sha256_hex(b'different-owned-target') if damage == 'different-pin' else None
+    executor = KubernetesNormalTokenInputExecutor({'normal_token_input_only': True, 'target': str(path)},
+        runner=_no_kubectl, expected_target_sha256=constructor_pin)
+    check = load_pack(UPDATE / 'packs/PACK-BASELINE').checks['REQ-09']
+    with pytest.raises(ValueError, match='^KUBERNETES_INPUT_NORMAL_TARGET_UNVERIFIED$'):
+        executor.prepared_normal_token_input(check, env, NORMAL_INPUT_POLICY, expected_target_sha256=pin)
+
+
 def transport(tmp_path):
     build(tmp_path, 'v2-default')
     target = json.loads((tmp_path / 'target.json').read_text())

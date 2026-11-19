@@ -110,18 +110,36 @@ class KubernetesNormalTokenInputExecutor:
                 or len(set(codes)) != len(codes)):
             raise ValueError("KUBERNETES_INPUT_NORMAL_POLICY_INVALID")
 
+    def _target_transports(self, target, env, *, expected_target_sha256=None):
+        target_sha = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self._expected_target_sha256, expected_target_sha256) if pin is not None]
+        if not pins or any(pin != target_sha for pin in pins):
+            raise ValueError
+        model_window, tokenizer, completion = normal_input_transports(
+            target, env, duration=self.cfg.get("max_duration_seconds", 12),
+            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner)
+        return target_sha, model_window, tokenizer, completion
+
+    def prepared_normal_token_input(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the saved target and both effective transport settings without building requests."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            self._target_transports(target, env, expected_target_sha256=expected_target_sha256)
+        except (KeyError, TypeError, ValueError, OSError, OverflowError, KubernetesBindingError):
+            raise ValueError("KUBERNETES_INPUT_NORMAL_TARGET_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if adapter is None or self._expected_target_sha256 != target_sha:
+            if adapter is None:
                 raise ValueError
-            model_window, tokenizer, completion = normal_input_transports(
-                target, env, duration=self.cfg.get("max_duration_seconds", 12),
-                binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner)
+            target_sha, model_window, tokenizer, completion = self._target_transports(target, env)
         except (KeyError, TypeError, ValueError, OSError, KubernetesBindingError):
             raise ValueError("KUBERNETES_INPUT_NORMAL_TARGET_UNVERIFIED") from None
 

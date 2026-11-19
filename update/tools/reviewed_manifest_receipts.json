@@ -860,6 +860,11 @@
       "manifest_sha256": "65046cbb3339335e913cfb2967d107d732164b644699abe3b1463a7b06e83822",
       "reviewed_by": "Codex / paired startup compile cache metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T03:04:53+00:00"
+    },
+    {
+      "manifest_sha256": "9ec6d9f964024d0ef7cc2dee7623dabe9a44bd9fa6e9a78f5f8f01336c274791",
+      "reviewed_by": "Codex / paired stock Safetensors reader branch / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T04:27:07+00:00"
     }
   ]
 }

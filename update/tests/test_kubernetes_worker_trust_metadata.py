@@ -18,8 +18,10 @@ VALUES = {'worker_isolation_requirement': 'independent-uid', 'worker_trust_group
 
 class WorkerWorld(ProcessWorld):
     def __init__(self, target, case):
-        super().__init__(target, mode={'replaced': 'replacement', 'partial-process': 'later-row-gap'}.get(case))
+        super().__init__(target, mode={'replaced': 'replacement', 'partial-process': 'later-row-gap',
+                                      'cleanup-incomplete': 'cleanup'}.get(case))
         self.case = case
+        self.received_packet_sha256 = None
 
     def runner(self, argv, **kwargs):
         if 'exec' not in argv:
@@ -50,12 +52,14 @@ class WorkerWorld(ProcessWorld):
             packet['capture_subject']['identity_stable'] = self.case != 'reader-unstable'
             packet['capture_process_excluded'] = self.case != 'reader-unexcluded'
         result['stdout_bytes'] = canonical_json(packet)
+        self.received_packet_sha256 = sha256_hex(result['stdout_bytes'])
         return result
 
 
 @pytest.mark.parametrize('case,completed,markers', [
     ('one-marker', True, ['VLLM']), ('two-markers', True, ['VLLM', 'Worker']),
     ('partial-process', True, ['VLLM']), ('ambiguous', False, []), ('replaced', False, []),
+    ('cleanup-incomplete', False, []),
     ('reader-only', False, []), ('reader-unstable', False, []), ('reader-unexcluded', False, []),
     ('mount-changed', False, []), ('root-mount', False, []), ('proc-mount', False, []),
     ('proc-child', False, []), ('duplicate-mount', False, []),
@@ -81,6 +85,15 @@ def test_worker_marker_map_uses_owned_read_only_metadata(tmp_path, case, complet
     assert [group['marker'] for group in mapping] == markers
     summary = json.loads(draft.artifacts[0].path.read_text().splitlines()[-1])
     assert summary['worker_role_authenticated'] is False and summary['process_pid_namespace_membership_verified'] is False
+    if completed:
+        assert summary['capture_status']['stage'] == 'complete'
+    if case == 'cleanup-incomplete':
+        assert world.received_packet_sha256 is not None
+        assert summary['capture_status'] == {'stage': 'packet_transport', 'packet_sha256': world.received_packet_sha256}
+        assert summary['stable_process_rows'] == 0 and summary['process_inventory_stable'] is False
+        assert summary['binding_verified'] is False and not observations['worker_trust_group_map'].collected
+        assert not observations['worker_trust_groups_missing'].collected
+        assert draft.cleanup_errors == ['KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED']
     stable_reader = bool(mapping) or case in {'reader-only', 'ambiguous'}
     assert summary['reader_pid_namespace_sha256'] == (sha256_hex(canonical_json(20)) if stable_reader else None)
     assert summary['reader_mount_namespace_sha256'] == (sha256_hex(canonical_json(10)) if stable_reader else None)

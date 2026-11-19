@@ -840,6 +840,11 @@
       "manifest_sha256": "d099d1c016dce0f6c1e1f1c5745e27e763ef1d1f75839701adcd317fe6bfe3a9",
       "reviewed_by": "Codex / paired owned SUP10 installed plugin metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T00:28:22+00:00"
+    },
+    {
+      "manifest_sha256": "373c30b8f47addecc69df0e2f8745621b18427adab44bbca6fbfc0089204ef33",
+      "reviewed_by": "Codex / closed installed distribution metadata interface / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T00:45:11+00:00"
     }
   ]
 }

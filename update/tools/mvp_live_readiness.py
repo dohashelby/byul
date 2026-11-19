@@ -468,6 +468,15 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if normal_request_latency and prebound_kubernetes and check.executor == 'stream_buffer':
             executor.prepared_normal_request_latency(check, env, effective,
                                                      expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if normal_startup_load and prebound_kubernetes and check.executor == 'supply_boot':
+            executor.prepared_normal_startup_load(check, env, effective,
+                                                  expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if normal_compile_cache and prebound_kubernetes and check.executor == 'supply_boot':
+            executor.prepared_normal_compile_cache(check, env, effective,
+                                                   expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if cilium_egress_status and prebound_kubernetes and check.executor == 'boundary_egress':
+            executor.prepared_passive_egress_policy(check, env, effective,
+                                                    expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if installed_plugin_inventory and prebound_kubernetes and check.executor == 'supply_boot':
             executor.prepared_installed_plugin_inventory(check, env, effective,
                                                          expected_target_sha256=sha256_hex(canonical_json(target_data)))

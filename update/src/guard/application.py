@@ -601,12 +601,15 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
     from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
     from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
+    from guard.executors.kubernetes_normal_compile_cache import KubernetesNormalCompileCacheExecutor
     from guard.executors.kubernetes_normal_graph_capture import KubernetesNormalGraphCaptureExecutor
     from guard.executors.kubernetes_normal_request_latency import KubernetesNormalRequestLatencyExecutor
     from guard.executors.kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
     from guard.executors.kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
+    from guard.executors.kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
     from guard.executors.kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
+    from guard.executors.kubernetes_passive_egress_policy import KubernetesPassiveEgressPolicyExecutor
     from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
     from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
     from guard.executors.kubernetes_response_content import KubernetesResponseContentExecutor
@@ -778,6 +781,18 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                                 and isinstance(executor, KubernetesNormalRequestLatencyExecutor)):
                             executor.prepared_normal_request_latency(check_def, selected_env, values,
                                                                      expected_target_sha256=expected_target)
+                        if (prebound and item.check_id == "LIF-01"
+                                and isinstance(executor, KubernetesNormalStartupLoadExecutor)):
+                            executor.prepared_normal_startup_load(check_def, selected_env, values,
+                                                                  expected_target_sha256=expected_target)
+                        if (prebound and item.check_id == "SUP-07"
+                                and isinstance(executor, KubernetesNormalCompileCacheExecutor)):
+                            executor.prepared_normal_compile_cache(check_def, selected_env, values,
+                                                                   expected_target_sha256=expected_target)
+                        if (prebound and item.check_id == "PLT-07"
+                                and isinstance(executor, KubernetesPassiveEgressPolicyExecutor)):
+                            executor.prepared_passive_egress_policy(check_def, selected_env, values,
+                                                                    expected_target_sha256=expected_target)
                         if (prebound and item.check_id == "SUP-10"
                                 and isinstance(executor, KubernetesInstalledPluginInventoryExecutor)):
                             executor.prepared_installed_plugin_inventory(check_def, selected_env, values,

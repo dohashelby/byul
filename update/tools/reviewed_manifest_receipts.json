@@ -1015,6 +1015,11 @@
       "manifest_sha256": "fb7a6d62ed1b6af1deff2aa561328969e1a039af5a51f5417e92f218757755a6",
       "reviewed_by": "Codex / paired OBS-01 snapshot and LIF-12 retry input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T18:51:51+00:00"
+    },
+    {
+      "manifest_sha256": "f016a8fb2f0ed405caa478f62c4b65365b15759b785e5069d653de58a2e7ae6b",
+      "reviewed_by": "Codex / paired REQ-10 sampling and LIF-04 stream input validation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T19:19:30+00:00"
     }
   ]
 }

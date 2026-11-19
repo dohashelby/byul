@@ -107,6 +107,9 @@ class InstalledMetadata(metadata.Distribution):
     def read_text(self, filename):
         return self.fields.get(filename)
 
+    def locate_file(self, path):
+        raise ValueError('Installed metadata reader permits only the supplied text')
+
 
 def scan(roots, expected_name, expected):
     identities = []

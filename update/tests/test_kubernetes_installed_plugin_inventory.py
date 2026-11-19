@@ -68,6 +68,7 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
     env, target, _, path = normal_sampling_inputs(tmp_path, version)
     path.write_bytes(canonical_json(target))
     dispatches = []
+    child_stderr = []
 
     class InstalledWorld(World):
         def runner(self, argv, **kwargs):
@@ -80,7 +81,7 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
             dispatches.append(command)
             self.after_exec = True
             capture = capture_pipes([str(interpreter), *command[1:]], **kwargs)
-            assert capture["stderr_bytes"] == b""
+            child_stderr.append(capture["stderr_bytes"])
             return capture
 
     def owned_api(role, document, after):
@@ -101,6 +102,7 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
 
     collected = fault in {None, "empty-groups"}
     assert len(dispatches) == 1 and not world.execs
+    assert child_stderr == [b""]
     assert draft.status == (ExecStatus.COMPLETED if collected else ExecStatus.ABORTED)
     assert draft.data_origin == DataOrigin.EXAMPLE
     assert draft.normal_control.attempted is False

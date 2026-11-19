@@ -94,3 +94,88 @@ def test_invalid_or_missing_inputs_are_not_materialized(tmp_path, damage):
     with pytest.raises((ValueError, OSError)):
         tool.prepare(**args, output=tmp_path / 'result', side=side)
     assert not (tmp_path / 'result').exists()
+
+
+@pytest.mark.parametrize(('filename', 'phase'), [
+    ('prepared.json', 'before-run'),
+    ('common-input.json', 'before-run'),
+    ('prepared.json', 'at-binding'),
+    ('prepared.json', 'at-consumption'),
+    ('common-input.json', 'at-consumption'),
+])
+def test_sealed_file_only_rank_plan_never_consumes_same_path_replacement(tmp_path, monkeypatch, filename, phase):
+    from guard import application
+    from guard.collectors.file import load_environment, load_policy
+    from guard.core.execution_recipe import bind_recipe
+    from guard.core.run import run_plan
+    from guard.core.select import select
+    from guard.executors import registry, run_binding
+    from guard.models import DataOrigin, ExecStatus
+    from guard.store import Store
+    from guard.store.packs import put_pack
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('File-only rank consumption must not make a runtime request')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    output = tmp_path / 'result'
+    tool.prepare(**inputs(tmp_path), output=output, side='candidate')
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    env = load_environment(output / 'environment.json')
+    pol = load_policy(output / 'policy.yaml', pack)
+    cfg = tomllib.loads((output / 'guard.toml').read_text())
+    store = Store(tmp_path / 'store')
+    put_pack(store, pack.path)
+    store.put_many([env, pol])
+    plan = bind_recipe(select(pack, [env], pol), cfg, [env])
+    store.put(plan)
+    source = output / filename
+    original = source.read_bytes()
+
+    def rewrite_bytes():
+        # The JSON meaning is identical. Only the exact saved bytes change.
+        source.write_bytes(original + b'\n')
+
+    if phase == 'before-run':
+        rewrite_bytes()
+        with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+            run_plan(store, pack, plan, application.run_config(cfg))
+        assert not list(store.iter_kind('EVD'))
+        return
+    if phase == 'at-binding':
+        bind = run_binding.effective_values
+
+        def swap_before_binding(*args, **kwargs):
+            assert kwargs['expected_rank_prepared_file']['sha256'] == sha256_hex(original)
+            rewrite_bytes()
+            return bind(*args, **kwargs)
+
+        monkeypatch.setattr(run_binding, 'effective_values', swap_before_binding)
+    else:
+        build = registry.build_executor
+
+        def swap_before_consumption(executor, impl, raw, **kwargs):
+            assert executor == 'rank_failure' and impl == 'common-input'
+            key = 'prepared' if filename == 'prepared.json' else 'record'
+            assert raw['_rank_common_files'][key]['sha256'] == sha256_hex(original)
+            rewrite_bytes()
+            return build(executor, impl, raw, **kwargs)
+
+        monkeypatch.setattr(registry, 'build_executor', swap_before_consumption)
+
+    evd, = run_plan(store, pack, plan, application.run_config(cfg))
+    assert evd.data_origin == DataOrigin.EXAMPLE and not evd.normal_control.attempted
+    assert store.resolve(evd.ref()).to_dict() == evd.to_dict()
+    if phase == 'at-binding':
+        assert evd.execution.status == ExecStatus.NOT_RUN
+        assert evd.execution.abort_reason == 'RUN_BINDING_RANK_PREPARED_CHANGED'
+        assert not evd.artifacts
+    elif filename == 'prepared.json':
+        assert evd.execution.status == ExecStatus.ABORTED
+        assert not evd.observations['activation_steps'].collected and not evd.artifacts
+    else:
+        assert evd.execution.status == ExecStatus.ABORTED
+        report = evd.observations['activation_steps'].value[-1]
+        assert report['records'] == [] and not report['producer_authenticated']
+        assert 'B_COMMON_INPUT_REJECTED:rank-fault:B_COMMON_INPUT_FILE_CHANGED' in report['gaps']

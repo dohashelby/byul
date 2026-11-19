@@ -9,7 +9,7 @@ from guard.models import Mode, canonical_json, sha256_hex, utcnow
 def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None,
                          transition_manifests=None, plan=None, initialization_digests=None,
                          response_route_digests=None, supply_record_digests=None,
-                         missing_native_route_prepared_sides=None):
+                         missing_native_route_prepared_sides=None, rank_common_files=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
@@ -88,6 +88,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     from guard.configuration import for_check, merge_config
     from guard.executors.kubernetes_response_content import route_target_bytes
     from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, inputs_manifest, redeployment_side_reuse
+    from guard.executors.rank_common_input import recipe_source_files
     from guard.executors.run_binding import (INITIALIZATION_CHECKS, SUPPLY_RECORD_CHECKS,
                                              initialization_recipe_digests, native_route_preparation_missing,
                                              supply_record_recipe_digests)
@@ -112,6 +113,20 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     response_routes = {}
     supply_inputs = {}
     missing_route_prepared = set()
+    rank_inputs = {}
+    rank_update = eligible.get('LIF-08') == 'rank_failure'
+    rank_audit = len(environments) == 1 and plan is not None and plan.mode == Mode.audit and any(
+        item.check_id == 'LIF-08' and item.executor == 'rank_failure' and item.selected and not item.gaps
+        for item in plan.items)
+
+    def bind_rank_sources(side, effective):
+        if (effective.get('executors', {}).get('rank_failure') == 'common-input'
+                and not effective.get('lab_activation') and not effective.get('record_attestation')):
+            settings = for_check(effective, 'rank_failure', 'LIF-08').get('rank_failure', {})
+            rank_inputs[side] = recipe_source_files(settings)
+
+    if rank_audit:
+        bind_rank_sources('single', cfg)
     prebound = update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
     prebound_response = prebound and eligible.get('REQ-13') == 'response_content'
     prebound_route_record = prebound and eligible.get('REQ-02') == 'route_record'
@@ -120,6 +135,8 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     for side, env in sides.items():
         effective = merge_config(cfg, cfg.get('sides', {}).get(side, {}))
         factories(effective, side, env)
+        if rank_update and side in ('baseline', 'candidate'):
+            bind_rank_sources(side, effective)
         bindings = effective.get('run_binding')
         # Stage-2 transition inputs use a list of per-generation files rather
         # than the one target path committed by the generic recipe visitor.
@@ -211,6 +228,10 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
         recipe['missing_native_route_prepared_sides'] = sorted(missing_route_prepared)
     if missing_native_route_prepared_sides is not None:
         missing_native_route_prepared_sides.update(missing_route_prepared)
+    if rank_inputs:
+        recipe['rank_common_files_by_side'] = rank_inputs
+    if rank_common_files is not None:
+        rank_common_files.update(rank_inputs)
     return sha256_hex(canonical_json(recipe))
 
 

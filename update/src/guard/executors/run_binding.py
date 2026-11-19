@@ -557,13 +557,18 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
             run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None,
             expected_transition_manifest_sha256=None, expected_initialization_digests=None,
-            expected_supply_record_digests=None, native_route_prepared_absent: bool = False):
+            expected_supply_record_digests=None, native_route_prepared_absent: bool = False,
+            expected_rank_prepared_file=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
     `policy_row` is this check's values as written in the POL (stage 4).
     """
     stages = stages_for(check)
+    if expected_rank_prepared_file is not None and (
+            check.id != 'LIF-08' or check.executor != 'rank_failure' or 1 not in stages
+            or type(executor_cfg) is not dict or executor_cfg.get('input_mode') != 'common-records'):
+        raise RunBindingUnavailable('RUN_BINDING_RANK_COMMON_SCOPE_INVALID')
     supply_digests = expected_supply_record_digests
     if supply_digests is not None and (
             not is_supply_record_binding(check) or type(supply_digests) is not dict
@@ -681,6 +686,13 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 values[key] = _stamp(start)
             elif key.endswith('validity_end'):
                 values[key] = _stamp(end)
+            elif key == 'rank_prepared_sha256' and expected_rank_prepared_file is not None:
+                from .lifecycle_common_input_consumption import _read
+                try:
+                    prepared, _ = _read(executor_cfg['prepared'], expected_file=expected_rank_prepared_file)
+                except (KeyError, TypeError, ValueError, OSError):
+                    raise RunBindingUnavailable('RUN_BINDING_RANK_PREPARED_CHANGED') from None
+                values[key] = files[key] = sha256_hex(canonical_json(prepared))
             elif key == 'init_prepared_sha256' and (expected_prepared is not None
                     or (type(executor_cfg.get('prepared')) is str and executor_cfg['prepared'])):
                 from guard.adapters.vllm_release_profiles import InitializationPreparationMismatch

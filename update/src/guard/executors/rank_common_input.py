@@ -7,14 +7,40 @@ from .rank_failure_contract import normalize_policy
 from .lifecycle_common_input_consumption import _read, attach_inputs
 
 
-def run_records(check, env, values, cfg, workdir, *, expected_target_sha256=None):
+def recipe_source_files(cfg):
+    """Bind the passive source paths and their exact bytes before consumption."""
+    if (type(cfg) is not dict or set(cfg) != {'input_mode', 'target', 'prepared', 'common_inputs'}
+            or cfg['input_mode'] != 'common-records'):
+        return None
+    try:
+        descriptor = cfg['common_inputs']
+        if (type(descriptor) is not dict or descriptor['prepared'] != cfg['prepared']
+                or type(descriptor['records']) is not dict or set(descriptor['records']) != {'rank-fault'}):
+            return None
+        paths = {'prepared': cfg['prepared'], 'record': descriptor['records']['rank-fault']}
+        files = {}
+        for key, path in paths.items():
+            path = str(Path(path).absolute())
+            try:
+                _, digest = _read(path)
+            except (OSError, ValueError):
+                digest = None
+            files[key] = {'path': path, 'sha256': digest}
+        return files
+    except (KeyError, TypeError):
+        return None
+
+
+def run_records(check, env, values, cfg, workdir, *, expected_target_sha256=None, expected_files=None):
     started = utcnow()
     start, end = normalize_policy(values)
     try:
         if (type(cfg) is not dict or set(cfg) != {'input_mode', 'target', 'prepared', 'common_inputs'}
                 or cfg['input_mode'] != 'common-records' or not env.hash_ok()):
             raise ValueError
-        target, _ = _read(cfg['target']); prepared, _ = _read(cfg['prepared'])
+        target, _ = _read(cfg['target'])
+        expected = expected_files['prepared'] if expected_files is not None else None
+        prepared, _ = _read(cfg['prepared'], expected_file=expected)
         descriptor = cfg['common_inputs']
         if (type(target) is not dict or target.get('environment_ref') != env.ref().model_dump(mode='json')
                 or type(prepared) is not dict or type(descriptor) is not dict
@@ -45,6 +71,7 @@ def run_records(check, env, values, cfg, workdir, *, expected_target_sha256=None
             'prepared_sha256': values['rank_prepared_sha256'], 'engine_executed': False},
         started_at=started, abort_reason='RANK_RECORD_INPUT_QUESTION_SCOPE_INCOMPLETE')
     # 선언된 준비물을 runtime 자격으로 넘기지 않는다. 현재 owner는 재관측하지 않았다.
-    draft = attach_inputs(draft, check, env, target, descriptor, Path(workdir), prepared=None, owner=None)
+    draft = attach_inputs(draft, check, env, target, descriptor, Path(workdir), prepared=None, owner=None,
+                          expected_files=expected_files)
     draft.finished_at = utcnow()
     return draft

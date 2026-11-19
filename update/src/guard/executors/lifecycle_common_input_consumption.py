@@ -26,8 +26,10 @@ CHECK_IDS = frozenset({"LIF-03", "LIF-05", "LIF-06", "LIF-07", "LIF-09", "LIF-10
 MAX_BYTES = 8 * 1024**2
 
 
-def _read(path):
+def _read(path, *, expected_file=None):
     path = Path(path)
+    if expected_file is not None and str(path.absolute()) != expected_file["path"]:
+        raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError("B_COMMON_INPUT_SYMLINK")
     before = path.stat()
@@ -39,7 +41,10 @@ def _read(path):
     if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
         raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
-    return strict_json(raw, limit=MAX_BYTES), sha256_hex(raw)
+    digest = sha256_hex(raw)
+    if expected_file is not None and digest != expected_file["sha256"]:
+        raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
+    return strict_json(raw, limit=MAX_BYTES), digest
 
 
 def consume_record(check_id, record, *, environment_ref, target_sha256, prepared_sha256, session, owner=None):
@@ -116,7 +121,8 @@ def _list(draft, key):
     return list(row.value) if row is not None and row.collected and type(row.value) is list else []
 
 
-def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=None, owner=None, generation=None):
+def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=None, owner=None, generation=None,
+                  expected_files=None):
     """Add domain facts to existing judge inputs and an exact, bounded evidence artifact."""
     if descriptor is None:
         return draft
@@ -131,7 +137,8 @@ def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=No
                 or descriptor.get("data_origin", "EXAMPLE") not in {"EXAMPLE", "DECLARED"}
                 or descriptor.get("generation") != generation):
             raise ValueError("B_COMMON_INPUT_CONFIGURATION_INVALID")
-        declared, _ = _read(descriptor["prepared"])
+        expected = expected_files["prepared"] if expected_files is not None else None
+        declared, _ = _read(descriptor["prepared"], expected_file=expected)
         if type(declared) is not dict:
             raise ValueError("B_COMMON_INPUT_PREPARED_INVALID")
         if prepared is not None and canonical_json(declared) != canonical_json(prepared):
@@ -147,7 +154,8 @@ def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=No
             try:
                 if kind not in KINDS:
                     raise ValueError("B_COMMON_INPUT_KIND_UNSUPPORTED")
-                record, file_sha = _read(path)
+                expected = expected_files["record"] if expected_files is not None else None
+                record, file_sha = _read(path, expected_file=expected)
                 if type(record) is not dict or record.get("kind") != kind:
                     raise ValueError("B_COMMON_INPUT_KIND_MISMATCH")
                 result = consume_record(check.id, record, **scope)

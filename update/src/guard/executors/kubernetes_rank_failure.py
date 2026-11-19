@@ -44,9 +44,11 @@ def _activation_observations(projection, trials, diagnostics):
 class KubernetesRankFailureExecutor(HttpCheckExecutor):
     name='rank_failure';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
-    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None,common_records=False):
+    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None,common_records=False,
+                 expected_common_files=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
         self.common_records=common_records
+        self.expected_common_files=expected_common_files
         if common_records:self.version='0.1.0-common-input'
 
     def validate_policy(self,check,values):
@@ -57,7 +59,8 @@ class KubernetesRankFailureExecutor(HttpCheckExecutor):
         if self.common_records:
             from .rank_common_input import run_records
             self.validate_policy(check,policy_values)
-            return run_records(check,env,policy_values,self.cfg,workdir,expected_target_sha256=self.expected_target)
+            return run_records(check,env,policy_values,self.cfg,workdir,expected_target_sha256=self.expected_target,
+                               expected_files=self.expected_common_files)
         from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check,policy_values)
         try:

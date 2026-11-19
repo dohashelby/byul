@@ -172,7 +172,7 @@ def _rank_record_input(cfg):
     if cfg.get('lab_activation') or cfg.get('record_attestation'):
         raise ValueError('RANK_RECORD_INPUT_ACTIVATION_UNSUPPORTED')
     return KubernetesRankFailureExecutor(cfg.get('rank_failure', {}), common_records=True,
-        expected_target_sha256=cfg.get('_kubernetes_target_sha256'))
+        expected_target_sha256=cfg.get('_kubernetes_target_sha256'), expected_common_files=cfg.get('_rank_common_files'))
 
 # 실행기 메타데이터: 이 실행기가 만든 증거를 판정하는 기본 판정기(없으면 CheckDef.judge).
 # 증거를 만들 때 EVD.execution.executor.default_judge로 기록하고, 판정 코어는 그 값만 읽는다.

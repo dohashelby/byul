@@ -150,6 +150,7 @@ def _inspect(source, check, pack, issued_at):
             check_policy_value(check.id, field.key, field.type, values[field.key])
     from guard.configuration import UPDATE_CHECK_OUTSIDE_SCOPE, update_allowed_checks
     config = tomllib.loads(files['configuration'].decode('utf-8'))
+    requested_update = config.get('update', {})
     allowed = update_allowed_checks(config, pack)
     if allowed is not None and check.id not in allowed:
         raise ValueError(UPDATE_CHECK_OUTSIDE_SCOPE)
@@ -183,7 +184,10 @@ def _inspect(source, check, pack, issued_at):
     if gateway_snapshot:
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
     normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
-    supply_record_roles = check.id == 'SUP-15' and implementation == 'kubernetes'
+    supply_record_binding = (implementation == 'kubernetes' and run_binding.is_supply_record_binding(check)
+                             and requested_update.get('mode', 'external') == 'external'
+                             and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
+    supply_record_roles = supply_record_binding or (check.id == 'SUP-15' and implementation == 'kubernetes')
     initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
                       and check.id in run_binding.INITIALIZATION_CHECKS
                       and {1, 2}.issubset(run_binding.stages_for(check)))
@@ -205,6 +209,7 @@ def _inspect(source, check, pack, issued_at):
     bound_files = []
     binding_options = {}
     role_digests = {}
+    prepared_raw_digests = {}
     if supply_record_roles:
         for role in SUPPLY_ROLES:
             for key in ('target', 'prepared'):
@@ -213,6 +218,8 @@ def _inspect(source, check, pack, issued_at):
                 bound_files.append((path, raw, identity))
                 document = json.loads(raw, object_pairs_hook=_pairs)
                 role_digests[f'supply_{role}_{key}_sha256'] = sha256_hex(canonical_json(document))
+                if key == 'prepared':
+                    prepared_raw_digests[role] = sha256_hex(raw)
     elif target is not None:
         raw_target, identity = _read(target)
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
@@ -296,6 +303,10 @@ def _inspect(source, check, pack, issued_at):
         binding = None  # The source evidence belongs to a future run attempt.
     else:
         run_cfg = run_binding.run_config(config, check.id)
+        if supply_record_binding and type(run_cfg) is dict and 'record_producer' in run_cfg:
+            producer = run_binding.producer_sha256(run_cfg['record_producer'])
+            binding_options['expected_supply_record_digests'] = {**prepared_raw_digests, 'record_producer': producer}
+            config = {**config, '_supply_prepared_sha256_by_role': prepared_raw_digests}
         if initialization and type(run_cfg) is dict and 'scenario' in run_cfg and 'prepared' in cfg:
             initialization_digests = {}
             for key, path in (('prepared', cfg['prepared']), ('scenario', run_cfg['scenario'])):
@@ -320,7 +331,7 @@ def _inspect(source, check, pack, issued_at):
         if supply_record_roles:
             if any(effective.get(key) != digest for key, digest in role_digests.items()):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
-            executor.sup15_prepared_roles(env, effective, require_complete=True)
+            executor.prepared_supply_roles(check, env, effective)
         if initialization:
             if effective['init_target_sha256'] != sha256_hex(canonical_json(target_data)):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')

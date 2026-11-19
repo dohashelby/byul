@@ -54,6 +54,7 @@ SCHEMA = 'guard-run-binding/1'
 SCHEMA_2 = 'guard-run-binding/2'
 SCHEMAS = (SCHEMA, SCHEMA_2)
 INITIALIZATION_CHECKS = frozenset({'LIF-07', 'LIF-09'})
+SUPPLY_RECORD_CHECKS = frozenset({'SUP-15', 'SUP-16'})
 _TARGET_ONLY_NORMAL_MODES = {
     'LIF-01': ('supply_boot', NORMAL_STARTUP_LOAD_OPTION, 'supply_target_sha256'),
     'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
@@ -290,6 +291,11 @@ def keys_for(check) -> tuple[str, ...]:
     return tuple(k for number in stages_for(check) for k in STAGES[number - 1].get(check.id, ()))
 
 
+def is_supply_record_binding(check) -> bool:
+    return (check.id in SUPPLY_RECORD_CHECKS and check.executor == 'supply_boot'
+            and {1, 3}.issubset(stages_for(check)))
+
+
 def owned_keys(check):
     """Keys the policy must not carry for this definition (computed or dropped)."""
     stages = stages_for(check)
@@ -456,6 +462,15 @@ def initialization_recipe_digests(executor_cfg, run_cfg):
             'scenario': sha256_hex(dependency(run_cfg['scenario'], None))}
 
 
+def supply_record_recipe_digests(executor_cfg, run_cfg):
+    """Commit the two prepared manifests and the record producer's identity bytes."""
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    return {'normal': sha256_hex(dependency(executor_cfg['normal']['prepared'], None)),
+            'challenge': sha256_hex(dependency(executor_cfg['challenge']['prepared'], None)),
+            'record_producer': producer_sha256(run_cfg['record_producer'])}
+
+
 def _stage_2(check, executor_cfg, run_cfg, issued_at, *, expected_initialization_scenario_sha256=None):
     """Return (file hashes, values) for the stage-2 keys of this check."""
     cid, files, values = check.id, {}, {}
@@ -509,13 +524,22 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
             run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None,
-            expected_transition_manifest_sha256=None, expected_initialization_digests=None):
+            expected_transition_manifest_sha256=None, expected_initialization_digests=None,
+            expected_supply_record_digests=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
     `policy_row` is this check's values as written in the POL (stage 4).
     """
     stages = stages_for(check)
+    supply_digests = expected_supply_record_digests
+    if supply_digests is not None and (
+            not is_supply_record_binding(check) or type(supply_digests) is not dict
+            or set(supply_digests) != {'normal', 'challenge', 'record_producer'}):
+        raise RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_FILE_SCOPE_INVALID')
+    if supply_digests is not None:
+        for digest in supply_digests.values():
+            _hex(digest)
     normal = _TARGET_ONLY_NORMAL_MODES.get(check.id)
     if normal is not None and type(executor_cfg) is dict and normal[1] in executor_cfg:
         executor, marker, key = normal
@@ -579,6 +603,9 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             files.update(stage_files)
         if 3 in stages:
             stage_files, stage_values, validity = _stage_3(check, run_cfg or {}, issued_at, valid_from, valid_until)
+            if (supply_digests is not None
+                    and stage_values['supply_record_source_sha256'] != supply_digests['record_producer']):
+                raise RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_PRODUCER_CHANGED')
             files.update(stage_files)
             extra = {**extra, **stage_values}
         if 4 in stages:
@@ -625,6 +652,14 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                                              expected_sha256=expected_normal_file_sha256['prepared'])
                 except (OSError, ValueError):
                     raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_PREPARED_CHANGED') from None
+                values[key] = files[key] = sha256_hex(canonical_json(manifest))
+            elif supply_digests is not None and key in {'supply_normal_prepared_sha256', 'supply_challenge_prepared_sha256'}:
+                from guard.collectors.lifecycle import load_prepared
+                role = key.split('_')[1]
+                try:
+                    manifest = load_prepared(executor_cfg[role]['prepared'], expected_sha256=supply_digests[role])
+                except (OSError, ValueError):
+                    raise RunBindingUnavailable(f'RUN_BINDING_SUPPLY_{role.upper()}_PREPARED_CHANGED') from None
                 values[key] = files[key] = sha256_hex(canonical_json(manifest))
             else:
                 values[key] = files[key] = file_hash(check.id, key, executor_cfg)

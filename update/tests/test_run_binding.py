@@ -4,19 +4,24 @@ from __future__ import annotations
 from datetime import timedelta
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 import yaml
 
+from guard import application
+from guard.core.execution_recipe import bind_recipe, configuration_sha256
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
 from guard.executors import registry, run_binding
 from guard.executors.base import EvidenceDraft
-from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
+from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
 from guard.models.objects import Execution
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import environment, policy
+from tests.test_lifecycle_capture import external  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = load_pack(ROOT / 'packs/PACK-BASELINE')
@@ -239,3 +244,138 @@ def test_policy_migration_tool_keeps_enterprise_values_and_never_overwrites(tmp_
         main([str(path), '--out', str(tmp_path / 'new.yaml')])
     with pytest.raises(ValueError, match='SEALED_POLICY'):
         migrate({'kind': 'POL'}, PACK)
+
+
+def _supply_pair(external, check_id):
+    from tests.test_sup15_owned_record_admission import _prepare_roles
+    from tools.mvp_versions import versions
+
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {'supply_boot': 'kubernetes'},
+           'update': {'allowed_checks': [check_id]}, 'sides': {}}
+    envs = []
+    for index, (side, version) in enumerate(versions().items()):
+        root = external / side
+        root.mkdir()
+        env = environment(id=f'ENV-SUPPLY-RECIPE-{side.upper()}',
+            engine={'name': version['engine'], 'version': version['version'], 'image_digest': version['image']},
+            runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE GPU', 'driver': 'EXAMPLE driver'})
+        envs.append(env)
+        settings, _, _, _ = _prepare_roles(root, env, late_owner_change=False, first_owner=1 + 2 * index)
+        producer = root / 'exact-producer.py'
+        producer.write_bytes(b'# EXAMPLE identity only\n')
+        cfg['sides'][side] = {'check_config': {check_id: settings},
+                             'run_binding': {check_id: {'record_producer': str(producer)}}}
+    return envs, policy(PACK.ref(), scope={'include': [check_id]}, values={}), cfg
+
+
+def test_sup16_offline_readiness_accepts_both_nested_roles(external, monkeypatch):  # noqa: F811
+    from tools import mvp_live_readiness
+    from tools.j02_run_config import write_config
+
+    def forbid_runtime_request(*args, **kwargs):
+        pytest.fail('SUP-16 file readiness must not make a runtime request')
+
+    monkeypatch.setattr(subprocess, 'Popen', forbid_runtime_request)
+    envs, pol, cfg = _supply_pair(external, 'SUP-16')
+    ready = application.update_readiness(PACK, envs, pol, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    config_path, policy_path = external / 'guard.toml', external / 'policy.json'
+    write_config(cfg, config_path)
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    index = mvp_live_readiness.template(PACK)
+    for side, env in zip(cfg['sides'], envs):
+        env_path = external / side / 'env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        inputs = {role: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+                  for role, path in {'configuration': config_path, 'policy': policy_path, 'environment': env_path}.items()}
+        index['inputs'].append({'check_id': 'SUP-16', 'side': side, **inputs})
+    index_path = external / 'index.json'
+    index_path.write_bytes(canonical_json(index))
+    report = mvp_live_readiness.audit(index_path, pack=PACK)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 2
+    for row in report['rows']:
+        if row['check_id'] == 'SUP-16':
+            assert row['file_binding_valid'], row
+            assert row['engine_executed'] is row['ready_for_execution'] is False
+
+
+@pytest.mark.parametrize('check_id', ['SUP-15', 'SUP-16'])
+@pytest.mark.parametrize(('phase', 'field', 'reason'), [
+    ('before-recipe', 'challenge', None),
+    ('before-recipe', 'record_producer', None),
+    ('before-binding', 'challenge', 'RUN_BINDING_SUPPLY_CHALLENGE_PREPARED_CHANGED'),
+    ('before-binding', 'record_producer', 'RUN_BINDING_SUPPLY_RECORD_PRODUCER_CHANGED'),
+    ('after-binding', 'challenge', None),
+])
+def test_paired_recipe_binds_raw_supply_role_files_until_consumed(
+        external, tmp_path, monkeypatch, check_id, phase, field, reason):  # noqa: F811
+    from guard.core import run as core_run
+
+    def forbid_runtime_request(*args, **kwargs):
+        pytest.fail('The supply role fixture must not make a runtime request')
+
+    envs, pol, cfg = _supply_pair(external, check_id)
+    store = Store(tmp_path / 'store')
+    put_pack(store, PACK.path)
+    store.put_many([*envs, pol])
+    plan = bind_recipe(select(PACK, envs, pol, mode='update'), cfg, envs)
+    store.put(plan)
+    digests = {}
+    assert configuration_sha256(cfg, envs, plan=plan, supply_record_digests=digests) == plan.inputs.execution_recipe_sha256
+    assert set(digests) == {f'baseline:{check_id}', f'candidate:{check_id}'}
+    candidate = cfg['sides']['candidate']
+    settings = candidate['check_config'][check_id]
+    path = Path(candidate['run_binding'][check_id]['record_producer']
+                if field == 'record_producer' else settings[field]['prepared'])
+    assert digests[f'candidate:{check_id}'][field] == sha256_hex(path.read_bytes())
+    unchanged_document = json.loads(path.read_bytes()) if field != 'record_producer' else None
+
+    def rewrite():
+        path.write_bytes(path.read_bytes() + b'\n')
+        if unchanged_document is not None:
+            assert json.loads(path.read_bytes()) == unchanged_document
+
+    monkeypatch.setattr(subprocess, 'Popen', forbid_runtime_request)
+    seen = []
+
+    def role_reader(executor, target, env, prepared):
+        seen.append(target['run_id'])
+        raise ValueError('EXAMPLE detached reader')
+
+    monkeypatch.setattr(KubernetesSupplyBootExecutor, '_role_reader', role_reader)
+    run_cfg = application.run_config(cfg)
+    if phase == 'before-recipe':
+        rewrite()
+        with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+            run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+        assert seen == []
+        return
+    if phase == 'before-binding':
+        run_one = core_run._run_one
+
+        def rewrite_before_binding(*args, **kwargs):
+            rewrite()
+            return run_one(*args, **kwargs)
+
+        monkeypatch.setattr(core_run, '_run_one', rewrite_before_binding)
+    else:
+        binding = run_binding.effective_values
+
+        def rewrite_after_binding(*args, **kwargs):
+            result = binding(*args, **kwargs)
+            rewrite()
+            return result
+
+        monkeypatch.setattr(run_binding, 'effective_values', rewrite_after_binding)
+    evd, = run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+    if phase == 'before-binding':
+        assert seen == []
+        assert evd.execution.status == ExecStatus.NOT_RUN and evd.execution.abort_reason == reason
+        assert evd.execution.run_binding is None
+    else:
+        assert seen == ['guard-normal']
+        assert evd.execution.status == ExecStatus.ABORTED
+        assert evd.execution.run_binding['files']['supply_challenge_prepared_sha256'] == sha256_hex(canonical_json(unchanged_document))
+        normal, challenge = evd.observations['supply_boot_sessions'].value
+        assert normal['diagnostic_codes'] == ['SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE']
+        assert challenge['diagnostic_codes'] == ['SUPPLY_BOOT_INPUT_UNAVAILABLE']

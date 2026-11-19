@@ -596,7 +596,7 @@ def _execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_o
 def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                      change=None, previous_plan=None, source_store=None) -> dict:
     """Read-only preparation check. It neither pulls images nor starts an engine."""
-    from guard.executors import registry
+    from guard.executors import registry, run_binding
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
     from guard.executors.kubernetes_response_content import KubernetesResponseContentExecutor
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
@@ -683,6 +683,20 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
                 c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 settings = c.get(item.executor, {})
+                check_def = pack.checks[item.check_id]
+                supplied_roles = (kube and run_binding.is_supply_record_binding(check_def)
+                                  and cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound")
+                run_cfg = run_binding.run_config(c, item.check_id) if supplied_roles else None
+                binding_options = {}
+                if supplied_roles and type(run_cfg) is dict and set(run_cfg) == run_binding.config_keys(check_def):
+                    try:
+                        digests = run_binding.supply_record_recipe_digests(settings, run_cfg)
+                    except run_binding.RunBindingUnavailable:
+                        raise
+                    except (KeyError, OSError, TypeError, ValueError):
+                        raise run_binding.RunBindingUnavailable("RUN_BINDING_UNAVAILABLE") from None
+                    binding_options["expected_supply_record_digests"] = digests
+                    c = {**c, "_supply_prepared_sha256_by_role": {role: digests[role] for role in ("normal", "challenge")}}
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
                 explicit_observer = (item.check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09",
                                                        "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
@@ -709,20 +723,23 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         and hasattr(executor, "validate_configuration")):
                     executor.validate_configuration(pack.checks[item.check_id])
                 else:
-                    from guard.executors import run_binding
-                    check_def, values = pack.checks[item.check_id], policy.values.get(item.check_id, {})
+                    values = policy.values.get(item.check_id, {})
                     if run_binding.keys_for(check_def):
                         # Static preparation computes the same per-run binding guard run will compute.
+                        if not supplied_roles:
+                            run_cfg = run_binding.run_config(c, item.check_id)
+                        if normal_file_read:
+                            binding_options["expected_target_sha256"] = expected_target
                         _, values = run_binding.effective_values(
-                            check_def, c.get(item.executor, {}), selected_env, values, side=side, attempt_id=None,
+                            check_def, settings, selected_env, values, side=side, attempt_id=None,
                             issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
-                            run_cfg=run_binding.run_config(c, item.check_id), policy_ref=policy.ref(),
-                            **({"expected_target_sha256": expected_target} if normal_file_read else {}))
+                            run_cfg=run_cfg, policy_ref=policy.ref(), **binding_options)
                     executor.validate_policy(check_def, values)
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
-                    if kube and item.check_id == "SUP-15" and isinstance(executor, KubernetesSupplyBootExecutor):
-                        executor.sup15_prepared_roles(selected_env, values, require_complete=True)
+                    if (kube and (item.check_id == "SUP-15" or supplied_roles)
+                            and isinstance(executor, KubernetesSupplyBootExecutor)):
+                        executor.prepared_supply_roles(check_def, selected_env, values)
                     if (kube and item.check_id in run_binding.INITIALIZATION_CHECKS
                             and isinstance(executor, KubernetesInitializationExecutor)
                             and {1, 2}.issubset(run_binding.stages_for(check_def))):

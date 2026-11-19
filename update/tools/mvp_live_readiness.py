@@ -184,6 +184,9 @@ def _inspect(source, check, pack, issued_at):
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
     normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
     supply_record_roles = check.id == 'SUP-15' and implementation == 'kubernetes'
+    initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
+                      and check.id in run_binding.INITIALIZATION_CHECKS
+                      and {1, 2}.issubset(run_binding.stages_for(check)))
     normal_graph_capture = check.id == 'REQ-20' and cfg.get(NORMAL_GRAPH_CAPTURE_OPTION) is True
     normal_safetensors_reader = check.id == 'SUP-12' and cfg.get(NORMAL_SAFETENSORS_READER_OPTION) is True
     normal_compile_cache = check.id == 'SUP-07' and cfg.get(NORMAL_COMPILE_CACHE_OPTION) is True
@@ -284,10 +287,19 @@ def _inspect(source, check, pack, issued_at):
         passive_api_hop.validate_target(target_data, env)
         binding = None  # The source evidence belongs to a future run attempt.
     else:
+        run_cfg = run_binding.run_config(config, check.id)
+        if initialization and type(run_cfg) is dict and 'scenario' in run_cfg and 'prepared' in cfg:
+            initialization_digests = {}
+            for key, path in (('prepared', cfg['prepared']), ('scenario', run_cfg['scenario'])):
+                raw, identity = _read(path)
+                bound_files.append((path, raw, identity))
+                initialization_digests[key] = sha256_hex(raw)
+            binding_options['expected_initialization_digests'] = initialization_digests
+            config = {**config, '_initialization_prepared_sha256': initialization_digests['prepared']}
         binding, effective = run_binding.effective_values(check, cfg, env, values,
             side=source['side'], attempt_id='mvp-offline-readiness', issued_at=issued_at,
             valid_from=policy.valid_from, valid_until=policy.valid_until,
-            run_cfg=run_binding.run_config(config, check.id), policy_ref=policy.ref(), **binding_options)
+            run_cfg=run_cfg, policy_ref=policy.ref(), **binding_options)
         # Use the same executor configuration and policy validation as runtime.
         try:
             executor = registry.build_executor(check.executor, implementation, config,
@@ -301,6 +313,10 @@ def _inspect(source, check, pack, issued_at):
             if any(effective.get(key) != digest for key, digest in role_digests.items()):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             executor.sup15_prepared_roles(env, effective, require_complete=True)
+        if initialization:
+            if effective['init_target_sha256'] != sha256_hex(canonical_json(target_data)):
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            executor.prepared_inputs(check, env, effective)
     if requires_native_matrix and not normal_token_input:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():

@@ -304,3 +304,89 @@ def test_sup05_normal_bundle_reaches_offline_input_audit(tmp_path, external, mon
             assert row['file_binding_valid'] and row[NORMAL_FILE_READS_OPTION]
             assert row['binding_schema'] == 'guard-run-binding/1'
             assert set(row['blocking_codes']) == {'EXAMPLE_ENV_NOT_ACTUAL', 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'}
+
+
+@pytest.mark.parametrize(('check_id', 'candidate_input', 'gap'), [
+    ('LIF-07', 'valid', None),
+    ('LIF-09', 'valid', None),
+    ('LIF-07', 'lab-false', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('LIF-09', 'wrong-model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('LIF-07', 'scenario-changed', 'RUN_BINDING_INITIALIZATION_SCENARIO_CHANGED'),
+    ('LIF-09', 'prepared-rewritten', 'INITIALIZATION_CONFIGURATION_INVALID'),
+])
+def test_initialization_readiness_uses_the_declared_startup_inputs(
+        tmp_path, external, monkeypatch, check_id, candidate_input, gap):
+    from guard import application
+    from guard.models import canonical_json, sha256_hex
+    from tests.test_initialization_preparation import _paired_inputs
+    from tools.j02_run_config import write_config
+
+    def no_runtime(*args, **kwargs):
+        pytest.fail('Initialization file readiness must not contact or run a target')
+
+    monkeypatch.setattr(socket, 'socket', no_runtime)
+    monkeypatch.setattr(subprocess, 'Popen', no_runtime)
+    pack, envs, pol, config = _paired_inputs(external, check_id, None)
+    policy_path = external / 'policy.json'
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    config_path = external / 'guard.toml'
+    entries = []
+    for index, (side, env) in enumerate(zip(('baseline', 'candidate'), envs)):
+        env = env.model_copy(update={'runtime': env.runtime.model_copy(update={
+            'gpu_count': 1, 'gpu_model': 'EXAMPLE GPU', 'driver': 'EXAMPLE driver',
+        })}).seal()
+        envs[index] = env
+        env_path = external / (side + '-env.json')
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        path = Path(config['sides'][side]['initialization']['target'])
+        target = json.loads(path.read_bytes())
+        target['environment_ref'] = env.ref().model_dump(mode='json')
+        if side == 'candidate':
+            if candidate_input == 'lab-false':
+                target['lab'] = False
+            elif candidate_input == 'wrong-model':
+                target['model_mapping']['revision'] = 'EXAMPLE other model revision'
+        path.write_bytes(canonical_json(target))
+        entries.append((side, env_path))
+
+    ready = application.update_readiness(pack, envs, pol, config)
+    inputs = next(row for row in ready['checks'] if row['check'] == 'inputs')
+    static_failure = candidate_input in {'lab-false', 'wrong-model'}
+    assert inputs['ok'] is (not static_failure), ready
+    if static_failure:
+        assert inputs['detail'] == gap
+    assert all(not row['runtime_qualified'] for row in ready['check_support'])
+
+    if candidate_input in {'scenario-changed', 'prepared-rewritten'}:
+        bind = tool.run_binding.effective_values
+        scenario = Path(config['run_binding'][check_id]['scenario'])
+        manifest = Path(config['sides']['candidate']['initialization']['prepared'])
+
+        def change_during_binding(*args, **kwargs):
+            candidate = kwargs['side'] == 'candidate'
+            if candidate and candidate_input == 'scenario-changed':
+                scenario.write_bytes(canonical_json({'case': 'EXAMPLE substitute scenario'}))
+            result = bind(*args, **kwargs)
+            if candidate and candidate_input == 'prepared-rewritten':
+                manifest.write_bytes(manifest.read_bytes() + b'\n')
+            return result
+
+        monkeypatch.setattr(tool.run_binding, 'effective_values', change_during_binding)
+    write_config(config, config_path)
+    index = tool.template(pack)
+    index['inputs'] = [{'check_id': check_id, 'side': side, **{
+        role: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+        for role, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()
+    }} for side, env in entries]
+    report = run(tmp_path, index)
+    assert report['sides'] == 138 and report['active_checks'] == 69
+    assert report['file_binding_valid_sides'] == (2 if gap is None else 1)
+    for row in report['rows']:
+        if row['check_id'] != check_id:
+            continue
+        assert row['engine_executed'] is row['live_target_verified'] is row['ready_for_execution'] is False
+        if row['side'] == 'candidate' and gap is not None:
+            assert row['blocking_codes'] == [gap]
+        else:
+            assert row['binding_schema'] == 'guard-run-binding/2'
+            assert set(row['blocking_codes']) == {'EXAMPLE_ENV_NOT_ACTUAL', 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'}

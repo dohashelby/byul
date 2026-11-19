@@ -9,20 +9,21 @@ from guard.executors import kubernetes_supply_boot, run_binding
 from guard.models import Comparison, DataOrigin, ExecStatus, Verdict, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from tests.builders import policy
+from tests.test_lifecycle_capture import external
 from tests.test_sup05_normal_file_reads import normal_case
 
 
 PACK = Path(__file__).resolve().parents[1] / "packs" / "PACK-BASELINE"
 
 
-def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, monkeypatch):
+def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, external, monkeypatch):
     # The immutable /17 producer supports this synthetic release on both sides.
     # Different target, ENV and prepared-session identities must survive routing.
-    model_root = tmp_path / "approved-model"
+    model_root = external / "approved-model"
     sides = {
-        "baseline": normal_case(tmp_path / "baseline", monkeypatch, model_root=model_root,
+        "baseline": normal_case(external / "baseline", monkeypatch, model_root=model_root,
                                 env_id="ENV-EXAMPLE-SUP05-BASELINE"),
-        "candidate": normal_case(tmp_path / "candidate", monkeypatch, model_root=model_root,
+        "candidate": normal_case(external / "candidate", monkeypatch, model_root=model_root,
                                  env_id="ENV-EXAMPLE-SUP05-CANDIDATE", engine_role={
                                      "pod_uid": "00000000-0000-0000-0000-000000000099",
                                      "container_id": "containerd://" + "c" * 64,

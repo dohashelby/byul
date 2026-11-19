@@ -268,17 +268,36 @@ def _supply_pair(external, check_id):
     return envs, policy(PACK.ref(), scope={'include': [check_id]}, values={}), cfg
 
 
-def test_sup16_offline_readiness_accepts_both_nested_roles(external, monkeypatch):  # noqa: F811
+@pytest.mark.parametrize(('check_id', 'candidate_issue', 'reason'), [
+    ('SUP-09', None, None),
+    ('SUP-09', 'foreign-environment', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
+    ('SUP-11', None, None),
+    ('SUP-11', 'same-record-location', 'SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED'),
+    ('SUP-16', None, None),
+])
+def test_offline_readiness_validates_nested_supply_roles(external, monkeypatch, check_id, candidate_issue, reason):  # noqa: F811
     from tools import mvp_live_readiness
     from tools.j02_run_config import write_config
 
     def forbid_runtime_request(*args, **kwargs):
-        pytest.fail('SUP-16 file readiness must not make a runtime request')
+        pytest.fail('supply file readiness must not make a runtime request')
 
     monkeypatch.setattr(subprocess, 'Popen', forbid_runtime_request)
-    envs, pol, cfg = _supply_pair(external, 'SUP-16')
+    envs, pol, cfg = _supply_pair(external, check_id)
+    roles = cfg['sides']['candidate']['check_config'][check_id]
+    if candidate_issue == 'foreign-environment':
+        path = Path(roles['challenge']['target'])
+        target = json.loads(path.read_bytes())
+        target['environment_ref'] = envs[0].ref().model_dump(mode='json')
+        path.write_bytes(canonical_json(target))
+    elif candidate_issue == 'same-record-location':
+        roles['challenge'] = dict(roles['normal'])
+
     ready = application.update_readiness(PACK, envs, pol, cfg)
-    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    inputs_result = next(row for row in ready['checks'] if row['check'] == 'inputs')
+    assert inputs_result['ok'] is (reason is None), ready
+    if reason:
+        assert inputs_result['detail'] == reason
     config_path, policy_path = external / 'guard.toml', external / 'policy.json'
     write_config(cfg, config_path)
     policy_path.write_bytes(canonical_json(pol.to_dict()))
@@ -288,14 +307,19 @@ def test_sup16_offline_readiness_accepts_both_nested_roles(external, monkeypatch
         env_path.write_bytes(canonical_json(env.to_dict()))
         inputs = {role: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
                   for role, path in {'configuration': config_path, 'policy': policy_path, 'environment': env_path}.items()}
-        index['inputs'].append({'check_id': 'SUP-16', 'side': side, **inputs})
+        index['inputs'].append({'check_id': check_id, 'side': side, **inputs})
     index_path = external / 'index.json'
     index_path.write_bytes(canonical_json(index))
     report = mvp_live_readiness.audit(index_path, pack=PACK)
-    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 2
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == (1 if reason else 2)
     for row in report['rows']:
-        if row['check_id'] == 'SUP-16':
-            assert row['file_binding_valid'], row
+        if row['check_id'] == check_id:
+            if reason and row['side'] == 'candidate':
+                assert not row['file_binding_valid'], row
+                assert row['blocking_codes'] == [reason]
+            else:
+                assert row['file_binding_valid'], row
+            assert row['live_target_verified'] is False
             assert row['engine_executed'] is row['ready_for_execution'] is False
 
 

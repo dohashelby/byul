@@ -737,8 +737,9 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     executor.validate_policy(check_def, values)
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
-                    if (kube and (item.check_id == "SUP-15" or supplied_roles)
-                            and isinstance(executor, KubernetesSupplyBootExecutor)):
+                    if (kube and isinstance(executor, KubernetesSupplyBootExecutor)
+                            and (item.check_id == "SUP-15" or supplied_roles
+                                 or run_binding.is_dynamic_supply_role_preflight(check_def, cfg.get("update", {})))):
                         executor.prepared_supply_roles(check_def, selected_env, values)
                     if (kube and item.check_id in run_binding.INITIALIZATION_CHECKS
                             and isinstance(executor, KubernetesInitializationExecutor)

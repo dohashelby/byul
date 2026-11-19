@@ -187,7 +187,9 @@ def _inspect(source, check, pack, issued_at):
     supply_record_binding = (implementation == 'kubernetes' and run_binding.is_supply_record_binding(check)
                              and requested_update.get('mode', 'external') == 'external'
                              and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
-    supply_record_roles = supply_record_binding or (check.id == 'SUP-15' and implementation == 'kubernetes')
+    supply_record_roles = implementation == 'kubernetes' and (
+        supply_record_binding or check.id == 'SUP-15'
+        or run_binding.is_dynamic_supply_role_preflight(check, requested_update))
     initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
                       and check.id in run_binding.INITIALIZATION_CHECKS
                       and {1, 2}.issubset(run_binding.stages_for(check)))

@@ -296,6 +296,14 @@ def is_supply_record_binding(check) -> bool:
             and {1, 3}.issubset(stages_for(check)))
 
 
+def is_dynamic_supply_role_preflight(check, update: dict) -> bool:
+    """Both role declarations can be checked offline for existing prebound inputs."""
+    return (check.id in {'SUP-09', 'SUP-11'} and check.executor == 'supply_boot'
+            and update.get('mode', 'external') == 'external'
+            and update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
+            and {1, 3}.issubset(stages_for(check)))
+
+
 def owned_keys(check):
     """Keys the policy must not carry for this definition (computed or dropped)."""
     stages = stages_for(check)

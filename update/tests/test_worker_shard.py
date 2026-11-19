@@ -106,6 +106,7 @@ def test_relative_index_symlink_preserves_observed_required_and_assigned_shards(
     ('empty-requirements', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
     ('malformed-digest', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
     ('directory-index', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
+    ('linked-directory-index', True, 'WORKER_SHARD_INDEX_UNREADABLE'),
 ])
 def test_unverified_shard_index_keeps_assignments_without_required_claims(
         tmp_path, monkeypatch, index_state, index_present, diagnostic):
@@ -114,16 +115,34 @@ def test_unverified_shard_index_keeps_assignments_without_required_claims(
     shard.write_bytes(content)
     observer = callback.WorkerShardObserver(SCOPE['session'], context_provider=lambda: {})
     native_result = (str(tmp_path), [str(shard)], True)
+    index_opens = []
     if index_present is True:
         index = tmp_path / 'fixture.index.json'
-        if index_state == 'directory-index':
+        if index_state in ('directory-index', 'linked-directory-index'):
             index.mkdir()
         else:
             index.write_text('{}', encoding='utf-8')
+        if index_state == 'linked-directory-index':
+            directory = index
+            link = tmp_path / 'linked.index.json'
+            link.symlink_to(directory.name)
+            index = link
         native_result += (index.name,)
     elif index_present is False:
         native_result += (None,)
-    observed = observer._prepared(native_result)
+    with monkeypatch.context() as inspect_index:
+        if index_state == 'linked-directory-index':
+            open_file = callback.os.open
+
+            def detect_index_open(path, *args, **kwargs):
+                if path in (index, directory, str(index), str(directory)):
+                    index_opens.append(path)
+                    raise AssertionError('A link to a directory must be rejected before opening it')
+                return open_file(path, *args, **kwargs)
+
+            inspect_index.setattr(callback.os, 'open', detect_index_open)
+        observed = observer._prepared(native_result)
+    assert not index_opens
     assert observed['index_present'] is index_present
     assert observed['required'] is None
     if index_state == 'unrecorded':

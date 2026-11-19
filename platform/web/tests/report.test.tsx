@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { mockApi, renderAt } from "./helpers";
 import { FullReport, markText } from "../src/pages/ReportView";
@@ -73,11 +73,130 @@ describe("검증 보고서 화면", () => {
     expect(screen.getAllByText("REQ-01 질문 <b>굵게</b>?").length).toBeGreaterThan(0);
   });
 
-  it("미충족·미확인 쪽의 판정 이유를 RES 원문 그대로 보여준다", () => {
+  it("과거 판정은 유지하고 근거 부족을 안내하며 기술 사유와 원본 행을 열 수 있다", () => {
     mockApi({});
-    renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
-    expect(screen.getByText(SUP_REASON)).toBeTruthy();
-    expect(screen.getAllByText("판정 이유(미충족·미확인 축)").length).toBe(1); // 이유가 없는 기준 쪽은 표시하지 않는다
+    renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={{ "REQ-01": { original: "raw-value" } }} selected="REQ-01" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(drawer.getByText("후보의 세부 판정 근거를 설명할 수 있는 관측 기록이 없습니다.")).toBeTruthy();
+    const details = drawer.getByText("상세 근거").closest("details")!;
+    expect(details.open).toBe(false);
+    fireEvent.click(drawer.getByText("상세 근거"));
+    expect(details.textContent).toContain(SUP_REASON);
+    fireEvent.click(drawer.getByRole("tab", { name: "RPT 원본 행" }));
+    expect(drawer.getByRole("tabpanel").textContent).toContain("raw-value");
+  });
+
+  it.each(["REGRESSED", "NOT_COMPARABLE"] as const)("SUP-08의 로드 근거와 비교 상태를 표시한다 (%s)", (comparison) => {
+    mockApi({});
+    const row = check("SUP-08", {
+      headline: "FAIL", comparison,
+      candidate: { ...side("FAIL"), finding: {
+        code: "forbidden_code_revision_imported", field: "mm_processor_kwargs.code_revision", revision: "recorded-revision",
+      } },
+    });
+    const update = { ...report, checks: [row], targets: {
+      baseline: { name: "vllm", version: "0.7.0" },
+      candidate: { name: "vllm", version: "0.30.0" },
+    } };
+    renderAt("/update/results", "/update/results", <FullReport report={update} rawChecks={null} selected="SUP-08" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(within(drawer.getByText("기준 · vLLM 0.7.0").parentElement!).getByText("보안 충족")).toBeTruthy();
+    expect(within(drawer.getByText("후보 · vLLM 0.30.0").parentElement!).getByText("보안 미충족")).toBeTruthy();
+    const heading = comparison === "REGRESSED"
+      ? "기준은 보안 충족, 후보에서는 요청에 지정한 코드가 로드됨"
+      : "후보 vLLM 0.30.0 · 요청에 지정한 코드가 실제로 로드됨";
+    expect(drawer.getByRole("heading", { name: heading })).toBeTruthy();
+    if (comparison === "NOT_COMPARABLE") expect(drawer.getByText(/비교 조건을 충족하지 못했으며/)).toBeTruthy();
+    const details = drawer.getByText("상세 근거").closest("details")!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain("recorded-revision");
+    expect(drawer.getByText(/기준 vLLM 0.7.0은 보안 충족으로 기록됐습니다/)).toBeTruthy();
+    expect(screen.getByText("두 판본에 모두 기록된 보안 판정 중 1건이 달라졌습니다.")).toBeTruthy();
+    expect(drawer.getByText(/로드 기록과 저장된 모듈의 해시가 일치했습니다/)).toBeTruthy();
+  });
+
+  it("단일 보고서에서도 누락과 미확인 관측을 표시한다", () => {
+    mockApi({});
+    const row = check("SUP-03", {
+      headline: "UNKNOWN", baseline: null, candidate: null,
+      single: { ...side("UNKNOWN"), functional: "UNKNOWN", missing_observations: ["selected_template_sha256"],
+        unverified_observations: ["template_consumer_verified"], decisions: (["security", "functional"] as const).map((axis) => ({
+          axis, verdict: "UNKNOWN", observations: [], unmet: [],
+          missing: ["selected_template_sha256"], policy_missing: ["internal_policy_key"], limits: ["no_pass_rule"],
+        })) },
+    });
+    const audit = { ...report, mode: "audit", checks: [row], targets: { single: { name: "sglang", version: "0.5.1" } } };
+    renderAt("/update/results", "/update/results", <FullReport report={audit} rawChecks={null} selected="SUP-03" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(drawer.getByText("검증 대상 · sglang 0.5.1")).toBeTruthy();
+    expect(drawer.getByText("보안 미확인")).toBeTruthy();
+    expect(drawer.getByText(/수집 기록이 빠진 관측은 선택된 템플릿의 해시입니다/)).toBeTruthy();
+    expect(drawer.getByText(/템플릿의 실제 소비 확인입니다/)).toBeTruthy();
+    expect(drawer.getAllByText(/선택된 템플릿의 해시입니다/)).toHaveLength(1);
+    expect(drawer.getAllByText(/보안·기능 — 이 축의 충족을 확인할 판정 규칙이 없습니다/)).toHaveLength(1);
+    expect(drawer.getByText(/필요한 정책 설정값 1개/)).toBeTruthy();
+    expect(drawer.getByText("상세 근거").closest("details")?.textContent).toContain("internal_policy_key");
+  });
+
+  it("평문 API 요청의 관측과 미확인 범위를 함께 표시한다", () => {
+    mockApi({});
+    const row = check("PLT-08", {
+      headline: "FAIL", baseline: null, candidate: null,
+      single: { ...side("FAIL"), finding: { code: "forbidden_plaintext_succeeded" },
+        unverified_observations: ["api_transport_scope_complete"] },
+    });
+    const audit = { ...report, mode: "audit", checks: [row] };
+    renderAt("/update/results", "/update/results", <FullReport report={audit} rawChecks={null} selected="PLT-08" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(drawer.getByRole("heading", { name: "평문 연결이 금지된 구간에서 API 요청이 성공함" })).toBeTruthy();
+    expect(drawer.getByText(/평문 HTTP 요청을 보냈고, API가 정상 응답했습니다/)).toBeTruthy();
+    expect(drawer.getByText(/대상 API 전송 구간 전체의 관측입니다/)).toBeTruthy();
+  });
+
+  it("기존 전용 문구가 없는 점검도 축별 관측과 미확인 조건을 표시한다", () => {
+    mockApi({});
+    const row = check("REQ-01", {
+      baseline: null, candidate: null, single: { ...side("PASS"), decisions: [
+        { axis: "security", verdict: "PASS", criterion: "시험 대상에 보호 정책이 적용된다.",
+          observations: [{ key: "routes_tested", kind: "count", value: 2, operators: ["nonempty"] },
+            { key: "unknown_technical_key", kind: "recorded" }],
+          missing: [], unmet: [], policy_missing: [], limits: [] },
+        { axis: "performance", verdict: "UNKNOWN", observations: [], missing: [], unmet: [],
+          policy_missing: [], limits: ["cpu_performance_unverified"] },
+      ] },
+    });
+    renderAt("/update/results", "/update/results", <FullReport report={{ ...report, mode: "audit", checks: [row] }} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(drawer.getByRole("heading", { name: "검증 대상 · 보안 충족 근거" })).toBeTruthy();
+    expect(drawer.getByText(/실제로 시험한 요청 경로 · 2건 기록 · 항목이 기록됨/)).toBeTruthy();
+    expect(drawer.getByText("성능 — 이 CPU 비교에서는 성능을 검증하지 않았습니다.")).toBeTruthy();
+    const details = drawer.getByText("상세 근거").closest("details")!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain("unknown_technical_key");
+    expect(Array.from(drawer.getByText(/실제로 시험한 요청 경로/).closest("ul")!.children)
+      .every((item) => !item.textContent?.includes("unknown_technical_key"))).toBe(true);
+  });
+
+  it.each([
+    ["REQ-03", "nonadmin_outcomes", "관리자 권한이 없는 사용자로 작업을 요청한 결과", "PASS"],
+    ["PLT-06", "worker_isolation_violations", "작업 프로세스 사이에서 확인된 격리 위반", "FAIL"],
+    ["OBS-06", "record_copy_inventory", "확인 대상 기록 복사본 목록", "UNKNOWN"],
+  ] as const)("새 한국어 관측명을 기본 화면에 표시하고 키는 상세 근거에 둔다 (%s)", (id, key, name, verdict) => {
+    mockApi({});
+    const row = check(id, {
+      headline: verdict, baseline: null, candidate: null,
+      single: { ...side(verdict), decisions: [{
+        axis: "security", verdict, observations: verdict === "UNKNOWN" ? [] : [{ key, kind: "count", value: 1 }],
+        missing: verdict === "UNKNOWN" ? [key] : [], unmet: [], policy_missing: [], limits: [],
+      }] },
+    });
+    renderAt("/update/results", "/update/results", <FullReport report={{ ...report, mode: "audit", checks: [row] }} rawChecks={null} selected={id} onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    const basic = drawer.getByText(name, { exact: false, selector: "li" });
+    expect(basic.textContent).not.toContain(key);
+    const details = drawer.getByText("상세 근거").closest("details")!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain(key);
   });
 
   it("미확인 점검을 충족처럼 보이게 하지 않는다", () => {

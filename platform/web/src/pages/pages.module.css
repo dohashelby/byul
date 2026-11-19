@@ -640,3 +640,14 @@
 @media (max-width: 600px) {
   .fiveCards { grid-template-columns: minmax(0, 1fr); }
 }
+
+
+.reportSides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 12px;
+}
+
+.reportSides > :global(.card) {
+  padding: 12px;
+}

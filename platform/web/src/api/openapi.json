@@ -4113,6 +4113,179 @@
         ],
         "title": "ReportCounts"
       },
+      "ReportDecision": {
+        "properties": {
+          "axis": {
+            "type": "string",
+            "enum": [
+              "security",
+              "functional",
+              "performance"
+            ],
+            "title": "Axis"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "FAIL",
+              "UNKNOWN"
+            ],
+            "title": "Verdict"
+          },
+          "criterion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criterion"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ReportDecisionObservation"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "unmet": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unmet"
+          },
+          "policy_missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Policy Missing"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "axis",
+          "verdict",
+          "observations",
+          "missing",
+          "unmet",
+          "policy_missing",
+          "limits"
+        ],
+        "title": "ReportDecision"
+      },
+      "ReportDecisionObservation": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "boolean",
+              "count",
+              "number",
+              "recorded"
+            ],
+            "title": "Kind"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "operators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Operators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "kind"
+        ],
+        "title": "ReportDecisionObservation"
+      },
+      "ReportFinding": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "forbidden_code_revision_imported",
+              "forbidden_ipc_connection",
+              "forbidden_egress_succeeded",
+              "forbidden_plaintext_succeeded",
+              "forbidden_template_reference",
+              "unapproved_running_image",
+              "untrusted_input_changed_log",
+              "normal_probes_passed",
+              "normal_probe_failed"
+            ],
+            "title": "Code"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "ReportFinding"
+      },
       "ReportFocus": {
         "properties": {
           "regressed": {
@@ -4343,6 +4516,47 @@
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "missing_observations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Observations"
+          },
+          "unverified_observations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unverified Observations"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManifestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportFinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportDecision"
+            },
+            "type": "array",
+            "title": "Decisions"
           }
         },
         "type": "object",
@@ -4356,6 +4570,24 @@
           "reasons"
         ],
         "title": "ReportSide"
+      },
+      "ReportTarget": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "ReportTarget"
       },
       "ReportView": {
         "properties": {
@@ -4529,6 +4761,13 @@
             },
             "type": "array",
             "title": "Inputs Manifest"
+          },
+          "targets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ReportTarget"
+            },
+            "type": "object",
+            "title": "Targets"
           },
           "checks": {
             "items": {

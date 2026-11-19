@@ -10,6 +10,7 @@ import pytest
 
 from guard.models import load_pack
 from tools import mvp_live_readiness as tool
+from tests.test_lifecycle_capture import external  # noqa: F401
 from tests.test_mvp_a_input_preflight import sources  # noqa: F401
 
 
@@ -213,3 +214,93 @@ def test_unpinned_image_reports_separate_missing_profiles_and_qualifications(tmp
             'NATIVE_INPUT_CAPTURE_GPU_UNQUALIFIED', projection + '_GPU_UNQUALIFIED',
         } <= set(candidates[check_id]['blocking_codes'])
     assert 'NATIVE_INPUT_PROFILE_UNAVAILABLE' not in candidates['REQ-10']['blocking_codes']
+
+
+@pytest.mark.parametrize(('candidate_input', 'gap'), [
+    ('exact', None),
+    ('foreign-target', 'MVP_TARGET_ENVIRONMENT_MISMATCH'),
+    ('foreign-release', 'SUPPLY_BOOT_NORMAL_BINDING_INVALID'),
+    ('reference-changed', 'SUPPLY_BOOT_NORMAL_REFERENCE_MISMATCH'),
+])
+def test_sup05_normal_bundle_reaches_offline_input_audit(tmp_path, external, monkeypatch, candidate_input, gap):
+    from guard.adapters.vllm_approved_file_read_composition import PROFILES
+    from guard.collectors.lifecycle import prepare_assets
+    from guard.collectors.model_read_scope import build_scope
+    from guard.configuration import NORMAL_FILE_READS_OPTION
+    from guard.models import canonical_json, sha256_hex
+    from tests.builders import environment, policy
+    from tests.test_kubernetes_sampling import inputs as sampling_inputs
+    from tools.j02_run_config import write_config
+
+    def forbid_runtime(*args, **kwargs):
+        raise AssertionError('offline file binding must not contact or run a target')
+
+    monkeypatch.setattr(socket, 'socket', forbid_runtime)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_runtime)
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    pol = policy(pack.ref(), scope={'include': ['SUP-05']}, values={})
+    policy_path = external / 'policy.json'
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    config = {'executors': {'supply_boot': 'kubernetes'},
+              'update': {'mode': 'external', 'allowed_checks': ['SUP-05']},
+              'check_config': {'SUP-05': {NORMAL_FILE_READS_OPTION: True}}, 'sides': {}}
+    config_path = external / 'guard.toml'
+    entries = []
+    model = 'example/approved'
+    files = [{'path': 'model.safetensors', 'bytes': 7, 'sha256': sha256_hex(b'EXAMPLE')}]
+    inventory = sha256_hex(canonical_json(files))
+    reference = {'schema': 'guard.model-manifest/1', 'scope': 'all', 'model_id': model,
+                 'files': files, 'inventory_sha256': inventory}
+
+    for index, (side, release) in enumerate(tool.versions().items(), 1):
+        root = external / side
+        root.mkdir()
+        ref_path = root / 'reference.json'
+        ref_path.write_bytes(canonical_json(reference))
+        env = environment(id=f'ENV-EXAMPLE-SUP05-{side.upper()}',
+            engine={'name': release['engine'], 'version': release['version'], 'image_digest': release['image']},
+            runtime={'platform': 'fixture; engine_requested=V1', 'gpu_count': 1,
+                     'gpu_model': 'EXAMPLE GPU', 'driver': 'EXAMPLE driver'},
+            model={'id': model, 'revision': 'approved-example', 'inventory_sha256': inventory})
+        env_path = root / 'env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        supplied = sampling_inputs()['kubernetes']
+        engine = {**supplied['engine'], 'image': release['image'], 'image_id': release['image'],
+                  'pod_uid': f'10000000-0000-0000-0000-{index:012d}', 'container_id': 'containerd://' + str(index) * 64}
+        target = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': True, 'run_id': supplied['run_id'],
+                  'environment_ref': env.ref().model_dump(mode='json'),
+                  'kubernetes': {'context': supplied['context'], 'engine': engine}}
+        target_path = root / 'target.json'
+        target_path.write_bytes(canonical_json(target))
+        scope = build_scope(env, target, ref_path, '/models', nonsecret_model_weights=True, hash_model_bytes=True)
+        scope_path = root / 'scope.json'
+        scope_path.write_bytes(canonical_json(scope))
+        profile = PROFILES[release['version']]
+        if side == 'candidate' and candidate_input == 'foreign-release':
+            profile = PROFILES[tool.versions()['baseline']['version']]
+        assets = root / 'assets'
+        prepare_assets(assets, tool.ROOT.parent, profile=profile, model_read_scope=scope_path)
+        if side == 'candidate' and candidate_input == 'foreign-target':
+            target_path = external / 'baseline' / 'target.json'
+        if side == 'candidate' and candidate_input == 'reference-changed':
+            ref_path.write_bytes(ref_path.read_bytes() + b'\n')
+        config['sides'][side] = {'supply_boot': {'normal': {'target': str(target_path),
+            'prepared': str(assets / 'manifest.json'), 'reference_manifest': str(ref_path)}}}
+        entries.append((side, env_path))
+
+    write_config(config, config_path)
+    inputs = [{'check_id': 'SUP-05', 'side': side, **{
+        role: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+        for role, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()}}
+        for side, env in entries]
+    result = run(tmp_path, {**blank(), 'inputs': inputs})
+    assert len(result['rows']) == 138
+    rows = {row['side']: row for row in result['rows'] if row['check_id'] == 'SUP-05'}
+    for side, row in rows.items():
+        assert row['ready_for_execution'] is row['live_target_verified'] is row['engine_executed'] is False
+        if side == 'candidate' and gap is not None:
+            assert not row['file_binding_valid'] and row['blocking_codes'] == [gap]
+        else:
+            assert row['file_binding_valid'] and row[NORMAL_FILE_READS_OPTION]
+            assert row['binding_schema'] == 'guard-run-binding/1'
+            assert set(row['blocking_codes']) == {'EXAMPLE_ENV_NOT_ACTUAL', 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'}

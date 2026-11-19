@@ -23,7 +23,7 @@ from guard.collectors import native_input_rejection_qualification, reused_input_
 from guard.collectors.file import load_environment, load_policy
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNAPSHOT_OPTION,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, NORMAL_COMPILE_CACHE_OPTION,
-                                 NORMAL_GRAPH_CAPTURE_OPTION,
+                                 NORMAL_FILE_READS_OPTION, NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION,
@@ -31,7 +31,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNA
                                  NORMAL_TOKEN_INPUT_OPTION,
                                  bounded_metadata_scopes, cilium_egress_status_requested, for_check, merge_config,
                                  installed_plugin_inventory_requested, normal_request_latency_requested,
-                                 normal_compile_cache_requested,
+                                 normal_compile_cache_requested, normal_file_reads_requested,
                                  normal_graph_capture_requested,
                                  normal_safetensors_reader_requested,
                                  normal_serving_readiness_requested,
@@ -155,6 +155,7 @@ def _inspect(source, check, pack, issued_at):
     side_configs = {side: merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES}
     if any(cilium_egress_status_requested(raw) or installed_plugin_inventory_requested(raw)
            or normal_compile_cache_requested(raw)
+           or normal_file_reads_requested(raw)
            or normal_graph_capture_requested(raw)
            or normal_safetensors_reader_requested(raw)
            or normal_request_latency_requested(raw)
@@ -180,6 +181,7 @@ def _inspect(source, check, pack, issued_at):
     gateway_snapshot = check.id == 'OBS-01' and cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True
     if gateway_snapshot:
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
+    normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
     normal_graph_capture = check.id == 'REQ-20' and cfg.get(NORMAL_GRAPH_CAPTURE_OPTION) is True
     normal_safetensors_reader = check.id == 'SUP-12' and cfg.get(NORMAL_SAFETENSORS_READER_OPTION) is True
     normal_compile_cache = check.id == 'SUP-07' and cfg.get(NORMAL_COMPILE_CACHE_OPTION) is True
@@ -189,10 +191,11 @@ def _inspect(source, check, pack, issued_at):
     normal_request_latency = check.id == 'LIF-03' and cfg.get(NORMAL_REQUEST_LATENCY_OPTION) is True
     normal_serving_readiness = check.id == 'OBS-02' and cfg.get(NORMAL_SERVING_READINESS_OPTION) is True
     normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
-    target = cfg.get('target')
+    target = cfg['normal']['target'] if normal_file_reads else cfg.get('target')
     if implementation == 'kubernetes' and target is None:
         raise ValueError('MVP_CURRENT_TARGET_REQUIRED')
-    target_state = None
+    bound_files = []
+    binding_options = {}
     if target is not None:
         raw_target, identity = _read(target)
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
@@ -200,7 +203,16 @@ def _inspect(source, check, pack, issued_at):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
         if gateway_snapshot:
             _scoped_target_sha256(raw_target, env, gateway_snapshot=True, scoped_check=check.id)
-        target_state = (target, raw_target, identity)
+        bound_files.append((target, raw_target, identity))
+    if normal_file_reads:
+        binding_options['expected_target_sha256'] = _scoped_target_sha256(raw_target, env, scoped_check=check.id)
+        normal_hashes = {}
+        for role in ('prepared', 'reference_manifest'):
+            path = cfg['normal'][role]
+            raw, identity = _read(path)
+            bound_files.append((path, raw, identity))
+            normal_hashes[role] = sha256(raw).hexdigest()
+        binding_options['expected_normal_file_sha256'] = normal_hashes
     if cilium_egress_status:
         try:
             passive_egress_policy_transport(target_data, env, duration=1)
@@ -264,7 +276,7 @@ def _inspect(source, check, pack, issued_at):
         binding, effective = run_binding.effective_values(check, cfg, env, values,
             side=source['side'], attempt_id='mvp-offline-readiness', issued_at=issued_at,
             valid_from=policy.valid_from, valid_until=policy.valid_until,
-            run_cfg=run_binding.run_config(config, check.id), policy_ref=policy.ref())
+            run_cfg=run_binding.run_config(config, check.id), policy_ref=policy.ref(), **binding_options)
         # Use the same executor configuration and policy validation as runtime.
         try:
             executor = registry.build_executor(check.executor, implementation, config,
@@ -272,15 +284,17 @@ def _inspect(source, check, pack, issued_at):
             executor.validate_policy(check, effective)
         except (ValueError, TypeError, KeyError):
             raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
+        if normal_file_reads:
+            executor.normal_file_read_inputs(env, effective)
     if requires_native_matrix and not normal_token_input:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
         after, current = _read(source[role]['path'])
         if current != identity or after != files[role]:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
-    if target_state is not None:
-        after, current = _read(target_state[0])
-        if after != target_state[1] or current != target_state[2]:
+    for path, before, identity in bound_files:
+        after, current = _read(path)
+        if after != before or current != identity:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
     blockers = ['LIVE_EXECUTOR_PREFLIGHT_REQUIRED']
     if passive_hop:
@@ -291,6 +305,7 @@ def _inspect(source, check, pack, issued_at):
             'environment_origin': env.data_origin.value, 'implementation': implementation,
             'binding_schema': binding['schema'] if binding else None,
             'files': {role: source[role] for role in files}, 'blocking_codes': blockers,
+            **({NORMAL_FILE_READS_OPTION: True} if normal_file_reads else {}),
             **({NORMAL_GRAPH_CAPTURE_OPTION: True} if normal_graph_capture else {}),
             **({NORMAL_SAFETENSORS_READER_OPTION: True} if normal_safetensors_reader else {}),
             **({NORMAL_COMPILE_CACHE_OPTION: True} if normal_compile_cache else {}),

@@ -316,19 +316,23 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                         or set(values.get("required_trusted_fields", [])) - set(TRUSTED_FIELDS)):
                     unsupported("valid collector/trust/field policy exceeds the fixed native INFO reference collector", policy_scope=True)
                 row["limitations"].append("source identity and exact trial events need runtime verification; enterprise collector/SIEM coverage is unverified")
+            image, version = env.engine.image_digest, env.engine.version
             if not managed:
                 if row["status"] != "UNSUPPORTED":
                     row["status"] = "UNKNOWN"
                 row["reasons"].append("external target ownership and launch metadata require runtime verification")
-                if kube:
-                    if evidence_contract(adapter, "request_binding_contract", env.engine.image_digest,env.engine.version) is None:
+                if kube and executor == "request_binding":
+                    if evidence_contract(adapter, "request_binding_contract", image, version) is None:
                         unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")
                     row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
+                elif kube and executor == "log_integrity":
+                    if evidence_contract(adapter, "native_log_contract", image, version) is None:
+                        unsupported("OBS-09 has no inspected native logging contract for the exact image/version")
+                    row["limitations"].append("Kubernetes native INFO collection requires a verified owned Pod, logging launch and source-linked log bytes")
                 continue
             launch = cfg.get(env.engine.name, {})
             if not provider.bounded_launch_evidence(launch, env):
                 unsupported("this inspected collection profile requires an explicit bounded GPU launch (gpu-bounded with assigned GPUs)")
-            image, version = env.engine.image_digest, env.engine.version
             if not image or not version:
                 if row["status"] != "UNSUPPORTED":
                     row["status"] = "UNKNOWN"

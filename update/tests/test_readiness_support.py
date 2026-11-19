@@ -179,6 +179,41 @@ def test_external_target_launch_metadata_is_unconfirmed_without_reading_it(pack)
     assert all("runtime verification" in " ".join(row["reasons"]) for row in rows)
 
 
+@pytest.mark.parametrize(("version", "expected"), [("0.30.0", "UNSUPPORTED"), ("0.31.0", "UNKNOWN")])
+def test_external_kubernetes_obs09_uses_its_own_source_contract(pack, monkeypatch, tmp_path, version, expected):
+    from guard import readiness_support
+    from guard.adapters.vllm_release_profiles import release_profile
+
+    env, pol, cfg = declared_inputs(pack)
+    image = next(pin for pin in release_profile(version)["images"] if pin.startswith("vllm/"))
+    engine = env.engine.model_copy(update={"version": version, "image_digest": image})
+    env = env.model_copy(update={"engine": engine}).seal()
+    cfg["executors"] = {"log_integrity": "kubernetes", "request_binding": "kubernetes"}
+    cfg["log_integrity"] = {"target": str(tmp_path / "unavailable-log-target.json")}
+    cfg["request_binding"] = {"target": str(tmp_path / "unavailable-binding-target.json")}
+    before = deepcopy((env.model_dump(), pol.model_dump(), cfg))
+    source_contract = readiness_support.evidence_contract
+    requested = []
+
+    def track(adapter, name, selected_image, selected_version):
+        requested.append((name, selected_image, selected_version))
+        return source_contract(adapter, name, selected_image, selected_version)
+
+    monkeypatch.setattr(readiness_support, "evidence_contract", track)
+    obs, req = assess_check_support(pack, env, pol, cfg, selected_check_ids=["OBS-09", "REQ-11"], managed=False)
+    assert requested == [("native_log_contract", image, version), ("request_binding_contract", image, version)]
+    assert (obs["status"], req["status"]) == (expected, expected)
+    assert obs["code_available"] and obs["policy_valid"] and obs["policy_supported"]
+    assert obs["profile_available"] == (expected == "UNKNOWN")
+    assert not obs["runtime_qualified"]
+    assert "external target ownership and launch metadata require runtime verification" in obs["reasons"]
+    assert "source-linked log bytes" in " ".join(obs["limitations"])
+    assert not any("REQ-11" in reason for reason in obs["reasons"])
+    assert any("OBS-09 has no inspected native logging contract" in reason for reason in obs["reasons"]) == (
+        expected == "UNSUPPORTED")
+    assert (env.model_dump(), pol.model_dump(), cfg) == before and not list(tmp_path.iterdir())
+
+
 def test_external_target_does_not_hide_known_policy_mismatch(pack):
     def mutate(env, pol, cfg):
         values = deepcopy(pol.values)

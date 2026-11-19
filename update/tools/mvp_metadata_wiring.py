@@ -195,7 +195,7 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_cilium_gap=Fals
             _paired_record_inputs({side: {**settings['run_binding'][check_id],
                 **(settings['check_config'][check_id] if check_id == 'PLT-12' else {})}
                 for side, settings in settings_by_side.items()}, check_id)
-    restricted_executors = {CHECK_EXECUTORS[cid] for cid in KUBERNETES_BOUND_CHECK_OPTIONS}
+    restricted_executors = {CHECK_EXECUTORS[cid] for cid in KUBERNETES_BOUND_CHECK_OPTIONS if cid in CHECK_EXECUTORS}
     if allowed is None:
         if restricted_executors.intersection(executors):
             raise ValueError('METADATA_STAGED_EXECUTION_SCOPE_INVALID')

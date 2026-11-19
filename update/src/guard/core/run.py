@@ -16,6 +16,7 @@ from guard.executors.base import EvidenceDraft
 from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS, cilium_egress_status_requested,
                                  NORMAL_COMPILE_CACHE_SCOPE_ERROR, normal_compile_cache_requested,
+                                 NORMAL_FILE_READS_SCOPE_ERROR, normal_file_reads_requested,
                                  NORMAL_GRAPH_CAPTURE_SCOPE_ERROR, normal_graph_capture_requested,
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, installed_plugin_inventory_requested,
                                  NORMAL_SAFETENSORS_READER_SCOPE_ERROR, normal_safetensors_reader_requested,
@@ -56,6 +57,7 @@ class RunConfig:
     requested: dict | None = None
     attempt_id: str | None = None
     check_abort_reasons: dict[str, str] = field(default_factory=dict)  # Runtime preflight failures for this side.
+    normal_file_read_sha256: dict[str, str | None] = field(default_factory=dict)  # Private PLAN input snapshots.
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -135,6 +137,8 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
             raise ValueError(NORMAL_STARTUP_LOAD_SCOPE_ERROR)
         if any(normal_compile_cache_requested(config) for config in configurations):
             raise ValueError(NORMAL_COMPILE_CACHE_SCOPE_ERROR)
+        if any(normal_file_reads_requested(config) for config in configurations):
+            raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
         if any(normal_graph_capture_requested(config) for config in configurations):
             raise ValueError(NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
         if any(normal_safetensors_reader_requested(config) for config in configurations):
@@ -304,7 +308,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
             target_options = {}
-            if (check.id in {'LIF-01', 'LIF-03', 'OBS-02', 'PLT-07', 'REQ-20', 'SUP-07', 'SUP-10', 'SUP-12'}
+            if (check.id in {'LIF-01', 'LIF-03', 'OBS-02', 'PLT-07', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12'}
                     and type(section) is dict and option in section):
                 hashes = raw.get("_kubernetes_target_sha256_by_executor")
                 expected_target = hashes.get(item.executor) if type(hashes) is dict else None
@@ -312,6 +316,11 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                     check_label = check.id.replace('-', '')
                     raise run_binding.RunBindingUnavailable(f"RUN_BINDING_{check_label}_NORMAL_TARGET_UNAVAILABLE")
                 target_options["expected_target_sha256"] = expected_target
+                if check.id == 'SUP-05':
+                    if (set(cfg.normal_file_read_sha256) != {'prepared', 'reference_manifest'}
+                            or any(digest is None for digest in cfg.normal_file_read_sha256.values())):
+                        raise run_binding.RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_FILES_UNAVAILABLE')
+                    target_options["expected_normal_file_sha256"] = cfg.normal_file_read_sha256
             binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],

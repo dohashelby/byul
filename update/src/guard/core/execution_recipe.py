@@ -6,7 +6,7 @@ import inspect
 from guard.models import canonical_json, sha256_hex, utcnow
 
 
-def configuration_sha256(cfg, environments=(), *, target_snapshots=None):
+def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
@@ -21,6 +21,8 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None):
         return value
     inputs = {}
     captured_digests = {}
+    from guard.configuration import normal_file_reads_requested
+    normal_file_reads = normal_file_reads_requested(cfg)
     late_candidate = cfg.get('update', {}).get('kubernetes_candidate_binding') == 'after_baseline'
     def files(value, location=()):
         if not isinstance(value, dict): return
@@ -30,13 +32,20 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None):
                 ('run_binding', 'OBS-01'), ('run_binding', 'PLT-12')}
             copy_inventory = key == 'copy_inventory' and (
                 location[-1:] == ('required_event_record',) or location[-2:] == ('check_config', 'PLT-12'))
-            if (record_source or copy_inventory) and isinstance(item, (str, Path)):
+            normal_file_input = normal_file_reads and key in {'prepared', 'reference_manifest'} and location[-2:] in {
+                ('supply_boot', 'normal'), ('SUP-05', 'normal')}
+            if (record_source or copy_inventory or normal_file_input) and isinstance(item, (str, Path)):
                 # The audit record names the source bytes, so commit them with
                 # the exact side's requested record session and inventory.
                 from guard.executors.run_binding import producer_sha256
                 path = str(item)
-                try: inputs[path] = producer_sha256(path)
-                except (OSError, ValueError): inputs[path] = None
+                if normal_file_input and normal_file_hashes is not None and path in normal_file_hashes:
+                    inputs[path] = normal_file_hashes[path]
+                else:
+                    try: inputs[path] = producer_sha256(path)
+                    except (OSError, ValueError): inputs[path] = None
+                    if normal_file_input and normal_file_hashes is not None:
+                        normal_file_hashes[path] = inputs[path]
                 continue
             if key in {'target', 'manifest', 'gateway_target'} and isinstance(item, (str, Path)):
                 path = Path(item)
@@ -95,9 +104,10 @@ def validate_policy_time(policy):
         raise ValueError('POLICY_EXPIRED')
 
 
-def bind_recipe(plan, cfg, environments=(), *, target_snapshots=None):
+def bind_recipe(plan, cfg, environments=(), *, target_snapshots=None, normal_file_hashes=None):
     return plan.model_copy(update={'inputs': plan.inputs.model_copy(update={
-        'execution_recipe_sha256': configuration_sha256(cfg, environments, target_snapshots=target_snapshots)})}).seal()
+        'execution_recipe_sha256': configuration_sha256(cfg, environments, target_snapshots=target_snapshots,
+                                                       normal_file_hashes=normal_file_hashes)})}).seal()
 
 
 @contextmanager

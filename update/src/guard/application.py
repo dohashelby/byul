@@ -14,7 +14,7 @@ from guard.adapters.engine_provider import get_provider
 from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECORD_SNAPSHOT_OPTION,
                                  INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS,
-                                 NORMAL_COMPILE_CACHE_SCOPE_ERROR,
+                                 NORMAL_COMPILE_CACHE_SCOPE_ERROR, NORMAL_FILE_READS_SCOPE_ERROR,
                                  NORMAL_GRAPH_CAPTURE_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
@@ -22,6 +22,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECOR
                                  bounded_metadata_scopes, cilium_egress_status_requested, for_check,
                                  installed_plugin_inventory_requested,
                                  normal_compile_cache_requested,
+                                 normal_file_reads_requested,
                                  normal_graph_capture_requested,
                                  normal_request_latency_requested,
                                  normal_safetensors_reader_requested,
@@ -163,6 +164,7 @@ def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
     sides = cfg.get("sides", {})
     if (cilium_egress_status_requested(cfg) or installed_plugin_inventory_requested(cfg)
             or normal_compile_cache_requested(cfg)
+            or normal_file_reads_requested(cfg)
             or normal_graph_capture_requested(cfg)
             or normal_request_latency_requested(cfg)
             or normal_safetensors_reader_requested(cfg)
@@ -186,7 +188,8 @@ def _bounded_kubernetes_targets(raw, selected):
             continue  # Per-check execution reports the malformed configuration.
         if type(effective) is not dict or effective.get(option) is not True:
             continue
-        target = effective.get("target")
+        section = effective.get("normal") if check_id == "SUP-05" else effective
+        target = section.get("target") if type(section) is dict else None
         paths[check_id] = Path(target) if isinstance(target, (str, Path)) else None
     return paths
 
@@ -215,6 +218,10 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=
 
     try:
         target = strict_json(content, limit=65536)
+        if scoped_check == "SUP-05":
+            from guard.runtime.kubernetes_binding import validate_capture_target
+            validate_capture_target(target, env)
+            return sha256_hex(canonical_json(target))
         binding, _ = validate_target_binding(target, env)
         if target["lab"] is False and target.get("environment_ref") == env.ref().model_dump(mode="json"):
             if gateway_snapshot:
@@ -309,7 +316,8 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
         target_paths = {side: _bounded_kubernetes_targets(raw, selected) for side, raw in side_cfgs.items()}
         if cfg.get("update", {}).get("kubernetes_candidate_binding", "prebound") == "prebound":
             target_snapshots = {path: None for paths in target_paths.values() for path in paths.values() if path is not None}
-    plan = bind_recipe(plan, cfg, envs, target_snapshots=target_snapshots or None)
+    normal_file_hashes = {} if normal_file_reads_requested(cfg) else None
+    plan = bind_recipe(plan, cfg, envs, target_snapshots=target_snapshots or None, normal_file_hashes=normal_file_hashes)
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
     rc = RunConfig(executors=cfg.get("executors", {}), requested=deepcopy(cfg))
@@ -318,6 +326,11 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
             for name in c.get("executors", {}):
                 c.setdefault(name, {})["target"] = str(run_dir / side / "target.json")
         rc.side_configs[side] = RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
+        if normal_file_hashes is not None and "SUP-05" in target_paths.get(side, {}):
+            normal = for_check(c, "supply_boot", "SUP-05")["supply_boot"]["normal"]
+            rc.side_configs[side].normal_file_read_sha256 = {
+                key: normal_file_hashes.get(normal[key]) for key in ("prepared", "reference_manifest")
+            }
     lifecycle_errors = []
     diagnostic_refs = []
     kube_transition=None
@@ -468,6 +481,8 @@ def _validation_inputs(env, cfg: dict):
         raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
     if normal_compile_cache_requested(cfg):
         raise ValueError(NORMAL_COMPILE_CACHE_SCOPE_ERROR)
+    if normal_file_reads_requested(cfg):
+        raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
     if normal_graph_capture_requested(cfg):
         raise ValueError(NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
     if normal_safetensors_reader_requested(cfg):
@@ -663,15 +678,17 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 settings = c.get(item.executor, {})
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
                 explicit_observer = (item.check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09",
-                                                       "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
+                                                       "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
                                      and type(settings) is dict
                                      and option in settings)
+                normal_file_read = explicit_observer and item.check_id == "SUP-05"
+                expected_target = None
                 if kube and option and type(settings) is dict and settings.get(option) is True:
-                    path = Path(settings["target"])
+                    path = Path(settings["normal"]["target"] if normal_file_read else settings["target"])
                     if not path.is_file() or path.is_symlink():
                         raise ValueError("KUBERNETES_SCOPED_TARGET_INVALID")
                     with path.open("rb") as stream:
-                        _scoped_target_sha256(stream.read(65537), selected_env,
+                        expected_target = _scoped_target_sha256(stream.read(65537), selected_env,
                             gateway_snapshot=settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True,
                             scoped_check=item.check_id)
                 executor = (registry.build_executor(item.executor, implementation, c,
@@ -692,8 +709,11 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         _, values = run_binding.effective_values(
                             check_def, c.get(item.executor, {}), selected_env, values, side=side, attempt_id=None,
                             issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
-                            run_cfg=run_binding.run_config(c, item.check_id), policy_ref=policy.ref())
+                            run_cfg=run_binding.run_config(c, item.check_id), policy_ref=policy.ref(),
+                            **({"expected_target_sha256": expected_target} if normal_file_read else {}))
                     executor.validate_policy(check_def, values)
+                    if normal_file_read:
+                        executor.normal_file_read_inputs(selected_env, values)
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
     except Exception as exc:

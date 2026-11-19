@@ -178,7 +178,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             continue
         row['code_available'] = True
         if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-07', 'PLT-12', 'LIF-01', 'LIF-03', 'LIF-04',
-                                 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-07', 'SUP-10', 'SUP-12'}:
+                                 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12'}:
             effective = for_check(cfg, executor, check_id).get(executor, {})
             setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
             if type(effective) is dict and effective.get(setting) is True:
@@ -205,6 +205,9 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 elif check_id == 'SUP-07':
                     row["scope"] = "source-checked startup compile record and cache file metadata in the owned container"
                     row["limitations"].append("writer enforcement, cache reads and verification before use require separate evidence")
+                elif check_id == 'SUP-05':
+                    row["scope"] = "owned native eager-read bytes from the prepared normal model load"
+                    row["limitations"].append("worker assignment, tensor storage and file admission enforcement require independent evidence")
                 elif check_id == 'SUP-12':
                     row["scope"] = "source-checked default Safetensors branch during the owned normal startup"
                     row["limitations"].append("exact file reads, alternate readers and malformed-input behavior require separate evidence")

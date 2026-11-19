@@ -26,6 +26,7 @@ from guard.adapters.vllm import VllmAdapter
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR,
+                                 NORMAL_FILE_READS_OPTION, NORMAL_FILE_READS_SCOPE_ERROR,
                                  NORMAL_GRAPH_CAPTURE_OPTION, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
                                  NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
@@ -262,6 +263,7 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
         settings = cfg.get(executor)
         if type(settings) is dict:
             modes = {
+                NORMAL_FILE_READS_OPTION: (KubernetesSupplyBootExecutor, NORMAL_FILE_READS_SCOPE_ERROR),
                 NORMAL_STARTUP_LOAD_OPTION: (KubernetesNormalStartupLoadExecutor, NORMAL_STARTUP_LOAD_SCOPE_ERROR),
                 NORMAL_COMPILE_CACHE_OPTION: (KubernetesNormalCompileCacheExecutor, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
                 NORMAL_SAFETENSORS_READER_OPTION: (

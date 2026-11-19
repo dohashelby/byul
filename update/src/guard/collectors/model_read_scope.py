@@ -52,9 +52,14 @@ def scope_summary(value):
 
 
 def validate_binding(prepared,env,target):
-    if prepared.get('profile') not in {sensor.PROFILE,'vllm-native-lifecycle-metadata/18','vllm-native-lifecycle-metadata/19','vllm-native-lifecycle-metadata/20','vllm-native-lifecycle-metadata/21','vllm-native-lifecycle-metadata/22'}:return
+    from guard.adapters import vllm_lifecycle_catalog as configured
+    profile = prepared.get('profile')
+    approved = configured.approved_file_read(profile)
+    if not approved and profile not in {sensor.PROFILE,'vllm-native-lifecycle-metadata/18','vllm-native-lifecycle-metadata/19','vllm-native-lifecycle-metadata/20','vllm-native-lifecycle-metadata/21','vllm-native-lifecycle-metadata/22'}:return
     value=prepared.get('model_read_scope',{})
     if type(env.model.id) is not str or type(env.model.revision) is not str:raise ValueError('MODEL_READ_SCOPE_MODEL_BINDING_REQUIRED')
     if (value.get('environment_ref')!=env.ref().model_dump(mode='json') or value.get('target_sha256')!=sha256_hex(canonical_json(target))
             or value.get('model_sha256')!=sha256_hex(env.model.id.encode()) or value.get('revision_sha256')!=sha256_hex(env.model.revision.encode())
-            or value.get('inventory_sha256')!=env.model.inventory_sha256):raise ValueError('MODEL_READ_SCOPE_TARGET_MISMATCH')
+            or value.get('inventory_sha256')!=env.model.inventory_sha256
+            or approved and (not configured.approved_file_read_matches(env, prepared)
+                             or value.get('hash_model_bytes') is not True)):raise ValueError('MODEL_READ_SCOPE_TARGET_MISMATCH')

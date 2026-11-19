@@ -43,7 +43,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
-                                 NORMAL_COMPILE_CACHE_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
+                                 NORMAL_COMPILE_CACHE_OPTION, NORMAL_FILE_READS_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_STARTUP_LOAD_OPTION,
@@ -258,6 +258,7 @@ _CHECK_FILE_OVERRIDES = {
                'profiler_target_sha256': (('profiler_target',), 'json'),
                'identity_prepared_sha256': (('identity_prepared',), 'lifecycle'),
                'profiler_prepared_sha256': (('profiler_prepared',), 'lifecycle')},
+    'SUP-05': {'supply_normal_reference_manifest_sha256': (('normal', 'reference_manifest'), 'bytes')},
 }
 # Longest window each executor's policy contract accepts (end - start).
 _WINDOW_SECONDS = {'supply_boot': 3600}
@@ -488,7 +489,7 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 
 
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
-            run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None):
+            run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
@@ -514,6 +515,13 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                     'issued_at': _stamp(issued_at)}
         return document, {}
     keys = tuple(k for k in KEYS_BY_CHECK.get(check.id, ()) if 1 in stages)
+    normal_file_reads = check.id == 'SUP-05' and NORMAL_FILE_READS_OPTION in executor_cfg
+    if normal_file_reads:
+        if (check.executor != 'supply_boot' or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK[check.id]
+                or executor_cfg[NORMAL_FILE_READS_OPTION] is not True or stages != (1,) or run_cfg is not None):
+            raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_SCOPE_INVALID')
+        keys = (*(key for key in keys if not key.startswith('supply_challenge_')),
+                'supply_normal_reference_manifest_sha256')
     if check.id == 'LIF-04' and check.executor == 'stream_buffer' and executor_cfg.get(NORMAL_STREAM_OPTION) is True:
         from .stream_buffer_contract import PROFILE
         if getattr(check, 'collection_profile', None) == PROFILE:
@@ -561,8 +569,22 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 values[key] = _stamp(start)
             elif key.endswith('validity_end'):
                 values[key] = _stamp(end)
+            elif normal_file_reads and expected_normal_file_sha256 is not None and key == 'supply_normal_prepared_sha256':
+                from guard.collectors.lifecycle import load_prepared
+                try:
+                    manifest = load_prepared(executor_cfg['normal']['prepared'],
+                                             expected_sha256=expected_normal_file_sha256['prepared'])
+                except (OSError, ValueError):
+                    raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_PREPARED_CHANGED') from None
+                values[key] = files[key] = sha256_hex(canonical_json(manifest))
             else:
                 values[key] = files[key] = file_hash(check.id, key, executor_cfg)
+        if (normal_file_reads and expected_target_sha256 is not None
+                and values['supply_normal_target_sha256'] != expected_target_sha256):
+            raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_TARGET_CHANGED')
+        if (normal_file_reads and expected_normal_file_sha256 is not None
+                and values['supply_normal_reference_manifest_sha256'] != expected_normal_file_sha256['reference_manifest']):
+            raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_REFERENCE_CHANGED')
     except RunBindingUnavailable:
         raise
     except Exception:
@@ -595,6 +617,9 @@ def effective_values(check, executor_cfg, env, policy_values, **kwargs):
         raise RunBindingUnavailable('RUN_BINDING_BELONGS_TO_EXECUTION')
     if type(executor_cfg) is not dict:
         raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE')
+    if (check.id == 'SUP-05' and NORMAL_FILE_READS_OPTION in executor_cfg
+            and 'supply_normal_reference_manifest_sha256' in (policy_values or {})):
+        raise RunBindingUnavailable('RUN_BINDING_BELONGS_TO_EXECUTION')
     kwargs.setdefault('policy_row', dict(policy_values or {}))
     document, values = compute(check, executor_cfg, env, **kwargs)
     return document, {**(policy_values or {}), **values}

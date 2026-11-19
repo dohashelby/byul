@@ -12,6 +12,7 @@ from . import vllm_baseline_startup as startup_native
 from . import vllm_baseline_profiler_composition as direct_profiler
 from . import vllm_baseline_profiler as profiler_native
 from . import vllm_baseline_stream_composition as baseline_stream
+from . import vllm_approved_file_read_composition as file_read
 
 
 def _catalog():
@@ -35,8 +36,17 @@ def _catalog():
                     if point in points:
                         raise ValueError('LIFECYCLE_POINT_AMBIGUOUS')
                     points[point] = module
-        if (not points and not {'startup', 'baseline_profiler'} & row.keys()) or not set(row['void_return_argument_ids']) <= points.keys():
+        if (not points and not {'startup', 'baseline_profiler', 'approved_file_read'} & row.keys()
+                or not set(row['void_return_argument_ids']) <= points.keys()):
             raise ValueError('LIFECYCLE_CATALOG_INVALID')
+        if 'approved_file_read' in row and (row['approved_file_read'] is not True
+                or row['engine'] != 'vllm' or row['engine_mode'] != 'V1'
+                or row['profile'] != file_read.PROFILES.get(row['version'])
+                or row['schema'] != row['profile'].replace('vllm-native-lifecycle-metadata', 'guard-native-lifecycle-events')
+                or row['runtimes'] != {file_read.RUNTIME: ['posix']} or points
+                or set(row['sources']) != {file_read.LOADER, file_read.WEIGHTS}
+                or {'request_binding', 'startup', 'baseline_profiler', 'baseline_stream'} & row.keys()):
+            raise ValueError('LIFECYCLE_FILE_READ_CATALOG_INVALID')
         if 'startup' in row and (row['startup'] != 'baseline-v1'
                 or row['profile'] != startup.STARTUP_PROFILE or row['schema'] != startup.STARTUP_SCHEMA
                 or row.get('startup_image') not in row['images'] or 'request_binding' in row
@@ -114,6 +124,17 @@ def stream_observation(profile):
     return contains(profile) and row(profile).get('baseline_stream') == 'uvicorn-0.34-wheel-source'
 
 
+def approved_file_read(profile):
+    return contains(profile) and row(profile).get('approved_file_read') is True
+
+
+def approved_file_read_matches(env, prepared):
+    profile = prepared.get('profile')
+    return (approved_file_read(profile)
+            and matches(profile, env.engine.name, env.engine.version, env.engine.image_digest, env.runtime.platform)
+            and env.engine.source_commit in {None, row(profile)['commit']})
+
+
 def startup_assets(profile):
     dependencies = {filename: (logical, digest) for logical, (filename, digest) in startup.DEPENDENCIES.items()} if startup_observation(profile) or profiler_observation(profile) else {}
     return dependencies | (direct_profiler.EXTRA_ASSETS if profiler_observation(profile) else {})
@@ -123,12 +144,17 @@ def stream_assets(profile):
     return {'guard_stream_buffer_extension.py': ('vllm_stream_buffer_sensor', baseline_stream.EXTENSION_SHA256)} if stream_observation(profile) else {}
 
 
+def approved_file_read_assets(profile):
+    return {file_read.PRIMITIVE_FILE: ('vllm_file_read_sensor', file_read.PRIMITIVE_SHA256)} if approved_file_read(profile) else {}
+
+
 def asset_names(profile):
     return {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py', 'sitecustomize.py', 'settings.json'} | (
-        {'request-binding-key.json'} if request_binding(profile) else set()) | set(startup_assets(profile)) | set(stream_assets(profile))
+        {'request-binding-key.json'} if request_binding(profile) else set()) | set(startup_assets(profile)) | set(stream_assets(profile)) | (
+        {'model-read-scope.json', *approved_file_read_assets(profile)} if approved_file_read(profile) else set())
 
 
-def render_source(profile, *, request_key_sha256=None):
+def render_source(profile, *, request_key_sha256=None, model_read_scope_sha256=None):
     # Canonical ordering keeps the same selected row byte-identical when unrelated
     # release rows are added. This literal is data, not executable input.
     spec = json.loads(json.dumps(runtime_spec(profile), sort_keys=True))
@@ -146,6 +172,13 @@ def render_source(profile, *, request_key_sha256=None):
         extension += b'\n' + Path(startup.__file__).read_bytes() + b'\n' + Path(direct_profiler.__file__).read_bytes()
     if stream_observation(profile):
         extension += b'\n' + Path(baseline_stream.__file__).read_bytes()
+    if approved_file_read(profile):
+        if type(model_read_scope_sha256) is not str or re.fullmatch('[0-9a-f]{64}', model_read_scope_sha256) is None:
+            raise ValueError('APPROVED_FILE_READ_SCOPE_PIN_REQUIRED')
+        spec['model_read_scope_sha256'] = model_read_scope_sha256
+        extension += b'\n' + Path(file_read.__file__).read_bytes()
+    elif model_read_scope_sha256 is not None:
+        raise ValueError('APPROVED_FILE_READ_PROFILE_REQUIRED')
     return Path(template.__file__).read_bytes() + extension + (
         '\nSPEC = ' + repr(spec) + "\nif __name__ == '__main__':\n    main()\n").encode()
 

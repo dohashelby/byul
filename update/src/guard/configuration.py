@@ -23,6 +23,8 @@ NORMAL_REQUEST_LATENCY_OPTION = "normal_request_latency_only"
 NORMAL_REQUEST_LATENCY_SCOPE_ERROR = "NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID"
 NORMAL_COMPILE_CACHE_OPTION = "normal_compile_cache_only"
 NORMAL_COMPILE_CACHE_SCOPE_ERROR = "NORMAL_COMPILE_CACHE_EXECUTION_SCOPE_INVALID"
+NORMAL_FILE_READS_OPTION = "normal_file_reads_only"
+NORMAL_FILE_READS_SCOPE_ERROR = "NORMAL_FILE_READS_EXECUTION_SCOPE_INVALID"
 NORMAL_GRAPH_CAPTURE_OPTION = "normal_graph_capture_only"
 NORMAL_GRAPH_CAPTURE_SCOPE_ERROR = "NORMAL_GRAPH_CAPTURE_EXECUTION_SCOPE_INVALID"
 NORMAL_SAFETENSORS_READER_OPTION = "normal_safetensors_reader_only"
@@ -40,6 +42,7 @@ _NORMAL_ONLY_CASES = {
     "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
     "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
     "REQ-20": ("engine_sensor", NORMAL_GRAPH_CAPTURE_OPTION, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR),
+    "SUP-05": ("supply_boot", NORMAL_FILE_READS_OPTION, NORMAL_FILE_READS_SCOPE_ERROR),
     "SUP-07": ("supply_boot", NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
     "SUP-12": ("supply_boot", NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
     "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
@@ -144,6 +147,10 @@ def normal_compile_cache_requested(raw):
     return next(_option_occurrences(raw, NORMAL_COMPILE_CACHE_OPTION), None) is not None
 
 
+def normal_file_reads_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_FILE_READS_OPTION), None) is not None
+
+
 def normal_graph_capture_requested(raw):
     return next(_option_occurrences(raw, NORMAL_GRAPH_CAPTURE_OPTION), None) is not None
 
@@ -192,6 +199,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         _validate_normal_option_placement(raw, NORMAL_COMPILE_CACHE_OPTION, {
             (CHECK_CONFIG, "SUP-07", NORMAL_COMPILE_CACHE_OPTION),
         }, NORMAL_COMPILE_CACHE_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_FILE_READS_OPTION, {
+            (CHECK_CONFIG, "SUP-05", NORMAL_FILE_READS_OPTION),
+        }, NORMAL_FILE_READS_SCOPE_ERROR)
         _validate_normal_option_placement(raw, NORMAL_GRAPH_CAPTURE_OPTION, {
             (CHECK_CONFIG, "REQ-20", NORMAL_GRAPH_CAPTURE_OPTION),
         }, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
@@ -243,9 +253,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
                     or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10", "REQ-20",
-                                     "SUP-07", "SUP-10", "SUP-12"}
+                                     "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
                         and raw.get("record_attestation"))
-                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
                         and "run_binding" in raw
                         and (type(bindings) is not dict or check_id in bindings))
                     or (check_id in {"LIF-01", "PLT-07", "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
@@ -254,6 +264,16 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
             scoped[check_id] = (settings, None)
             if executor == "stream_buffer":
                 stream_cases[check_id] = settings
+        if "SUP-05" in scoped:
+            settings, _ = scoped["SUP-05"]
+            supply_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}
+            normal = settings.get("normal")
+            if (supply_checks != {"SUP-05"} or set(settings) - {
+                    NORMAL_FILE_READS_OPTION, "normal", "kubectl_binary", "max_duration_seconds"}
+                    or type(normal) is not dict or set(normal) != {"target", "prepared", "reference_manifest"}
+                    or any(type(path) is not str or not path for path in normal.values())
+                    or raw.get("update", {}).get("kubernetes_candidate_binding", "prebound") != "prebound"):
+                raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
         if stream_cases:
             stream_error = (NORMAL_REQUEST_LATENCY_SCOPE_ERROR if "LIF-03" in stream_cases
                             else _NORMAL_ONLY_CASES["LIF-04"][2])

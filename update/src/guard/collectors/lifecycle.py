@@ -51,9 +51,13 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         if not fault_control.fingerprint(fault_control_target_sha256):raise ValueError('FAULT_CONTROL_TARGET_REQUIRED')
     elif fault_control_target_sha256 is not None:raise ValueError('FAULT_CONTROL_PROFILE_REQUIRED')
     from guard.collectors import model_read_scope as scope_contract
-    if selected in (read_sensor,mapping_sensor,startup_sensor,joint_sensor,generation_sensor,endpoint_sensor):
+    approved_file_read = configured.approved_file_read(profile)
+    model_read = approved_file_read or selected in (read_sensor,mapping_sensor,startup_sensor,joint_sensor,generation_sensor,endpoint_sensor)
+    if model_read:
         if model_read_scope is None:raise ValueError('MODEL_READ_SCOPE_REQUIRED')
         scope,scope_raw=scope_contract.load_scope(model_read_scope)
+        if approved_file_read and not scope['hash_model_bytes']:
+            raise ValueError('APPROVED_FILE_READ_HASH_REQUIRED')
     elif model_read_scope is not None:raise ValueError('MODEL_READ_SCOPE_PROFILE_MISMATCH')
     output = Path(output).absolute()
     if any(parent.is_symlink() or parent.is_junction() or (parent/".git").exists() for parent in output.parents):
@@ -61,12 +65,15 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
     output = reserve_output(output, protected=[Path(repository)])
     selected_profile = profile if selected in (configured,release_observation) else selected.PROFILE
     session = uuid.uuid4().hex
+    deployed_scope = scope_contract.deploy_scope(scope, scope_raw, session) if model_read else None
     key_raw = None
     if configured.request_binding(selected_profile) or selected is release_observation:
         key_raw = json.dumps({'schema': 'guard-lifecycle-request-key/1', 'session': session,
             'key_hex': secrets.token_hex(32)}, sort_keys=True, separators=(',', ':')).encode()
-    source = (configured.render_source(profile, **({'request_key_sha256': hashlib.sha256(key_raw).hexdigest()}
-        if key_raw is not None else {})) if selected is configured else
+    source = (configured.render_source(profile,
+        request_key_sha256=hashlib.sha256(key_raw).hexdigest() if key_raw is not None else None,
+        model_read_scope_sha256=hashlib.sha256(deployed_scope).hexdigest() if approved_file_read else None)
+        if selected is configured else
         release_observation.render_source(release_observation.variant_for(profile),
             request_key_sha256=hashlib.sha256(key_raw).hexdigest())
         if selected is release_observation else Path(selected.__file__).read_bytes())
@@ -98,8 +105,7 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         base_raw=Path(sensor.__file__).read_bytes();iteration_raw=Path(weight_sensor.__file__).read_bytes()
         if (hashlib.sha256(base_raw).hexdigest()!=read_sensor.BASE8_SHA256 or hashlib.sha256(iteration_raw).hexdigest()!=read_sensor.ITERATION16_SHA256):
             raise ValueError('LIFECYCLE_FILE_READ_DEPENDENCY_UNAVAILABLE')
-        deployed=scope_contract.deploy_scope(scope,scope_raw,session)
-        values.update({'guard_lifecycle_base.py':base_raw,'guard_weight_iteration.py':iteration_raw,'model-read-scope.json':deployed})
+        values.update({'guard_lifecycle_base.py':base_raw,'guard_weight_iteration.py':iteration_raw,'model-read-scope.json':deployed_scope})
         if selected in (mapping_sensor,startup_sensor,joint_sensor,generation_sensor,endpoint_sensor):
             scope_module=Path(read_sensor.__file__).read_bytes()
             if hashlib.sha256(scope_module).hexdigest()!=mapping_sensor.SCOPE17_SHA256:raise ValueError('SAFE_OPEN_MAPPING_SCOPE_DEPENDENCY_UNAVAILABLE')
@@ -162,11 +168,14 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         if hashlib.sha256(base_raw).hexdigest() != configured.runtime_spec(profile)['base_sha256']:
             raise ValueError('CONFIGURED_LIFECYCLE_BASE_UNAVAILABLE')
         values['guard_lifecycle_base.py'] = base_raw
-        for filename, (logical, digest) in (configured.startup_assets(profile) | configured.stream_assets(profile)).items():
+        for filename, (logical, digest) in (configured.startup_assets(profile) | configured.stream_assets(profile)
+                                             | configured.approved_file_read_assets(profile)).items():
             raw = Path(sensor.__file__).with_name(logical + '.py').read_bytes()
             if hashlib.sha256(raw).hexdigest() != digest:
                 raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE')
             values[filename] = raw
+        if approved_file_read:
+            values['model-read-scope.json'] = deployed_scope
     elif selected is init_release:
         for filename,module in (('guard_lifecycle_base.py',sensor),('guard_lifecycle_release.py',release_sensor),('guard_initialization.py',init_sensor)):
             raw=Path(module.__file__).read_bytes()
@@ -221,27 +230,34 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         "source_sha256":profiles.source_hashes(selected_profile), "engine_started":False,
         "image_contents_verified":False, "product_connected":False}
     if selected is fault_sensor:manifest['fault_control_target_sha256']=fault_control_target_sha256
-    if selected in (read_sensor,mapping_sensor,startup_sensor,joint_sensor,generation_sensor,endpoint_sensor):manifest['model_read_scope']=scope_contract.scope_summary(scope)
+    if model_read:manifest['model_read_scope']=scope_contract.scope_summary(scope)
     with (output/"manifest.json").open("x",encoding="utf-8",newline="\n") as stream:
         json.dump(manifest,stream,sort_keys=True,indent=2)
         stream.write("\n")
     return manifest
 
 
-def load_prepared(path):
+def load_prepared(path, *, expected_sha256=None):
     path = Path(path)
-    with path.open("rb") as stream:
-        raw_manifest=stream.read(262145)
-        manifest = strict_json(raw_manifest,limit=262144)
+    if expected_sha256 is None:
+        with path.open("rb") as stream:
+            raw_manifest = stream.read(262145)
+    else:
+        raw_manifest = read_sensor.dependency(path, expected_sha256)
+    manifest = strict_json(raw_manifest,limit=262144)
     release_variant = (type(manifest) is dict and type(manifest.get('profile')) is str
                        and manifest['profile'] in {v[0] for v in release_observation.PROFILES.values()})
+    profile = manifest.get('profile') if type(manifest) is dict else None
+    approved_file_read = configured.approved_file_read(profile)
+    model_read = approved_file_read or type(profile) is str and profile in {
+        read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     variant_assets = {'guard_lifecycle_sensor.py','guard_lifecycle_base.py','guard_lifecycle_release.py',
                       'guard_lifecycle_extension.py','guard_request_binding.py','request-binding-key.json',
                       'sitecustomize.py','settings.json'}
     if (type(manifest) is not dict or type(manifest.get("profile")) is not str
             or set(manifest) != ({"schema","profile","session","public_commit",
-            "assets","source_sha256","engine_started","image_contents_verified","product_connected"} | ({'fault_control_target_sha256'}if manifest.get('profile')==fault_sensor.PROFILE else set()) | ({'model_read_scope'} if manifest.get('profile') in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()))
-            or manifest.get('profile') not in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and len(raw_manifest)>16384
+            "assets","source_sha256","engine_started","image_contents_verified","product_connected"} | ({'fault_control_target_sha256'}if manifest.get('profile')==fault_sensor.PROFILE else set()) | ({'model_read_scope'} if model_read else set()))
+            or not model_read and len(raw_manifest)>16384
             or manifest["schema"] != "guard-lifecycle-assets/1"  or type(manifest["profile"]) is not str
             or manifest["profile"] not in profiles.SCHEMAS
             or manifest["public_commit"] != profiles.public_commit(manifest["profile"])
@@ -257,6 +273,7 @@ def load_prepared(path):
                     if manifest["profile"] in {sglang_sensor.PROFILE,termination_sensor.PROFILE,attempt.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,release_sensor.PROFILE} else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json"}))):
         raise ValueError("LIFECYCLE_ASSETS_INVALID")
     if manifest['profile']==fault_sensor.PROFILE and not fault_control.fingerprint(manifest['fault_control_target_sha256']):raise ValueError('FAULT_CONTROL_TARGET_INVALID')
+    dependencies = configured.startup_assets(profile) | configured.stream_assets(profile) | configured.approved_file_read_assets(profile)
     source_supported = False
     for name, expected in manifest["assets"].items():
         if (type(expected) is not dict or set(expected) != {"sha256","bytes"}
@@ -278,10 +295,9 @@ def load_prepared(path):
             identity = lambda s: (s.st_dev, s.st_ino, s.st_mode, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
             if (len(raw) != before.st_size or len({identity(s) for s in (before, opened, after, key_path.lstat())}) != 1):
                 raise ValueError('REQUEST_BINDING_KEY_INVALID')
-        elif name in (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile'])):
+        elif name in dependencies:
             try:
-                raw = configured.startup._startup_read(name,
-                    (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile']))[name][1], directory_path=str(path.parent))
+                raw = configured.startup._startup_read(name, dependencies[name][1], directory_path=str(path.parent))
             except OSError:
                 raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE') from None
         else:
@@ -317,8 +333,8 @@ def load_prepared(path):
         if configured.contains(manifest['profile']) and name == 'guard_lifecycle_base.py':
             if hashlib.sha256(raw).hexdigest() != configured.runtime_spec(manifest['profile'])['base_sha256']:
                 raise ValueError('CONFIGURED_LIFECYCLE_BASE_UNAVAILABLE')
-        if name in (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile'])):
-            logical, digest = (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile']))[name]
+        if name in dependencies:
+            logical, digest = dependencies[name]
             if (hashlib.sha256(raw).hexdigest() != digest
                     or raw != Path(sensor.__file__).with_name(logical + '.py').read_bytes()):
                 raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE')
@@ -350,10 +366,12 @@ def load_prepared(path):
         if manifest['profile'] in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}:
             required={'guard_lifecycle_base.py':read_sensor.BASE8_SHA256,'guard_weight_iteration.py':read_sensor.ITERATION16_SHA256,**({'guard_file_read_scope.py':mapping_sensor.SCOPE17_SHA256} if manifest['profile'] in {mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else {})}.get(name)
             if required is not None and hashlib.sha256(raw).hexdigest()!=required:raise ValueError('LIFECYCLE_FILE_READ_DEPENDENCY_UNAVAILABLE')
-            if name=='model-read-scope.json':
-                from guard.collectors.model_read_scope import scope_summary
-                value=read_sensor.validate_scope(strict_json(raw,limit=262144),session=manifest['session'])
-                if scope_summary(value)!=manifest['model_read_scope']:raise ValueError('MODEL_READ_SCOPE_MANIFEST_MISMATCH')
+        if model_read and name=='model-read-scope.json':
+            from guard.collectors.model_read_scope import scope_summary
+            value=read_sensor.validate_scope(strict_json(raw,limit=262144),session=manifest['session'])
+            if (scope_summary(value)!=manifest['model_read_scope']
+                    or approved_file_read and not value['hash_model_bytes']):
+                raise ValueError('MODEL_READ_SCOPE_MANIFEST_MISMATCH')
         if manifest['profile'] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}:
             dependency={'guard_lifecycle_base.py':startup_sensor.BASE8_SHA256,'guard_weight_iteration.py':startup_sensor.ITERATION16_SHA256,
                 'guard_file_read_scope.py':startup_sensor.SCOPE17_SHA256,'guard_safe_open_mapping.py':startup_sensor.MAPPING18_SHA256,
@@ -372,7 +390,9 @@ def load_prepared(path):
         if name == "guard_lifecycle_sensor.py":
             source_supported = profiles.asset_supported(manifest["profile"], raw,
                 **({'request_key_sha256': manifest['assets']['request-binding-key.json']['sha256']}
-                   if configured.request_binding(manifest['profile']) or release_variant else {}))
+                   if configured.request_binding(manifest['profile']) or release_variant else {}),
+                **({'model_read_scope_sha256': manifest['assets']['model-read-scope.json']['sha256']}
+                   if approved_file_read else {}))
     if not source_supported:
         raise ValueError("LIFECYCLE_ASSET_VERSION_UNAVAILABLE")
     return manifest
@@ -453,10 +473,16 @@ def validate_session_binding(env,target,source,prepared):
             raise ValueError('LIFECYCLE_RELEASE_ENGINE_UNSUPPORTED') from None
     if configured.contains(prepared['profile']):
         try:
-            require(env.engine.name, env.engine.version, 'configured_lifecycle_rows')
-            if not configured.matches(prepared['profile'], env.engine.name, env.engine.version,
-                                      env.engine.image_digest, env.runtime.platform):
-                raise ValueError('PROFILE_UNREVIEWED')
+            if configured.approved_file_read(prepared['profile']):
+                if not configured.approved_file_read_matches(env, prepared):
+                    raise ValueError('PROFILE_UNREVIEWED')
+                from guard.collectors.model_read_scope import validate_binding as validate_read_scope
+                validate_read_scope(prepared, env, target)
+            else:
+                require(env.engine.name, env.engine.version, 'configured_lifecycle_rows')
+                if not configured.matches(prepared['profile'], env.engine.name, env.engine.version,
+                                          env.engine.image_digest, env.runtime.platform):
+                    raise ValueError('PROFILE_UNREVIEWED')
         except ValueError:
             raise ValueError('LIFECYCLE_CONFIGURED_ENGINE_UNSUPPORTED') from None
     validate_owned_source(**source)

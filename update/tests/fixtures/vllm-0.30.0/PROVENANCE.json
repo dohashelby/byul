@@ -146,6 +146,14 @@
       "sha256": "75d05ddddf303734a078a3e42fcb173fef58ea56da09bc0b5c7525cb9bbbf527",
       "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
       "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "vllm/model_executor/model_loader/default_loader.py.txt": {
+      "source": "vllm/model_executor/model_loader/default_loader.py",
+      "sha256": "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8"
+    },
+    "vllm/model_executor/model_loader/weight_utils.py.txt": {
+      "source": "vllm/model_executor/model_loader/weight_utils.py",
+      "sha256": "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

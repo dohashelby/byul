@@ -61,7 +61,8 @@ def project(rows):
         if type(key) is not str or key not in specs or key in valid or row.get('contract') != CONTRACT:
             errors.append('unknown_or_duplicate_case'); continue
         case = specs[key]
-        if row.get('case_identity') != identity(case) or row.get('python_optimize') != MODES[case['mode']]:
+        optimize = row.get('python_optimize')
+        if row.get('case_identity') != identity(case) or type(optimize) is not int or optimize != MODES[case['mode']]:
             errors.append(key); continue
         try:
             events = clean_events(row.get('events', []))

@@ -86,7 +86,9 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
             return prepared
         prepared['index_present'] = True
         try:
-            if not (stat.S_ISREG(identity.st_mode) or stat.S_ISLNK(identity.st_mode)):
+            if stat.S_ISLNK(identity.st_mode):
+                identity = os.stat(path)
+            if not stat.S_ISREG(identity.st_mode):
                 raise ValueError
             descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0))
             try:

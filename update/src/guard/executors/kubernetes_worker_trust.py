@@ -46,6 +46,14 @@ def collect(ctx):
     groups, ambiguous, mount_relations = defaultdict(list), [], []
     stable_rows = kubernetes_process_rows(record) if record is not None and scope_gap is None else []
     subject = record['packet']['capture_subject'] if stable_rows else None
+    if subject is None and record is not None and scope_gap is None:
+        # The reader's own identity can be stable even if no target process rows qualify.
+        packet = record['packet']
+        if (record['available'] is True and record['binding_verified_before_after'] is True
+                and record['binding_before'] == ctx.cprobe.binding['engine'] == record['binding_after']
+                and type(packet) is dict and packet['capture_process_excluded'] is True
+                and packet['capture_subject']['identity_stable'] is True):
+            subject = packet['capture_subject']
     for row in stable_rows:
         if any(row[key] is None for key in ('name', 'uid_effective', 'start_ticks', 'mount_namespace_inode')):
             continue
@@ -82,7 +90,7 @@ def collect(ctx):
     }
     summary = {'profile': PROFILE, 'target_sha256': ctx.cprobe.target_sha256,
                'binding_verified': bool(record and record['binding_verified_before_after']),
-               'process_inventory_stable': bool(subject and record['packet']['pid_inventory_stable']),
+               'process_inventory_stable': bool(stable_rows and record['packet']['pid_inventory_stable']),
                'stable_process_rows': len(stable_rows), 'ambiguous_processes': ambiguous, 'diagnostic_codes': diagnostics,
                'reader_pid_namespace_sha256': sha256_hex(canonical_json(subject['pid_namespace_inode'])) if subject else None,
                'reader_mount_namespace_sha256': sha256_hex(canonical_json(subject['mount_namespace_inode'])) if subject else None,

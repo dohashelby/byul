@@ -44,6 +44,11 @@ class WorkerWorld(ProcessWorld):
             second['name'] = 'python3'
         first['environment_names'].append('PRIVATE_SETTING_NAME')
         first['environment_names'].sort()
+        if self.case in {'reader-only', 'reader-unstable', 'reader-unexcluded'}:
+            packet.update(processes=[], pid_count_before=0, pid_count_after=0, pid_inventory_stable=False,
+                          process_metadata_complete=False, diagnostic_codes=['PROCESS_SET_EMPTY'])
+            packet['capture_subject']['identity_stable'] = self.case != 'reader-unstable'
+            packet['capture_process_excluded'] = self.case != 'reader-unexcluded'
         result['stdout_bytes'] = canonical_json(packet)
         return result
 
@@ -51,6 +56,7 @@ class WorkerWorld(ProcessWorld):
 @pytest.mark.parametrize('case,completed,markers', [
     ('one-marker', True, ['VLLM']), ('two-markers', True, ['VLLM', 'Worker']),
     ('partial-process', True, ['VLLM']), ('ambiguous', False, []), ('replaced', False, []),
+    ('reader-only', False, []), ('reader-unstable', False, []), ('reader-unexcluded', False, []),
     ('mount-changed', False, []), ('root-mount', False, []), ('proc-mount', False, []),
     ('proc-child', False, []), ('duplicate-mount', False, []),
 ])
@@ -75,12 +81,21 @@ def test_worker_marker_map_uses_owned_read_only_metadata(tmp_path, case, complet
     assert [group['marker'] for group in mapping] == markers
     summary = json.loads(draft.artifacts[0].path.read_text().splitlines()[-1])
     assert summary['worker_role_authenticated'] is False and summary['process_pid_namespace_membership_verified'] is False
+    stable_reader = bool(mapping) or case in {'reader-only', 'ambiguous'}
+    assert summary['reader_pid_namespace_sha256'] == (sha256_hex(canonical_json(20)) if stable_reader else None)
+    assert summary['reader_mount_namespace_sha256'] == (sha256_hex(canonical_json(10)) if stable_reader else None)
+    if case.startswith('reader-'):
+        assert summary['stable_process_rows'] == 0 and summary['process_inventory_stable'] is False
+        assert summary['binding_verified'] is (case != 'reader-unexcluded')
+        assert not observations['worker_trust_group_map'].collected
+        assert not observations['worker_trust_groups_missing'].collected
+        assert summary['marker_mount_namespace_relations'] == []
+    if case == 'replaced':
+        assert summary['binding_verified'] is False
     if mapping:
         assert all(item['effective_uid'] == 2000 for group in mapping for item in group['processes'])
         assert all(set(item) == {'pid', 'start_ticks', 'effective_uid', 'mount_namespace_sha256'}
                    for group in mapping for item in group['processes'])
-        assert summary['reader_pid_namespace_sha256'] == sha256_hex(canonical_json(20))
-        assert summary['reader_mount_namespace_sha256'] == sha256_hex(canonical_json(10))
         assert [(item['pid'], item['start_ticks'], item['shares_reader_mount_namespace'])
                 for item in summary['marker_mount_namespace_relations']] == (
                     [(1, 101, True), (2, 102, False)] if case == 'two-markers' else [(1, 101, True)])

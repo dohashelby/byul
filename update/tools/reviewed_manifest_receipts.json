@@ -1040,6 +1040,11 @@
       "manifest_sha256": "711a5e71c8a4c8bdb8af3beb2bb4ab74171b2d7adb99d9424d944094d4bea14e",
       "reviewed_by": "Codex / PLT-02 protected path input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T20:53:17+00:00"
+    },
+    {
+      "manifest_sha256": "4b6481f4032e15c4a9604e54cfc2968e0d1835aa374119f8f35892830782548f",
+      "reviewed_by": "Codex / REQ-09 token and SUP-05 reader input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T21:20:24+00:00"
     }
   ]
 }

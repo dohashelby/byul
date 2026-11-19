@@ -144,6 +144,30 @@ def revalidate_candidate(config, env, preliminary_ref):
     The operator supplies the new target after verified baseline resource release.
     This checks saved declarations and never queries or modifies a deployment.
     """
+    hashes, _ = _revalidate_candidate(config, env, preliminary_ref)
+    return hashes
+
+
+def bind_staged_candidate(run: RunConfig, env, preliminary_ref):
+    """Bind the verified candidate and return any check-specific preflight failure."""
+    config = run.requested
+    candidate = run.side_configs['candidate']
+    hashes, cilium_gap = _revalidate_candidate(config, env, preliminary_ref, allow_cilium_gap=True)
+    check_hashes, abort_reasons = {}, {}
+    if cilium_gap is not None:
+        # A failed PLT-07 binding must never borrow the shared OBS-04 target pin.
+        egress_hash = hashes.pop('boundary_egress')
+        check_hashes['PLT-07'] = None
+        if 'OBS-04' in config['update']['allowed_checks']:
+            check_hashes['OBS-04'] = egress_hash
+        abort_reasons['PLT-07'] = cilium_gap
+    candidate.raw['_kubernetes_target_sha256_by_executor'] = hashes
+    candidate.raw['_kubernetes_target_sha256_by_check'] = check_hashes
+    candidate.check_abort_reasons = abort_reasons
+    return abort_reasons
+
+
+def _revalidate_candidate(config, env, preliminary_ref, *, allow_cilium_gap=False):
     executors = config.get('executors', {})
     candidate = config.get('sides', {}).get('candidate', {})
     allowed = config.get('update', {}).get('allowed_checks')
@@ -201,13 +225,17 @@ def revalidate_candidate(config, env, preliminary_ref):
                 raise ValueError
         except ValueError:
             raise ValueError(error) from None
+    cilium_gap = None
     if 'PLT-07' in (allowed or ()):
         try:
             passive_egress_policy_transport(current, env, duration=1, runner=_detached_runner)
         except (KubernetesBindingError, ValueError):
-            raise ValueError('CILIUM_EGRESS_STATUS_TARGET_UNAVAILABLE') from None
-        if current['cilium_agent'] != preliminary.get('cilium_agent'):
-            raise ValueError('CILIUM_AGENT_GENERATION_CHANGED')
+            cilium_gap = 'CILIUM_EGRESS_STATUS_TARGET_UNAVAILABLE'
+        else:
+            if current['cilium_agent'] != preliminary.get('cilium_agent'):
+                cilium_gap = 'CILIUM_AGENT_GENERATION_CHANGED'
+        if cilium_gap is not None and not allow_cilium_gap:
+            raise ValueError(cilium_gap)
     if 'SUP-10' in (allowed or ()):
         try:
             installed_plugin_inventory_transport(current, env, duration=1, runner=_detached_runner)
@@ -241,7 +269,7 @@ def revalidate_candidate(config, env, preliminary_ref):
     if 'template_validation' in executors and (current.get('observed_version') != env.engine.version
             or current['engine'].get('command') != preliminary['engine'].get('command')):
         raise ValueError('METADATA_CANDIDATE_TEMPLATE_LAUNCH_CHANGED')
-    return dict.fromkeys(executors, new.target_sha256)
+    return dict.fromkeys(executors, new.target_sha256), cilium_gap
 
 
 def _check_reason(check, env, target, transport, values, *, policy, side, target_path, record_inputs):

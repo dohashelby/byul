@@ -55,6 +55,7 @@ class RunConfig:
     abort_reason: str | None = None
     requested: dict | None = None
     attempt_id: str | None = None
+    check_abort_reasons: dict[str, str] = field(default_factory=dict)  # Runtime preflight failures for this side.
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -197,7 +198,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             adapter = adapter_factory() if adapter_factory else None
             adapter_info = PluginInfo(name=adapter.name, version=adapter.version) if adapter else None
             prev = existing.get((check.id, side))
-            if cfg.abort_reason or side_cfg.abort_reason:
+            if cfg.abort_reason or side_cfg.abort_reason or side_cfg.check_abort_reasons.get(check.id):
                 if prev is not None and prev.execution.status == ExecStatus.COMPLETED and prev.execution.attempt_id == cfg.attempt_id:
                     out.append(prev)
                     continue  # A later operation failed; this completed fragment stays visible.
@@ -252,8 +253,9 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     reason = _blocked_reason(item, cfg, env, allowed_checks=allowed_checks)
     if reason:
         return stopped(ExecStatus.NOT_RUN, reason)
-    if cfg.abort_reason:
-        return stopped(ExecStatus.ABORTED, cfg.abort_reason)
+    abort_reason = cfg.abort_reason or cfg.check_abort_reasons.get(check.id)
+    if abort_reason:
+        return stopped(ExecStatus.ABORTED, abort_reason)
     from guard.configuration import for_check
     try:
         raw = for_check(cfg.raw, item.executor, check.id)  # [check_config.<CHECK>] (RB2-S)

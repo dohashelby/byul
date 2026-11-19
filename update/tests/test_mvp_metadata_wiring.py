@@ -313,15 +313,9 @@ def test_local_metadata_scope_pins_public_update_targets_and_withholds_shared_si
             assert row.execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
 
 
-def test_plt07_cilium_status_and_obs04_local_mode_use_independent_owned_bindings(tmp_path, sources, monkeypatch):
-    from guard.executors import run_binding
-    from guard.executors.kubernetes_egress_product import KubernetesEgressProductExecutor
-    from guard.executors.kubernetes_passive_egress_policy import (
-        CILIUM_AGENT_IMAGE, CILIUM_AGENT_IMAGE_ID, KubernetesPassiveEgressPolicyExecutor,
-    )
-    from guard.executors.kubernetes_usage_report import KubernetesUsageReportExecutor
+def _bind_cilium_fixture_targets(sides):
+    from guard.executors.kubernetes_passive_egress_policy import CILIUM_AGENT_IMAGE, CILIUM_AGENT_IMAGE_ID
 
-    pack, sides, policy_path = sources
     for side in sides.values():
         target = json.loads(side['target'].read_bytes())
         target['cilium_agent'] = {
@@ -334,6 +328,16 @@ def test_plt07_cilium_status_and_obs04_local_mode_use_independent_owned_bindings
             'started_at': target['kubernetes']['engine']['started_at'],
         }
         _write(side['target'], target)
+
+
+def test_plt07_cilium_status_and_obs04_local_mode_use_independent_owned_bindings(tmp_path, sources, monkeypatch):
+    from guard.executors import run_binding
+    from guard.executors.kubernetes_egress_product import KubernetesEgressProductExecutor
+    from guard.executors.kubernetes_passive_egress_policy import KubernetesPassiveEgressPolicyExecutor
+    from guard.executors.kubernetes_usage_report import KubernetesUsageReportExecutor
+
+    pack, sides, policy_path = sources
+    _bind_cilium_fixture_targets(sides)
     prior = tool.Policy.model_validate_json(policy_path.read_bytes())
     values = {
         'OBS-04': {'usage_allowed': False, 'usage_settings_fresh_process': True,
@@ -427,6 +431,104 @@ def test_plt07_cilium_status_and_obs04_local_mode_use_independent_owned_bindings
     staged['check_config'].pop('OBS-04')
     with pytest.raises(ValueError, match='METADATA_STAGED_EXECUTION_SCOPE_INVALID'):
         tool.revalidate_candidate(staged, envs[1], pointer)
+
+
+@pytest.mark.parametrize(('gap', 'reason'), [
+    ('missing', 'CILIUM_EGRESS_STATUS_TARGET_UNAVAILABLE'),
+    ('changed', 'CILIUM_AGENT_GENERATION_CHANGED'),
+])
+def test_staged_candidate_cilium_gap_does_not_abort_other_admitted_checks(tmp_path, sources, monkeypatch, gap, reason):
+    from guard.core.run import run_plan
+    from guard.executors.kubernetes_egress_product import KubernetesEgressProductExecutor
+    from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
+    from guard.executors.kubernetes_passive_egress_policy import KubernetesPassiveEgressPolicyExecutor
+    from guard.executors.kubernetes_usage_report import KubernetesUsageReportExecutor
+    from guard.models import Side
+    from guard.store.packs import put_pack
+
+    pack, sides, policy_path = sources
+    _bind_cilium_fixture_targets(sides)
+    prior = tool.Policy.model_validate_json(policy_path.read_bytes())
+    policy_document = json.loads((tool.readiness.ROOT / 'docs/dev-1/mvp-enterprise-policy-20261116.json').read_bytes())
+    admitted = {'OBS-04', 'PLT-06', 'PLT-07'}
+    scope = admitted | {'OBS-05'}
+    values = {}
+    for row in policy_document['decisions']:
+        if row['check_id'] in scope:
+            values.setdefault(row['check_id'], {})[row['key']] = row['value']
+    policy = prior.model_copy(update={'values': values,
+        'scope': prior.scope.model_copy(update={'include': sorted(scope)})}).seal()
+    _write(policy_path, policy.to_dict())
+    store_path = tmp_path / 'store'
+    config, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store_path, cilium_egress_status=True)
+    assert set(config['update']['allowed_checks']) == admitted
+    fresh = tmp_path / 'fresh-candidate.json'
+    staged = tool.staged_config(config, fresh)
+    run = application.run_config(staged)
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    store = Store(store_path)
+    put_pack(store, pack.path)
+    for value in (*envs, policy):
+        store.put(value)
+    plan = bind_recipe(select(pack, envs, policy, mode='update'), staged, envs)
+    store.put(plan)
+    baseline, _ = tool._source(sides['baseline']['target'])
+    expected = {envs[0].id: sha256_hex(canonical_json(baseline))}
+    run.side_configs['baseline'].raw['_kubernetes_target_sha256_by_executor'] = dict.fromkeys(
+        config['executors'], expected[envs[0].id])
+    dispatched = []
+
+    def collect(check, env, target_pin):
+        dispatched.append((check.id, env.id))
+        assert target_pin == expected[env.id]
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None})
+
+    monkeypatch.setattr(KubernetesUsageReportExecutor, 'run',
+        lambda self, check, env, *_: collect(check, env, self.expected_target))
+    monkeypatch.setattr(KubernetesIPCProductExecutor, 'run',
+        lambda self, check, env, *_: collect(check, env, self.expected_target))
+    monkeypatch.setattr(KubernetesPassiveEgressPolicyExecutor, 'run',
+        lambda self, check, env, *_: collect(check, env, self._expected_target_sha256))
+    monkeypatch.setattr(KubernetesEgressProductExecutor, 'run',
+        lambda self, check, env, *_: collect(check, env, None))
+    baseline_rows = {row.check_id: row for row in run_plan(store, pack, plan, run, only_side=Side.baseline)}
+    assert all(baseline_rows[cid].execution.status == ExecStatus.COMPLETED for cid in admitted)
+
+    current, preliminary_ref = tool._source(sides['candidate']['target'])
+    for number, role in enumerate(('engine', 'probe'), 200):
+        current['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-000000000{number}'
+        current['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    if gap == 'missing':
+        current.pop('cilium_agent')
+    else:
+        current['cilium_agent']['pod_uid'] = '00000000-0000-0000-0000-000000000323'
+    _write(fresh, current)
+    expected[envs[1].id] = sha256_hex(canonical_json(current))
+    with pytest.raises(ValueError, match=f'^{reason}$'):
+        tool.revalidate_candidate(staged, envs[1], preliminary_ref)
+    assert tool.bind_staged_candidate(run, envs[1], preliminary_ref) == {'PLT-07': reason}
+    candidate = run.side_configs['candidate']
+    assert candidate.raw['_kubernetes_target_sha256_by_executor'] == {'unix_ipc': expected[envs[1].id]}
+    assert candidate.raw['_kubernetes_target_sha256_by_check'] == {'OBS-04': expected[envs[1].id], 'PLT-07': None}
+    rows = {row.check_id: row for row in run_plan(store, pack, plan, run, only_side=Side.candidate)}
+    assert rows['OBS-04'].execution.status == rows['PLT-06'].execution.status == ExecStatus.COMPLETED
+    assert rows['OBS-05'].execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
+    failed = rows['PLT-07']
+    assert failed.execution.status == ExecStatus.ABORTED and failed.execution.abort_reason == reason
+    assert failed.execution.executor is None and not failed.normal_control.attempted and not failed.artifacts
+
+    candidate.check_abort_reasons.clear()
+    without_diagnostic = {row.check_id: row for row in run_plan(store, pack, plan, run, only_side=Side.candidate)}
+    assert without_diagnostic['PLT-07'].execution.status == ExecStatus.NOT_RUN
+    assert without_diagnostic['PLT-07'].execution.abort_reason == 'RUN_BINDING_PLT07_NORMAL_TARGET_UNAVAILABLE'
+    assert set(dispatched) == {(cid, envs[0].id) for cid in admitted} | {
+        (cid, envs[1].id) for cid in ('OBS-04', 'PLT-06')}
+
+    current['kubernetes']['context'] = 'fixture-unrelated-context'
+    _write(fresh, current)
+    with pytest.raises(ValueError, match='METADATA_CANDIDATE_OWNERSHIP_CHANGED'):
+        tool.bind_staged_candidate(run, envs[1], preliminary_ref)
 
 
 def test_plt07_cilium_status_cannot_enable_legacy_or_unmarked_scope(tmp_path, sources, monkeypatch):

@@ -604,6 +604,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     from guard.executors.kubernetes_normal_request_latency import KubernetesNormalRequestLatencyExecutor
     from guard.executors.kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
     from guard.executors.kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
+    from guard.executors.kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
     from guard.executors.kubernetes_record_access_product import KubernetesRecordAccessExecutor
     from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
@@ -753,6 +754,10 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
                     if kube and expected_target is not None:
+                        if (prebound and item.check_id == "REQ-09"
+                                and isinstance(executor, KubernetesNormalTokenInputExecutor)):
+                            executor.prepared_normal_token_input(check_def, selected_env, values,
+                                                                 expected_target_sha256=expected_target)
                         if (prebound and item.check_id == "REQ-10"
                                 and getattr(check_def, "collection_profile", None) is None
                                 and isinstance(executor, KubernetesSamplingExecutor)):

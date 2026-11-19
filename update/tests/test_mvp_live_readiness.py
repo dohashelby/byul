@@ -486,6 +486,8 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
     ('PLT-02', 'unix_ipc', 'duration', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
     ('OBS-02', 'observation_state', None, None),
     ('OBS-02', 'observation_state', 'duration', 'OBS02_NORMAL_TARGET_UNVERIFIED'),
+    ('REQ-09', 'input_validation', None, None),
+    ('REQ-09', 'input_validation', 'duration', 'KUBERNETES_INPUT_NORMAL_TARGET_UNVERIFIED'),
     ('REQ-10', 'sampling_validation', None, None),
     ('REQ-10', 'sampling_validation', 'model', 'KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED'),
     ('REQ-10', 'sampling_validation', 'missing-scope', 'NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID'),
@@ -502,6 +504,7 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
     from guard.executors.http_common import HttpCheckExecutor
     from guard.models import canonical_json, sha256_hex
     from tests.builders import environment, policy
+    from tests.test_input_matrix import values as input_values
     from tests.test_kubernetes_request_binding import target as owned_target
     from tests.test_kubernetes_usage_report import LOCAL_VALUES
     from tests.test_kubernetes_worker_trust_metadata import VALUES as WORKER_VALUES
@@ -517,7 +520,9 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
     policy_values = {'OBS-04': LOCAL_VALUES, 'PLT-06': WORKER_VALUES,
                      'PLT-02': {'protected_unix_paths': ['/run/fixture/engine.sock'], 'allowed_ipc_uids': ['1000']}}
-    if check_id == 'REQ-10':
+    if check_id == 'REQ-09':
+        policy_values[check_id] = input_values()
+    elif check_id == 'REQ-10':
         policy_values[check_id] = {'allowed_sampling_options': ['max_tokens', 'temperature'],
                                    'rejection_codes': ['400', '422']}
     elif check_id == 'OBS-02':

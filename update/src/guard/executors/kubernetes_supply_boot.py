@@ -20,6 +20,7 @@ RECORD_DIRECTORY = "/guard-supply-boot/data/"
 CONFIG_KEYS = {"normal", "challenge", "kubectl_binary", "max_duration_seconds"}
 NORMAL_FILE_READS_OPTION = "normal_file_reads_only"
 NORMAL_FILE_READS_PROFILE = "owned-normal-model-file-reads/1"
+_PREPARATION_RECEIPT = "preparation_receipt"
 _MODEL_ROOT = "/models"
 _REFERENCE_KEY = "supply_normal_reference_manifest_sha256"
 _NORMAL_BINDING_KEYS = {"supply_environment_sha256", "supply_normal_target_sha256",
@@ -155,6 +156,8 @@ class KubernetesSupplyBootExecutor:
             self.validate_configuration(check)
             _normal_validity(values)
             return
+        if _PREPARATION_RECEIPT in self.cfg:
+            raise ValueError("SUPPLY_BOOT_NORMAL_CONFIGURATION_INVALID")
         contract.normalize_policy(check.id, values)
         if check.id == "SUP-05" and any(
                 values[f"supply_normal_{kind}_sha256"] == values[f"supply_challenge_{kind}_sha256"]
@@ -166,10 +169,14 @@ class KubernetesSupplyBootExecutor:
             return
         section = self.cfg.get("normal")
         if (self.cfg[NORMAL_FILE_READS_OPTION] is not True or check.id != "SUP-05" or check.executor != self.name
-                or set(self.cfg) - ((CONFIG_KEYS - {"challenge"}) | {NORMAL_FILE_READS_OPTION})
+                or set(self.cfg) - ((CONFIG_KEYS - {"challenge"}) | {NORMAL_FILE_READS_OPTION, _PREPARATION_RECEIPT})
                 or type(section) is not dict or set(section) != {"target", "prepared", "reference_manifest"}
                 or any(type(path) is not str or not path for path in section.values())):
             raise ValueError("SUPPLY_BOOT_NORMAL_CONFIGURATION_INVALID")
+        if _PREPARATION_RECEIPT in self.cfg:
+            from guard.configuration import validate_sup05_preparation_receipt
+
+            validate_sup05_preparation_receipt(self.cfg[_PREPARATION_RECEIPT])
 
     def keys(self):
         return {}
@@ -395,10 +402,26 @@ class KubernetesSupplyBootExecutor:
         if env.ref().sha256 != values["supply_environment_sha256"]:
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
         section = self.cfg["normal"]
-        with Path(section["target"]).open("rb") as stream:
-            target = strict_json(stream.read(65537), limit=65536)
+        if _PREPARATION_RECEIPT in self.cfg:
+            from guard.configuration import validate_sup05_preparation_receipt
+            from .kubernetes_sup05_normal_preparation import read_normal_preparation
+
+            ref = validate_sup05_preparation_receipt(self.cfg[_PREPARATION_RECEIPT])
+            receipt = read_normal_preparation(ref["path"], env, expected_sha256=ref["sha256"])
+            file_hashes = receipt["expected_normal_file_sha256"]
+            if (receipt["normal"] != section or receipt["target_sha256"] != values["supply_normal_target_sha256"]
+                    or file_hashes["reference_manifest"] != values[_REFERENCE_KEY]):
+                raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
+            raw_target = sensor.dependency(section["target"], receipt["target_file_sha256"])
+            expected_prepared = file_hashes["prepared"]
+        else:
+            with Path(section["target"]).open("rb") as stream:
+                raw_target = stream.read(65537)
+            expected_prepared = None
+        target = strict_json(raw_target, limit=65536)
         validate_target(target, env)
-        prepared = load_prepared(section["prepared"])
+        prepared = (load_prepared(section["prepared"], expected_sha256=expected_prepared)
+                    if expected_prepared is not None else load_prepared(section["prepared"]))
         target_sha256 = sha256_hex(canonical_json(target))
         prepared_sha256 = sha256_hex(canonical_json(prepared))
         if prepared["profile"] == sensor.PROFILE:

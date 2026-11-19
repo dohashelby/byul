@@ -102,7 +102,8 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     assert all(receipt[key] is False for key in ("approval_verified", "live_owner_verified", "pre_import_verified",
         "asset_publication_verified", "engine_started", "model_files_read", "native_consumption_observed"))
     assert all(b"/private-model-location" not in path.read_bytes() for path in case.output.rglob("*") if path.is_file())
-    settings = {"normal_file_reads_only": True, "normal": normal}
+    settings = {"normal_file_reads_only": True, "normal": normal, "preparation_receipt": {
+        "path": str(receipt_path), "sha256": sha256_hex(receipt_path.read_bytes())}}
     factory = registry.build_executor("supply_boot", "kubernetes", {"supply_boot": settings},
                                       engine=case.env.engine.name, version=case.env.engine.version)
     check = load_pack(REPOSITORY / "update" / "packs" / "PACK-BASELINE").checks["SUP-05"]
@@ -113,6 +114,45 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     factory.validate_policy(check, values)
     _, reloaded, target_hash, prepared_hash = factory.normal_file_read_inputs(case.env, values)
     assert (reloaded, target_hash, prepared_hash) == (prepared, receipt["target_sha256"], receipt["prepared_sha256"])
+
+
+@pytest.mark.parametrize("key", ("target", "prepared", "reference_manifest"))
+@pytest.mark.parametrize("after_receipt_read", (False, True))
+def test_supply_executor_revalidates_receipt_pinned_files_before_transport(external, monkeypatch, key, after_receipt_read):
+    from guard.executors import kubernetes_sup05_normal_preparation as preparation
+    from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+
+    case = _case(external, "0.30.0")
+    receipt = prepare(case.output, REPOSITORY, **case.args)
+    receipt_path = case.output / "preparation.json"
+    settings = {"normal_file_reads_only": True, "normal": receipt["normal"], "preparation_receipt": {
+        "path": str(receipt_path), "sha256": sha256_hex(receipt_path.read_bytes())}}
+    check = load_pack(REPOSITORY / "update" / "packs" / "PACK-BASELINE").checks["SUP-05"]
+    _, values = run_binding.effective_values(check, settings, case.env, {}, side="baseline",
+                                               attempt_id=None, issued_at=utcnow())
+    file_path = Path(receipt["normal"][key])
+
+    def rewrite():
+        file_path.write_bytes(file_path.read_bytes() + b"\n")
+
+    if after_receipt_read:
+        def verified_then_rewritten(*args, **kwargs):
+            verified = read_normal_preparation(*args, **kwargs)
+            rewrite()
+            return verified
+
+        monkeypatch.setattr(preparation, "read_normal_preparation", verified_then_rewritten)
+    else:
+        rewrite()
+
+    def no_transport(*args, **kwargs):
+        pytest.fail("A stale pinned input must be rejected before constructing the reader")
+
+    monkeypatch.setattr(KubernetesSupplyBootExecutor, "_normal_reader", no_transport)
+    executor = KubernetesSupplyBootExecutor(settings, runner=no_transport)
+    reason = "FILE_READ_DEPENDENCY_UNAVAILABLE" if after_receipt_read else "SUP05_PREPARATION_RECEIPT_INVALID"
+    with pytest.raises(ValueError, match=f"^{reason}$"):
+        executor.run(check, case.env, values, None, external / "work")
 
 
 @pytest.mark.parametrize("damage", ("environment", "receipt-pin", "promoted", "missing-flag",

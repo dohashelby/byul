@@ -224,7 +224,7 @@ def snapshot_inputs(tmp_path,mode='normal',*,declared=False):
 
 
 @pytest.mark.parametrize('mode',['normal','missing','wrong-source','pod-replaced','outside-inventory',
-                                 'interleaved-sequence','source-sequence-gap'])
+                                 'interleaved-sequence','source-sequence-gap','hidden-event-conflict'])
 def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mode):
     environment,world,values,pack,cfg,digest=snapshot_inputs(tmp_path,mode,declared=True)
     if mode=='outside-inventory':world.copy_packet['events'][0]['copy_id']='0'*32
@@ -233,6 +233,11 @@ def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mo
         first_claim,unselected,*_=world.copy_packet['events']
         second_claim={**first_claim,'event_id':'a'*32,'seq':2}
         world.copy_packet['events']=[first_claim,unselected,second_claim] if mode=='interleaved-sequence' else [first_claim,second_claim]
+    if mode=='hidden-event-conflict':
+        inventory_claim,unselected,*_=world.copy_packet['events']
+        hidden_actor='b'*32
+        world.copy_packet['events'].append({
+            **unselected,'event_id':inventory_claim['event_id'],'seq':inventory_claim['seq'],'actor_id':hidden_actor})
 
     def read_only(argv,**kwargs):
         assert 'input_bytes' not in kwargs
@@ -279,6 +284,18 @@ def test_copy_snapshot_only_reads_exactly_one_owned_file(tmp_path,monkeypatch,mo
         missing=draft.observations['copy_missing'].value
         assert ('copy_declared_event_sequence_gap' in missing)==(mode=='source-sequence-gap')
         assert all(unselected['event_id'].encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
+    if mode=='hidden-event-conflict':
+        snapshot,=draft.observations['copy_record_snapshots'].value
+        record,=draft.observations['copy_event_declarations'].value
+        attachment,=draft.observations['copy_collection'].value
+        assert snapshot['packet']['events']==[inventory_claim]
+        assert snapshot['source_event_count']==len(world.copy_packet['events'])
+        assert record['event_id']==inventory_claim['event_id'] and record['event_id_ambiguous'] is True
+        assert draft.observations['copy_conflicts'].value==['copy_event_id_conflict','copy_event_sequence_conflict']
+        assert 'copy_declared_event_sequence_gap' not in draft.observations['copy_missing'].value
+        assert source_checksums==[(attachment['file_bytes'],attachment['file_bytes_sha256'])]
+        assert draft.abort_reason=='COPY_RECORD_SNAPSHOT_INCOMPLETE'
+        assert all(hidden_actor.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
     if mode in {'missing','wrong-source','pod-replaced'}:
         assert draft.observations['copy_record_snapshots'].collected is False
     assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)

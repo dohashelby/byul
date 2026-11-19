@@ -518,8 +518,11 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     normal_file_reads = check.id == 'SUP-05' and NORMAL_FILE_READS_OPTION in executor_cfg
     if normal_file_reads:
         if (check.executor != 'supply_boot' or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK[check.id]
-                or executor_cfg[NORMAL_FILE_READS_OPTION] is not True or stages != (1,) or run_cfg is not None):
+                or executor_cfg[NORMAL_FILE_READS_OPTION] is not True
+                or stages not in {(1,), (1, 3)} or run_cfg is not None):
             raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_SCOPE_INVALID')
+        # This mode consumes a sealed native recording and has no supply-record producer.
+        stages = (1,)
         keys = (*(key for key in keys if not key.startswith('supply_challenge_')),
                 'supply_normal_reference_manifest_sha256')
     if check.id == 'LIF-04' and check.executor == 'stream_buffer' and executor_cfg.get(NORMAL_STREAM_OPTION) is True:
@@ -528,7 +531,7 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             keys = tuple(key for key in keys if key != 'buffer_prepared_sha256')
     if not stages:
         return None, {}
-    wanted = config_keys(check)
+    wanted = frozenset() if normal_file_reads else config_keys(check)
     if run_cfg is not None and not wanted:
         # These values still come from this definition's policy; never mix both sources.
         raise RunBindingUnavailable('RUN_BINDING_BELONGS_TO_POLICY')

@@ -139,7 +139,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         reader=RequiredEventReader(ctx.cprobe,ctx.target,values['observation_session'],
             binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120),
             runner=self.runner or capture_pipes,snapshot_only=True)
-        packet=None; provenance=None; records=[]; diagnostics=[]; unmatched_actor_count=0
+        packet=None; provenance=None; records=[]; diagnostics=[]; unmatched_actor_count=0; unmatched_policy_count=0
         try:
             packet,provenance=self._read_bound_packet(ctx,reader,*normalize_policy(values))
             run_hash=sha256_hex(reader.binding['run_id'].encode())
@@ -148,10 +148,13 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             scoped=[row for row in packet['events'] if row['event'] in expected_actors
                     and row['event'] in values['observation_required_events']
                     and row['run_sha256']==run_hash and row['target_sha256']==values['observation_target_sha256']]
-            records=[row for row in scoped if row['actor_sha256']==expected_actors[row['event']]]
-            unmatched_actor_count=len(scoped)-len(records)
+            actor_matched=[row for row in scoped if row['actor_sha256']==expected_actors[row['event']]]
+            records=[row for row in actor_matched if row['policy_sha256']==values['observation_event_policy_sha256']]
+            unmatched_actor_count=len(scoped)-len(actor_matched)
+            unmatched_policy_count=len(actor_matched)-len(records)
             if not records:diagnostics.append('OBSERVATION_RECORD_SCOPE_EMPTY')
             if unmatched_actor_count:diagnostics.append('OBSERVATION_RECORD_ACTOR_UNVERIFIED')
+            if unmatched_policy_count:diagnostics.append('OBSERVATION_RECORD_POLICY_UNVERIFIED')
         except (KeyError,ValueError,TypeError,OSError,KubernetesCaptureError):
             diagnostics.append('OBSERVATION_RECORD_UNAVAILABLE')
         reader_report=reader.report()
@@ -175,6 +178,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         }
         summary={'profile':PROFILE,'record_snapshot_only':True,'capture':capture,
                  'diagnostic_codes':diagnostics,'record_transport':reader_report,'unmatched_actor_count':unmatched_actor_count,
+                 'unmatched_policy_count':unmatched_policy_count,
                  'fixture':{'profile':PROFILE,'scope':'owned-existing-audit-record-snapshot'},
                  'independent_trigger_verified':False,'event_arrival_time_verified':False}
         normal={'attempted':False,'succeeded':None,'detail':'Read a bounded existing audit record; no request was sent.'}

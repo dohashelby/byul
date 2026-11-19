@@ -13,7 +13,7 @@ from guard.cli import app
 from guard.adapters.vllm import VllmAdapter
 from guard.models import DataOrigin,ExecStatus,canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
-from guard.executors import kubernetes_observation as observation, run_binding
+from guard.executors import kubernetes_gateway_observation, kubernetes_observation as observation, run_binding
 from guard.executors.observation_contract import EVENTS,FIELDS,SCHEMA,normalize_policy,validate_record
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.registry import build_executor
@@ -21,6 +21,7 @@ from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
 from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
+from tests.test_kubernetes_gateway_observation import ordinary_gateway_record
 from tests.test_kubernetes_request_binding import env,target
 from tests.test_kubernetes_sampling import World as PodWorld
 from tools.build_kubernetes_required_event_pack import derive
@@ -114,16 +115,24 @@ def inputs(tmp_path,mode='normal'):
     return environment,world,values,pack,receipt
 
 
-@pytest.mark.parametrize('mode', ['normal','wrong-record-target','wrong-actor','missing','bad-source','pod-replaced'])
-def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key(tmp_path,mode):
+@pytest.mark.parametrize('mode', ['normal','wrong-record-target','wrong-actor','missing','bad-source','pod-replaced',
+                                 'wrong-policy','missing-policy','mixed-policy'])
+def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key(tmp_path,mode,ordinary_gateway_record):
     environment,world,values,_,_=inputs(tmp_path,mode)
     world.target['lab']=False
     digest=values['observation_target_sha256']=sha256_hex(canonical_json(world.target))
-    record={key:None for key in FIELDS}
-    record.update(seq=0,event_id_sha256='1'*64,event='ACCESS_ALLOWED',actor_sha256=values['observation_allowed_actor_sha256'],
-        target_sha256=digest,run_sha256=sha256_hex(world.target['kubernetes']['run_id'].encode()),
-        policy_sha256=values['observation_event_policy_sha256'],source_sha256=values['observation_expected_source_sha256'])
+    raw,original,_=ordinary_gateway_record
+    record,=kubernetes_gateway_observation.record_events(raw.decode().splitlines(),run_id=original['run_id'])
+    # Reuse the writer's event fields inside the EXAMPLE direct-reader envelope.
+    values['observation_allowed_actor_sha256']=record['actor_sha256']
+    values['observation_event_policy_sha256']=record['policy_sha256']
+    record.update(target_sha256=digest,run_sha256=sha256_hex(world.target['kubernetes']['run_id'].encode()),
+        source_sha256=values['observation_expected_source_sha256'])
     world.records=[record]
+    if mode=='wrong-policy':record['policy_sha256']='0'*64
+    elif mode=='missing-policy':record['policy_sha256']=None
+    elif mode=='mixed-policy':
+        world.records.append({**record,'seq':1,'event_id_sha256':'f'*64,'policy_sha256':'0'*64})
     target_path=tmp_path/'target.json'
     target_path.write_bytes(canonical_json(world.target))
     pack=load_pack(Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE')
@@ -141,7 +150,7 @@ def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key
     draft=executor.run(pack.checks['OBS-01'],environment,values,VllmAdapter(),tmp_path/'snapshot')
     assert not world.sent and world.reads==1
     assert draft.data_origin==DataOrigin.EXAMPLE
-    assert draft.status==(ExecStatus.COMPLETED if mode=='normal' else ExecStatus.ABORTED)
+    assert draft.status==(ExecStatus.COMPLETED if mode in {'normal','mixed-policy'} else ExecStatus.ABORTED)
     assert not draft.normal_control.attempted and all(not step.attempted for step in draft.challenges)
     observations=draft.observations
     assert observations['required_event_trials'].collected is False
@@ -150,7 +159,7 @@ def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key
         'required_event_producer_authenticated','required_event_independent_trigger_verified'))
     assert all(row['reason']=='independent_trigger_and_collection_time_unverified'
                for row in observations['required_event_missing'].value)
-    if mode=='normal':
+    if mode in {'normal','mixed-policy'}:
         assert observations['required_event_records'].value==[record]
         capture,=observations['required_event_collection'].value
         assert capture['owner_binding_verified'] and capture['file_bytes_sha256']==sha256_hex(canonical_json(world._packet()))
@@ -158,6 +167,10 @@ def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key
         assert observations['required_event_records'].value==[]
         summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
         assert summary['unmatched_actor_count']==1 and 'OBSERVATION_RECORD_ACTOR_UNVERIFIED' in summary['diagnostic_codes']
+    if mode in {'wrong-policy','missing-policy','mixed-policy'}:
+        assert observations['required_event_records'].value==([record] if mode=='mixed-policy' else [])
+        summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+        assert summary['unmatched_policy_count']==1 and 'OBSERVATION_RECORD_POLICY_UNVERIFIED' in summary['diagnostic_codes']
     assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
 
 

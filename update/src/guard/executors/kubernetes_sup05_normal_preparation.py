@@ -76,7 +76,7 @@ def read_normal_preparation(path, env, *, expected_sha256):
     except (AttributeError, KeyError, OSError, TypeError, ValueError):
         raise ValueError("SUP05_PREPARATION_RECEIPT_INVALID") from None
 
-    return {"normal": normal, "target_sha256": receipt["target_sha256"],
+    return {"normal": normal, "target_sha256": receipt["target_sha256"], "target_file_sha256": hashes["target"],
             "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
                                             "reference_manifest": hashes["reference_manifest"]}}
 

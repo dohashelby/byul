@@ -96,6 +96,7 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     receipt_path = case.output / "preparation.json"
     assert read_normal_preparation(receipt_path, case.env, expected_sha256=sha256_hex(receipt_path.read_bytes())) == {
         "normal": normal, "target_sha256": receipt["target_sha256"],
+        "target_file_sha256": sha256_hex(args["target"].read_bytes()),
         "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
                                         "reference_manifest": args["model_manifest_sha256"]}}
     assert all(receipt[key] is False for key in ("approval_verified", "live_owner_verified", "pre_import_verified",

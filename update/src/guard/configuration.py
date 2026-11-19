@@ -264,16 +264,6 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
             scoped[check_id] = (settings, None)
             if executor == "stream_buffer":
                 stream_cases[check_id] = settings
-        if "SUP-05" in scoped:
-            settings, _ = scoped["SUP-05"]
-            supply_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}
-            normal = settings.get("normal")
-            if (supply_checks != {"SUP-05"} or set(settings) - {
-                    NORMAL_FILE_READS_OPTION, "normal", "kubectl_binary", "max_duration_seconds"}
-                    or type(normal) is not dict or set(normal) != {"target", "prepared", "reference_manifest"}
-                    or any(type(path) is not str or not path for path in normal.values())
-                    or raw.get("update", {}).get("kubernetes_candidate_binding", "prebound") != "prebound"):
-                raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
         if stream_cases:
             stream_error = (NORMAL_REQUEST_LATENCY_SCOPE_ERROR if "LIF-03" in stream_cases
                             else _NORMAL_ONLY_CASES["LIF-04"][2])
@@ -291,7 +281,22 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                         or ("run_binding" in raw and (type(bindings) is not dict or set(stream_cases) & bindings.keys()))):
                     raise ValueError(stream_error)
         supply_cases = {cid: scoped[cid][0] for cid in ("LIF-01", "SUP-07", "SUP-12", "SUP-10") if cid in scoped}
-        if supply_cases:
+        if "SUP-05" in scoped:
+            settings, _ = scoped["SUP-05"]
+            supply_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}
+            normal = settings.get("normal")
+            if (supply_checks != {"SUP-05", *supply_cases} or set(settings) - {
+                    NORMAL_FILE_READS_OPTION, "normal", "kubectl_binary", "max_duration_seconds"}
+                    or type(normal) is not dict or set(normal) != {"target", "prepared", "reference_manifest"}
+                    or any(type(path) is not str or not path for path in normal.values())
+                    or raw.get("update", {}).get("kubernetes_candidate_binding", "prebound") != "prebound"):
+                raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+            if supply_cases:
+                target = next(iter(supply_cases.values())).get("target")
+                if (type(target) is not str or not target or normal["target"] == target
+                        or any(case.get("target") != target for case in supply_cases.values())):
+                    raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+        elif supply_cases:
             anchor = next(iter(supply_cases))
             _, _, supply_error = _NORMAL_ONLY_CASES[anchor]
             if set(supply_cases) != {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}:

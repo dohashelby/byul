@@ -1045,6 +1045,11 @@
       "manifest_sha256": "4b6481f4032e15c4a9604e54cfc2968e0d1835aa374119f8f35892830782548f",
       "reviewed_by": "Codex / REQ-09 token and SUP-05 reader input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T21:20:24+00:00"
+    },
+    {
+      "manifest_sha256": "ab2863592ca424c01512b07d5df541220a1f131f319a2d920990d1ca5c300e94",
+      "reviewed_by": "Codex / vLLM paired local declaration preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T21:42:44+00:00"
     }
   ]
 }

@@ -134,7 +134,9 @@ def test_snapshot_keeps_only_the_prespecified_original_final(ordinary_gateway_re
     if fault == "policy":
         source["runtime_policy_sha256"] = "0" * 64
     if fault:
-        with pytest.raises(ValueError, match="GATEWAY_AUDIT_"):
+        expected = {"duplicate-key": r"^RUNTIME_RECORD_LINE_INVALID:2$",
+                    "cr-only": r"^RUNTIME_RECORD_LINE_INVALID:1$"}.get(fault, r"^GATEWAY_AUDIT_")
+        with pytest.raises(ValueError, match=expected):
             module.snapshot_record(raw, source=source, values=values, run_id="guard-fixture")
         return
     result, digest, recorded_at = module.snapshot_record(raw, source=source, values=values, run_id="guard-fixture")

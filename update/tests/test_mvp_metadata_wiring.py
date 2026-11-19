@@ -1409,6 +1409,15 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
     audit = json.loads((output / 'readiness.json').read_bytes())
     assert audit['active_checks'] == 69 and audit['file_binding_valid_sides'] == 4
     assert audit['actual_results'] is None and not audit['ready_for_execution']
+    index = output / 'input-sources.json'
+    assert audit['source_index_sha256'] == sha256_hex(index.read_bytes())
+    published_config = {'path': str(output / 'guard.toml'), 'sha256': sha256_hex((output / 'guard.toml').read_bytes())}
+    for row in audit['rows']:
+        if row['file_binding_valid']:
+            assert row['files']['configuration'] == published_config
+        if row['check_id'] == 'SUP-05':
+            assert row['sup05_normal_preparation'] == references[row['side']]
+    assert all(row['configuration'] == published_config for row in json.loads(index.read_bytes())['inputs'])
     sibling = audit['metadata_wiring']['SUP-05']['shared_executor_checks']['SUP-11']
     assert all(not row['transport_dispatched'] for row in sibling.values())
     with pytest.raises(ValueError, match='^SUP05_NORMAL_PREPARATIONS_REQUIRE_PREBOUND_PAIR$'):
@@ -1419,6 +1428,25 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
     with pytest.raises(ValueError, match='outside source inputs'):
         tool.main()
     assert not nested.exists()
+
+    prepared = Path(outputs['candidate']['normal']['prepared'])
+    original_bytes = prepared.read_bytes()
+    assemble = tool.assemble
+
+    def change_after_assembly(*args, **kwargs):
+        result = assemble(*args, **kwargs)
+        assert result[2]['SUP-05']['configuration_enabled']
+        prepared.write_bytes(original_bytes + b'\n')
+        return result
+
+    declined = tmp_path / 'declined'
+    with monkeypatch.context() as late:
+        late.setattr(tool, 'assemble', change_after_assembly)
+        late.setattr(sys, 'argv', [*argv, '--output', str(declined)])
+        with pytest.raises(ValueError, match='^SUP05_NORMAL_PREPARATION_PUBLICATION_UNVERIFIED$'):
+            tool.main()
+    assert declined.is_dir() and not any(declined.iterdir())
+    assert prepared.read_bytes() == original_bytes + b'\n'
 
 
 def _startup_declaration(paths, *, source_commit=None):

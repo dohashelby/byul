@@ -58,6 +58,7 @@ from guard.models import Environment, canonical_json, load_pack, sha256_hex
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
+from guard.update_validation import _plain_path
 from tools.mvp_a_input_preflight import _code, _pairs, _read
 from tools.mvp_versions import versions
 
@@ -72,6 +73,18 @@ STARTUP_OBSERVERS = {
 
 def template(pack):
     return {'schema': SCHEMA, 'pack_ref': pack.ref().model_dump(mode='json'), 'inputs': []}
+
+
+def _sup05_preparation_refs(value):
+    if type(value) is not dict or set(value) != set(SIDES):
+        raise ValueError('SUP05_PAIRED_NORMAL_PREPARATIONS_REQUIRED')
+    for entry in value.values():
+        if (type(entry) is not dict or set(entry) != {'path', 'sha256'}
+                or type(entry['path']) is not str or not entry['path']
+                or type(entry['sha256']) is not str or len(entry['sha256']) != 64
+                or any(char not in '0123456789abcdef' for char in entry['sha256'])):
+            raise ValueError('SUP05_NORMAL_PREPARATION_REFERENCE_INVALID')
+    return value
 
 
 def startup_observer_reason(check_id, target, env, *, runner=None):
@@ -180,7 +193,7 @@ def _paired_normal_control_requested(raw):
     return False
 
 
-def _inspect(source, check, pack, issued_at, redeployment_identities):
+def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_normal_preparation=None):
     files, identities = {}, {}
     for role in ('environment', 'policy', 'configuration'):
         pointer = source[role]
@@ -275,6 +288,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             'LIF-12': 'retry_record_source_sha256',
         }[check.id]
     normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
+    if sup05_normal_preparation is not None and not (
+            normal_file_reads and prebound_kubernetes and check.executor == 'supply_boot'):
+        raise ValueError('SUP05_NORMAL_PREPARATION_SCOPE_INVALID')
     supply_record_binding = (implementation == 'kubernetes' and run_binding.is_supply_record_binding(check)
                              and requested_update.get('mode', 'external') == 'external'
                              and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
@@ -315,6 +331,19 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
     prepared_raw_digests = {}
     record_digests = {}
     record_source_file = None
+    preparation = None
+    if sup05_normal_preparation is not None:
+        from guard.executors.kubernetes_sup05_normal_preparation import read_normal_preparation
+
+        receipt_path = _plain_path(Path(sup05_normal_preparation['path']))
+        receipt_sha256 = sup05_normal_preparation['sha256']
+        raw, identity = _read(receipt_path)
+        if sha256_hex(raw) != receipt_sha256:
+            raise ValueError('SUP05_PREPARATION_RECEIPT_INVALID')
+        bound_files.append((receipt_path, raw, identity))
+        preparation = read_normal_preparation(receipt_path, env, expected_sha256=receipt_sha256)
+        if preparation['normal'] != cfg['normal']:
+            raise ValueError('SUP05_NORMAL_PREPARATION_INPUT_MISMATCH')
     if supply_record_roles:
         for role in SUPPLY_ROLES:
             for key in ('target', 'prepared'):
@@ -347,13 +376,20 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         digest_bytes = canonical_json(strict_json(raw, limit=262144)) if record_access else raw
         record_digests[digest_key] = sha256_hex(digest_bytes)
     if normal_file_reads:
-        binding_options['expected_target_sha256'] = _scoped_target_sha256(raw_target, env, scoped_check=check.id)
+        target_sha256 = _scoped_target_sha256(raw_target, env, scoped_check=check.id)
         normal_hashes = {}
         for role in ('prepared', 'reference_manifest'):
             path = cfg['normal'][role]
             raw, identity = _read(path)
             bound_files.append((path, raw, identity))
             normal_hashes[role] = sha256(raw).hexdigest()
+        if preparation is not None:
+            if (preparation['target_sha256'] != target_sha256 or preparation['target_file_sha256'] != sha256_hex(raw_target)
+                    or preparation['expected_normal_file_sha256'] != normal_hashes):
+                raise ValueError('SUP05_NORMAL_PREPARATION_INPUT_MISMATCH')
+            target_sha256 = preparation['target_sha256']
+            normal_hashes = preparation['expected_normal_file_sha256']
+        binding_options['expected_target_sha256'] = target_sha256
         binding_options['expected_normal_file_sha256'] = normal_hashes
     if gateway_response and 'route_target' in cfg:
         path = cfg['route_target']
@@ -549,6 +585,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             'binding_schema': binding['schema'] if binding else None,
             'files': {role: source[role] for role in files}, 'blocking_codes': blockers,
             **({NORMAL_FILE_READS_OPTION: True} if normal_file_reads else {}),
+            **({'sup05_normal_preparation': sup05_normal_preparation} if sup05_normal_preparation is not None else {}),
             **({NORMAL_GRAPH_CAPTURE_OPTION: True} if normal_graph_capture else {}),
             **({NORMAL_SAFETENSORS_READER_OPTION: True} if normal_safetensors_reader else {}),
             **({NORMAL_COMPILE_CACHE_OPTION: True} if normal_compile_cache else {}),
@@ -560,10 +597,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
             **({NORMAL_TOKEN_INPUT_OPTION: True} if normal_token_input else {})}
 
 
-def audit(index_file, *, pack=None, issued_at=None, side=None):
+def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_preparations=None):
     if side is not None and (type(side) is not str or side not in SIDES):
         raise ValueError('MVP_SIDE_SELECTION_INVALID')
     selected_sides = SIDES if side is None else (side,)
+    preparations = (_sup05_preparation_refs(sup05_normal_preparations)
+                    if sup05_normal_preparations is not None else {})
     pack = pack or load_pack(ROOT / 'packs/PACK-BASELINE')
     active = {cid: check for cid, check in pack.checks.items() if not check.retired}
     raw, _ = _read(index_file)
@@ -608,7 +647,9 @@ def audit(index_file, *, pack=None, issued_at=None, side=None):
                 row['blocking_codes'] = ['ACTUAL_INPUT_FILES_MISSING']
             else:
                 try:
-                    row.update(_inspect(sources[cid, selected_side], check, pack, now, redeployment_identities))
+                    preparation = preparations.get(selected_side) if cid == 'SUP-05' else None
+                    row.update(_inspect(sources[cid, selected_side], check, pack, now, redeployment_identities,
+                                        sup05_normal_preparation=preparation))
                 except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as error:
                     row['blocking_codes'] = [_code(error)]
             if requires_native_matrix and not row.get(NORMAL_TOKEN_INPUT_OPTION):

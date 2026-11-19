@@ -6,6 +6,7 @@ from copy import deepcopy
 from hashlib import sha256
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 from guard.adapters.engine_profiles import supports
@@ -122,18 +123,6 @@ def _gateway_record_inputs(value):
     for side, entry in inputs.items():
         entry[SNAPSHOT_SOURCE] = value[side][SNAPSHOT_SOURCE]
     return inputs
-
-
-def _sup05_preparation_refs(value):
-    if type(value) is not dict or set(value) != set(readiness.SIDES):
-        raise ValueError('SUP05_PAIRED_NORMAL_PREPARATIONS_REQUIRED')
-    for entry in value.values():
-        if (type(entry) is not dict or set(entry) != {'path', 'sha256'}
-                or type(entry['path']) is not str or not entry['path']
-                or type(entry['sha256']) is not str or len(entry['sha256']) != 64
-                or any(char not in '0123456789abcdef' for char in entry['sha256'])):
-            raise ValueError('SUP05_NORMAL_PREPARATION_REFERENCE_INVALID')
-    return value
 
 
 def _sup05_normal_inputs(pointer, check, env, policy, *, side, ordinary_target):
@@ -511,7 +500,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
     normal_file_reads = {}
     if sup05_normal_preparations is not None:
-        references = _sup05_preparation_refs(sup05_normal_preparations)
+        references = readiness._sup05_preparation_refs(sup05_normal_preparations)
         reasons = {}
         for side, (env, _, _, _, target_pointer) in sides.items():
             normal_file_reads[side], reasons[side] = _sup05_normal_inputs(
@@ -577,6 +566,41 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     return config, bindings, candidates
 
 
+def _write_input_sources(index, pack, bindings, config_ref):
+    index.write_text(json.dumps({**readiness.template(pack),
+        'inputs': [{**entry, 'configuration': config_ref} for entry in bindings]}, indent=2), encoding='utf-8')
+
+
+def _publish_prebound_sup05(output, *, config, bindings, checks, pack, preparations):
+    with TemporaryDirectory(dir=output, prefix='.sup05-preflight-') as directory:
+        staging = Path(directory)
+        config_path = staging / 'guard.toml'
+        index = staging / 'input-sources.json'
+        write_config(config, config_path)
+        config_sha256 = sha256(config_path.read_bytes()).hexdigest()
+        _write_input_sources(index, pack, bindings, {'path': str(config_path), 'sha256': config_sha256})
+        result = readiness.audit(index, pack=pack, sup05_normal_preparations=preparations)
+        verified = {row['side'] for row in result['rows'] if row['check_id'] == 'SUP-05'
+                    and row['file_binding_valid'] and row.get('sup05_normal_preparation') == preparations[row['side']]}
+        if verified != set(readiness.SIDES):
+            raise ValueError('SUP05_NORMAL_PREPARATION_PUBLICATION_UNVERIFIED')
+        if sha256(config_path.read_bytes()).hexdigest() != config_sha256:
+            raise ValueError('MVP_INPUT_FILE_CHANGED')
+
+        # Publish the audited config bytes at their final path and bind that path in the emitted index.
+        config_ref = {'path': str(output / config_path.name), 'sha256': config_sha256}
+        _write_input_sources(index, pack, bindings, config_ref)
+        for row in result['rows']:
+            if 'files' in row:
+                row['files']['configuration'] = config_ref
+        result['source_index_sha256'] = sha256(index.read_bytes()).hexdigest()
+        result['metadata_wiring'] = checks
+        report = staging / 'readiness.json'
+        report.write_text(json.dumps(result, indent=2), encoding='utf-8')
+        for path in (index, report, config_path):
+            (output / path.name).hardlink_to(path)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for side in readiness.SIDES:
@@ -632,7 +656,7 @@ def main():
     sup05_preparations = None
     if args.sup05_normal_preparations is not None:
         raw, _ = _read(_plain_path(args.sup05_normal_preparations), max_bytes=65536)
-        sup05_preparations = _sup05_preparation_refs(strict_json(raw, limit=65536))
+        sup05_preparations = readiness._sup05_preparation_refs(strict_json(raw, limit=65536))
     config, bindings, checks = assemble(inputs, args.policy, pack=pack, store=args.store,
                                         node_image_verification=args.node_image_verification, passive_plt08=args.passive_plt08,
                                         protected_ipc_metadata=args.protected_ipc_metadata, observation_run_bindings=observation,
@@ -664,12 +688,15 @@ def main():
         # Each receipt's directory contains all files emitted by prepare-sup05-normal.
         protected.extend([args.sup05_normal_preparations, *(Path(row['path']).parent for row in sup05_preparations.values())])
     output = reserve_output(args.output, protected=protected)
+    if sup05_preparations is not None and checks['SUP-05']['configuration_enabled']:
+        _publish_prebound_sup05(output, config=config, bindings=bindings, checks=checks,
+                               pack=pack, preparations=sup05_preparations)
+        return
     config_path = output / ('preliminary-guard.toml' if staged is not None else 'guard.toml')
     write_config(config, config_path)
     cfg_ref = {'path': str(config_path), 'sha256': sha256(config_path.read_bytes()).hexdigest()}
     index = output / 'input-sources.json'
-    index.write_text(json.dumps({**readiness.template(pack),
-        'inputs': [{**entry, 'configuration': cfg_ref} for entry in bindings]}, indent=2), encoding='utf-8')
+    _write_input_sources(index, pack, bindings, cfg_ref)
     result = readiness.audit(index, pack=pack)
     result['metadata_wiring'] = checks
     if staged is not None:

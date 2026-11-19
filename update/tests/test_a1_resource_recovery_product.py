@@ -165,13 +165,26 @@ def test_full_two_branches_and_original_76_definition_bytes_remain(tmp_path):
         if p.is_file() and p.relative_to(seed.path).as_posix() not in {'pack.yaml','checks/LIF-11.yaml'}:assert p.read_bytes()==(pack.path/p.relative_to(seed.path)).read_bytes()
 
 
-@pytest.mark.parametrize('mode', ['released-descriptors', 'retained', 'census-failure'])
-def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp_path, group, native_target, mode):
+@pytest.mark.parametrize('mode', ['released-descriptors', 'retained', 'census-failure', 'initial-binding-failure'])
+def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp_path, group, native_target, monkeypatch, mode):
     from guard.adapters.engine_provider import PROVIDERS
     from guard.core.run import _normalize
     from guard.executors.kubernetes_resource_recovery import KubernetesResourceRecoveryExecutor
+    from guard.runtime.kubernetes_resource_recovery import KubernetesResourceRecoveryReader
 
     world, selected, values_, _ = inputs(tmp_path, group, native_target, mode, 'runtime-failure')
+    if mode == 'initial-binding-failure':
+        snapshot = KubernetesResourceRecoveryReader.snapshot
+        failed = False
+
+        def fail_preflight(self, *args, **kwargs):
+            nonlocal failed
+            if not failed:
+                failed = True
+                raise ValueError('EXAMPLE initial binding unavailable')
+            return snapshot(self, *args, **kwargs)
+
+        monkeypatch.setattr(KubernetesResourceRecoveryReader, 'snapshot', fail_preflight)
     target, selection_path = tmp_path / 'target.json', tmp_path / 'selection.json'
     target.write_bytes(canonical_json(world.target))
     selection_path.write_bytes(canonical_json(selected))
@@ -190,9 +203,13 @@ def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp
     resources = {row['id']: row for row in step['resources']}
     selected_ids = {row['id'] for row in selected['owners'] + selected['resources']}
     assert set(resources) == selected_ids
-    assert all(row['before_status'] == 'match' for row in resources.values())
-    after = {'released-descriptors': 'absent', 'retained': 'match', 'census-failure': None}
+    before = None if mode == 'initial-binding-failure' else 'match'
+    assert all(row['before_status'] == before for row in resources.values())
+    after = {'released-descriptors': 'absent', 'retained': 'match', 'census-failure': None, 'initial-binding-failure': 'match'}
     assert all(resources[row['id']]['after_status'] == after[mode] for row in selected['resources'])
+    if mode == 'initial-binding-failure':
+        assert world.census_count == 1 and draft.status.value == 'ABORTED'
+        assert not any(row['same_selected_baseline_observed'] for row in resources.values())
     assert observations['activation_missing']['value']
     assert observations['activation_violations']['value'] is None
     assert not observations['activation_violations']['collected']

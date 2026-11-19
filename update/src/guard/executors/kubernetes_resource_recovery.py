@@ -55,7 +55,8 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         ctx._recovery_prepared=prepared;ctx._recovery_selection=selection;return self._finish(ctx)
 
     def collect(self,ctx):
-        start,end,deadline=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[];censuses=[];groups=[];gpus=[]
+        start,end,deadline=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[];groups=[];gpus=[]
+        before_census = after_census = None
         group_selection={'schema':group_probe.SELECTION_SCHEMA,
             'owners':[{'id':row['id'],'context':row['context']}for row in ctx._recovery_selection['owners']]}
         def collect_group():
@@ -92,7 +93,8 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         try:
             reader=KubernetesResourceRecoveryReader(native_target,ctx.env,ctx._recovery_prepared,runner=self.runner,
                 binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120));reader.snapshot()
-            censuses.append(reader.resource_census(ctx._recovery_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']))
+            before_census = reader.resource_census(ctx._recovery_selection,
+                max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
             collect_group()
             collect_gpu()
             for slot in SLOTS:
@@ -113,7 +115,9 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         except Exception:diagnostics.append('RESOURCE_RECOVERY_PREFLIGHT_UNAVAILABLE')
         finally:
             if reader is not None:
-                try:censuses.append(reader.resource_census(ctx._recovery_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']))
+                try:
+                    after_census = reader.resource_census(ctx._recovery_selection,
+                        max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_CENSUS_UNAVAILABLE')
                 try:collect_group()
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_NAMESPACE_CENSUS_UNAVAILABLE')
@@ -126,7 +130,8 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
                         prepared=ctx._recovery_prepared,owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
                     if not packet.get('recorded_files_covered'):diagnostics.append('RESOURCE_RECOVERY_NATIVE_COVERAGE_UNAVAILABLE')
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_CAPTURE_UNAVAILABLE')
-        projection=project(censuses,ctx._recovery_selection,ctx.policy_values)
+        projection = project([before_census or {}, after_census or {}], ctx._recovery_selection, ctx.policy_values)
+        censuses = [row for row in (before_census, after_census) if row is not None]
         group_projection=None
         if self.cfg.get('namespace_resources',False):
             try:

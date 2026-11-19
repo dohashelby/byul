@@ -49,6 +49,9 @@ def test_sharded_model_assigns_both_required_shards_then_loads_and_reports_ready
 
 def test_single_file_model_uses_the_assigned_file_as_required():
     record, result = build(case('single-file')['rows'])
+    required, = [row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_required']
+    assigned, = [row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_assigned']
+    assert required == assigned
     assert 'GPU_INPUT_PRODUCER_DIAGNOSTIC:REQUIRED_FROM_ASSIGNED' in result['gaps']
     assert producer.shard_rows(record)[0]['ready_accepted'] is True
 
@@ -66,6 +69,51 @@ def test_registered_producer_makes_the_sharded_record_complete(monkeypatch):
     monkeypatch.setitem(contract.SUPPORTED_PRODUCERS, (source['name'], source['version']), source['source_sha256'])
     _, result = build(case('sharded')['rows'])
     assert result['complete'] is True and result['producer_authenticated'] is False
+
+
+@pytest.mark.parametrize('index_state,diagnostic', [
+    ('unknown', 'WORKER_SHARD_INDEX_UNOBSERVED'),
+    ('unrecorded', 'WORKER_SHARD_INDEX_UNOBSERVED'),
+    ('malformed', 'WORKER_SHARD_INDEX_UNOBSERVED'),
+    ('unreadable', 'WORKER_SHARD_INDEX_UNREADABLE'),
+])
+def test_unverified_shard_index_keeps_assignments_without_required_claims(
+        tmp_path, monkeypatch, index_state, diagnostic):
+    shard = tmp_path / 'fixture.safetensors'
+    content = b'EXAMPLE shard metadata fixture'
+    shard.write_bytes(content)
+    observer = callback.WorkerShardObserver(SCOPE['session'], context_provider=lambda: {})
+    native_result = (str(tmp_path), [str(shard)], True)
+    if index_state == 'unreadable':
+        index = tmp_path / 'fixture.index.json'
+        index.write_text('{}', encoding='utf-8')
+        native_result += (index.name,)
+    observed = observer._prepared(native_result)
+    assert observed['index_present'] is (True if index_state == 'unreadable' else None)
+    assert observed['required'] is None
+    if index_state == 'unrecorded':
+        del observed['index_present']
+        observed['required'] = ['f' * 64]
+    elif index_state == 'malformed':
+        observed.update(index_present=1, required=['f' * 64])
+
+    rows = case('sharded')['rows']
+    prepared = next(r for r in rows if r.get('point') == 'DefaultModelLoader._prepare_weights' and r['phase'] == 'RETURN')
+    prepared['fields'] = {key: prepared['fields'][key] for key in ('pid', 'start_ticks', 'tp_rank')}
+    prepared['fields'].update(observed)
+    source = producer.producer()
+    monkeypatch.setitem(contract.SUPPORTED_PRODUCERS, (source['name'], source['version']), source['source_sha256'])
+
+    record, result = build(rows)
+    assigned, = [row for row in record['events'] if row['event'] == 'shard_assigned']
+    assert assigned['shard_sha256'] == observed['files'][0] and assigned['bytes'] == len(content)
+    assert all(row['event'] != 'shard_required' for row in record['events'])
+    assert record['completeness'] == {'source_ended': False, 'dropped': 0, 'diagnostic_codes': [diagnostic]}
+    assert result['supported'] and not result['complete'] and not result['producer_authenticated']
+    projection = common_consumption.worker_shards(record, SCOPE, {})
+    assert f'GPU_INPUT_PRODUCER_DIAGNOSTIC:{diagnostic}' in projection['missing']
+    assert projection['load_facts'][0]['load_completed'] is True
+    assert not projection['complete'] and not projection['violations']
 
 
 def test_ready_with_a_missing_required_shard_is_a_violation_candidate_and_existing_consumer_fails_it():

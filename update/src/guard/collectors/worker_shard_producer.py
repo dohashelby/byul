@@ -4,7 +4,7 @@
 
 프로세스(콜백 행의 process_sha256)마다 행에 남은 PID·시작 ticks와 rank(READY 후보 행의 worker rank, 없으면 TP rank)로 바인딩을 만든다.
 PID·시작 ticks를 읽지 못하거나 rank가 확인되지 않은 프로세스는 바인딩하지 않고 진단으로 남긴다.
-필수 shard는 index의 weight_map 값, index가 없으면 배정된 파일 자체다(그 경우 `REQUIRED_FROM_ASSIGNED`).
+필수 shard는 index의 weight_map 값이다. index 부재를 관측한 경우에만 배정 파일을 사용한다(`REQUIRED_FROM_ASSIGNED`).
 `shard_rows`는 기존 `supply_boot_contract._worker_shard`가 받는 `{rank, required_missing, ready_accepted}` 행을 낸다.
 """
 from __future__ import annotations
@@ -66,11 +66,18 @@ def events_from(rows):
         prepared = [r for r in items if r['point'] == 'DefaultModelLoader._prepare_weights' and r['phase'] == 'RETURN' and r.get('fields')]
         for row in prepared:
             f = row['fields']
-            required = f.get('required')
-            if required is None:
+            index_present = f.get('index_present')
+            if index_present is False:
                 required = f.get('files') or []
                 codes.add('REQUIRED_FROM_ASSIGNED')
-            for shard in sorted(set(required)):
+            elif index_present is True:
+                required = f.get('required')
+                if required is None:
+                    codes.add('WORKER_SHARD_INDEX_UNREADABLE')
+            else:
+                required = None
+                codes.add('WORKER_SHARD_INDEX_UNOBSERVED')
+            for shard in sorted(set(required or [])):
                 add('shard_required', _ms(row), shard)
             for shard, size in zip(f.get('files') or [], f.get('file_bytes') or []):
                 add('shard_assigned', _ms(row), shard, size if type(size) is int else None)
@@ -99,7 +106,8 @@ def record(rows, *, pod, environment_ref, target_sha256, prepared_sha256, sessio
                  'restart_count': pod['restart_count'], 'worker_pid': i['pid'], 'start_ticks': i['start_ticks'], 'rank': i['rank']}
                 for i in identities]
     blocking = {'WORKER_SHARD_ROWS_BOUND', 'WORKER_SHARD_ENTRY_UNQUALIFIED', 'WORKER_IDENTITY_UNOBSERVED',
-                'WORKER_SHARD_ASSIGNMENT_UNOBSERVED', 'WORKER_RANK_UNOBSERVED', 'WORKER_RANK_CONFLICT'}
+                'WORKER_SHARD_ASSIGNMENT_UNOBSERVED', 'WORKER_SHARD_INDEX_UNOBSERVED', 'WORKER_SHARD_INDEX_UNREADABLE',
+                'WORKER_RANK_UNOBSERVED', 'WORKER_RANK_CONFLICT'}
     value = {'schema': contract.SCHEMA, 'kind': 'worker-shard-load', 'producer': producer(),
              'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
              'session': session, 'bindings': bindings, 'events': events,

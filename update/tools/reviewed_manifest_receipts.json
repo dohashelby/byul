@@ -970,6 +970,11 @@
       "manifest_sha256": "cd79aa181f7b15890a73b2345963bdcc326287d761c8d58bee2b4949bf0509db",
       "reviewed_by": "Codex / LIF-07/LIF-09 input readiness and OBS-03 bounded diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T11:58:22+00:00"
+    },
+    {
+      "manifest_sha256": "f8e6862cf8ddbd7a50da1bbb17f1445f7167bee4d1f8d1de24991b6cd98ae275",
+      "reviewed_by": "Codex / REQ-13 prebound Gateway inputs, LIF-11 namespace observations and OBS-09 capture window / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T12:36:38+00:00"
     }
   ]
 }

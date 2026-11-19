@@ -1297,8 +1297,12 @@ def test_lif01_startup_load_cannot_enable_legacy_supply_checks(tmp_path, sources
     for invalid in (missing, wrong, false_marker, target_override, sibling, mixed, wrapped):
         with pytest.raises(ValueError, match='NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID'):
             application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
-    with pytest.raises(ValueError, match='NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(config))
+    audit = select(pack, envs[:1], policy, mode='audit')
+    startup_only = {**missing, 'update': {'allowed_checks': ['LIF-01']}}
+    with pytest.raises(ValueError, match='^NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID$'):
+        run_plan(store, pack, audit, application.run_config(startup_only))
+    with pytest.raises(ValueError, match='^INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID$'):
+        run_plan(store, pack, audit, application.run_config(config))
 
 
 def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources):

@@ -18,6 +18,16 @@ LIMIT_BYTES = 65536
 POLICY_KEYS = frozenset({'allowed_log_fields', 'forbidden_log_fields', 'forbidden_marker_contexts',
                          'required_sources', 'required_branches'})
 TIMESTAMPED_JSON = re.compile(r'^\d{4}-\d{2}-\d{2}T\S+\s+\{')
+_PIPE_FLAGS = ('bounded_at_source', 'complete', 'timed_out', 'truncated', 'pipes_closed')
+
+
+def _runner_status(returncode, pipes):
+    code = returncode if type(returncode) is int and -255 <= returncode <= 255 else None
+    flags = {key: pipes.get(key) for key in _PIPE_FLAGS}
+    errors = pipes.get('read_errors')
+    return {'stage': 'runner_returned_nonzero' if code else 'runner_result_rejected', 'returncode': code,
+            **{key: value if type(value) is bool else None for key, value in flags.items()},
+            'child_reap_unverified': 'child_reap' in errors if type(errors) is list else None}
 
 
 class KubernetesLogAnalysisExecutor(KubernetesContainerConfigExecutor):
@@ -51,24 +61,33 @@ class KubernetesLogAnalysisExecutor(KubernetesContainerConfigExecutor):
         correlation, captures = {}, []
         gaps = ['NORMAL_ENGINE_LOG_ONLY', 'CALLER_INPUT_MARKER_NOT_SENT']
         normal_outcome = 'no_response'
+        normal_status = {'stage': 'binding_or_capture_unavailable'}
         try:
             response, = normal_transport.normal_requests('kubernetes-probe', [request], ctx.timeout)
+            outcome, captured = response.get('outcome'), response.get('capture_complete')
+            normal_status = {'stage': 'response_received', 'binding_verified_before_after': True,
+                             'capture_complete': captured if type(captured) is bool else None,
+                             'http_status': outcome if type(outcome) is int and 100 <= outcome <= 599 else None}
             normal_outcome = control_state(response, ctx.api_model, '/v1/completions')
             if normal_outcome == 'pass':
                 body = strict_json_loads(response['body'])
                 ident = body.get('id')
                 if type(ident) is str and re.fullmatch(r'[A-Za-z0-9_.:-]{8,128}', ident):
                     correlation['normal'] = ident
+                    normal_status['stage'] = 'response_id_observed'
         except (KubernetesBindingError, ValueError, TypeError, RecursionError):
             gaps.append('NORMAL_REQUEST_BINDING_UNAVAILABLE')
         if not correlation:
             gaps.append('NORMAL_RESPONSE_ID_UNAVAILABLE')
 
         ctx._normal_log_source = {'byte_count': None, 'sha256': None, 'available': False, 'payload_retained': False}
+        log_status = {'stage': 'binding_or_capture_unavailable'}
         try:
             result = log_transport.engine_logs(started, LIMIT_BYTES)
             raw, pipes = result.get('stdout_bytes'), result.get('capture') or {}
-            if (result.get('returncode') != 0 or type(raw) is not bytes or len(raw) > LIMIT_BYTES
+            returncode = result.get('returncode')
+            log_status = _runner_status(returncode, pipes)
+            if (returncode != 0 or type(raw) is not bytes or len(raw) > LIMIT_BYTES
                     or pipes.get('bounded_at_source') is not True):
                 raise KubernetesBindingError()
             truncated = len(raw) == LIMIT_BYTES or pipes.get('truncated') is True
@@ -86,16 +105,17 @@ class KubernetesLogAnalysisExecutor(KubernetesContainerConfigExecutor):
                              'timed_out': pipes.get('timed_out'), 'truncated': truncated})
             ctx._normal_log_source = {'byte_count': len(raw), 'sha256': sha256(raw).hexdigest(),
                                       'available': True, 'payload_retained': False}
+            log_status['stage'] = 'bounded_capture_complete' if complete else 'bounded_capture_partial'
         except (KubernetesBindingError, ValueError, TypeError):
             gaps.append('OWNED_ENGINE_LOG_UNAVAILABLE')
         ctx._normal_log_cleanup = list(log_transport.report()['cleanup_errors'])
         observed = protect_analysis(analyze_log_captures(captures, ctx.policy_values, {}, correlation,
             initial_gaps=gaps, profile=STRICT_JSON_PROFILE), ctx.policy_values)
-        # Only the evaluator's policy predicates and protected field names
-        # leave this method. The response and log strings never enter EVD.
+        # The response and log strings never enter EVD or the status summary.
         fixture = {'profile': PROFILE, 'target_source': 'owned-engine-pod-stdout', 'logical_request': LOGICAL_ID,
                    'policy_sha256': sha256(canonical_json(ctx.policy_values)).hexdigest()}
         summary = {'profile': PROFILE, 'source': ctx._normal_log_source, 'fixture': fixture,
+                   'collection_status': {'normal_control': normal_status, 'engine_stdout': log_status},
                    'gaps': observed['log_coverage_gaps'], 'violations': observed.pop('log_violations')}
         observed['functional_probes_planned'] = [LOGICAL_ID]
         observed['functional_probe_results'] = {LOGICAL_ID: normal_outcome}

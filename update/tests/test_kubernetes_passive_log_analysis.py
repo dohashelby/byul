@@ -5,9 +5,10 @@ import pytest
 
 from guard.adapters.vllm import VllmAdapter
 from guard.core.judge import judge_evidence
+from guard.core.run import _normalize
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor, LIMIT_BYTES
-from guard.models import ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
-from tests.builders import T0, evidence, policy
+from guard.models import Evidence, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
+from tests.builders import T0, dummy_ref, policy
 from tests.test_kubernetes_process_consumers import ProcessWorld
 from tests.test_model_preparation_integration import full_inputs
 from tools import mvp_live_readiness
@@ -17,6 +18,7 @@ VALUES = {'required_sources': ['engine', 'gateway'], 'required_branches': ['norm
           'allowed_log_fields': ['request_id', 'event'], 'forbidden_log_fields': ['prompt'],
           'forbidden_marker_contexts': ['caller_input', 'error_input']}
 PRIVATE = 'EXAMPLE-PRIVATE-LOG-BODY-CANNOT-BE-PERSISTED'
+STDERR = 'EXAMPLE-PRIVATE-STDERR-CANNOT-BE-PERSISTED'
 REQUEST_ID = 'cmpl-EXAMPLE-NORMAL-CORRELATION'
 
 
@@ -39,10 +41,17 @@ class LogWorld(ProcessWorld):
             text = f'{stamp} {json.dumps(event)}\n' if self.log_mode != 'plain' else f'{stamp} {PRIVATE}\n'
             if self.log_mode == 'replaced':
                 self.replaced = True
-            return {'returncode': 0, 'stdout_bytes': text.encode(), 'stderr_bytes': PRIVATE.encode(),
-                    'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
+            pipes = {'schema': 'guard-pipe-capture/1', 'complete': True, 'bounded_at_source': True,
+                     'timed_out': False, 'truncated': False, 'pipes_closed': True, 'read_errors': []}
+            returncode = {'nonzero': 1, 'unreaped': -1}.get(self.log_mode, 0)
+            if self.log_mode == 'unreaped':
+                pipes.update(complete=False, timed_out=True, pipes_closed=False, read_errors=['child_reap'])
+            return {'returncode': returncode, 'stdout_bytes': text.encode(), 'stderr_bytes': STDERR.encode(),
+                    'capture': {**pipes, 'streams': {'stderr': {'retained_sha256': sha256_hex(STDERR.encode())}}}}
         result = super().runner(argv, **kwargs)
         if 'exec' in argv and 'input_bytes' in kwargs:
+            if self.log_mode == 'normal-unavailable':
+                return {**result, 'returncode': 1, 'stderr_bytes': STDERR.encode()}
             row, = json.loads(result['stdout_bytes'])
             body = json.loads(row['body'])
             body['id'] = REQUEST_ID
@@ -53,7 +62,8 @@ class LogWorld(ProcessWorld):
 
 
 @pytest.mark.parametrize('mode,security', [('clean', 'UNKNOWN'), ('forbidden', 'FAIL'), ('unlinked', 'UNKNOWN'),
-                                            ('plain', 'UNKNOWN'), ('replaced', 'UNKNOWN')])
+                                            ('plain', 'UNKNOWN'), ('replaced', 'UNKNOWN'), ('nonzero', 'UNKNOWN'),
+                                            ('unreaped', 'UNKNOWN'), ('normal-unavailable', 'UNKNOWN')])
 def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, mode, security):
     env, target = full_inputs()
     world = LogWorld(target, mode)
@@ -68,14 +78,43 @@ def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, m
     assert request['headers'] == {} and request['body']['prompt'] == 'ping'
     assert all(not challenge.attempted for challenge in draft.challenges)
     assert draft.data_origin.value == 'EXAMPLE'
-    assert draft.status == (ExecStatus.ABORTED if mode == 'replaced' else ExecStatus.COMPLETED)
+    log_unavailable = mode in {'replaced', 'nonzero', 'unreaped'}
+    assert draft.status == (ExecStatus.ABORTED if log_unavailable else ExecStatus.COMPLETED)
+    assert draft.abort_reason == ('OWNED_ENGINE_LOG_CAPTURE_INCOMPLETE' if log_unavailable else None)
+    assert draft.cleanup_errors == []
     assert draft.observations['log_coverage_complete'].value is False
     assert draft.observations['log_fields_seen'].collected is (mode in {'clean', 'forbidden'})
     assert draft.observations['log_marker_contexts_seen'].collected is False
-    observed = {key: entry.model_dump() for key, entry in draft.observations.items()}
-    result = judge_evidence(check, evidence(status=draft.status, check_id='OBS-03', observations=observed,
-                                          normal=draft.normal_control.model_dump()),
-                            policy(pack.ref(), values={'OBS-03': VALUES}), T0)
+    evd = Evidence(id='EVD-OBS03-EXAMPLE', data_origin=draft.data_origin, check_id=check.id, side='single',
+                   environment=env.ref(), plan=dummy_ref('PLAN'), execution={'status': draft.status},
+                   **_normalize(check, draft)).seal()
+    assert 'collection_status' not in evd.observations
+    result = judge_evidence(check, evd, policy(pack.ref(), values={'OBS-03': VALUES}), T0)
     assert result.verdicts.security == security
-    persisted = b''.join(artifact.path.read_bytes() for artifact in draft.artifacts)
-    assert PRIVATE.encode() not in persisted and REQUEST_ID.encode() not in persisted
+    artifact, = draft.artifacts
+    persisted = artifact.path.read_bytes()
+    private_fields = (PRIVATE, STDERR, REQUEST_ID, sha256_hex(STDERR.encode()))
+    assert all(value.encode() not in persisted + canonical_json(evd.to_dict()) for value in private_fields)
+    summary = json.loads(persisted.splitlines()[-1])
+    status = summary['collection_status']
+    generic = {'stage': 'binding_or_capture_unavailable'}
+    assert set(status) == {'normal_control', 'engine_stdout'}
+    if mode == 'normal-unavailable':
+        assert status['normal_control'] == generic
+        assert not draft.normal_control.succeeded
+    else:
+        assert status['normal_control'] == {'stage': 'response_id_observed', 'binding_verified_before_after': True,
+                                            'capture_complete': True, 'http_status': 200}
+    unreaped = mode == 'unreaped'
+    if mode == 'replaced':
+        assert status['engine_stdout'] == generic
+    else:
+        assert status['engine_stdout'] == {
+            'stage': 'runner_returned_nonzero' if log_unavailable else 'bounded_capture_complete',
+            'returncode': {'nonzero': 1, 'unreaped': -1}.get(mode, 0),
+            'bounded_at_source': True, 'complete': not unreaped, 'timed_out': unreaped,
+            'truncated': False, 'pipes_closed': not unreaped, 'child_reap_unverified': unreaped,
+        }
+    assert summary['source']['available'] == (not log_unavailable)
+    if log_unavailable:
+        assert summary['source'] == {'available': False, 'byte_count': None, 'sha256': None, 'payload_retained': False}

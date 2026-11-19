@@ -31,6 +31,16 @@ def record_path(session):
     return RECORD_DIRECTORY + session + "/boot-record.json"
 
 
+def _record_location(role_input, env):
+    target, prepared, _ = role_input
+    try:
+        owner = validate_target(target, env)["engine"]
+    except ValueError:
+        # Leave the ordinary per-role preflight to record the invalid target.
+        return None
+    return owner["namespace_uid"], owner["pod_uid"], owner["container_id"], record_path(prepared["session"])
+
+
 def _read_projection(captured, prepared, digest, prepared_sha256, analysis):
     native = contract.native_consumption(analysis)
     native["source_binding"] = {"session": prepared["session"], "target_sha256": digest,
@@ -263,11 +273,17 @@ class KubernetesSupplyBootExecutor:
         begin, end = contract.normalize_policy(check.id, policy_values)
         if not begin <= started <= end:
             raise ValueError("SUPPLY_BOOT_POLICY_WINDOW_EXPIRED")
-        if check.id == "SUP-05":
+        if check.id in {"SUP-05", "SUP-15"}:
             role_inputs = {role: self._load_available(env, policy_values, role) for role in contract.ROLES}
             normal, challenge = (role_inputs[role] for role in contract.ROLES)
-            if normal is not None and challenge is not None and normal[1]["session"] == challenge[1]["session"]:
-                raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
+            if normal is not None and challenge is not None:
+                if check.id == "SUP-05" and normal[1]["session"] == challenge[1]["session"]:
+                    raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
+                if check.id == "SUP-15":
+                    # A record replaced between reads cannot supply two separate roles.
+                    normal_location = _record_location(normal, env)
+                    if normal_location is not None and normal_location == _record_location(challenge, env):
+                        raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
             collected = {role: self._collect_role(check, env, policy_values, role, role_inputs=role_inputs)
                          for role in contract.ROLES}
         else:

@@ -1,5 +1,8 @@
 """SUP-15 owned-record admission through the real read-only executor."""
 
+from copy import deepcopy
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +13,7 @@ from guard.executors import registry
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, sha256_hex
 from tests.builders import environment, evidence
+from tests.test_b3_supply_records import retained
 from tests.test_kubernetes_lifecycle import World
 from tests.test_kubernetes_sampling import inputs
 from tests.test_lifecycle_capture import Docker, IMAGE, external
@@ -51,6 +55,42 @@ def _prepare_roles(tmp_path, env, late_owner_change):
         worlds[engine["namespace"]] = world
         records[role] = raw
     return settings, pins, worlds, records
+
+
+@pytest.mark.parametrize(('same_owner', 'same_session'), [(True, True), (True, False), (False, True)])
+def test_sup15_rejects_only_role_aliases_at_the_same_owned_record_location(
+        tmp_path, external, monkeypatch, same_owner, same_session):
+    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE})
+    settings, pins, _, _ = _prepare_roles(external, env, late_owner_change=False)
+    _, _, archived_roles = retained('SUP-15', tmp_path)
+    if same_owner:
+        normal_target = json.loads(Path(settings['normal']['target']).read_bytes())
+        # Context aliases can address the same exact namespace, Pod and container.
+        normal_target['kubernetes']['context'] = 'fixture-alias-context'
+        challenge_target = Path(settings['challenge']['target'])
+        challenge_target.write_bytes(canonical_json(normal_target))
+        pins['supply_challenge_target_sha256'] = sha256_hex(challenge_target.read_bytes())
+    if same_session:
+        settings['challenge']['prepared'] = settings['normal']['prepared']
+        pins['supply_challenge_prepared_sha256'] = pins['supply_normal_prepared_sha256']
+
+    check = PACK.checks['SUP-15']
+    executor = registry.build_executor('supply_boot', 'kubernetes', {'supply_boot': settings})
+    calls = []
+    def replay(check, environment, values, role, *, role_inputs):
+        assert role_inputs[role] is not None
+        calls.append(role)
+        return deepcopy(archived_roles[role])
+    monkeypatch.setattr(executor, '_collect_role', replay)
+    values = base_values(env, check.id, pins)
+    if same_owner and same_session:
+        with pytest.raises(ValueError, match='SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED'):
+            executor.run(check, env, values, None, tmp_path / 'evidence')
+        assert calls == []
+    else:
+        draft = executor.run(check, env, values, None, tmp_path / 'evidence')
+        assert calls == ['normal', 'challenge'] and draft.data_origin is DataOrigin.EXAMPLE
+        assert not draft.observations['supply_boot_complete'].value
 
 
 @pytest.mark.parametrize("late_owner_change", [False, True], ids=["stable-owner", "late-owner-change"])

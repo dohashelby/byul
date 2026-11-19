@@ -457,3 +457,83 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
             assert row['blocking_codes'] == ['KUBERNETES_HTTP_BINDING_UNAVAILABLE']
         else:
             assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'
+
+
+@pytest.mark.parametrize(('check_id', 'executor_name', 'damage', 'reason'), [
+    ('OBS-04', 'boundary_egress', None, None),
+    ('OBS-04', 'boundary_egress', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('OBS-04', 'boundary_egress', 'duration', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('PLT-06', 'unix_ipc', None, None),
+    ('PLT-06', 'unix_ipc', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('PLT-06', 'unix_ipc', 'duration', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+])
+def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
+        tmp_path, monkeypatch, check_id, executor_name, damage, reason):
+    from guard import application
+    from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS
+    from guard.models import canonical_json, sha256_hex
+    from tests.builders import environment, policy
+    from tests.test_kubernetes_request_binding import target as owned_target
+    from tests.test_kubernetes_usage_report import LOCAL_VALUES
+    from tests.test_kubernetes_worker_trust_metadata import VALUES as WORKER_VALUES
+    from tools.j02_run_config import write_config
+    from tools.mvp_versions import versions
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Scoped metadata preparation must not access the declared Pod')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    pol = policy(pack.ref(), scope={'include': [check_id]},
+                 values={check_id: LOCAL_VALUES if check_id == 'OBS-04' else WORKER_VALUES})
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {executor_name: 'kubernetes'},
+           'update': {'allowed_checks': [check_id]}, 'sides': {},
+           'check_config': {check_id: {KUBERNETES_BOUND_CHECK_OPTIONS[check_id]: True}}}
+    envs, env_paths = [], {}
+    for side, row in versions().items():
+        env = environment(id=f'ENV-OWNED-METADATA-{side.upper()}', model={'id': 'EXAMPLE', 'revision': 'r1'},
+            engine={'name': row['engine'], 'version': row['version'], 'image_digest': row['image']},
+            runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE', 'driver': 'EXAMPLE'})
+        declaration = owned_target(env)
+        declaration.update(lab=False, observed_version=row['version'])
+        declaration['engine']['image_digest'] = row['image']
+        declaration['kubernetes']['engine'].update(image=row['image'], image_id=row['image'])
+        target_path = tmp_path / f'{side}-target.json'
+        settings = {'target': str(target_path)}
+        if side == 'candidate' and damage == 'model':
+            declaration['model_mapping']['revision'] = 'EXAMPLE-other-revision'
+        if side == 'candidate' and damage == 'duration':
+            settings['max_duration_seconds'] = 0
+        target_path.write_bytes(canonical_json(declaration))
+        cfg['sides'][side] = {executor_name: settings}
+        env_path = tmp_path / f'{side}-env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        envs.append(env)
+        env_paths[side] = env_path
+
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    inputs = next(row for row in ready['checks'] if row['check'] == 'inputs')
+    assert inputs['ok'] is (reason is None), ready
+    if reason:
+        assert inputs['detail'] == reason
+
+    policy_path, config_path = tmp_path / 'policy.json', tmp_path / 'guard.toml'
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    write_config(cfg, config_path)
+    index = tool.template(pack)
+    index['inputs'] = [{'check_id': check_id, 'side': side, **{
+        key: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+        for key, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()
+    }} for side, env in env_paths.items()]
+    report = run(tmp_path, index)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == (2 if reason is None else 1)
+    for row in report['rows']:
+        if row['check_id'] != check_id:
+            continue
+        assert row['engine_executed'] is row['live_target_verified'] is row['ready_for_execution'] is False
+        assert row['actual_results'] is None
+        if row['side'] == 'candidate' and reason:
+            assert row['blocking_codes'] == [reason]
+        else:
+            assert row['file_binding_valid'] and 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']

@@ -702,7 +702,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     binding_options["expected_supply_record_digests"] = digests
                     c = {**c, "_supply_prepared_sha256_by_role": {role: digests[role] for role in ("normal", "challenge")}}
                 option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
-                explicit_observer = (item.check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09",
+                explicit_observer = (item.check_id in {"LIF-01", "LIF-03", "OBS-02", "OBS-04", "PLT-06", "PLT-07", "REQ-09",
                                                        "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
                                      and type(settings) is dict
                                      and option in settings)
@@ -741,6 +741,13 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     executor.validate_policy(check_def, values)
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
+                    if kube and expected_target is not None:
+                        if item.check_id == "OBS-04":
+                            executor.prepared_local_observation(check_def, selected_env, values,
+                                                                expected_target_sha256=expected_target)
+                        elif item.check_id == "PLT-06":
+                            executor.prepared_worker_trust(check_def, selected_env, values,
+                                                           expected_target_sha256=expected_target)
                     if paired_supply_roles and isinstance(executor, KubernetesSupplyBootExecutor):
                         executor.prepared_supply_roles(check_def, selected_env, values)
                     if (kube and item.check_id in run_binding.INITIALIZATION_CHECKS

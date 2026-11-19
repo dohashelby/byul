@@ -22,7 +22,8 @@ from guard.collectors import native_input, native_input_qualification
 from guard.collectors import native_input_rejection_qualification, reused_input_qualification
 from guard.collectors.file import load_environment, load_policy
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNAPSHOT_OPTION,
-                                 INSTALLED_PLUGIN_INVENTORY_OPTION, NORMAL_COMPILE_CACHE_OPTION,
+                                 INSTALLED_PLUGIN_INVENTORY_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
+                                 NORMAL_COMPILE_CACHE_OPTION,
                                  NORMAL_FILE_READS_OPTION, NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
@@ -232,6 +233,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
                       and {1, 2}.issubset(run_binding.stages_for(check)))
     collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
                          and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
+    local_metadata = (check.id in {'OBS-04', 'PLT-06'} and implementation == 'kubernetes'
+                      and requested_update.get('mode', 'external') == 'external'
+                      and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS[check.id]) is True)
     gateway_response = (check.id == 'REQ-13' and check.executor == 'response_content'
                         and implementation == 'kubernetes' and 'gateway' in values['required_targets']
                         and config.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
@@ -388,6 +392,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if collection_status:
             executor.prepared_collection_status(check, env, effective,
                                                 expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if local_metadata:
+            expected = sha256_hex(canonical_json(target_data))
+            if check.id == 'OBS-04':
+                executor.prepared_local_observation(check, env, effective, expected_target_sha256=expected)
+            else:
+                executor.prepared_worker_trust(check, env, effective, expected_target_sha256=expected)
         if gateway_response:
             executor.prepared_gateway(env, expected_target_sha256=sha256_hex(canonical_json(target_data)))
     if requires_native_matrix and not normal_token_input:

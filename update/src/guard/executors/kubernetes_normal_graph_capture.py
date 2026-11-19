@@ -20,6 +20,8 @@ _CHECK_PROFILE = "engine-sensor-graph-lifetime-v1"
 _PROGRESS_TITLE = b"Capturing CUDA graphs (decode, FULL)"
 _RETURN_TITLE = b"Graph capturing finished"
 _SKIP_TITLE = b"Skipping CUDA graph capture"
+_GRAPH_OVERRIDES = {"--enforce-eager", "--compilation-config", "-cc", "--optimization-level",
+                    "--cudagraph-capture-sizes", "--max-cudagraph-capture-size"}
 # CR can re-render progress without opening a new CRI line. The bar can be ASCII or UTF-8.
 _PROGRESS = re.compile(
     rb"Capturing CUDA graphs \(decode, FULL\): +(?P<percent>[0-9]{1,3})%\|"
@@ -42,6 +44,13 @@ def _capture_callsite(adapter, env):
     if type(profile) is not dict or profile.keys() != {key} or type(profile[key]) is not int or not 1 <= profile[key] <= 99999:
         raise ValueError("REQ20_CAPTURE_SOURCE_UNQUALIFIED")
     return profile[key]
+
+
+def _verify_graph_launch(target, container, source):
+    _verify_launch(target, container, source)
+    if any(arg.partition("=")[0].partition(".")[0].replace("_", "-") in _GRAPH_OVERRIDES
+           for arg in container["args"] if arg.startswith("-")):
+        raise ValueError("REQ20_CAPTURE_LAUNCH_UNQUALIFIED")
 
 
 def _capture_observation(raw, window, callsite):
@@ -132,7 +141,7 @@ class KubernetesNormalGraphCaptureExecutor:
             window, container = _ready_window(logs)
             if any(prefix[key] != value for key, value in window.items()):
                 raise ValueError
-            _verify_launch(target, container, source)
+            _verify_graph_launch(target, container, source)
             failure = "REQ20_CAPTURE_INSTALLED_SOURCE_UNVERIFIED"
             _verify_source(source_reader, source)
             failure = "REQ20_CAPTURE_PREFIX_UNVERIFIED"
@@ -143,7 +152,7 @@ class KubernetesNormalGraphCaptureExecutor:
             capture = _capture_observation(raw, window, callsite)
             failure = "REQ20_CAPTURE_OWNER_AFTER_UNVERIFIED"
             after, container = _ready_window(logs)
-            _verify_launch(target, container, source)
+            _verify_graph_launch(target, container, source)
             _verify_source(source_reader, source)
             if after == window and not any(t.report()["cleanup_errors"] or t.report()["collection_gap"]
                                            for t in (logs, source_reader)):

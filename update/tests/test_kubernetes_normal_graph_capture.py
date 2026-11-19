@@ -11,7 +11,7 @@ from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
 from tests.builders import evidence
 from tests.test_gpu_a_run_inputs import UPDATE
-from tests.test_kubernetes_normal_startup_load import Adapter, ROOT, StartupWorld, _inputs as startup_inputs
+from tests.test_kubernetes_normal_startup_load import ARGS, Adapter, ROOT, StartupWorld, _inputs as startup_inputs
 
 UNRELATED = "EXAMPLE unrelated console data"
 _ZERO = "Capturing CUDA graphs (decode, FULL):   0%|          | 0/2 [00:00<?, ?it/s]"
@@ -23,11 +23,21 @@ class GraphAdapter(Adapter):
         return {"capture_completion_call_linenumber": 6854 if self.line == 5354 else 6929}
 
 
-def _run(tmp_path, version, fault=None):
+def _run(tmp_path, version, fault=None, graph_option=None):
     env, target, path, initial = startup_inputs(tmp_path, version)
     adapter = GraphAdapter(initial.adapter.line)
     modern = version == "0.31.0"
     world = StartupWorld(target, adapter, modern, None)
+    if graph_option:
+        args = [*ARGS, graph_option]
+        target["comparison_config"]["launch"]["argv"] = args
+
+        def pod_readback(role, document, after):
+            world.pod_readback(role, document, after)
+            if role == "engine":
+                document["spec"]["containers"][0]["args"] = args
+
+        world.mutate = pod_readback
     proc = "(EngineCore pid=96) " if modern else ""
     callsite = adapter.graph_capture_source(env)["capture_completion_call_linenumber"]
     if fault == "wrong-callsite":
@@ -118,3 +128,12 @@ def test_req20_rejects_without_a_complete_unambiguous_owned_capture_sequence(tmp
 @pytest.mark.parametrize("fault", ["disabled", "wrong-target"])
 def test_req20_refuses_unselected_or_wrongly_bound_reads(tmp_path, fault):
     _run(tmp_path, "0.30.0", fault)
+
+
+@pytest.mark.parametrize("graph_option", ["--enforce-eager", "--compilation_config.cudagraph_mode=FULL",
+                                         "-cc.cudagraph_mode=FULL", "--cudagraph_capture_sizes=2",
+                                         "--max-cudagraph-capture-size=2", "--optimization-level=1"])
+def test_req20_rejects_nonstock_capture_options_before_reading_logs_or_sources(tmp_path, graph_option):
+    draft, summary, _, world = _run(tmp_path, "0.31.0", graph_option=graph_option)
+    assert draft.status == ExecStatus.ABORTED
+    assert summary["observation"] is None and not world.log_calls and not world.hash_calls

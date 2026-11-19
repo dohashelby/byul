@@ -1020,6 +1020,11 @@
       "manifest_sha256": "f016a8fb2f0ed405caa478f62c4b65365b15759b785e5069d653de58a2e7ae6b",
       "reviewed_by": "Codex / paired REQ-10 sampling and LIF-04 stream input validation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T19:19:30+00:00"
+    },
+    {
+      "manifest_sha256": "3c1126b201e236e28077088bfc2708006b1205481343e8c408b23d2c023cda1b",
+      "reviewed_by": "Codex / REQ-10 optional collection profile preparation correction / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T19:34:32+00:00"
     }
   ]
 }

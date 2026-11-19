@@ -220,6 +220,7 @@ def status(env, rows):
     ('candidate', None),
     ('owner-alias', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('configured-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('request-timeout', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
     ('offline-digest', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
     ('executor-digest', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
     ('non-object', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
@@ -252,6 +253,8 @@ def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_pat
     path.write_bytes(raw)
     digest = sha256_hex(raw)
     settings = {'target': str(path), 'max_duration_seconds': 301 if case == 'configured-budget' else 30}
+    if case == 'request-timeout':
+        settings['request_timeout'] = 'invalid'
     executor = module.KubernetesLogIntegrityExecutor(
         settings, runner=forbidden, expected_target_sha256='0' * 64 if case == 'executor-digest' else digest)
     values = {key: value for key, value in GAP_VALUES.items()

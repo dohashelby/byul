@@ -151,6 +151,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID")
         self.validate_policy(check, values)
         try:
+            float(self.cfg.get("request_timeout", 30))
             target = strict_json(dependency(self.cfg["target"], None))
             if type(target) is not dict:
                 raise ValueError
@@ -158,7 +159,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
             if any(pin is not None and pin != digest for pin in
                    (expected_target_sha256, self._expected_target_sha256)):
                 raise ValueError
-        except (KeyError, TypeError, ValueError, OSError):
+        except (KeyError, TypeError, ValueError, OverflowError, OSError):
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID") from None
         try:
             self._transport(target, env)

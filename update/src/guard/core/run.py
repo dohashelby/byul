@@ -13,7 +13,8 @@ from typing import Any
 
 from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
-from guard.configuration import (KUBERNETES_BOUND_CHECK_OPTIONS, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
+from guard.configuration import (INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR, KUBERNETES_BOUND_CHECK_OPTIONS,
+                                 NORMAL_REQUEST_LATENCY_SCOPE_ERROR, installed_plugin_inventory_requested,
                                  NORMAL_SERVING_READINESS_SCOPE_ERROR, normal_request_latency_requested,
                                  UPDATE_CHECK_OUTSIDE_SCOPE, bounded_metadata_scopes, merge_config,
                                  normal_serving_readiness_requested, normal_token_input_requested,
@@ -116,6 +117,8 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
     requested = cfg.requested if cfg.requested is not None else cfg.raw
     if plan.mode != Mode.update:
         configurations = (requested, cfg.raw, *(side.raw for side in cfg.side_configs.values()))
+        if any(installed_plugin_inventory_requested(config) for config in configurations):
+            raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
         if any(normal_request_latency_requested(config) for config in configurations):
             raise ValueError(NORMAL_REQUEST_LATENCY_SCOPE_ERROR)
         if any(normal_serving_readiness_requested(config) for config in configurations):
@@ -284,7 +287,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
             target_options = {}
-            if check.id in {'LIF-03', 'OBS-02'} and type(section) is dict and option in section:
+            if check.id in {'LIF-03', 'OBS-02', 'SUP-10'} and type(section) is dict and option in section:
                 hashes = raw.get("_kubernetes_target_sha256_by_executor")
                 expected_target = hashes.get(item.executor) if type(hashes) is dict else None
                 if expected_target is None:

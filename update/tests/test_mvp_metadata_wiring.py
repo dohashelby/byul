@@ -888,6 +888,113 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
         tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', gateway_record_inputs=gateway_inputs)
 
 
+def test_sup10_installed_inventory_uses_exact_pair_and_empty_policy(tmp_path, sources, monkeypatch):
+    from guard.executors import run_binding
+    from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
+    from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+
+    pack, sides, policy_path = sources
+    prior = tool.Policy.model_validate_json(policy_path.read_bytes())
+    policy = prior.model_copy(update={'values': {},
+        'scope': prior.scope.model_copy(update={'include': ['SUP-10', 'SUP-11']})}).seal()
+    _write(policy_path, policy.to_dict())
+    output, store_path, fresh = (tmp_path / name for name in ('inventory', 'store', 'fresh-target.json'))
+    default, _, _ = tool.assemble(sides, policy_path, pack=pack, store=store_path)
+    assert 'supply_boot' not in default['executors']
+    args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store_path), '--output', str(output),
+            '--installed-plugin-inventory', '--candidate-target-after-baseline', str(fresh)]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            args.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', args)
+    tool.main()
+    cfg = tomllib.loads((output / 'preliminary-guard.toml').read_text())
+    assert cfg['executors'] == {'supply_boot': 'kubernetes'}
+    assert cfg['update']['allowed_checks'] == ['SUP-10']
+    assert cfg['check_config'] == {'SUP-10': {'installed_plugin_inventory_only': True}}
+    assert all(side == {'supply_boot': {'target': str(sides[name]['target'])}}
+               for name, side in cfg['sides'].items())
+    readiness = json.loads((output / 'readiness.json').read_bytes())
+    rows = [row for row in readiness['rows'] if row['check_id'] == 'SUP-10']
+    assert len(rows) == 2 and readiness['active_checks'] == 69
+    for row in rows:
+        assert row['file_binding_valid'] and row['installed_plugin_inventory_only'], row
+        assert row['binding_schema'] == run_binding.SCHEMA and not row['engine_executed']
+    siblings = readiness['metadata_wiring']['SUP-10']['shared_executor_checks']
+    assert not siblings['SUP-11']['baseline']['transport_dispatched']
+
+    envs = [tool.Environment.model_validate_json(settings['environment'].read_bytes()) for settings in sides.values()]
+    ready = application.update_readiness(pack, envs, policy, cfg)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    legacy = registry.build_executor('supply_boot', 'kubernetes', {'supply_boot': {}},
+        engine=envs[0].engine.name, version=envs[0].engine.version)
+    assert type(legacy) is KubernetesSupplyBootExecutor
+    expected = {env.id: sha256_hex(canonical_json(json.loads(side['target'].read_bytes())))
+                for env, side in zip(envs, sides.values())}
+
+    def fixture_inventory(self, check, env, values, *_args):
+        assert check.id == 'SUP-10' and values == {}
+        assert self._expected_target_sha256 == expected[env.id]
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
+
+    monkeypatch.setattr(KubernetesInstalledPluginInventoryExecutor, 'run', fixture_inventory)
+    store = Store(store_path)
+    report, _ = application.execute_update(store, pack, envs, policy, cfg, tmp_path / 'paired', utcnow())
+    row = next(row for row in report.by_check if row.check_id == 'SUP-10')
+    assert row.baseline.security == row.candidate.security == 'UNKNOWN'
+    for side in (row.baseline, row.candidate):
+        evidence = store.resolve(store.resolve(side.result).evidence)
+        binding = evidence.execution.run_binding
+        assert evidence.execution.status == ExecStatus.COMPLETED and not run_binding.verify(binding, evidence)
+        assert binding['files'] == {'supply_target_sha256': expected[evidence.environment.id]}
+        assert 'values' not in binding
+
+    staged = tomllib.loads((output / 'guard.toml').read_text())
+    current, pointer = tool._source(sides['candidate']['target'])
+    for number, role in enumerate(('engine', 'probe'), 200):
+        current['kubernetes'][role]['pod_uid'] = f'00000000-0000-0000-0000-{number:012d}'
+        current['kubernetes'][role]['container_id'] = f'containerd://{number:064x}'
+    _write(fresh, current)
+    assert tool.revalidate_candidate(staged, envs[1], pointer) == {
+        'supply_boot': sha256_hex(canonical_json(current))}
+    staged['check_config'].clear()
+    with pytest.raises(ValueError, match='METADATA_STAGED_EXECUTION_SCOPE_INVALID'):
+        tool.revalidate_candidate(staged, envs[1], pointer)
+
+
+def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_path, sources, monkeypatch):
+    from guard.core.run import run_plan
+
+    pack, sides, policy_path = sources
+    policy = tool.Policy.model_validate_json(policy_path.read_bytes())
+    envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    option = 'installed_plugin_inventory_only'
+    base = {'executors': {'supply_boot': 'kubernetes'}, 'update': {'allowed_checks': ['SUP-10']},
+            'sides': {side: {'supply_boot': {'target': str(paths['target'])}} for side, paths in sides.items()}}
+    cfg = {**base, 'check_config': {'SUP-10': {option: True}}}
+    half = deepcopy(base)
+    half['sides']['baseline']['check_config'] = cfg['check_config']
+    wrong_check = {**base, 'check_config': {'SUP-11': {option: True}}}
+    false_marker = {**base, 'check_config': {'SUP-10': {option: False}}}
+    sibling = {**cfg, 'update': {'allowed_checks': ['SUP-10', 'SUP-11']}}
+    mixed = {**cfg, 'run_binding': {'SUP-10': {}}}
+    prepared = {**cfg, 'supply_boot': {'normal': {'prepared': '/fixture/unused'}}}
+    wrapped = {**cfg, 'record_attestation': {'mode': 'example'}}
+
+    def no_preparation(*_args, **_kwargs):
+        raise AssertionError('Invalid installed inventory scope reached target preparation')
+
+    monkeypatch.setattr(application, 'update_inputs', no_preparation)
+    store = Store(tmp_path / 'store')
+    for invalid in (half, wrong_check, false_marker, sibling, mixed, prepared, wrapped):
+        with pytest.raises(ValueError, match='INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID'):
+            application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
+    assert not (tmp_path / 'run').exists()
+    with pytest.raises(ValueError, match='INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID'):
+        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
+
+
 def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())

@@ -23,7 +23,8 @@ from guard.adapters.base import EngineAdapter
 from guard.adapters.fake import FakeAdapter
 from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
-from guard.configuration import (NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
+from guard.configuration import (INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
+                                 NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION)
 
@@ -42,6 +43,7 @@ from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
 from .kubernetes_input_validation import KubernetesInputValidationExecutor
+from .kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
 from .kubernetes_normal_request_latency import KubernetesNormalRequestLatencyExecutor
 from .kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
 from .kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
@@ -231,6 +233,13 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
             if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
                 raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
             return KubernetesNormalTokenInputExecutor(
+                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
+    if executor == "supply_boot":
+        settings = cfg.get(executor)
+        if type(settings) is dict and INSTALLED_PLUGIN_INVENTORY_OPTION in settings:
+            if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
+                raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
+            return KubernetesInstalledPluginInventoryExecutor(
                 settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if impl == "kubernetes":
         factory = activated(factory) if executor in ACTIVATED else attested(factory)

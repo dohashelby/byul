@@ -12,6 +12,8 @@ def merge_config(base, override):
 CHECK_CONFIG = "check_config"
 UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
 GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
+INSTALLED_PLUGIN_INVENTORY_OPTION = "installed_plugin_inventory_only"
+INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR = "INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID"
 NORMAL_STREAM_OPTION = "normal_stream_only"
 NORMAL_SAMPLING_OPTION = "normal_sampling_only"
 NORMAL_TOKEN_INPUT_OPTION = "normal_token_input_only"
@@ -25,6 +27,7 @@ _NORMAL_ONLY_CASES = {
     "OBS-02": ("observation_state", NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR),
     "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
     "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
+    "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
 }
 RECORD_SNAPSHOT_OPTIONS = {
     "OBS-01": "record_snapshot_only",
@@ -122,6 +125,10 @@ def normal_request_latency_requested(raw):
     return next(_option_occurrences(raw, NORMAL_REQUEST_LATENCY_OPTION), None) is not None
 
 
+def installed_plugin_inventory_requested(raw):
+    return next(_option_occurrences(raw, INSTALLED_PLUGIN_INVENTORY_OPTION), None) is not None
+
+
 def normal_serving_readiness_requested(raw):
     """Detect a serving-readiness opt-in before validating its placement or value."""
     return next(_option_occurrences(raw, NORMAL_SERVING_READINESS_OPTION), None) is not None
@@ -144,6 +151,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         _validate_normal_option_placement(raw, NORMAL_REQUEST_LATENCY_OPTION, {
             (CHECK_CONFIG, "LIF-03", NORMAL_REQUEST_LATENCY_OPTION),
         }, NORMAL_REQUEST_LATENCY_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, INSTALLED_PLUGIN_INVENTORY_OPTION, {
+            (CHECK_CONFIG, "SUP-10", INSTALLED_PLUGIN_INVENTORY_OPTION),
+        }, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
         if type(overlays) is dict and any(
                 check_id != "REQ-09" and type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section
                 for check_id, section in overlays.items()):
@@ -182,9 +192,11 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or raw.get("executors", {}).get(executor) != "kubernetes"
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
-                    or (check_id in {"LIF-03", "OBS-02", "REQ-09", "REQ-10"} and raw.get("record_attestation"))
-                    or (check_id in {"LIF-03", "OBS-02"} and "run_binding" in raw
-                        and (type(bindings) is not dict or check_id in bindings))):
+                    or (check_id in {"LIF-03", "OBS-02", "REQ-09", "REQ-10", "SUP-10"} and raw.get("record_attestation"))
+                    or (check_id in {"LIF-03", "OBS-02", "SUP-10"} and "run_binding" in raw
+                        and (type(bindings) is not dict or check_id in bindings))
+                    or (check_id == "SUP-10"
+                        and set(settings) - {option, "target", "kubectl_binary", "max_duration_seconds"})):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
             if executor == "stream_buffer":

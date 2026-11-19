@@ -16,6 +16,7 @@ from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
 from guard.executors import passive_api_hop, registry, run_binding, template_supply_approval as template_supply
 from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snapshot_owner
+from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
 from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
@@ -34,7 +35,8 @@ from tools.mvp_a_input_preflight import _pairs, _read
 from tools.mvp_versions import versions
 
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
-                   'SUP-03': 'template_validation', 'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
+                   'SUP-03': 'template_validation', 'SUP-10': 'supply_boot',
+                   'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
                    'OBS-04': 'boundary_egress', 'PLT-06': 'unix_ipc',
                    'OBS-01': 'required_event_record', 'OBS-02': 'observation_state',
                    'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
@@ -43,7 +45,7 @@ CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', '
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
                if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-03', 'LIF-04',
-                              'REQ-09', 'REQ-10', passive_api_hop.CHECK})
+                              'REQ-09', 'REQ-10', 'SUP-10', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
@@ -182,6 +184,11 @@ def revalidate_candidate(config, env, preliminary_ref):
         raise ValueError('METADATA_PRELIMINARY_TARGET_CHANGED')
     current, _ = _source(current_path)
     old, new = _transport(preliminary, env), _transport(current, env)
+    if 'SUP-10' in (allowed or ()):
+        try:
+            installed_plugin_inventory_transport(current, env, duration=1, runner=_detached_runner)
+        except (KubernetesBindingError, ValueError):
+            raise ValueError('INSTALLED_PLUGIN_INVENTORY_TARGET_UNAVAILABLE') from None
     if 'LIF-03' in (allowed or ()):
         try:
             normal_request_latency_transport(current, env, duration=1, runner=_detached_runner)
@@ -228,6 +235,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return None
     try:
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
+        if check.id == 'SUP-10':
+            config[check.executor]['target'] = target_path
+            try:
+                installed_plugin_inventory_transport(target, env, duration=1, runner=_detached_runner)
+            except (KubernetesBindingError, ValueError):
+                return 'INSTALLED_PLUGIN_INVENTORY_TARGET_UNAVAILABLE'
         if check.id == 'LIF-03':
             config[check.executor]['target'] = target_path
             try:
@@ -304,7 +317,7 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
 def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None, passive_plt08=False,
              protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None,
              gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
-             normal_serving_readiness=False, normal_request_latency=False):
+             normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -346,6 +359,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 'LIF-03': normal_request_latency, 'LIF-04': normal_stream_buffer,
                 'REQ-10': normal_sampling, 'REQ-09': normal_token_input,
                 'OBS-02': normal_serving_readiness,
+                'SUP-10': installed_plugin_inventory,
                 **dict.fromkeys(records, True)}
     check_ids = (*CHECKS, *(cid for cid, requested in optional.items() if requested))
     for check_id in check_ids:
@@ -393,7 +407,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
     bounded_metadata_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
-    shared_checks = ('SUP-03', 'OBS-04', 'PLT-06', 'LIF-03', 'LIF-04', 'REQ-09',
+    shared_checks = ('SUP-03', 'SUP-10', 'OBS-04', 'PLT-06', 'LIF-03', 'LIF-04', 'REQ-09',
                      *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
@@ -443,6 +457,8 @@ def main():
                         help='Observe an ordinary REQ-09 completion using the bound tokenizer result')
     parser.add_argument('--normal-serving-readiness', action='store_true',
                         help='Observe the owned Pod readiness and ordinary serving correspondence for OBS-02')
+    parser.add_argument('--installed-plugin-inventory', action='store_true',
+                        help='Read installed plugin entry-point metadata in the owned SUP-10 container')
     parser.add_argument('--copy-record-inputs', type=Path,
                         help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
@@ -461,7 +477,8 @@ def main():
                                         normal_stream_buffer=args.normal_stream_buffer, normal_sampling=args.normal_sampling,
                                         normal_token_input=args.normal_token_input,
                                         normal_serving_readiness=args.normal_serving_readiness,
-                                        normal_request_latency=args.normal_request_latency)
+                                        normal_request_latency=args.normal_request_latency,
+                                        installed_plugin_inventory=args.installed_plugin_inventory)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

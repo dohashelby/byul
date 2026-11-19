@@ -930,6 +930,11 @@
       "manifest_sha256": "d4445fbb9b2c8fb98499a28153286dec8596fe3d4b2e25d2ce98cd20d2247f73",
       "reviewed_by": "Codex / SUP-05 preparation executor ownership / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T09:04:06+00:00"
+    },
+    {
+      "manifest_sha256": "823f2961f2844a41b11634ac5a65c06a77c2e881778ad29cb279418dda2fa620",
+      "reviewed_by": "Codex / external OBS-09 log support diagnosis / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T09:17:53+00:00"
     }
   ]
 }

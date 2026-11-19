@@ -179,13 +179,18 @@ def test_external_target_launch_metadata_is_unconfirmed_without_reading_it(pack)
     assert all("runtime verification" in " ".join(row["reasons"]) for row in rows)
 
 
-@pytest.mark.parametrize(("version", "expected"), [("0.30.0", "UNSUPPORTED"), ("0.31.0", "UNKNOWN")])
-def test_external_kubernetes_obs09_uses_its_own_source_contract(pack, monkeypatch, tmp_path, version, expected):
+@pytest.mark.parametrize(("version", "image_prefix", "expected"), [
+    pytest.param("0.30.0", "vllm/", "UNSUPPORTED", id="baseline-pin"),
+    pytest.param("0.31.0", "vllm/", "UNKNOWN", id="reviewed-candidate-pin"),
+    pytest.param("0.31.0", "docker.io/vllm/", "UNSUPPORTED", id="deployed-candidate-pin"),
+])
+def test_external_kubernetes_obs09_uses_its_own_source_contract(
+        pack, monkeypatch, tmp_path, version, image_prefix, expected):
     from guard import readiness_support
     from guard.adapters.vllm_release_profiles import release_profile
 
     env, pol, cfg = declared_inputs(pack)
-    image = next(pin for pin in release_profile(version)["images"] if pin.startswith("vllm/"))
+    image = next(pin for pin in release_profile(version)["images"] if pin.startswith(image_prefix))
     engine = env.engine.model_copy(update={"version": version, "image_digest": image})
     env = env.model_copy(update={"engine": engine}).seal()
     cfg["executors"] = {"log_integrity": "kubernetes", "request_binding": "kubernetes"}

@@ -1065,6 +1065,11 @@
       "manifest_sha256": "90fbccce4ff83754e8e25a8adf07105858eddfabfd71ee54d6c3565e877fe383",
       "reviewed_by": "Codex / SUP-06 observed worker shard assignments and index gaps / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T23:19:15+00:00"
+    },
+    {
+      "manifest_sha256": "d0566d53faccd0df29aa12a7de2769e8f43a816408bd828ae5d2db1c5dd07bd4",
+      "reviewed_by": "Codex / SUP-06 paired passive sources and bounded PLT-02/06 receipt retention / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T23:51:34+00:00"
     }
   ]
 }

@@ -1,4 +1,5 @@
 """Pinned file-read producers and lifecycle capture with an EXAMPLE Kubernetes transport."""
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import timedelta
 import json
@@ -171,31 +172,36 @@ def test_retains_exact_source_read_and_reference_without_challenge(external, mon
         assert MODEL_BYTES not in retained and b"approved-model" not in retained
 
 
-@pytest.mark.parametrize("failure", ["noncanonical", "existing-file"])
+@pytest.mark.parametrize("failure", ["existing-file", "short-write"])
 def test_missing_exact_source_artifact_preserves_verified_read(external, monkeypatch, failure):
     case = normal_case(external / "case", monkeypatch)
     out = external / "out"
     name = "supply_boot_normal_source_000.jsonl"
-    if failure == "noncanonical":
-        # Only the terminal line has extra whitespace. Its contents and hash-chain
-        # predecessor still validate, but the canonical serialization differs.
-        original = case.raw[:-1] + b" \n"
-        case.world.group.raw_by_pid[CONTEXT["pid"]] = original
-        expected = "SUPPLY_BOOT_NORMAL_SOURCE_BYTES_UNVERIFIED"
-    else:
+    if failure == "existing-file":
         out.mkdir()
         (out / name).write_bytes(b"Existing private output")
-        original = case.raw
-        expected = "SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_UNAVAILABLE"
+    else:
+        original_open = Path.open
+
+        @contextmanager
+        def short_write(path, *args, **kwargs):
+            with original_open(path, *args, **kwargs) as stream:
+                if path.parent.name.startswith(".sup05-source-") and path.name == name:
+                    yield SimpleNamespace(write=lambda data: stream.write(data[:1]))
+                else:
+                    yield stream
+
+        monkeypatch.setattr(Path, "open", short_write)
 
     draft = run(case, out)
+    expected = "SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_UNAVAILABLE"
     assert draft.status == ExecStatus.ABORTED
     assert draft.abort_reason == expected
     assert expected in draft.observations["supply_boot_missing"].value
     native, = draft.observations["supply_boot_native_consumption"].value
     row, = native["rows"]
     assert row["matches_approved"] is True
-    assert row["source_binding"]["recording_sha256"] == sha256_hex(original)
+    assert row["source_binding"]["recording_sha256"] == sha256_hex(case.raw)
     assert "recording_artifact" not in row["source_binding"]
     summary, = draft.artifacts
     assert expected in json.loads(summary.path.read_bytes())["missing"]
@@ -203,7 +209,7 @@ def test_missing_exact_source_artifact_preserves_verified_read(external, monkeyp
     if failure == "existing-file":
         assert (out / name).read_bytes() == b"Existing private output"
     else:
-        assert not (out / name).exists()
+        assert {path.name for path in out.iterdir()} == {"supply_boot_summary.json"}
 
 
 @pytest.mark.parametrize("mode", ["unsealed", "late-file-owner", "writable-model", "nested-shadow", "cleanup"])

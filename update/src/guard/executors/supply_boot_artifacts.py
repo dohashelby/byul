@@ -1,6 +1,8 @@
 """supply_boot 전체 프로파일의 증거 저장. 수집·판정·실행기는 추가하지 않는다."""
 from pathlib import Path
 import json
+import os
+from tempfile import TemporaryDirectory
 
 from guard.adapters.vllm_file_read_sensor import MAX_BYTES as FILE_READ_MAX_BYTES, MAX_ROWS as FILE_READ_MAX_ROWS
 from guard.models import sha256_hex
@@ -65,9 +67,15 @@ def persist_normal_file_read_sources(workdir, captured, selected, collector):
         path = workdir / name
         try:
             workdir.mkdir(parents=True, exist_ok=True)
-            with path.open("xb") as stream:
-                if stream.write(raw) != len(raw):
-                    raise OSError("SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_SHORT_WRITE")
+            with TemporaryDirectory(dir=workdir, prefix=".sup05-source-") as staging:
+                temporary = Path(staging) / name
+                with temporary.open("xb") as stream:
+                    if stream.write(raw) != len(raw):
+                        raise OSError("SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_SHORT_WRITE")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                # Publish the completed file atomically without replacing another file.
+                os.link(temporary, path)
         except OSError:
             errors.append("SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_UNAVAILABLE")
             continue

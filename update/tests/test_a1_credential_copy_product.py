@@ -320,3 +320,47 @@ def test_copy_snapshot_opt_in_rejects_unbound_or_sibling_configuration(tmp_path,
     with pytest.raises(ValueError,match='COPY_'):
         executor.run(check,environment,values,VllmAdapter(),tmp_path/'snapshot')
     assert not world.calls and not world.reads and not world.sent
+
+
+@pytest.mark.parametrize('case,error', [
+    ('ordinary', None),
+    ('foreign-model-revision', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('over-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('unbound-session', 'COPY_POLICY_INVALID'),
+    ('inventory-hash', 'COPY_CONFIGURATION_INVALID'),
+    ('target-pin', 'COPY_CONFIGURATION_INVALID'),
+    ('legacy-stage', 'COPY_RECORD_SNAPSHOT_CONFIGURATION_INVALID'),
+])
+def test_copy_snapshot_preparation_checks_bound_declarations_without_collecting(tmp_path, monkeypatch, case, error):
+    from guard.models.checkdef import PolicyParam
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('PLT-12 preparation must not contact the target or read the copy records')
+
+    monkeypatch.setattr(http.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(http.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(copy_executor.RequiredEventReader, 'read_file', forbidden)
+    environment, world, values, pack, cfg, digest = snapshot_inputs(tmp_path)
+    check = pack.checks['PLT-12']
+    if case == 'foreign-model-revision':
+        world.target['model_mapping']['revision'] = 'EXAMPLE-other-revision'
+        raw = canonical_json(world.target)
+        Path(cfg['target']).write_bytes(raw)
+        digest = values['copy_target_sha256'] = sha256_hex(raw)
+    elif case == 'over-budget':
+        cfg['max_duration_seconds'] = 301
+    elif case == 'unbound-session':
+        values['copy_record_session'] = 'invalid'
+    elif case == 'inventory-hash':
+        values['copy_inventory_sha256'] = 'f' * 64
+    elif case == 'legacy-stage':
+        check = check.model_copy(update={'policy_params': [
+            *check.policy_params, PolicyParam(key='copy_record_session', type='str')]})
+
+    executor = KubernetesRequiredEventExecutor(
+        cfg, runner=forbidden, expected_target_sha256='0' * 64 if case == 'target-pin' else None)
+    if error is None:
+        executor.prepared_copy_record_snapshot(check, environment, values, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_copy_record_snapshot(check, environment, values, expected_target_sha256=digest)

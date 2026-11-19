@@ -61,6 +61,12 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         return KubernetesGatewayRecordSnapshotExecutor(settings, runner=self.runner,
             expected_target_sha256=self.expected_target)
 
+    def prepared_copy_record_snapshot(self, check, env, values, *, expected_target_sha256=None):
+        from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
+        executor = KubernetesCredentialCopyRecordExecutor(self.cfg, runner=self.runner, environ=self._environ,
+                                                          expected_target_sha256=self.expected_target)
+        executor.prepared_copy_record_snapshot(check, env, values, expected_target_sha256=expected_target_sha256)
+
     def validate_policy(self,check,values):
         if GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg:
             return self._gateway_snapshot().validate_policy(check,values)

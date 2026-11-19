@@ -132,7 +132,8 @@ def snapshot_record(raw, *, source, values, run_id):
     """Select one preidentified, successful original final row from an owned file."""
     if not 0 < len(raw) <= MAX_BYTES or not raw.endswith(b"\n"):
         raise ValueError("GATEWAY_AUDIT_FILE_INCOMPLETE")
-    rows = final_records(raw.decode("utf-8").splitlines(), run_id=run_id, session=values["observation_session"])
+    # The runtime store frames UTF-8 JSONL with LF. Unicode line separators can occur inside a JSON string.
+    rows = final_records(raw.decode("utf-8").split("\n"), run_id=run_id, session=values["observation_session"])
     matches = [row for row in rows if type(row.get("request_id")) is str
                and sha256_hex(row["request_id"].encode()) == source["request_sha256"]]
     if len(matches) != 1:

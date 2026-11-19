@@ -835,6 +835,11 @@
       "manifest_sha256": "fc67cf9c81a6f4c65003c529327f199f73efafca18a826b3adbf884accc4cdf1",
       "reviewed_by": "Codex / paired normal LIF03 timing and LIF04 co-execution / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T23:59:10+00:00"
+    },
+    {
+      "manifest_sha256": "d099d1c016dce0f6c1e1f1c5745e27e763ef1d1f75839701adcd317fe6bfe3a9",
+      "reviewed_by": "Codex / paired owned SUP10 installed plugin metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T00:28:22+00:00"
     }
   ]
 }

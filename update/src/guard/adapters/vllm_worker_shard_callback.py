@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 
 from . import vllm_cache_callback as cache
 
@@ -70,21 +71,33 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
         if len(result) == 3:
             return prepared
         index = result[3]
-        required, index_present = None, False
+        if index is None or type(index) is str and index == '':
+            return {**prepared, 'index_present': False}
+        if type(index) is not str or os.path.isabs(index) or '..' in index.split(os.sep):
+            self.gaps.add('WORKER_SHARD_INDEX_UNREADABLE')
+            return prepared
+        path = os.path.join(str(folder), index)
         try:
-            path = os.path.join(str(folder), str(index)) if index else None
-            if path and os.path.isfile(path):
-                index_present = True
-                with open(path, 'rb') as stream:
-                    raw = stream.read(1 << 24)
-                mapping = json.loads(raw).get('weight_map')
-                if type(mapping) is dict and len(set(mapping.values())) <= MAX_FILES:
-                    required = sorted({self._name(v) for v in mapping.values() if type(v) is str})
-                else:
-                    self.gaps.add('WORKER_SHARD_INDEX_UNREADABLE')
+            identity = os.lstat(path)
+        except FileNotFoundError:
+            return {**prepared, 'index_present': False}
+        except (OSError, ValueError):
+            self.gaps.add('WORKER_SHARD_INDEX_UNREADABLE')
+            return prepared
+        prepared['index_present'] = True
+        try:
+            if not stat.S_ISREG(identity.st_mode):
+                raise ValueError
+            with open(path, 'rb') as stream:
+                raw = stream.read(1 << 24)
+            mapping = json.loads(raw).get('weight_map')
+            if (type(mapping) is not dict or not mapping or any(type(v) is not str or not v for v in mapping.values())
+                    or len(set(mapping.values())) > MAX_FILES):
+                raise ValueError
+            prepared['required'] = sorted({self._name(v) for v in mapping.values()})
         except Exception:
             self.gaps.add('WORKER_SHARD_INDEX_UNREADABLE')
-        return {**prepared, 'index_present': index_present, 'required': required}
+        return prepared
 
     def _snapshot(self, point, args, kwargs, result=None, returned=False):
         receiver = args[0] if args else None

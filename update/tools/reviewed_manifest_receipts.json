@@ -965,6 +965,11 @@
       "manifest_sha256": "a50c8ac6237692359d49860ea634ecec11d19f21066ae5200c327bce4ef70619",
       "reviewed_by": "Codex / SUP-15 prepared roles, OBS-01 runtime framing and LIF-06 generation-bound evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-19T11:45:58+00:00"
+    },
+    {
+      "manifest_sha256": "cd79aa181f7b15890a73b2345963bdcc326287d761c8d58bee2b4949bf0509db",
+      "reviewed_by": "Codex / LIF-07/LIF-09 input readiness and OBS-03 bounded diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T11:58:22+00:00"
     }
   ]
 }

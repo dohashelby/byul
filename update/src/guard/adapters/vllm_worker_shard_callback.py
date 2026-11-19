@@ -8,8 +8,8 @@ vLLM 0.31.0의 두 모듈을 원 소스 해시로 고정해 감싼다.
 `load_weights`·`WorkerProc.__init__`은 `@instrument` 추적 장식자로 감싸여 원 코드 자격을 얻지 못하므로 감싸지 않는다(k3d 실측).
 모든 행에 PID·시작 ticks·TP rank(`parallel_state`, 읽지 못하면 None)를 남겨 바인딩에 쓴다.
 
-파일 이름은 세션 secret으로 keyed 요약하고 원 경로·tensor·payload는 남기지 않는다. 필수 shard는 index 파일의 weight_map 값,
-index가 없으면 배정된 파일 자체다. 이 관측은 파일 배정·적재 함수의 완료이며 tensor payload의 실제 GPU 적재 증명이 아니다.
+파일 이름은 세션 secret으로 keyed 요약하고 원 경로·tensor·payload는 남기지 않는다. index 값을 반환한 경우 기존 index 관측을
+남긴다. 세 요소 반환은 index 존재 여부와 필수 shard를 확인하지 않는다. tensor payload의 실제 GPU 적재는 별도 증거가 필요하다.
 """
 from __future__ import annotations
 
@@ -54,10 +54,9 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
         return self.fingerprint('shard:' + os.path.basename(str(path)))
 
     def _prepared(self, result):
-        try:
-            folder, files, safetensors, index = result
-        except Exception:
+        if type(result) is not tuple or len(result) not in (3, 4):
             self.gaps.add('WORKER_SHARD_PREPARE_SHAPE_UNAVAILABLE'); return {}
+        folder, files, safetensors = result[:3]
         if type(files) is not list or len(files) > MAX_FILES:
             self.gaps.add('WORKER_SHARD_FILE_SET_UNAVAILABLE'); return {}
         sizes = []
@@ -66,6 +65,11 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
                 sizes.append(os.stat(path).st_size)
             except OSError:
                 sizes.append(None)
+        prepared = {'files': [self._name(p) for p in files], 'file_bytes': sizes, 'safetensors': safetensors is True,
+                    'index_present': None, 'required': None, 'folder_sha256': self.fingerprint('folder:' + str(folder))}
+        if len(result) == 3:
+            return prepared
+        index = result[3]
         required, index_present = None, False
         try:
             path = os.path.join(str(folder), str(index)) if index else None
@@ -80,8 +84,7 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
                     self.gaps.add('WORKER_SHARD_INDEX_UNREADABLE')
         except Exception:
             self.gaps.add('WORKER_SHARD_INDEX_UNREADABLE')
-        return {'files': [self._name(p) for p in files], 'file_bytes': sizes, 'safetensors': safetensors is True,
-                'index_present': index_present, 'required': required, 'folder_sha256': self.fingerprint('folder:' + str(folder))}
+        return {**prepared, 'index_present': index_present, 'required': required}
 
     def _snapshot(self, point, args, kwargs, result=None, returned=False):
         receiver = args[0] if args else None

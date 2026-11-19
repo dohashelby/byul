@@ -124,6 +124,39 @@ def _run(tmp_path, version, fault=None):
 
 
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("settings,accepted", [
+    ({"max_duration_seconds": 30.5, "kubectl_binary": "example-kubectl"}, True),
+    ({"max_duration_seconds": 0}, False),
+    ({"kubectl_binary": " "}, False),
+])
+def test_prepares_saved_compile_cache_target_without_collecting(tmp_path, version, settings, accepted):
+    from tools.mvp_versions import versions
+
+    env, target, path, startup = startup_inputs(tmp_path, version)
+    image = next(item["image"] for item in versions().values() if item["version"] == version)
+    env = env.model_copy(update={"engine": env.engine.model_copy(update={"image_digest": image})}).seal()
+    target["environment_ref"] = env.ref().model_dump(mode="json")
+    target["engine"]["image_digest"] = image
+    target["kubernetes"]["engine"].update(image=image, image_id=image)
+    target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=startup.runner)
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    pin = sha256_hex(raw)
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["SUP-07"]
+
+    def no_collection(*args, **kwargs):
+        pytest.fail("SUP-07 preparation must not collect from the target")
+
+    executor = compile_cache.KubernetesNormalCompileCacheExecutor(
+        {"normal_compile_cache_only": True, "target": str(path), **settings}, runner=no_collection)
+    if accepted:
+        executor.prepared_normal_compile_cache(check, env, {}, expected_target_sha256=pin)
+        pin = sha256_hex(b"different-owned-target")
+    with pytest.raises(ValueError, match="^SUP07_COMPILE_TARGET_OR_SOURCE_UNVERIFIED$"):
+        executor.prepared_normal_compile_cache(check, env, {}, expected_target_sha256=pin)
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
 def test_normal_compile_with_owned_boot_cache_metadata_is_partial(tmp_path, version):
     draft, artifact, check, world = _run(tmp_path, version)
     assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE

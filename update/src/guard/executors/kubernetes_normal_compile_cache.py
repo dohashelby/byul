@@ -234,25 +234,43 @@ class KubernetesNormalCompileCacheExecutor:
                 or type(self.cfg.get("target")) is not str or not self.cfg["target"] or type(values) is not dict or values):
             raise ValueError("SUP07_COMPILE_SCOPE_INVALID")
 
+    def _target_inputs(self, target, env, adapter, *, duration, expected_target_sha256):
+        target_sha = sha256_hex(canonical_json(target))
+        if target_sha != expected_target_sha256 or self._expected_target_sha256 not in (None, target_sha):
+            raise ValueError
+        startup = _source_profile(adapter, env)
+        compile_profile = _compile_profile(adapter, env)
+        binary = self.cfg.get("kubectl_binary", "kubectl")
+        logs = normal_compile_cache_transport(target, env, duration=duration, binary=binary, runner=self.runner)
+        source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
+                                       profile=ENGINE_CALLBACK_PROFILE, clock=logs.clock)
+        metadata_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
+                                         profile=REQUEST_BINDING_PROFILE, clock=logs.clock)
+        source_reader.deadline = metadata_reader.deadline = logs.deadline
+        return target_sha, startup, compile_profile, logs, source_reader, metadata_reader
+
+    def prepared_normal_compile_cache(self, check, env, values, *, expected_target_sha256):
+        """Validate the saved boot selector and configured transport without collecting."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            adapter = get_provider(env.engine.name).adapter()
+            self._target_inputs(target, env, adapter, duration=self.cfg.get("max_duration_seconds", 30),
+                                expected_target_sha256=expected_target_sha256)
+        except (AttributeError, KeyError, OSError, OverflowError, TypeError, ValueError, re.error, KubernetesBindingError):
+            raise ValueError("SUP07_COMPILE_TARGET_OR_SOURCE_UNVERIFIED") from None
+
     def run(self, check, env, values, adapter, workdir):
         self.validate_policy(check, values)
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 30)
-        binary = self.cfg.get("kubectl_binary", "kubectl")
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)
-            target_sha = sha256_hex(canonical_json(target))
-            if target_sha != self._expected_target_sha256:
-                raise ValueError
-            startup = _source_profile(adapter, env)
-            compile_profile = _compile_profile(adapter, env)
-            logs = normal_compile_cache_transport(target, env, duration=duration, binary=binary, runner=self.runner)
-            source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
-                                           profile=ENGINE_CALLBACK_PROFILE, clock=logs.clock)
-            metadata_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
-                                             profile=REQUEST_BINDING_PROFILE, clock=logs.clock)
-            source_reader.deadline = metadata_reader.deadline = logs.deadline
+            target_sha, startup, compile_profile, logs, source_reader, metadata_reader = self._target_inputs(
+                target, env, adapter, duration=duration, expected_target_sha256=self._expected_target_sha256)
         except (AttributeError, KeyError, OSError, TypeError, ValueError, re.error, KubernetesBindingError):
             raise ValueError("SUP07_COMPILE_TARGET_OR_SOURCE_UNVERIFIED") from None
 

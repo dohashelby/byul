@@ -468,6 +468,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if normal_request_latency and prebound_kubernetes and check.executor == 'stream_buffer':
             executor.prepared_normal_request_latency(check, env, effective,
                                                      expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if installed_plugin_inventory and prebound_kubernetes and check.executor == 'supply_boot':
+            executor.prepared_installed_plugin_inventory(check, env, effective,
+                                                         expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if normal_safetensors_reader and prebound_kubernetes and check.executor == 'supply_boot':
             executor.prepared_normal_reader(check, env, effective,
                                             expected_target_sha256=sha256_hex(canonical_json(target_data)))

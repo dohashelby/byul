@@ -598,6 +598,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry, run_binding
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
+    from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
     from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
     from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
     from guard.executors.kubernetes_normal_graph_capture import KubernetesNormalGraphCaptureExecutor
@@ -777,6 +778,10 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                                 and isinstance(executor, KubernetesNormalRequestLatencyExecutor)):
                             executor.prepared_normal_request_latency(check_def, selected_env, values,
                                                                      expected_target_sha256=expected_target)
+                        if (prebound and item.check_id == "SUP-10"
+                                and isinstance(executor, KubernetesInstalledPluginInventoryExecutor)):
+                            executor.prepared_installed_plugin_inventory(check_def, selected_env, values,
+                                                                         expected_target_sha256=expected_target)
                         if (prebound and item.check_id == "SUP-12"
                                 and isinstance(executor, KubernetesNormalSafetensorsReaderExecutor)):
                             executor.prepared_normal_reader(check_def, selected_env, values,

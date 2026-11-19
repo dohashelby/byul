@@ -496,6 +496,8 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
     ('LIF-04', 'stream_buffer', None, None),
     ('LIF-04', 'stream_buffer', 'duration', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('LIF-04', 'stream_buffer', 'missing-scope', 'NORMAL_STREAM_EXECUTION_SCOPE_INVALID'),
+    ('SUP-10', 'supply_boot', None, None),
+    ('SUP-10', 'supply_boot', 'duration', 'SUP10_INVENTORY_TARGET_UNVERIFIED'),
 ])
 def test_prebound_owned_preflights_share_the_declared_target_limits(
         tmp_path, monkeypatch, check_id, executor_name, damage, reason):
@@ -519,6 +521,7 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
     monkeypatch.setattr(subprocess, 'Popen', forbidden)
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
     policy_values = {'OBS-04': LOCAL_VALUES, 'PLT-06': WORKER_VALUES,
+                     'SUP-10': {},
                      'PLT-02': {'protected_unix_paths': ['/run/fixture/engine.sock'], 'allowed_ipc_uids': ['1000']}}
     if check_id == 'REQ-09':
         policy_values[check_id] = input_values()

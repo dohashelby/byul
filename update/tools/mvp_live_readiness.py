@@ -217,7 +217,14 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         raise ValueError('MVP_EXECUTOR_UNAVAILABLE')
     cfg = config.get(check.executor, {})
     gateway_snapshot = check.id == 'OBS-01' and cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True
-    if gateway_snapshot:
+    external_kubernetes = implementation == 'kubernetes' and requested_update.get('mode', 'external') == 'external'
+    record_access = (external_kubernetes and check.id == 'OBS-06' and check.executor == 'record_access'
+                     and run_binding.stages_for(check) == (1, 2, 3, 4))
+    copy_snapshot = (external_kubernetes and check.id == 'PLT-12' and check.executor == 'required_event_record'
+                     and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['PLT-12']) is True
+                     and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
+                     and run_binding.stages_for(check) == (1, 2, 3, 4))
+    if gateway_snapshot or copy_snapshot:
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
     normal_file_reads = check.id == 'SUP-05' and cfg.get(NORMAL_FILE_READS_OPTION) is True
     supply_record_binding = (implementation == 'kubernetes' and run_binding.is_supply_record_binding(check)
@@ -275,6 +282,16 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if gateway_snapshot:
             _scoped_target_sha256(raw_target, env, gateway_snapshot=True, scoped_check=check.id)
         bound_files.append((target, raw_target, identity))
+    if record_access or copy_snapshot:
+        path = cfg['subjects' if record_access else 'copy_inventory']
+        raw, identity = _read(path)
+        bound_files.append((path, raw, identity))
+        if record_access:
+            declared_key = 'record_subject_plan_sha256'
+            declared_digest = sha256_hex(canonical_json(strict_json(raw, limit=262144)))
+        else:
+            declared_key = 'copy_inventory_sha256'
+            declared_digest = sha256_hex(raw)
     if normal_file_reads:
         binding_options['expected_target_sha256'] = _scoped_target_sha256(raw_target, env, scoped_check=check.id)
         normal_hashes = {}
@@ -392,6 +409,14 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
         if collection_status:
             executor.prepared_collection_status(check, env, effective,
                                                 expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if record_access or copy_snapshot:
+            if effective[declared_key] != declared_digest:
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            expected = sha256_hex(canonical_json(target_data))
+            if record_access:
+                executor.prepared_record_access(check, env, effective, expected_target_sha256=expected)
+            else:
+                executor.prepared_copy_record_snapshot(check, env, effective, expected_target_sha256=expected)
         if local_metadata:
             expected = sha256_hex(canonical_json(target_data))
             if check.id == 'OBS-04':

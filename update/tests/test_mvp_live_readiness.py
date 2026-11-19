@@ -10,6 +10,7 @@ import pytest
 
 from guard.models import load_pack
 from tools import mvp_live_readiness as tool
+from tests.test_kubernetes_record_access import context as record_access_context  # noqa: F401
 from tests.test_lifecycle_capture import external  # noqa: F401
 from tests.test_mvp_a_input_preflight import sources  # noqa: F401
 
@@ -537,3 +538,118 @@ def test_scoped_local_metadata_preflights_share_the_declared_target_limits(
             assert row['blocking_codes'] == [reason]
         else:
             assert row['file_binding_valid'] and 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']
+
+
+@pytest.mark.parametrize(('check_id', 'damage', 'reason'), [
+    ('OBS-06', None, None),
+    ('OBS-06', 'policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
+    ('PLT-12', None, None),
+    ('PLT-12', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('PLT-12', 'inventory_changed', 'MVP_INPUT_FILE_CHANGED'),
+])
+def test_record_declarations_match_runtime_input_contracts(
+        tmp_path, monkeypatch, record_access_context, check_id, damage, reason):
+    from guard import application
+    from guard.executors import credential_copy_contract as copy
+    from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
+    from guard.models import canonical_json, sha256_hex
+    from tests.builders import environment, policy
+    from tests.test_a1_credential_copy_contract import example as copy_example
+    from tests.test_kubernetes_request_binding import target as http_target
+    from tools.j02_run_config import write_config
+    from tools.mvp_versions import versions
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Record declaration checks must not contact the target')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    check = pack.checks[check_id]
+    record_access = check_id == 'OBS-06'
+    values = {}
+    if not record_access:
+        inventory, copy_values, _, _ = copy_example()
+        values = {copy.DECISION_KEY: copy.treatments(inventory),
+                  'copy_max_record_delay_ms': copy_values['copy_max_record_delay_ms']}
+        inventory['policy_sha256'] = sha256_hex(canonical_json(values))
+    pol = policy(pack.ref(), scope={'include': [check_id]}, values={check_id: values})
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {check.executor: 'kubernetes'},
+           'update': {'allowed_checks': [check_id]}, 'sides': {}}
+    envs, env_paths = [], {}
+    for number, (side, row) in enumerate(versions().items(), start=1):
+        env = environment(id=f'ENV-RECORD-DECLARATION-{side.upper()}', model={'id': 'EXAMPLE', 'revision': 'r1'},
+            engine={'name': row['engine'], 'version': row['version'], 'image_digest': row['image']},
+            runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE', 'driver': 'EXAMPLE'})
+        ref = env.ref().model_dump(mode='json')
+        target_path = tmp_path / f'{side}-target.json'
+        settings = {'target': str(target_path)}
+        if record_access:
+            target = deepcopy(record_access_context.target)
+            target['environment_ref'] = ref
+            target['kubernetes']['engine'].update(image=row['image'], image_id=row['image'])
+            subjects = deepcopy(record_access_context.subjects)
+            subjects.update(environment_ref=ref, target_sha256=sha256_hex(canonical_json(target)),
+                            policy_ref=pol.ref().model_dump(mode='json'))
+            if side == 'candidate' and damage == 'policy':
+                subjects['policy_ref'] = record_access_context.ref.model_dump(mode='json')
+            subjects_path = tmp_path / f'{side}-subjects.json'
+            subjects_path.write_bytes(canonical_json(subjects))
+            settings['subjects'] = str(subjects_path)
+        else:
+            target = http_target(env)
+            target.update(lab=False, observed_version=row['version'])
+            target['engine']['image_digest'] = row['image']
+            target['kubernetes']['engine'].update(image=row['image'], image_id=row['image'])
+            if side == 'candidate' and damage == 'model':
+                target['model_mapping']['revision'] = 'EXAMPLE-foreign-revision'
+            inventory_path = tmp_path / f'{side}-inventory.json'
+            inventory_path.write_bytes(canonical_json(inventory))
+            settings.update(copy_inventory=str(inventory_path), copy_record_snapshot_only=True)
+        target_path.write_bytes(canonical_json(target))
+        producer = tmp_path / f'{side}-producer-identity.txt'
+        producer.write_text(f'EXAMPLE producer identity for {side}\n', encoding='utf-8')
+        cfg['sides'][side] = {check.executor: settings, 'run_binding': {check_id: {
+            'record_session': f'{number:032x}', 'record_producer': str(producer),
+        }}}
+        env_path = tmp_path / f'{side}-env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        envs.append(env)
+        env_paths[side] = env_path
+
+    ready = application.update_readiness(pack, envs, pol, cfg)
+    inputs = next(row for row in ready['checks'] if row['check'] == 'inputs')
+    assert inputs['ok'] is (damage in {None, 'inventory_changed'}), ready
+    if not inputs['ok']:
+        assert inputs['detail'] == reason
+
+    if damage == 'inventory_changed':
+        prepare = KubernetesRequiredEventExecutor.prepared_copy_record_snapshot
+        candidate_inventory = tmp_path / 'candidate-inventory.json'
+
+        def replace_after_validation(self, check, env, values, **kwargs):
+            prepare(self, check, env, values, **kwargs)
+            if env.ref() == envs[1].ref():
+                candidate_inventory.write_bytes(candidate_inventory.read_bytes() + b'\n')
+
+        monkeypatch.setattr(KubernetesRequiredEventExecutor, 'prepared_copy_record_snapshot', replace_after_validation)
+    policy_path, config_path = tmp_path / 'policy.json', tmp_path / 'guard.toml'
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    write_config(cfg, config_path)
+    index = tool.template(pack)
+    index['inputs'] = [{'check_id': check_id, 'side': side, **{
+        key: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+        for key, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()
+    }} for side, env in env_paths.items()]
+    report = run(tmp_path, index)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == (2 if reason is None else 1)
+    for row in report['rows']:
+        if row['check_id'] != check_id:
+            continue
+        assert row['engine_executed'] is row['live_target_verified'] is row['ready_for_execution'] is False
+        assert row['actual_results'] is None
+        if row['side'] == 'candidate' and reason:
+            assert row['blocking_codes'] == [reason]
+        else:
+            assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'
+            assert 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']

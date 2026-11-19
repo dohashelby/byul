@@ -140,7 +140,16 @@ def test_canonical_lif11_keeps_held_owned_namespace_receipts_from_real_producer(
         assert row['probe_source_sha256'] == resource_group_source.GROUP_SHA256
         assert row['matched_owner_ids'] == [scope['owners'][0]['id']]
         assert {reference['kind'] for reference in row['held_references']} == {'socket', 'posix-shm'}
-        assert all(set(reference) == {'owner_id', 'kind', 'resource_sha256'} for reference in row['held_references'])
+        source_forms = {}
+        for source in packet['references']:
+            digest = sha256_hex(canonical_json([source['kind'], source['device'], source['inode']]))
+            form = 'memory-mapping' if source['fd'] is None else 'file-descriptor'
+            source_forms.setdefault((source['kind'], digest), set()).add(form)
+        assert {'file-descriptor', 'memory-mapping'} in source_forms.values()
+        assert row['held_references'] == [
+            {'owner_id': scope['owners'][0]['id'], 'kind': kind, 'resource_sha256': digest, 'reference_forms': sorted(forms)}
+            for (kind, digest), forms in sorted(source_forms.items())
+        ]
         assert not row['global_release_verified'] and not row['namespace_scan_complete']
     assert ('owned_namespace_held_reference_census_incomplete' in observations['activation_missing']) is later_unavailable
     assert observations['activation_violations'] is None and observations['activation_scope_complete'] is False

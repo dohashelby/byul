@@ -39,16 +39,22 @@ def _namespace_observations(censuses, selection, target_sha256, start, end):
             continue
         owners = {(owner['context']['pid'], owner['context']['start_ticks']): owner['id']
                   for owner in selection['owners'] if owner['id'] in matched}
-        references = {(owners[(ref['pid'], ref['start_ticks'])], ref['kind'],
-                       sha256_hex(canonical_json([ref['kind'], ref['device'], ref['inode']])))
-                      for ref in packet['references'] if (ref['pid'], ref['start_ticks']) in owners}
+        references = {}
+        for ref in packet['references']:
+            owner = owners.get((ref['pid'], ref['start_ticks']))
+            if owner is None:
+                continue
+            resource = sha256_hex(canonical_json([ref['kind'], ref['device'], ref['inode']]))
+            form = 'memory-mapping' if ref['fd'] is None else 'file-descriptor'
+            references.setdefault((owner, ref['kind'], resource), set()).add(form)
         steps.append({'step': 'owned-namespace-held-resource-census', 'stage': row['stage'],
             'target_sha256': target_sha256, 'selection_sha256': selection_sha256,
             'probe_source_sha256': row['probe_source_sha256'], 'context_source_sha256': row['context_source_sha256'],
             'packet_sha256': sha256_hex(canonical_json(packet)), 'started_at': row['started_at'], 'finished_at': row['finished_at'],
             'matched_owner_ids': sorted(matched), 'namespace_scan_complete': packet['namespace_scan_complete'],
-            'held_references': [{'owner_id': owner, 'kind': kind, 'resource_sha256': digest}
-                                for owner, kind, digest in sorted(references)],
+            'held_references': [{'owner_id': owner, 'kind': kind, 'resource_sha256': digest,
+                                 'reference_forms': sorted(forms)}
+                                for (owner, kind, digest), forms in sorted(references.items())],
             'global_release_verified': False, 'producer_authenticated': False})
     return steps
 

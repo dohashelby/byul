@@ -748,7 +748,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     if normal_file_read:
                         executor.normal_file_read_inputs(selected_env, values)
                     if kube and expected_target is not None:
-                        if (prebound and item.check_id == "REQ-10" and check_def.collection_profile is None
+                        if (prebound and item.check_id == "REQ-10"
+                                and getattr(check_def, "collection_profile", None) is None
                                 and isinstance(executor, KubernetesSamplingExecutor)):
                             executor.prepared_normal_sampling(check_def, selected_env, values,
                                                               expected_target_sha256=expected_target)

@@ -233,7 +233,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities):
                            and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
     prebound_record_stages = prebound_kubernetes and run_binding.stages_for(check) == (1, 2, 3, 4)
     normal_sampling = (prebound_kubernetes and check.id == 'REQ-10' and check.executor == 'sampling_validation'
-                       and check.collection_profile is None and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['REQ-10']) is True)
+                       and getattr(check, 'collection_profile', None) is None
+                       and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['REQ-10']) is True)
     normal_stream = (prebound_kubernetes and check.id == 'LIF-04' and check.executor == 'stream_buffer'
                      and run_binding.stages_for(check) == (1,) and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['LIF-04']) is True)
     record_access = external_kubernetes and run_binding.is_record_access_binding(check)

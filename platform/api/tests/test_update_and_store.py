@@ -15,7 +15,7 @@ from byul_platform.contracts import canonical_sha256
 from byul_platform.diff import json_diff
 from byul_platform.inputs import MVP_PACK
 from byul_platform.main import create_app
-from byul_platform.sources.report_evidence import _finding, _import_violation
+from byul_platform.sources.report_evidence import _decisions, _finding, _import_violation
 from byul_platform.sources.update import rpt_to_verification_result
 from byul_platform.store import FileDocumentStore, RevisionExists
 from conftest import EXAMPLES, FIXTURES, load_json
@@ -127,6 +127,22 @@ def test_report_functional_finding_checks_planned_probe_outcomes():
     view["functional"] = "FAIL"
     outcomes["second"] = "fail"
     assert _finding("REQ-01", view, result, evidence) == {"code": "normal_probe_failed"}
+
+
+def test_decision_display_requires_the_recorded_axis_and_collected_values():
+    verdicts = {"security": "FAIL", "functional": "UNKNOWN", "performance": "PASS"}
+    view = {**verdicts, "performance": "UNKNOWN"}
+    result = {"verdicts": verdicts, "decision_trace": {
+        "security": {"observations": ["violations", "missing"], "operators": {"violations": ["nonempty"]}},
+        "functional": {"missing": ["normal_probes"], "observations": ["unrelated"]},
+        "performance": {"observations": ["latency"]},
+    }}
+    evd = {"observations": {"violations": {"collected": True, "value": ["private-detail"]},
+                           "missing": {"collected": False, "value": ["unconfirmed"]}}}
+    failure, unknown = _decisions(view, result, evd)
+    assert failure["observations"] == [{"key": "violations", "kind": "count", "value": 1, "operators": ["nonempty"]}]
+    assert unknown["observations"] == [] and unknown["missing"] == ["normal_probes"]
+    assert _decisions(view, {"verdicts": verdicts}, evd) == []
 
 
 def test_sup08_display_requires_a_measured_module_import():

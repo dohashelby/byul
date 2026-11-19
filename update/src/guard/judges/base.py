@@ -8,6 +8,7 @@ from pydantic import Field
 
 from guard.models import CheckDef, Evidence, Verdict
 from guard.models.base import Strict
+from guard.models.objects import DecisionTrace
 
 AXES = ("security", "functional", "performance")
 
@@ -16,6 +17,7 @@ class JudgeOutput(Strict):
     verdicts: dict[str, Verdict]  # 축별. 빠진 축은 코어가 UNKNOWN으로 둔다
     reasons: list[str] = Field(default_factory=list)
     missing_observations: list[str] = Field(default_factory=list)
+    decision_trace: dict[str, DecisionTrace] = Field(default_factory=dict)
 
 
 @runtime_checkable

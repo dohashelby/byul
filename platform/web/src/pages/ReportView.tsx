@@ -210,10 +210,31 @@ function isFunctionalFinding(finding: ReportSide["finding"]) {
 }
 
 function needsEvidenceNote(side: ReportSide) {
-  return !side.finding || (isFunctionalFinding(side.finding) && !!side.security && side.security !== "NOT_APPLICABLE");
+  return (!side.finding && !side.decisions?.length)
+    || (isFunctionalFinding(side.finding) && !!side.security && side.security !== "NOT_APPLICABLE"
+      && !side.decisions?.some((decision) => decision.axis === "security"));
 }
 
 const OBSERVATION_NAMES: Record<string, string> = {
+  activation_steps: "실행 단계별 시험 기록",
+  activation_violations: "실행 단계에서 확인된 정책 위반",
+  activation_missing: "관측하지 못한 실행 단계",
+  activation_scope_complete: "대상 실행 단계 전체의 관측",
+  supply_boot_sessions: "공급물을 사용한 시작 세션 기록",
+  supply_boot_violations: "공급물 사용·시작 과정에서 확인된 정책 위반",
+  supply_boot_missing: "공급물 사용·시작 과정에서 빠진 항목",
+  supply_boot_complete: "공급물 사용·시작 과정 전체의 관측",
+  supply_boot_normal_verified: "정상 구성의 시작 검증",
+  supply_boot_change_applied: "시험에서 지정한 변경의 적용 여부",
+  supply_boot_record_authenticated: "시작 관측 기록의 출처 확인",
+  supply_boot_native_consumption: "실행 구성 요소의 공급물 사용 기록",
+  supply_boot_change: "시작 시험에 적용한 변경 기록",
+  engine_sensor_violation: "엔진 관측에서 확인된 정책 위반",
+  engine_sensor_full_scope: "대상 엔진 동작 전체의 관측",
+  normal_controls: "정상 조건으로 수행한 대조 시험",
+  log_coverage_gaps: "로그에서 관측이 빠진 범위",
+  process_scan_complete: "대상 프로세스 전체의 확인",
+  routes_registered: "등록된 요청 경로",
   running_image_unapproved: "실행 이미지의 승인 목록 일치 여부",
   supply_execution_scope_complete: "실행 코드와 의존성 전체의 승인 여부",
   log_security_violations: "요청 입력이 신뢰 로그에 미치는 영향",
@@ -244,6 +265,78 @@ const OBSERVATION_NAMES: Record<string, string> = {
   code_selection_confirmed_violations: "금지된 코드 선택의 확인 결과",
   code_selection_final_code_verified: "최종 코드의 확인 결과",
 };
+
+const DECISION_LIMITS: Record<string, string> = {
+  no_rule: "이 축에 적용할 판정 규칙이 없습니다.",
+  no_pass_rule: "이 축의 충족을 확인할 판정 규칙이 없습니다.",
+  policy_context_unverified: "시험에 적용된 정책과 관측의 관계를 확인하지 못했습니다.",
+  execution_incomplete: "시험 실행이 완료되지 않았습니다.",
+  normal_control_unverified: "정상 조건에서의 시험 성공을 확인하지 못했습니다.",
+  challenge_incomplete: "계획한 경계 시험 중 실행 기록이 빠진 항목이 있습니다.",
+  cpu_performance_unverified: "이 CPU 비교에서는 성능을 검증하지 않았습니다.",
+};
+
+const OPERATOR_DESCRIPTIONS: Record<string, string> = {
+  eq: "기준값과 일치", ne: "기준값과 다름",
+  in: "기준 목록에 포함", not_in: "기준 목록 밖의 값",
+  lt: "기준값 미만", le: "기준값 이하", gt: "기준값 초과", ge: "기준값 이상",
+  nonempty: "항목이 기록됨", empty: "기록된 항목이 없음",
+  all_in: "모든 결과가 기준 목록에 포함", any_in: "기준 목록에 포함된 결과가 있음",
+  none_in: "기준 목록에 포함된 결과가 없음",
+  any_between: "지정 범위에 들어가는 결과가 있음", all_between: "모든 결과가 지정 범위 안에 있음",
+  superset_of: "확인 대상이 모두 관측됨", subset_of: "기준 목록 안에서 관측됨",
+  not_subset_of: "기준 목록 밖의 항목이 관측됨",
+};
+
+function decisionAxis(decision: NonNullable<ReportSide["decisions"]>[number]) {
+  return AXES.find(([axis]) => axis === decision.axis)?.[1] ?? decision.axis;
+}
+
+function describeDecisionKeys(keys: string[]) {
+  return keys.map((key) => OBSERVATION_NAMES[key] ?? key).join(", ");
+}
+
+function RecordedDecisions({ side, target }: { side: ReportSide; target: string }) {
+  const explainedAxis = side.finding && (isFunctionalFinding(side.finding) ? "functional" : "security");
+  const decisions = (side.decisions ?? []).filter((decision) => decision.axis !== explainedAxis || decision.verdict === "UNKNOWN");
+  return decisions.map((decision) => {
+    const axis = decisionAxis(decision);
+    if (decision.verdict === "UNKNOWN") {
+      const limits = decision.limits.flatMap((code) => Object.hasOwn(DECISION_LIMITS, code) ? [DECISION_LIMITS[code]] : []);
+      const hasDetails = limits.length || decision.missing.length || decision.unmet.length || decision.policy_missing.length;
+      if (!hasDetails && (side.missing_observations?.length || side.unverified_observations?.length)) return null;
+      return (
+        <section key={decision.axis}>
+          <h4>{target} · {axis} 미확인 범위</h4>
+          <ul>
+            {limits.map((limit) => <li key={limit}>{limit}</li>)}
+            {decision.missing.length > 0 && <li>수집 기록이 빠진 관측은 {describeDecisionKeys(decision.missing)}입니다.</li>}
+            {decision.unmet.length > 0 && <li>충족 조건을 확인하지 못한 관측은 {describeDecisionKeys(decision.unmet)}입니다.</li>}
+            {decision.policy_missing.length > 0 && <li>필요한 정책 설정값이 기록되지 않았습니다 ({decision.policy_missing.join(", ")}).</li>}
+            {!hasDetails && <li>확인하지 못한 조건을 특정할 기록이 없습니다.</li>}
+          </ul>
+        </section>
+      );
+    }
+    return (
+      <section key={decision.axis}>
+        <h4>{target} · {axis} {decision.verdict === "PASS" ? "충족 근거" : "미충족 근거"}</h4>
+        {decision.criterion && <p>점검 기준 — {decision.criterion}</p>}
+        <p>{decision.verdict === "PASS" ? "다음 시험 관측이 충족 조건을 뒷받침합니다." : "다음 시험 관측에서 미충족 조건이 확인됐습니다."}</p>
+        <ul>
+          {decision.observations.map(({ key, kind, value, operators }) => (
+            <li key={key}>
+              {describeDecisionKeys([key])} · {kind === "boolean" ? (value ? "참으로 기록" : "거짓으로 기록")
+                : kind === "count" ? `${value}건 기록` : kind === "number" ? `${value}로 기록` : "수집값 확인"}
+              {operators?.flatMap((operator) => Object.hasOwn(OPERATOR_DESCRIPTIONS, operator)
+                ? [` · ${OPERATOR_DESCRIPTIONS[operator]}`] : []).join("")}
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  });
+}
 
 function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Report; raw: unknown; onClose: () => void }) {
   const update = report.mode === "update";
@@ -303,6 +396,9 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                   })}
                 </section>
               )}
+              {present.map((key) => (
+                <RecordedDecisions key={key} side={c[key]!} target={SIDE_LABEL[key]} />
+              ))}
               {present.some((key) => needsEvidenceNote(c[key]!) || c[key]?.missing_observations?.length || c[key]?.unverified_observations?.length) && (
                 <section>
                   <h4>미확인 범위</h4>
@@ -319,7 +415,7 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                         </div>
                       );
                     }
-                    if (key === "baseline" && candidateSecurityFinding && baselinePass && !side.finding) {
+                    if (key === "baseline" && candidateSecurityFinding && baselinePass && !side.finding && !side.decisions?.some((decision) => decision.axis === "security")) {
                       return <p key={key}>기준 {report.targets?.baseline ? `${targetLabel(report, "baseline")}은` : "판본은"} 보안 충족으로 기록됐습니다. 이 보고서에는 그 판정의 세부 관측 기록이 없습니다.</p>;
                     }
                     if (needsEvidenceNote(side)) return <p key={key}>{SIDE_LABEL[key]}의 {side.finding ? "보안 " : ""}세부 판정 근거를 설명할 수 있는 관측 기록이 없습니다.</p>;

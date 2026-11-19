@@ -22,6 +22,7 @@ from typing import Any
 
 from guard.models import CheckDef, Evidence, Verdict
 from guard.input_policy import policy_context
+from guard.models.objects import DecisionTrace
 
 from .base import AXES, JudgeOutput
 
@@ -133,11 +134,14 @@ class RuleTableJudge:
         missing: set[str] = set()
         policy_missing: set[str] = set()
         policy_values = policy_values or {}
+        traces: dict[str, DecisionTrace] = {}
+        trace = DecisionTrace()
 
         def observed(key: str) -> Any:
             obs = evidence.observations.get(key)
             if obs is None or not obs.collected:
                 missing.add(key)
+                trace.missing.append(key)
                 return _MISSING
             return obs.value
 
@@ -149,6 +153,7 @@ class RuleTableJudge:
                 key = rule["value_policy"]
                 if key not in policy_values:
                     policy_missing.add(key)
+                    trace.policy_missing.append(key)
                     return None
                 rule = {**rule, "value": policy_values[key]}
             v = observed(rule["obs"])
@@ -162,23 +167,34 @@ class RuleTableJudge:
                 key = rule["when_policy"]
                 if key not in policy_values:
                     policy_missing.add(key)
+                    trace.policy_missing.append(key)
                     return None
                 if policy_values[key] is not True:
                     return False
             return check_rule(rule["when"]) if rule.get("when") else True
 
+        def record_match(rule: dict) -> None:
+            key = rule["obs"]
+            trace.observations.append(key)
+            trace.operators.setdefault(key, []).append(rule["op"])
+
         for axis in AXES:
+            trace = traces[axis] = DecisionTrace()
             table = tables.get(axis)
             if not table:
                 verdicts[axis] = Verdict.UNKNOWN
                 reasons.append(f"{axis}: no rule for this axis")
+                trace.limits.append("no_rule")
                 continue
             fail_hits = []
             for rule in table.get("fail_when_any", []):
                 if premise(rule) is True and check_rule(rule) is True:
                     fail_hits.append(_describe(rule))
+                    record_match(rule)
             if fail_hits:
                 verdicts[axis] = Verdict.FAIL
+                if axis == "security":
+                    trace.criterion = check.fail_criteria
                 reasons.append(f"{axis}: FAIL because {'; '.join(fail_hits)} (observed {_values(evidence, table['fail_when_any'])})")
                 continue
             pass_rules = table.get("pass_when_all", [])
@@ -193,10 +209,15 @@ class RuleTableJudge:
                 ok = check_rule(rule)
                 if ok is None:
                     unobserved.append(_describe(rule))
-                elif not ok:
+                elif ok:
+                    record_match(rule)
+                else:
+                    trace.unmet.append(rule["obs"])
                     unmet.append(f"{_describe(rule)} (observed {evidence.observations[rule['obs']].value!r})")
             if pass_rules and not unmet and not unobserved:
                 verdicts[axis] = Verdict.PASS
+                if axis == "security":
+                    trace.criterion = check.satisfied_if
                 reasons.append(f"{axis}: all pass rules met: {'; '.join(_describe(r) for r in pass_rules)}")
             else:
                 verdicts[axis] = Verdict.UNKNOWN
@@ -207,6 +228,7 @@ class RuleTableJudge:
                     detail.append(f"pass rules unmet: {'; '.join(unmet)}")
                 if not pass_rules:
                     detail.append("no pass rules")
+                    trace.limits.append("no_pass_rule")
                 reasons.append(f"{axis}: UNKNOWN ({'; '.join(detail)})")
         for key in sorted(policy_missing):
             reasons.append(f"policy value missing: {key}")
@@ -215,9 +237,13 @@ class RuleTableJudge:
             reasons.extend(context.reasons)
             missing.update(context.missing)
             if context.blocked:
+                for axis, verdict in verdicts.items():
+                    if verdict == Verdict.PASS:
+                        traces[axis].limits.append("policy_context_unverified")
                 verdicts = {axis: Verdict.UNKNOWN if verdict == Verdict.PASS else verdict
                             for axis, verdict in verdicts.items()}
-        return JudgeOutput(verdicts=verdicts, reasons=reasons, missing_observations=sorted(missing))
+        return JudgeOutput(verdicts=verdicts, reasons=reasons, missing_observations=sorted(missing),
+                           decision_trace=traces)
 
 
 def _values(evidence: Evidence, rules: list[dict]) -> str:

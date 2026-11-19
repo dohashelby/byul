@@ -1483,6 +1483,45 @@ export interface components {
             /** Regressed */
             regressed: number;
         };
+        /** ReportDecision */
+        ReportDecision: {
+            /**
+             * Axis
+             * @enum {string}
+             */
+            axis: "security" | "functional" | "performance";
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "PASS" | "FAIL" | "UNKNOWN";
+            /** Criterion */
+            criterion?: string | null;
+            /** Observations */
+            observations: components["schemas"]["ReportDecisionObservation"][];
+            /** Missing */
+            missing: string[];
+            /** Unmet */
+            unmet: string[];
+            /** Policy Missing */
+            policy_missing: string[];
+            /** Limits */
+            limits: string[];
+        };
+        /** ReportDecisionObservation */
+        ReportDecisionObservation: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "boolean" | "count" | "number" | "recorded";
+            /** Value */
+            value?: boolean | number | null;
+            /** Operators */
+            operators?: string[];
+        };
         /** ReportFinding */
         ReportFinding: {
             /**
@@ -1554,6 +1593,8 @@ export interface components {
             unverified_observations?: string[];
             evidence_ref?: components["schemas"]["ManifestRef"] | null;
             finding?: components["schemas"]["ReportFinding"] | null;
+            /** Decisions */
+            decisions?: components["schemas"]["ReportDecision"][];
         };
         /** ReportTarget */
         ReportTarget: {

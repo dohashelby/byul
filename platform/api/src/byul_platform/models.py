@@ -220,6 +220,24 @@ class ReportFinding(BaseModel):
     revision: str | None = None
 
 
+class ReportDecisionObservation(BaseModel):
+    key: str
+    kind: Literal["boolean", "count", "number", "recorded"]
+    value: bool | int | float | None = None
+    operators: list[str] = Field(default_factory=list)
+
+
+class ReportDecision(BaseModel):
+    axis: Literal["security", "functional", "performance"]
+    verdict: Literal["PASS", "FAIL", "UNKNOWN"]
+    criterion: str | None = None
+    observations: list[ReportDecisionObservation]
+    missing: list[str]
+    unmet: list[str]
+    policy_missing: list[str]
+    limits: list[str]
+
+
 class ReportSide(BaseModel):
     result_id: str | None
     result_revision: int | None
@@ -232,6 +250,7 @@ class ReportSide(BaseModel):
     unverified_observations: list[str] = Field(default_factory=list)
     evidence_ref: ManifestRef | None = None
     finding: ReportFinding | None = None
+    decisions: list[ReportDecision] = Field(default_factory=list)
 
 
 class ReportMark(BaseModel):

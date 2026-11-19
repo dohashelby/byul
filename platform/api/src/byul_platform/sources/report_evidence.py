@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -118,6 +119,55 @@ def _finding(check_id, view, result, evd):
     return None
 
 
+def _observation_summary(evd, key):
+    value = _observed(evd, key)
+    if value is None:
+        return None
+    if type(value) is bool:
+        return {"key": key, "kind": "boolean", "value": value}
+    if isinstance(value, (list, dict)):
+        return {"key": key, "kind": "count", "value": len(value)}
+    if type(value) is int or (type(value) is float and math.isfinite(value)):
+        return {"key": key, "kind": "number", "value": value}
+    return {"key": key, "kind": "recorded"}
+
+
+def _decisions(view, result, evd):
+    traces = result.get("decision_trace")
+    if not isinstance(traces, dict) or evd.get("execution", {}).get("operator") is not None:
+        return []
+    verdicts = result.get("verdicts", {})
+    decisions = []
+    for axis in ("security", "functional", "performance"):
+        trace = traces.get(axis)
+        verdict = view.get(axis)
+        if not isinstance(trace, dict) or verdict not in {"PASS", "FAIL", "UNKNOWN"} or verdict != verdicts.get(axis):
+            continue
+
+        def keys(name):
+            values = trace.get(name, [])
+            return list(dict.fromkeys(k for k in values if isinstance(k, str))) if isinstance(values, list) else []
+
+        observations = [
+            summary for key in keys("observations")
+            if (summary := _observation_summary(evd, key)) is not None
+        ] if verdict != "UNKNOWN" else []
+        operators = trace.get("operators", {})
+        if isinstance(operators, dict):
+            for observation in observations:
+                matched = operators.get(observation["key"])
+                if isinstance(matched, list):
+                    observation["operators"] = list(dict.fromkeys(op for op in matched if isinstance(op, str)))
+        if verdict != "UNKNOWN" and not observations:
+            continue
+        decisions.append({
+            "axis": axis, "verdict": verdict, "observations": observations,
+            "criterion": trace.get("criterion") if verdict != "UNKNOWN" else None,
+            **{key: keys(key) for key in ("missing", "unmet", "policy_missing", "limits")},
+        })
+    return decisions
+
+
 def enrich_report(report, vr, store: Path | None):
     if store is None or not store.is_file():
         return
@@ -161,3 +211,4 @@ def _enrich(conn, report, vr):
                 if _observed(evd, key) is False
             ]
             view["finding"] = _finding(check["check_id"], view, result, evd)
+            view["decisions"] = _decisions(view, result, evd)

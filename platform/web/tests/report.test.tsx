@@ -145,6 +145,24 @@ describe("검증 보고서 화면", () => {
     expect(drawer.getByText(/대상 API 전송 구간 전체의 관측입니다/)).toBeTruthy();
   });
 
+  it("기존 전용 문구가 없는 점검도 축별 관측과 미확인 조건을 표시한다", () => {
+    mockApi({});
+    const row = check("REQ-01", {
+      baseline: null, candidate: null, single: { ...side("PASS"), decisions: [
+        { axis: "security", verdict: "PASS", criterion: "시험 대상에 보호 정책이 적용된다.",
+          observations: [{ key: "functional_probe_results", kind: "count", value: 2, operators: ["nonempty"] }],
+          missing: [], unmet: [], policy_missing: [], limits: [] },
+        { axis: "performance", verdict: "UNKNOWN", observations: [], missing: [], unmet: [],
+          policy_missing: [], limits: ["cpu_performance_unverified"] },
+      ] },
+    });
+    renderAt("/update/results", "/update/results", <FullReport report={{ ...report, mode: "audit", checks: [row] }} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(drawer.getByRole("heading", { name: "검증 대상 · 보안 충족 근거" })).toBeTruthy();
+    expect(drawer.getByText(/정상 동작 시험 결과 · 2건 기록 · 항목이 기록됨/)).toBeTruthy();
+    expect(drawer.getByText("이 CPU 비교에서는 성능을 검증하지 않았습니다.")).toBeTruthy();
+  });
+
   it("미확인 점검을 충족처럼 보이게 하지 않는다", () => {
     mockApi({});
     renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected={null} onSelect={() => {}} />);

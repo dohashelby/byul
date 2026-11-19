@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import os
 import sys
 import sysconfig
 
@@ -9,6 +10,7 @@ import pytest
 
 from guard.adapters.vllm import VllmAdapter
 from guard.core.run import _normalize
+from guard.executors import kubernetes_installed_plugin_inventory as inventory
 from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
 from guard.executors.plugin_loading import GROUPS
 from guard.judges.rule_table import RuleTableJudge
@@ -147,3 +149,35 @@ def test_sup10_validates_exact_scope_before_transport(tmp_path, fault):
         expected_target_sha256=None if fault == "unbound" else sha256_hex(path.read_bytes()))
     with pytest.raises(ValueError, match="SUP10_INVENTORY_(?:SCOPE_INVALID|TARGET_UNVERIFIED)"):
         executor.run(check, env, {}, VllmAdapter(), tmp_path / "work")
+
+
+def test_sup10_rejects_metadata_changed_after_individual_read(tmp_path, monkeypatch, capsys):
+    version = "0.31.0"
+    prefix = tmp_path / "private-venv"
+    _installed_fixture(prefix, version, None)
+    root = Path(sysconfig.get_path("purelib", vars={"base": str(prefix), "platbase": str(prefix)}))
+    distribution = root / f"vllm-{version}.dist-info"
+    source = distribution / "METADATA"
+    selected = distribution.stat()
+
+    scope = {}
+    with monkeypatch.context() as patch:
+        patch.setattr(sys, "argv", ["installed-metadata-standalone-reader"])
+        exec(compile(inventory._READER, "installed metadata reader", "exec"), scope)
+    assert json.loads(capsys.readouterr().out)["unavailable"] is True
+    original_read = scope["bounded_text"]
+    changed = []
+
+    def read_then_change(fd, name, ceiling, **kwargs):
+        result = original_read(fd, name, ceiling, **kwargs)
+        if name == "entry_points.txt" and os.fstat(fd).st_ino == selected.st_ino:
+            source.write_text("Metadata-Version: 2.1\nName: vllm\nVersion: 0.31.100\n\n")
+            current = distribution.stat()
+            assert (current.st_mtime_ns, current.st_ctime_ns) == (selected.st_mtime_ns, selected.st_ctime_ns)
+            changed.append(name)
+        return result
+
+    scope["bounded_text"] = read_then_change
+    with pytest.raises(ValueError):
+        scope["scan"]([root], sha256_hex(canonical_json("vllm")), sha256_hex(canonical_json(["vllm", version])))
+    assert changed == ["entry_points.txt"]

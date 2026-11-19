@@ -55,12 +55,19 @@ def directory(path):
         os.close(fd)
 
 
+def file_identity(fd, name):
+    try:
+        return identity(os.stat(name, dir_fd=fd, follow_symlinks=False))
+    except FileNotFoundError:
+        return None
+
+
 def bounded_text(fd, name, ceiling, *, optional=False):
     try:
         child = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
     except FileNotFoundError:
         if optional:
-            return None
+            return None, None
         raise
     with os.fdopen(child, 'rb') as stream:
         before = os.fstat(stream.fileno())
@@ -68,9 +75,9 @@ def bounded_text(fd, name, ceiling, *, optional=False):
             raise ValueError()
         raw = stream.read(before.st_size + 1)
         if (len(raw) != before.st_size or identity(os.fstat(stream.fileno())) != identity(before)
-                or identity(os.stat(name, dir_fd=fd, follow_symlinks=False)) != identity(before)):
+                or file_identity(fd, name) != identity(before)):
             raise ValueError()
-    return raw.decode('utf-8', 'strict')
+    return raw.decode('utf-8', 'strict'), identity(before)
 
 
 def installed_roots():
@@ -132,9 +139,10 @@ def scan(roots, expected_name, expected):
                     fd = os.open(item.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
                     try:
                         before = identity(os.fstat(fd))
-                        fields = {'METADATA': bounded_text(fd, 'METADATA', LIMITS['metadata_file_bytes']),
-                                  'entry_points.txt': bounded_text(fd, 'entry_points.txt', LIMITS['entry_point_file_bytes'],
-                                                                   optional=True)}
+                        files = {'METADATA': bounded_text(fd, 'METADATA', LIMITS['metadata_file_bytes']),
+                                 'entry_points.txt': bounded_text(fd, 'entry_points.txt', LIMITS['entry_point_file_bytes'],
+                                                                  optional=True)}
+                        fields = {name: text for name, (text, _) in files.items()}
                         bytes_read += sum(len(value.encode('utf-8')) for value in fields.values() if value is not None)
                         if bytes_read > LIMITS['total_metadata_bytes']:
                             raise ValueError()
@@ -168,7 +176,9 @@ def scan(roots, expected_name, expected):
                                     if not 0 < len(entry) <= 256 or not 0 < len(value) <= 4096:
                                         raise ValueError()
                                     entries[group].append(digest([identity_sha, group, entry, value]))
-                        if identity(os.stat(item.name, dir_fd=root_fd, follow_symlinks=False)) != before:
+                        # Directory metadata does not catch edits to an existing member's contents.
+                        if (any(file_identity(fd, filename) != claimed for filename, (_, claimed) in files.items())
+                                or identity(os.stat(item.name, dir_fd=root_fd, follow_symlinks=False)) != before):
                             raise ValueError()
                     finally:
                         os.close(fd)

@@ -83,14 +83,18 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
         self.validate_policy(check, values)
         self._prepared_metadata_target(env, expected_target_sha256=expected_target_sha256)
 
-    def _prepared_metadata_target(self, env, *, expected_target_sha256):
+    def _read_metadata_target(self):
         from guard.adapters.vllm_file_read_sensor import dependency
 
+        target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+        if type(target) is not dict:
+            raise ValueError
+        return target
+
+    def _prepared_metadata_target(self, env, *, expected_target_sha256):
         try:
             duration = self._duration(env, metadata_only=True)
-            target = strict_json(dependency(self.cfg['target'], None), limit=65536)
-            if type(target) is not dict:
-                raise ValueError
+            target = self._read_metadata_target()
             self._validate_target(target, metadata_only=True, expected_target_sha256=expected_target_sha256)
         except (KeyError, ValueError, TypeError, OverflowError, OSError, RuntimeError):
             raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None
@@ -105,7 +109,11 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
         try:
             if adapter is None:raise ValueError
             duration = self._duration(env, metadata_only)
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            if metadata_only:
+                target = self._read_metadata_target()
+            else:
+                with Path(self.cfg['target']).open('rb') as stream:
+                    target = strict_json(stream.read(65537), limit=65536)
             self._validate_target(target, metadata_only)
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None
         transport = self._transport(target, env, duration)

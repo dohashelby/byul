@@ -295,6 +295,8 @@ class LocalUsageWorld(FullWorld):
     ('foreign-model-revision', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('over-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('factory-target-changed', 'KUBERNETES_USAGE_CONFIGURATION_INVALID'),
+    ('symlink-after-preparation', 'KUBERNETES_USAGE_CONFIGURATION_INVALID'),
+    ('malformed-after-preparation', 'KUBERNETES_USAGE_CONFIGURATION_INVALID'),
 ])
 def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path, monkeypatch, case, error):
     def forbidden(*args, **kwargs):
@@ -316,6 +318,17 @@ def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path
     executor = module.kubernetes_boundary_egress(
         cfg, expected_target_sha256='f' * 64 if case == 'factory-target-changed' else digest)
     check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['OBS-04']
+    if case.endswith('-after-preparation'):
+        executor.prepared_local_observation(check, env, LOCAL_VALUES, expected_target_sha256=digest)
+        if case == 'symlink-after-preparation':
+            moved = path.with_name('original-target.json')
+            path.rename(moved)
+            path.symlink_to(moved)
+        else:
+            path.write_bytes(b'[]')
+        monkeypatch.setattr(executor, '_transport', forbidden)
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.run(check, env, LOCAL_VALUES, VllmAdapter(), tmp_path / 'work')
     if error is None:
         executor.prepared_local_observation(check, env, LOCAL_VALUES, expected_target_sha256=digest)
     else:

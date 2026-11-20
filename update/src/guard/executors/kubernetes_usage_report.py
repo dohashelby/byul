@@ -343,17 +343,21 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         return KubernetesHTTP(target, env, duration=duration, binary=self.cfg.get("kubectl_binary", "kubectl"),
                               runner=self.runner, profile=USAGE_CONTROL_PROFILE)
 
-    def prepared_local_observation(self, check, env, values, *, expected_target_sha256=None):
-        """Qualify only the saved OBS-04 local target declaration, without a collection."""
+    def _read_local_target(self):
         from guard.adapters.vllm_file_read_sensor import dependency
 
+        target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+        if type(target) is not dict:
+            raise ValueError
+        return target
+
+    def prepared_local_observation(self, check, env, values, *, expected_target_sha256=None):
+        """Qualify only the saved OBS-04 local target declaration, without a collection."""
         try:
             self.validate_policy(check, values)
             if self.cfg.get("local_observation_only") is not True:
                 raise ValueError
-            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
-            if type(target) is not dict:
-                raise ValueError
+            target = self._read_local_target()
             self._validate_targets(target, None, env, expected_target_sha256=expected_target_sha256)
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("KUBERNETES_USAGE_CONFIGURATION_INVALID") from None
@@ -372,7 +376,7 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
             def load(name):
                 with Path(self.cfg[name]).open("rb") as stream:
                     return strict_json(stream.read(65537), limit=65536)
-            target = load("target")
+            target = self._read_local_target() if self.cfg.get("local_observation_only") is True else load("target")
             sink = load("sink_target") if "sink_target" in self.cfg else None
             local = self._validate_targets(target, sink, env)
         except (KeyError, TypeError, ValueError, OSError):

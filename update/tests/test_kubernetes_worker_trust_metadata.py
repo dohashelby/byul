@@ -161,6 +161,8 @@ def test_worker_metadata_opt_in_never_activates_ipc_actor_scope(tmp_path, change
     ('foreign-model-revision', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('over-budget', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
     ('captured-target-changed', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+    ('symlink-after-preparation', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
+    ('malformed-after-preparation', 'KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'),
 ])
 def test_worker_preparation_checks_saved_target_without_collecting(tmp_path, monkeypatch, case, error):
     from guard.runtime.engine_http import KubernetesHTTP
@@ -184,6 +186,17 @@ def test_worker_preparation_checks_saved_target_without_collecting(tmp_path, mon
     executor = KubernetesIPCProductExecutor(cfg, runner=forbidden, expected_target_sha256=digest)
     expected = 'f' * 64 if case == 'captured-target-changed' else digest
     check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['PLT-06']
+    if case.endswith('-after-preparation'):
+        executor.prepared_worker_trust(check, env, VALUES, expected_target_sha256=expected)
+        if case == 'symlink-after-preparation':
+            moved = path.with_name('original-target.json')
+            path.rename(moved)
+            path.symlink_to(moved)
+        else:
+            path.write_bytes(b'[]')
+        monkeypatch.setattr(executor, '_transport', forbidden)
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.run(check, env, VALUES, VllmAdapter(), tmp_path / 'work')
     if error is None:
         executor.prepared_worker_trust(check, env, VALUES, expected_target_sha256=expected)
     else:

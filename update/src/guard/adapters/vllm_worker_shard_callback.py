@@ -81,6 +81,8 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
 
     def index_alias_change(self, module):
         """Return an optional change for the reviewed loader's already imported index helper."""
+        if getattr(self, '_source_pins', {}).get(LOADER) != _INDEX_SOURCES[LOADER]:
+            return None
         helper = sys.modules.get(WEIGHTS)
         if (sys.implementation.name != 'cpython' or type(module) is not types.ModuleType
                 or sys.modules.get(LOADER) is not module or type(helper) is not types.ModuleType):
@@ -130,7 +132,7 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
                 if (selected and cache._ACTIVE.get() is active and active.get(_INDEX_FRAME_KEY) is _INDEX_PENDING and bound()
                         and type(result) is list and result is not args[0] and 0 < len(result) <= MAX_FILES
                         and all(type(path) is str and path for path in result)):
-                    active[_INDEX_FRAME_KEY] = result
+                    active[_INDEX_FRAME_KEY] = (result, tuple(result))
             except BaseException:
                 pass
             return result
@@ -154,10 +156,12 @@ class WorkerShardObserver(cache.CacheCallbackObserver):
         if len(result) == 3:
             active = cache._ACTIVE.get()
             if (safetensors is True and type(active) is dict and active.get('observer') is self
-                    and active.get('pid') == self.pid == os.getpid() and active.get('thread') == threading.get_ident()
-                    and active.get(_INDEX_FRAME_KEY) is files):
-                prepared['index_present'] = True
-                prepared['required'] = sorted(set(prepared['files']))
+                    and active.get('pid') == self.pid == os.getpid() and active.get('thread') == threading.get_ident()):
+                observed = active.get(_INDEX_FRAME_KEY)
+                if (type(observed) is tuple and observed[0] is files
+                        and all(type(path) is str for path in files) and tuple(files) == observed[1]):
+                    prepared['index_present'] = True
+                    prepared['required'] = sorted(set(prepared['files']))
             return prepared
         index = result[3]
         if index is None or type(index) is str and index == '':

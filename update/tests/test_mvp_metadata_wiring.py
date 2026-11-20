@@ -2173,35 +2173,77 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
                             'record_session_sha256': sha256_hex(status[side]['record_session'].encode('ascii'))}
         assert published['OBS-11', side]['record_inputs'] == obs_pins
         assert replayed['OBS-11', side]['record_inputs'] == obs_pins
-        assert 'record_inputs' not in published['LIF-12', side]
-        assert 'record_inputs' not in replayed['LIF-12', side]
-        assert retry_pins['target_file_sha256'] == obs_pins['target_file_sha256']
-        assert retry_pins['retry_scope_sha256'] == sha256_hex(Path(retries[side]['retry_scope']).read_bytes())
-        assert retry_pins['retry_record_source_sha256'] == sha256_hex(Path(retries[side]['record_producer']).read_bytes())
+        assert retry_pins == {
+            'target_file_sha256': obs_pins['target_file_sha256'],
+            'record_session_sha256': sha256_hex(retries[side]['record_session'].encode('ascii')),
+            'retry_scope_sha256': sha256_hex(Path(retries[side]['retry_scope']).read_bytes()),
+            'retry_record_source_sha256': sha256_hex(Path(retries[side]['record_producer']).read_bytes()),
+        }
+        assert published['LIF-12', side]['record_inputs'] == retry_pins
+        assert replayed['LIF-12', side]['record_inputs'] == retry_pins
     for row in audit['rows']:
         if row['check_id'] in config['update']['allowed_checks']:
             assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'
     with pytest.raises(ValueError, match='^METADATA_RECORDS_REQUIRE_PREBOUND_PAIR$'):
         tool.staged_config(config, tmp_path / 'unbound-candidate.json')
 
-    key = ('OBS-11', 'candidate')
+    legacy_index = deepcopy(index)
+    for row in legacy_index['inputs']:
+        if row['check_id'] == 'LIF-12':
+            del row['record_inputs']
+    legacy = tool.readiness.audit(_write(tmp_path / 'legacy-index.json', legacy_index), pack=pack)
+    assert legacy['file_binding_valid_sides'] == 4
+    assert all('record_inputs' not in row for row in legacy['rows'] if row['check_id'] == 'LIF-12')
 
-    def assert_candidate_unverified(report, code):
-        assert report['file_binding_valid_sides'] == 3
-        row = next(row for row in report['rows'] if (row['check_id'], row['side']) == key)
-        assert not row['file_binding_valid'] and code in row['blocking_codes']
-        assert 'record_inputs' not in row
+    key = ('OBS-11', 'candidate')
+    retry_key = ('LIF-12', 'candidate')
+
+    def assert_candidate_unverified(report, code, checks=('OBS-11',)):
+        assert report['file_binding_valid_sides'] == 4 - len(checks)
+        for check_id in checks:
+            row = next(row for row in report['rows'] if (row['check_id'], row['side']) == (check_id, 'candidate'))
+            assert not row['file_binding_valid'] and code in row['blocking_codes']
+            assert 'record_inputs' not in row
 
     wrong_pins = {**published[key]['record_inputs'], 'record_session_sha256': '0' * 64}
     conflict = tool.readiness.audit(index_path, pack=pack, expected_record_inputs={key: wrong_pins})
     assert_candidate_unverified(conflict, 'MVP_INPUT_FILE_CHANGED')
+    wrong_retry_pins = {**published[retry_key]['record_inputs'], 'retry_scope_sha256': '0' * 64}
+    conflict = tool.readiness.audit(index_path, pack=pack, expected_record_inputs={retry_key: wrong_retry_pins})
+    assert_candidate_unverified(conflict, 'MVP_INPUT_FILE_CHANGED', ('LIF-12',))
 
     candidate_target = sides['candidate']['target']
     original_target = candidate_target.read_bytes()
     candidate_target.write_bytes(original_target + b'\n')
     changed = tool.readiness.audit(index_path, pack=pack)
     candidate_target.write_bytes(original_target)
-    assert_candidate_unverified(changed, 'MVP_INPUT_FILE_CHANGED')
+    assert_candidate_unverified(changed, 'MVP_INPUT_FILE_CHANGED', ('OBS-11', 'LIF-12'))
+
+    for role in ('retry_scope', 'record_producer'):
+        path = Path(retries['candidate'][role])
+        original = path.read_bytes()
+        path.write_bytes(original + b'\n')
+        changed = tool.readiness.audit(index_path, pack=pack)
+        path.write_bytes(original)
+        assert_candidate_unverified(changed, 'MVP_INPUT_FILE_CHANGED', ('LIF-12',))
+
+    candidate_scope = Path(retries['candidate']['retry_scope'])
+    original_scope = candidate_scope.read_bytes()
+    invalid_scope = json.loads(original_scope)
+    invalid_scope['run_id'] = 'unrelated-example-run'
+    _write(candidate_scope, invalid_scope)
+    original_pins = published[retry_key]['record_inputs']
+    published[retry_key]['record_inputs'] = {**original_pins, 'retry_scope_sha256': sha256_hex(candidate_scope.read_bytes())}
+    altered = tool.readiness.audit(_write(tmp_path / 'unowned-retry-index.json', index), pack=pack)
+    candidate_scope.write_bytes(original_scope)
+    assert_candidate_unverified(altered, 'RETRY_CONFIGURATION_INVALID', ('LIF-12',))
+
+    incomplete_pins = {name: digest for name, digest in original_pins.items() if name != 'retry_scope_sha256'}
+    for invalid_pins in (incomplete_pins, published[key]['record_inputs']):
+        published[retry_key]['record_inputs'] = invalid_pins
+        malformed = tool.readiness.audit(_write(tmp_path / 'malformed-retry-index.json', index), pack=pack)
+        assert_candidate_unverified(malformed, 'MVP_RECORD_INPUT_REFERENCE_INVALID', ('LIF-12',))
+    published[retry_key]['record_inputs'] = original_pins
 
     changed_config = deepcopy(config)
     changed_config['sides']['candidate']['run_binding']['OBS-11']['record_session'] = 'c' * 32
@@ -2220,11 +2262,21 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
     assert_candidate_unverified(tool.readiness.audit(unscoped_index, pack=pack), 'MVP_RECORD_INPUT_SCOPE_INVALID')
 
     published[key]['configuration'] = original_pointer
+    invalid_retry = deepcopy(config)
+    invalid_retry['check_config']['LIF-12']['retry_record_snapshot_only'] = False
+    invalid_retry_path = tmp_path / 'unscoped-retry.toml'
+    tool.write_config(invalid_retry, invalid_retry_path)
+    published[retry_key]['configuration'] = {'path': str(invalid_retry_path),
+                                             'sha256': sha256_hex(invalid_retry_path.read_bytes())}
+    unscoped_retry = _write(tmp_path / 'unscoped-retry-index.json', index)
+    assert_candidate_unverified(tool.readiness.audit(unscoped_retry, pack=pack),
+                                'MVP_RECORD_INPUT_SCOPE_INVALID', ('LIF-12',))
+    published[retry_key]['configuration'] = original_pointer
+
     published[key]['record_inputs'] = {**published[key]['record_inputs'], 'record_session_sha256': 'A' * 64}
     malformed_index = _write(tmp_path / 'malformed-status-index.json', index)
     assert_candidate_unverified(tool.readiness.audit(malformed_index, pack=pack), 'MVP_RECORD_INPUT_REFERENCE_INVALID')
 
-    candidate_scope = Path(retries['candidate']['retry_scope'])
     assemble = tool.assemble
 
     def replace_scope_after_assembly(*args, **kwargs):

@@ -80,8 +80,8 @@ def test_materialized_retry_scopes_join_both_sides_without_collection(tmp_path, 
     materialized = retry_inputs.prepare(paths, policy_path, selection, pin, output, pack=pack)
     published = json.loads((output / "retry-record-inputs.json").read_bytes())
     assert published == materialized
-    config, _, decisions = wiring.assemble(paths, policy_path, pack=pack, store=tmp_path / "store",
-                                           retry_record_inputs=published)
+    config, bindings, decisions = wiring.assemble(paths, policy_path, pack=pack, store=tmp_path / "store",
+                                                  retry_record_inputs=published)
     assert config["update"]["allowed_checks"] == ["LIF-12"]
     assert decisions["LIF-12"]["configuration_enabled"]
     for side, item in published.items():
@@ -94,6 +94,15 @@ def test_materialized_retry_scopes_join_both_sides_without_collection(tmp_path, 
         assert emitted["producer_source_sha256"] == declarations[side]["record_producer"]["sha256"]
         assert emitted["policy_sha256"] == sha256_hex(canonical_json(values))
         assert emitted["limits"] == values["retry_limits"]
+
+    assembly = tmp_path / "prebound"
+    assembly.mkdir()
+    wiring._publish_prebound(assembly, config=config, bindings=bindings, checks=decisions, pack=pack,
+                             preparations=None, record_checks={"LIF-12"})
+    audited = wiring.readiness.audit(assembly / "input-sources.json", pack=pack)
+    assert audited["file_binding_valid_sides"] == 2
+    assert {row["side"]: row["record_inputs"] for row in audited["rows"] if row["check_id"] == "LIF-12"} == (
+        decisions["LIF-12"]["prepared_record_input_sha256_by_side"])
 
     target_path = paths["candidate"]["target"]
     target = json.loads(target_path.read_bytes())

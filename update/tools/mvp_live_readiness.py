@@ -70,6 +70,7 @@ SIDES = ('baseline', 'candidate')
 _INPUT_FILES = ('environment', 'policy', 'configuration')
 _INPUT_ROW_FIELDS = {'check_id', 'side', *_INPUT_FILES}
 _COLLECTION_STATUS_DIGESTS = {'target_file_sha256', 'record_session_sha256'}
+_RETRY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'retry_scope_sha256', 'retry_record_source_sha256'}
 STARTUP_OBSERVERS = {
     'LIF-01': ('startup_load_source', normal_startup_load_transport, 'NORMAL_STARTUP_LOAD'),
     'SUP-07': ('compile_cache_source', normal_compile_cache_transport, 'NORMAL_COMPILE_CACHE'),
@@ -328,11 +329,15 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
                          and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
     if 'record_inputs' in source:
-        if (not collection_status or not prebound_kubernetes or run_binding.stages_for(check) != (2,)
-                or cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-11']) is not True):
+        if retry_records and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['LIF-12']) is True:
+            digests = _RETRY_RECORD_DIGESTS
+        elif (collection_status and prebound_kubernetes and run_binding.stages_for(check) == (2,)
+              and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-11']) is True):
+            digests = _COLLECTION_STATUS_DIGESTS
+        else:
             raise ValueError('MVP_RECORD_INPUT_SCOPE_INVALID')
         record_inputs = source['record_inputs']
-        if (type(record_inputs) is not dict or record_inputs.keys() != _COLLECTION_STATUS_DIGESTS
+        if (type(record_inputs) is not dict or record_inputs.keys() != digests
                 or not all(_is_sha256(digest) for digest in record_inputs.values())):
             raise ValueError('MVP_RECORD_INPUT_REFERENCE_INVALID')
         if expected_record_inputs is not None and record_inputs != expected_record_inputs:

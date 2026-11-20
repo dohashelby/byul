@@ -22,6 +22,7 @@ from guard.collectors import gpu_input_producers as producers
 from guard.collectors import process_device_observer as device_observer
 from guard.collectors import process_device_producer as device_producer
 from guard.collectors import scoped_consumption
+from guard.collectors import worker_shard_producer
 from guard.collectors.gpu_common_inputs import GpuInputError
 from guard.collectors.gpu_common_input_v4 import event_count
 from guard.models import canonical_json, sha256_hex
@@ -138,6 +139,21 @@ def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode
             continue
         records[kind] = {'record': record, 'validation': result}
         summaries.append(_summary(record, result))
+    if prepared.get('worker_shards') is True or settings.get('worker_shards') is True:
+        kind = 'worker-shard-load'
+        if (prepared.get('worker_shards') is not True or settings.get('worker_shards') is not True
+                or settings.get('session') != prepared['session']):
+            records[kind] = {'contract_error': 'WORKER_SHARD_PREPARED_SCOPE_MISMATCH'}
+        else:
+            try:
+                record, result = worker_shard_producer.record_from_processes(processes, **scope)
+            except (KeyError, TypeError, ValueError):
+                records[kind] = {'contract_error': 'WORKER_SHARD_CAPTURE_CONTRACT_ERROR'}
+            else:
+                records[kind] = {'record': record, 'validation': result}
+        captured = records[kind]
+        summaries.append(_summary(captured['record'], captured['validation']) if 'record' in captured
+                         else {'kind': kind, 'contract_error': captured['contract_error']})
     if roots:
         files = producers.supply_open_files(processes)
         hashes = transport.engine_supply_hashes(roots, files)

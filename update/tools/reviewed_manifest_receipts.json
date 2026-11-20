@@ -1120,6 +1120,11 @@
       "manifest_sha256": "a5710ac4944d97c6f99abffb881c4dae5807f9de17a9d44b0aad0d9f646abfe9",
       "reviewed_by": "Codex / LIF-05 and LIF-16 pinned model reference scopes / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T07:09:07+00:00"
+    },
+    {
+      "manifest_sha256": "7e68f5173d9db59fce11d6b732f668843b498856080d5ffc9766e04303edbbab",
+      "reviewed_by": "Codex / passive metadata target-read review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T08:47:19+00:00"
     }
   ]
 }

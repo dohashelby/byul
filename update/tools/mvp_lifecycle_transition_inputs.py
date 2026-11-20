@@ -127,6 +127,8 @@ def _prepared_sides(selection, check, releases, issued_at, captured):
 def _prebound_metadata(source, pack, policy, primary_refs, captured):
     from tools import mvp_metadata_wiring as metadata
 
+    if type(source) is dict and source.keys() == {'path', 'sha256'}:
+        _, source = _selected_file(source, 262144, captured)
     sides = set(readiness.SIDES)
     if (type(source) is not dict or source.keys() != {'index', 'targets'}
             or type(source['targets']) is not dict or source['targets'].keys() != sides):
@@ -175,7 +177,8 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     if ('SUP-04' in allowed and type(node) is dict and node.keys() == {'node_image_verification'}
             and node['node_image_verification'] in metadata.NODE_IMAGE_PROFILES):
         expected['SUP-04'] = node
-    if overrides != expected:
+    if overrides != expected or any(overrides[check_id][option] is not True
+                                      for check_id, option in metadata.CHECK_OPTIONS.items() if check_id in allowed):
         raise ValueError(_METADATA_INVALID)
 
     _, policy_doc = _selected_file(policy_pointer, 262144, captured)
@@ -212,6 +215,7 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
 
     A prebound metadata input provides its standard source index pointer under
     ``index`` and one independently pinned target per side under ``targets``.
+    A pinned file pointer to that declaration is also accepted.
     """
     if (not isinstance(selections, (list, tuple)) or not 1 <= len(selections) <= len(transition.REDEPLOY_CHECKS)
             or any(not isinstance(pair, (list, tuple)) or len(pair) != 2 for pair in selections)):
@@ -299,11 +303,18 @@ def main(argv=None):
         help='Independent SHA-256 of the exact selection bytes, in selection order')
     parser.add_argument('--output', type=Path, required=True, help='New directory for guard.toml and readiness.json')
     parser.add_argument('--store', type=Path, help='Store path used in the emitted configuration')
+    parser.add_argument('--prebound-metadata', type=Path,
+        help='Saved declaration with the prebound source index pointer and independently pinned targets by side')
+    parser.add_argument('--prebound-metadata-sha256', help='Independent SHA-256 of the prebound declaration bytes')
     args = parser.parse_args(argv)
     if len(args.selection) != len(args.selection_sha256):
         parser.error('each --selection requires one --selection-sha256')
+    if (args.prebound_metadata is None) != (args.prebound_metadata_sha256 is None):
+        parser.error('--prebound-metadata and --prebound-metadata-sha256 are required together')
     selections = list(zip(args.selection, args.selection_sha256, strict=True))
-    prepare_many(args.policy, selections, args.output, pack=load_pack(args.pack), store=args.store)
+    metadata = None if args.prebound_metadata is None else {
+        'path': str(args.prebound_metadata), 'sha256': args.prebound_metadata_sha256}
+    prepare_many(args.policy, selections, args.output, pack=load_pack(args.pack), store=args.store, prebound_metadata=metadata)
     print(args.output / CONFIG_NAME)
     print(args.output / INDEX_NAME)
 

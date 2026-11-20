@@ -237,6 +237,8 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
     ('other-policy', 'MVP_TRANSITION_METADATA_POLICY_MISMATCH'),
     ('other-env', 'MVP_TRANSITION_METADATA_ENVIRONMENT_MISMATCH'),
     ('changed-target', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('scope-mismatch', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('option-not-true', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
     ('output-alias', 'outside source inputs'),
 ])
 def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, monkeypatch, case, error):
@@ -244,7 +246,12 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     check_id = 'LIF-16'
     pack, envs, _, cfg = fixture._configuration(external, check_id, mvp_inputs=True, lab=False)
     policy_values = {'SUP-04': {'approved_image_digests': [env.engine.image_digest for env in envs]}}
-    confirmed = policy(pack.ref(), scope={'include': ['SUP-04', check_id]}, values=policy_values,
+    stock_checks = ['SUP-04']
+    if case == 'option-not-true':
+        stock_checks.append('PLT-06')
+        policy_values['PLT-06'] = {'worker_isolation_requirement': 'independent-uid',
+                                   'worker_trust_group_markers': ['VLLM', 'Worker']}
+    confirmed = policy(pack.ref(), scope={'include': [*stock_checks, check_id]}, values=policy_values,
                        data_origin=DataOrigin.DECLARED, status='CONFIRMED',
                        confirmed_by='EXAMPLE operator', confirmed_at=T0)
     policy_path = external / 'policy.json'
@@ -272,11 +279,15 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         stock_sources[side] = {'target': path, 'environment': env_path}
 
     stock_config, stock_rows, _ = metadata.assemble(stock_sources, stock_policy, pack=pack, store=stock / 'store')
-    assert stock_config['update']['allowed_checks'] == ['SUP-04']
+    assert stock_config['update']['allowed_checks'] == stock_checks
     if case == 'staged':
         stock_config = metadata.staged_config(stock_config, stock / 'later-target.json')
     if case == 'duplicate':
         stock_rows.append(stock_rows[0])
+    elif case == 'scope-mismatch':
+        stock_config['update']['allowed_checks'].append(check_id)
+    elif case == 'option-not-true':
+        stock_config['check_config']['PLT-06']['worker_trust_metadata_only'] = 1
     config_path = stock / 'guard.toml'
     index_path = stock / 'input-sources.json'
     write_config(stock_config, config_path)
@@ -300,7 +311,13 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         assert not output.exists()
         return
 
-    materialized, joined = materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=sources)
+    declaration = external / 'prebound-metadata.json'
+    declaration.write_bytes(canonical_json(sources))
+    materializer.main(['--pack', str(pack.path), '--policy', str(policy_path), '--output', str(output),
+        '--selection', str(selection), '--selection-sha256', selections[0][1],
+        '--prebound-metadata', str(declaration), '--prebound-metadata-sha256', _pointer(declaration)['sha256']])
+    materialized = tomllib.loads((output / materializer.CONFIG_NAME).read_text(encoding='utf-8'))
+    joined = json.loads((output / materializer.INDEX_NAME).read_bytes())
     assert materialized['update']['allowed_checks'] == ['SUP-04', check_id]
     for side in readiness.SIDES:
         settings = materialized['sides'][side]
@@ -311,3 +328,5 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     report = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
     assert report['sides'] == 138 and report['file_binding_valid_sides'] == 4
     assert not report['engine_executed'] and not report['ready_for_execution'] and report['actual_results'] is None
+    prepared = application.update_readiness(pack, envs, confirmed, materialized)
+    assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared

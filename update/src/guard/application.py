@@ -11,7 +11,8 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECORD_SNAPSHOT_OPTION,
+from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR,
+                                 GATEWAY_RECORD_SNAPSHOT_OPTION,
                                  INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_COMPILE_CACHE_SCOPE_ERROR, NORMAL_FILE_READS_SCOPE_ERROR,
@@ -19,7 +20,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECOR
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_SCOPE_ERROR,
-                                 bounded_metadata_scopes, cilium_egress_status_requested, for_check,
+                                 bounded_metadata_scopes, cilium_egress_status_requested, collection_status_snapshot_requested, for_check,
                                  installed_plugin_inventory_requested,
                                  normal_compile_cache_requested,
                                  normal_file_reads_requested,
@@ -163,6 +164,7 @@ def _update_config_for_execution(pack, cfg, allowed_checks):
 def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
     sides = cfg.get("sides", {})
     if (cilium_egress_status_requested(cfg) or installed_plugin_inventory_requested(cfg)
+            or collection_status_snapshot_requested(cfg)
             or normal_compile_cache_requested(cfg)
             or normal_file_reads_requested(cfg)
             or normal_graph_capture_requested(cfg)
@@ -653,6 +655,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 transition_requested = bool(_kubernetes_transition_configurations(effective_sides)[1])
         validate_pack(pack)
         if single:
+            if collection_status_snapshot_requested(cfg):
+                raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
             effective, managed = _validation_inputs(envs[0], cfg)
             prepared = ("managed", {"single": effective}, {"single": managed})
         else:
@@ -834,7 +838,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         executor.prepared_inputs(check_def, selected_env, values)
                     if (kube and item.check_id == "OBS-11" and isinstance(executor, KubernetesLogIntegrityExecutor)
                             and 2 in run_binding.stages_for(check_def)):
-                        executor.prepared_collection_status(check_def, selected_env, values)
+                        executor.prepared_collection_status(check_def, selected_env, values,
+                                                            expected_target_sha256=expected_target)
                     if (kube and isinstance(executor, KubernetesRecordAccessExecutor)
                             and run_binding.is_record_access_binding(check_def)):
                         executor.prepared_record_access(check_def, selected_env, values)

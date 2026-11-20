@@ -320,11 +320,10 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=Fals
 
 
 def _prebound_record_binding(check, env, values, *, policy, side, target_pointer, target_sha256, record_inputs):
-    settings = {'target': target_pointer['path']}
+    settings = {'target': target_pointer['path'], CHECK_OPTIONS[check.id]: True}
     run_cfg = dict(record_inputs)
     if check.id == 'LIF-12':
         settings['retry_scope'] = run_cfg.pop('retry_scope')
-        settings[CHECK_OPTIONS[check.id]] = True
     elif run_binding.stages_for(check) != (2,):
         raise ValueError('METADATA_COLLECTION_STATUS_PROFILE_UNAVAILABLE')
     _, effective = run_binding.effective_values(check, settings, env, values,

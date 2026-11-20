@@ -31,7 +31,8 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNA
                                  NORMAL_STARTUP_LOAD_OPTION,
                                  NORMAL_TOKEN_INPUT_OPTION,
                                  SUP05_PREPARATION_RECEIPT,
-                                 bounded_metadata_scopes, cilium_egress_status_requested, for_check, merge_config,
+                                 bounded_metadata_scopes, cilium_egress_status_requested, collection_status_snapshot_requested,
+                                 for_check, merge_config,
                                  installed_plugin_inventory_requested, normal_request_latency_requested,
                                  normal_compile_cache_requested, normal_file_reads_requested,
                                  normal_graph_capture_requested,
@@ -236,6 +237,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     side_configs = {side: merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES}
     if any(_paired_normal_control_requested(raw)
            or cilium_egress_status_requested(raw) or installed_plugin_inventory_requested(raw)
+           or collection_status_snapshot_requested(raw)
            or normal_compile_cache_requested(raw)
            or normal_file_reads_requested(raw)
            or normal_graph_capture_requested(raw)

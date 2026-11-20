@@ -1966,7 +1966,7 @@ def test_copy_and_observation_share_executor_with_separate_pinned_record_inputs(
     assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == 'COPY_CONFIGURATION_INVALID'
 
 
-def test_obs11_canonical_prepare_uses_exact_side_sessions_without_default_activation(sources):
+def _obs11_inputs(sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())
     approved = json.loads((tool.readiness.ROOT / 'docs/dev-1/mvp-enterprise-policy-20261116.json').read_bytes())
@@ -1979,6 +1979,11 @@ def test_obs11_canonical_prepare_uses_exact_side_sessions_without_default_activa
                             'run_binding': {'OBS-11': {'record_session': f'{number:032x}'}}}
                      for number, (side, entry) in enumerate(sides.items(), 1)}}
     envs = [tool.Environment.model_validate_json(entry['environment'].read_bytes()) for entry in sides.values()]
+    return pack, sides, policy, cfg, envs
+
+
+def test_obs11_canonical_prepare_uses_exact_side_sessions_without_default_activation(sources):
+    pack, _, policy, cfg, envs = _obs11_inputs(sources)
     assert tool.run_binding.config_keys(pack.checks['OBS-11']) == {'record_session'}
     readiness = application.update_readiness(pack, envs, policy, cfg)
     assert next(row for row in readiness['checks'] if row['check'] == 'inputs')['ok'], readiness
@@ -1986,6 +1991,91 @@ def test_obs11_canonical_prepare_uses_exact_side_sessions_without_default_activa
     cfg['sides']['candidate']['run_binding'] = {}
     blocked = application.update_readiness(pack, envs, policy, cfg)
     assert next(row for row in blocked['checks'] if row['check'] == 'inputs')['detail'] == 'RUN_BINDING_CONFIG_INVALID'
+
+
+@pytest.mark.parametrize('case', ['exact', 'unsealed', 'replacement', 'audit', 'changed-session', 'sibling'])
+def test_obs11_snapshot_uses_the_locked_plan_owner_and_side_session(tmp_path, monkeypatch, sources, case):
+    from guard.configuration import COLLECTION_STATUS_SNAPSHOT_OPTION
+    from guard.core import run
+    from guard.executors import kubernetes_log_integrity as observer
+    from guard.models import Mode, Side
+    from guard.store.packs import put_pack
+
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('Invalid or fixture-only status input reached transport I/O')
+
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    monkeypatch.setattr(observer, '_read_collection_status', forbid_io)
+    monkeypatch.setattr(observer.KubernetesLogIntegrityExecutor, '_transport', forbid_io)
+    pack, sides, pol, cfg, envs = _obs11_inputs(sources)
+    cfg['check_config'] = {'OBS-11': {COLLECTION_STATUS_SNAPSHOT_OPTION: True}}
+    store = Store(tmp_path / 'store')
+    if case == 'sibling':
+        cfg['update']['allowed_checks'].append('OBS-09')
+        monkeypatch.setattr(application, 'update_inputs', forbid_io)
+        with pytest.raises(ValueError, match='^COLLECTION_STATUS_SNAPSHOT_SCOPE_INVALID$'):
+            application.execute_update(store, pack, envs, pol, cfg, tmp_path / 'run', utcnow())
+        return
+
+    put_pack(store, pack.path)
+    use_envs = envs[:1] if case == 'audit' else envs
+    plan = select(pack, use_envs, pol, mode=Mode.audit if case == 'audit' else Mode.update)
+    if case not in {'audit', 'unsealed'}:
+        plan = bind_recipe(plan, cfg, use_envs)
+    store.put_many([*use_envs, pol, plan])
+    path = sides['candidate']['target']
+    digest = sha256_hex(canonical_json(json.loads(path.read_bytes())))
+    rc = application.run_config(cfg)
+    # Runtime-only target pins are never the source of this scoped binding.
+    rc.side_configs['candidate'].raw['_kubernetes_target_sha256_by_check'] = {'OBS-11': '0' * 64}
+    original = observer.KubernetesLogIntegrityExecutor.run
+    seen = []
+
+    def inspect_pin(executor, check, env, values, adapter, workdir):
+        assert case in {'exact', 'replacement'}
+        assert executor._expected_target_sha256 == digest
+        assert values['collection_session'] == cfg['sides']['candidate']['run_binding']['OBS-11']['record_session']
+        seen.append(env.ref())
+        if case == 'replacement':
+            return original(executor, check, env, values, adapter, workdir)
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False})
+
+    monkeypatch.setattr(observer.KubernetesLogIntegrityExecutor, 'run', inspect_pin)
+    if case == 'audit':
+        with pytest.raises(ValueError, match='^COLLECTION_STATUS_SNAPSHOT_SCOPE_INVALID$'):
+            run.run_plan(store, pack, plan, rc)
+        assert not seen and not list(store.iter_kind('EVD'))
+        return
+    if case == 'changed-session':
+        rc.side_configs['candidate'].raw['run_binding']['OBS-11']['record_session'] = 'f' * 32
+        with pytest.raises(ValueError, match='^OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID$'):
+            run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+        assert not seen and not list(store.iter_kind('EVD'))
+        return
+    if case == 'replacement':
+        original_run_one = run._run_one
+
+        def replace_after_lock(*args, **kwargs):
+            edited = json.loads(path.read_bytes())
+            edited['kubernetes']['probe']['pod_uid'] = '00000000-0000-0000-0000-000000000003'
+            _write(path, edited)
+            return original_run_one(*args, **kwargs)
+
+        monkeypatch.setattr(run, '_run_one', replace_after_lock)
+
+    evd, = run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+    if case == 'unsealed':
+        assert not seen and evd.execution.status is ExecStatus.NOT_RUN
+        assert evd.execution.abort_reason == 'RUN_BINDING_COLLECTION_STATUS_TARGET_UNAVAILABLE'
+    else:
+        assert seen == [envs[1].ref()]
+        if case == 'replacement':
+            assert evd.execution.status is ExecStatus.ABORTED and not evd.artifacts
+        else:
+            assert evd.execution.status is ExecStatus.COMPLETED and evd.data_origin is DataOrigin.EXAMPLE
+            assert evd.execution.run_binding['values']['collection_session'] == '0' * 31 + '2'
 
 
 def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path, monkeypatch, sources):
@@ -2054,6 +2144,9 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
         assert for_check(merged, 'request_termination', 'LIF-12')['request_termination'] == {
             'target': str(paths['target']), 'retry_record_snapshot_only': True, 'retry_scope': retries[side]['retry_scope']}
         assert for_check(merged, 'request_termination', 'REQ-12')['request_termination'] == {'target': str(paths['target'])}
+        assert for_check(merged, 'log_integrity', 'OBS-11')['log_integrity'] == {
+            'target': str(paths['target']), 'collection_status_snapshot_only': True}
+        assert for_check(merged, 'log_integrity', 'OBS-09')['log_integrity'] == {'target': str(paths['target'])}
         assert merged['run_binding']['LIF-12'] == {key: retries[side][key] for key in ('record_session', 'record_producer')}
         assert merged['run_binding']['OBS-11'] == status[side]
     ready = application.update_readiness(pack, envs, pol, config)

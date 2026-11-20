@@ -50,6 +50,8 @@ _NORMAL_ONLY_CASES = {
 }
 RETRY_RECORD_SNAPSHOT_OPTION = "retry_record_snapshot_only"
 RETRY_RECORD_SNAPSHOT_SCOPE_ERROR = "RETRY_RECORD_SNAPSHOT_SCOPE_INVALID"
+COLLECTION_STATUS_SNAPSHOT_OPTION = "collection_status_snapshot_only"
+COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR = "COLLECTION_STATUS_SNAPSHOT_SCOPE_INVALID"
 RECORD_SNAPSHOT_OPTIONS = {
     "OBS-01": "record_snapshot_only",
     "PLT-12": "copy_record_snapshot_only",
@@ -57,6 +59,7 @@ RECORD_SNAPSHOT_OPTIONS = {
 KUBERNETES_BOUND_CHECK_OPTIONS = {
     **RECORD_SNAPSHOT_OPTIONS,
     "LIF-12": RETRY_RECORD_SNAPSHOT_OPTION,
+    "OBS-11": COLLECTION_STATUS_SNAPSHOT_OPTION,
     **{check_id: option for check_id, (_, option, _) in _NORMAL_ONLY_CASES.items()},
     "OBS-04": "local_observation_only",
     "PLT-02": "protected_path_metadata_only",
@@ -145,6 +148,10 @@ def _validate_normal_option_placement(raw, option, paths, error):
 
 def retry_record_snapshot_requested(raw):
     return next(_option_occurrences(raw, RETRY_RECORD_SNAPSHOT_OPTION), None) is not None
+
+
+def collection_status_snapshot_requested(raw):
+    return next(_option_occurrences(raw, COLLECTION_STATUS_SNAPSHOT_OPTION), None) is not None
 
 
 def normal_request_latency_requested(raw):
@@ -296,6 +303,23 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                                              for cid in allowed_checks)):
                 raise ValueError(retry_error)
             scoped["LIF-12"] = (settings, bindings.get("LIF-12") if type(bindings) is dict else None)
+        if collection_status_snapshot_requested(raw):
+            status_option = COLLECTION_STATUS_SNAPSHOT_OPTION
+            status_error = COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR
+            _validate_normal_option_placement(raw, status_option, {(CHECK_CONFIG, "OBS-11", status_option)}, status_error)
+            executor = "log_integrity"
+            settings = for_check(raw, executor, "OBS-11").get(executor, {})
+            update = raw.get("update", {})
+            status_binding = bindings.get("OBS-11") if type(bindings) is dict else None
+            if (settings.get(status_option) is not True or allowed_checks is None
+                    or {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {"OBS-11"}
+                    or raw.get("executors", {}).get(executor) != "kubernetes"
+                    or update.get("mode", "external") != "external"
+                    or update.get("kubernetes_candidate_binding", "prebound") != "prebound"
+                    or raw.get("lab_activation") or raw.get("record_attestation")
+                    or type(status_binding) is not dict or set(status_binding) != {"record_session"}):
+                raise ValueError(status_error)
+            scoped["OBS-11"] = (settings, status_binding)
         stream_cases = {}
         for check_id, (executor, option, scope_error) in _NORMAL_ONLY_CASES.items():
             overlay = overlays.get(check_id) if type(overlays) is dict else None
@@ -389,6 +413,9 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         sides = [check_id in scoped for scoped in scopes]
         if any(sides) and (len(sides) != 2 or not all(sides)):
             raise ValueError(scope_error)
+    status_sides = ["OBS-11" in scoped for scoped in scopes]
+    if any(status_sides) and (len(status_sides) != 2 or not all(status_sides)):
+        raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
     if any(scopes) and (len(scopes) != 2 or set(scopes[0]) != set(scopes[1])):
         raise ValueError(error)
     if any(gateway_modes) and not all(gateway_modes):

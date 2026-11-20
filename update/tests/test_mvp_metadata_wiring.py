@@ -2270,7 +2270,7 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
                                              'sha256': sha256_hex(invalid_retry_path.read_bytes())}
     unscoped_retry = _write(tmp_path / 'unscoped-retry-index.json', index)
     assert_candidate_unverified(tool.readiness.audit(unscoped_retry, pack=pack),
-                                'MVP_RECORD_INPUT_SCOPE_INVALID', ('LIF-12',))
+                                'RETRY_RECORD_SNAPSHOT_SCOPE_INVALID', ('LIF-12',))
     published[retry_key]['configuration'] = original_pointer
 
     published[key]['record_inputs'] = {**published[key]['record_inputs'], 'record_session_sha256': 'A' * 64}

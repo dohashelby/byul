@@ -67,6 +67,8 @@ from tools.mvp_versions import versions
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = 'guard-mvp-live-input-sources/1'
 SIDES = ('baseline', 'candidate')
+_INPUT_FILES = ('environment', 'policy', 'configuration')
+_INPUT_ROW_FIELDS = {'check_id', 'side', *_INPUT_FILES}
 STARTUP_OBSERVERS = {
     'LIF-01': ('startup_load_source', normal_startup_load_transport, 'NORMAL_STARTUP_LOAD'),
     'SUP-07': ('compile_cache_source', normal_compile_cache_transport, 'NORMAL_COMPILE_CACHE'),
@@ -194,20 +196,28 @@ def _paired_normal_control_requested(raw):
     return False
 
 
+def _read_input(pointer, *, configured_target=None):
+    if (type(pointer) is not dict or set(pointer) != {'path', 'sha256'}
+            or type(pointer['path']) is not str or not pointer['path']
+            or type(pointer['sha256']) is not str or len(pointer['sha256']) != 64
+            or any(c not in '0123456789abcdef' for c in pointer['sha256'])):
+        raise ValueError('MVP_INPUT_REFERENCE_INVALID')
+    path = pointer['path']
+    if configured_target is not None:
+        if _plain_path(Path(path)) != _plain_path(Path(configured_target)):
+            raise ValueError('MVP_TARGET_REFERENCE_PATH_MISMATCH')
+        path = configured_target
+    raw, identity = _read(path)
+    if sha256(raw).hexdigest() != pointer['sha256']:
+        raise ValueError('MVP_INPUT_HASH_MISMATCH')
+    return raw, identity
+
+
 def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_normal_preparation=None,
              expected_record_inputs=None):
     files, identities = {}, {}
-    for role in ('environment', 'policy', 'configuration'):
-        pointer = source[role]
-        if (type(pointer) is not dict or set(pointer) != {'path', 'sha256'}
-                or type(pointer['path']) is not str or not pointer['path']
-                or type(pointer['sha256']) is not str or len(pointer['sha256']) != 64
-                or any(c not in '0123456789abcdef' for c in pointer['sha256'])):
-            raise ValueError('MVP_INPUT_REFERENCE_INVALID')
-        raw, identity = _read(pointer['path'])
-        if sha256(raw).hexdigest() != pointer['sha256']:
-            raise ValueError('MVP_INPUT_HASH_MISMATCH')
-        files[role], identities[role] = raw, identity
+    for role in _INPUT_FILES:
+        files[role], identities[role] = _read_input(source[role])
     raw_env = json.loads(files['environment'], object_pairs_hook=_pairs)
     if raw_env.get('kind') != 'ENV':
         raise ValueError('MVP_SEALED_ENV_REQUIRED')
@@ -332,6 +342,11 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     normal_serving_readiness = check.id == 'OBS-02' and cfg.get(NORMAL_SERVING_READINESS_OPTION) is True
     normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
     target = cfg['normal']['target'] if normal_file_reads else cfg.get('target')
+    if 'target' in source:
+        other_targets = {'generations', 'native_route', 'challenge', 'target' if normal_file_reads else 'normal'}
+        if (not prebound_kubernetes or type(target) is not str or not target or supply_record_roles
+                or not other_targets.isdisjoint(cfg) or any(key.endswith('_target') for key in cfg)):
+            raise ValueError('MVP_TARGET_REFERENCE_SCOPE_INVALID')
     if implementation == 'kubernetes' and target is None and not (supply_record_roles or generation_inputs):
         raise ValueError('MVP_CURRENT_TARGET_REQUIRED')
     bound_files = []
@@ -366,13 +381,18 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     elif generation_inputs:
         generation_manifest = _generation_manifest_snapshot(cfg, bound_files)
     elif target is not None:
-        raw_target, identity = _read(target)
+        if 'target' in source:
+            raw_target, identity = _read_input(source['target'], configured_target=target)
+            files['target'], identities['target'] = raw_target, identity
+        else:
+            raw_target, identity = _read(target)
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
         if type(target_data) is not dict or target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
         if gateway_snapshot:
             _scoped_target_sha256(raw_target, env, gateway_snapshot=True, scoped_check=check.id)
-        bound_files.append((target, raw_target, identity))
+        if 'target' not in source or source['target']['path'] != target:
+            bound_files.append((target, raw_target, identity))
     if record_access or copy_snapshot or retry_records:
         scope_key, digest_key = {
             'OBS-06': ('subjects', 'record_subject_plan_sha256'),
@@ -635,7 +655,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_prep
         raise ValueError('MVP_SOURCE_INDEX_INVALID')
     sources = {}
     for item in index['inputs']:
-        if (type(item) is not dict or set(item) != {'check_id', 'side', 'environment', 'policy', 'configuration'}
+        if (type(item) is not dict or set(item) - {'target'} != _INPUT_ROW_FIELDS
                 or item['check_id'] not in active or item['side'] not in SIDES):
             raise ValueError('MVP_SOURCE_INDEX_INVALID')
         if item['side'] not in selected_sides:

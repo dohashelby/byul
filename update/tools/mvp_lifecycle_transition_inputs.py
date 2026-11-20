@@ -136,16 +136,20 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     index_path, raw = _pinned_bytes(source['index'], 262144, captured)
     index = strict_json(raw, limit=262144)
     ordinary = set(metadata.CHECK_EXECUTORS) - set(metadata.RECORD_SNAPSHOT_OPTIONS) - set(metadata.PREBOUND_RECORD_EXECUTORS)
+    supported = ordinary | {'OBS-11'}
     if (type(index) is not dict or index.keys() != {'schema', 'pack_ref', 'inputs'}
             or index['schema'] != readiness.SCHEMA or index['pack_ref'] != pack.ref().model_dump(mode='json')
-            or type(index['inputs']) is not list or not 2 <= len(index['inputs']) <= 2 * len(ordinary)):
+            or type(index['inputs']) is not list or not 2 <= len(index['inputs']) <= 2 * len(supported)):
         raise ValueError(_METADATA_INVALID)
     entries, env_pointers = {}, {}
     config_pointer = policy_pointer = None
     for item in index['inputs']:
-        if (type(item) is not dict or item.keys() != {'check_id', 'side', 'environment', 'policy', 'configuration'}
-                or type(item['check_id']) is not str or item['check_id'] not in ordinary
-                or type(item['side']) is not str or item['side'] not in sides):
+        if type(item) is not dict or type(item.get('check_id')) is not str or item['check_id'] not in supported:
+            raise ValueError(_METADATA_INVALID)
+        fields = {'check_id', 'side', 'environment', 'policy', 'configuration'}
+        if item['check_id'] == 'OBS-11':
+            fields.add('record_inputs')
+        if item.keys() != fields or type(item['side']) is not str or item['side'] not in sides:
             raise ValueError(_METADATA_INVALID)
         key = item['check_id'], item['side']
         if key in entries:
@@ -164,7 +168,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
             or update.get('kubernetes_candidate_binding', 'prebound') != 'prebound'):
         raise ValueError('MVP_TRANSITION_PREBOUND_METADATA_REQUIRED')
     allowed = update_allowed_checks(config, pack)
-    if (not allowed or not allowed <= ordinary or set(entries) != {(check_id, side) for check_id in allowed for side in sides}
+    if (not allowed or not allowed <= supported or set(entries) != {(check_id, side) for check_id in allowed for side in sides}
             or config.keys() - {'store', 'adapter', 'update', 'executors', 'sides', 'check_config'}
             or update.keys() - {'mode', 'allowed_checks', 'kubernetes_candidate_binding'}
             or type(config.get('sides')) is not dict or config['sides'].keys() != sides
@@ -196,13 +200,27 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         if type(target) is not dict or target.get('synthetic', False) is not False:
             raise ValueError(_METADATA_INVALID)
         metadata._transport(target, env)
-        if config['sides'][side] != {name: {'target': path} for name in config['executors']}:
-            raise ValueError(_METADATA_INVALID)
+        side_settings = config['sides'][side]
+        expected_side = {name: {'target': path} for name in config['executors']}
         target_pointers[side] = {'path': path, 'sha256': source['targets'][side]['sha256']}
+        if 'OBS-11' in allowed:
+            bindings = side_settings.get('run_binding') if type(side_settings) is dict else None
+            status = bindings.get('OBS-11') if type(bindings) is dict else None
+            if type(status) is not dict or status.keys() != {'record_session'}:
+                raise ValueError(_METADATA_INVALID)
+            session = run_binding._session(status['record_session'])
+            expected_side['run_binding'] = {'OBS-11': {'record_session': session}}
+            record_inputs = {'target_file_sha256': target_pointers[side]['sha256'],
+                             'record_session_sha256': sha256_hex(session.encode('ascii'))}
+            if entries['OBS-11', side]['record_inputs'] != record_inputs:
+                raise ValueError('MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH')
+        if side_settings != expected_side:
+            raise ValueError(_METADATA_INVALID)
 
     report = readiness.audit(index_path, pack=pack)
-    admitted = {(row['check_id'], row['side']) for row in report['rows'] if row['file_binding_valid']}
-    if admitted != set(entries):
+    admitted = {(row['check_id'], row['side']): row for row in report['rows'] if row['file_binding_valid']}
+    if admitted.keys() != entries.keys() or any(admitted[key].get('record_inputs') != entry.get('record_inputs')
+                                               for key, entry in entries.items()):
         raise ValueError('MVP_TRANSITION_METADATA_READINESS_UNVERIFIED')
     pinned_entries = [{**row, 'target': target_pointers[row['side']]} for row in entries.values()]
     return config, pinned_entries, index_path.parent
@@ -218,6 +236,7 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
 
     A prebound metadata input provides its standard source index pointer under
     ``index`` and one independently pinned target per side under ``targets``.
+    An OBS-11 row must also carry its verified collection-status input digests.
     A pinned file pointer to that declaration is also accepted.
     """
     if (not isinstance(selections, (list, tuple)) or not 1 <= len(selections) <= len(transition.REDEPLOY_CHECKS)

@@ -10,11 +10,13 @@ import tomllib
 import pytest
 
 from guard import application
-from guard.executors import lifecycle_transition as transition
+from guard.executors import kubernetes_log_integrity, lifecycle_transition as transition
 from guard.models import DataOrigin, Environment, canonical_json, sha256_hex
 from tests import test_redeployment_preflight as fixture
 from tests.builders import T0, policy
+from tests.test_kubernetes_log_integrity import GAP_VALUES
 from tests.test_lifecycle_capture import external
+from tests.test_model_mapping import declared_mapping
 from tools import mvp_lifecycle_transition_inputs as materializer, mvp_live_readiness as readiness
 from tools import mvp_metadata_wiring as metadata
 from tools.j02_run_config import write_config
@@ -232,6 +234,12 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
 
 @pytest.mark.parametrize('case,error', [
     ('prebound', None),
+    ('obs11', None),
+    ('obs11-missing-pins', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('obs11-target-pin', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('obs11-session-pin', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('obs11-stray-binding', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('obs11-staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
     ('staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
     ('duplicate', 'MVP_TRANSITION_METADATA_DUPLICATE'),
     ('other-policy', 'MVP_TRANSITION_METADATA_POLICY_MISMATCH'),
@@ -244,9 +252,30 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
 def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, monkeypatch, case, error):
     _offline_only(monkeypatch)
     check_id = 'LIF-16'
+    include_status = case.startswith('obs11')
+    if include_status:
+        _, mapping = declared_mapping()
+        build_environment = fixture.environment
+
+        def mapped_environment(*, model, **kwargs):
+            model = {**model, 'id': mapping['repository_id'], 'revision': mapping['revision']}
+            return build_environment(model=model, **kwargs)
+
+        def no_status_read(*args, **kwargs):
+            pytest.fail('Offline preparation attempted to read the OBS-11 collection-status file')
+
+        monkeypatch.setattr(fixture, 'environment', mapped_environment)
+        monkeypatch.setattr(kubernetes_log_integrity, '_read_collection_status', no_status_read)
+
     pack, envs, _, cfg = fixture._configuration(external, check_id, mvp_inputs=True, lab=False)
     policy_values = {'SUP-04': {'approved_image_digests': [env.engine.image_digest for env in envs]}}
     stock_checks = ['SUP-04']
+    status_sessions = None
+    if include_status:
+        stock_checks.append('OBS-11')
+        policy_values['OBS-11'] = {key: value for key, value in GAP_VALUES.items() if key != 'collection_session'}
+        status_sessions = {side: {'record_session': f'{number:032x}'}
+                           for number, side in enumerate(readiness.SIDES, 1)}
     if case == 'option-not-true':
         stock_checks.append('PLT-06')
         policy_values['PLT-06'] = {'worker_isolation_requirement': 'independent-uid',
@@ -268,6 +297,9 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         sides[side] = _selected_side(env, rows, cfg['run_binding'][check_id])
         base = rows[0]
         target = json.loads(Path(base['target']).read_bytes())
+        if include_status:
+            target['model_mapping'] = {**mapping, 'environment_ref': env.ref().model_dump(mode='json'),
+                                       'inventory_sha256': env.model.inventory_sha256}
         env_path = Path(base['environment'])
         if case == 'other-env' and side == 'candidate':
             alternate = env.model_copy(update={'id': 'ENV-OTHER-FIXTURE'}).seal()
@@ -278,7 +310,8 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         path.write_bytes(canonical_json(target))
         stock_sources[side] = {'target': path, 'environment': env_path}
 
-    stock_config, stock_rows, _ = metadata.assemble(stock_sources, stock_policy, pack=pack, store=stock / 'store')
+    stock_config, stock_rows, decisions = metadata.assemble(stock_sources, stock_policy, pack=pack, store=stock / 'store',
+                                                            collection_status_bindings=status_sessions)
     assert stock_config['update']['allowed_checks'] == stock_checks
     if case == 'staged':
         stock_config = metadata.staged_config(stock_config, stock / 'later-target.json')
@@ -290,10 +323,33 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         stock_config['check_config']['PLT-06']['worker_trust_metadata_only'] = 1
     config_path = stock / 'guard.toml'
     index_path = stock / 'input-sources.json'
-    write_config(stock_config, config_path)
-    index = readiness.template(pack)
-    index['inputs'] = [{**row, 'configuration': _pointer(config_path)} for row in stock_rows]
-    index_path.write_bytes(canonical_json(index))
+    if include_status:
+        metadata._publish_prebound(stock, config=stock_config, bindings=stock_rows, checks=decisions,
+                                   pack=pack, preparations=None, record_checks={'OBS-11'})
+        index = json.loads(index_path.read_bytes())
+        status = next(row for row in index['inputs'] if row['check_id'] == 'OBS-11' and row['side'] == 'candidate')
+        if case == 'obs11-missing-pins':
+            del status['record_inputs']
+        elif case == 'obs11-target-pin':
+            status['record_inputs']['target_file_sha256'] = '0' * 64
+        elif case == 'obs11-session-pin':
+            status['record_inputs']['record_session_sha256'] = '0' * 64
+        if case == 'obs11-stray-binding':
+            stock_config['sides']['candidate']['run_binding']['LIF-12'] = {'record_session': '3' * 32}
+        if case == 'obs11-staged':
+            stock_config['update']['kubernetes_candidate_binding'] = 'after_baseline'
+        if case in {'obs11-stray-binding', 'obs11-staged'}:
+            write_config(stock_config, config_path)
+            config_pointer = _pointer(config_path)
+            for row in index['inputs']:
+                row['configuration'] = config_pointer
+        if case != 'obs11':
+            index_path.write_bytes(canonical_json(index))
+    else:
+        write_config(stock_config, config_path)
+        index = readiness.template(pack)
+        index['inputs'] = [{**row, 'configuration': _pointer(config_path)} for row in stock_rows]
+        index_path.write_bytes(canonical_json(index))
     sources = {'index': _pointer(index_path), 'targets': {side: _pointer(paths['target'])
                                                         for side, paths in stock_sources.items()}}
     if case == 'changed-target':
@@ -318,20 +374,32 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         '--prebound-metadata', str(declaration), '--prebound-metadata-sha256', _pointer(declaration)['sha256']])
     materialized = tomllib.loads((output / materializer.CONFIG_NAME).read_text(encoding='utf-8'))
     joined = json.loads((output / materializer.INDEX_NAME).read_bytes())
-    assert materialized['update']['allowed_checks'] == ['SUP-04', check_id]
+    assert materialized['update']['allowed_checks'] == [*stock_checks, check_id]
     for side in readiness.SIDES:
         settings = materialized['sides'][side]
         assert settings['container_config'] == stock_config['sides'][side]['container_config']
-        assert set(settings['check_config']) == set(settings['run_binding']) == {check_id}
+        assert set(settings['check_config']) == {check_id}
+        assert set(settings['run_binding']) == ({check_id, 'OBS-11'} if include_status else {check_id})
+        if include_status:
+            assert settings['log_integrity'] == stock_config['sides'][side]['log_integrity']
+            assert settings['run_binding']['OBS-11'] == status_sessions[side]
     assert all(item['configuration'] == _pointer(output / 'guard.toml') for item in joined['inputs'])
     for item in joined['inputs']:
-        if item['check_id'] == 'SUP-04':
+        if item['check_id'] in stock_checks:
             assert item['target'] == sources['targets'][item['side']]
         else:
             assert 'target' not in item
+        if item['check_id'] == 'OBS-11':
+            assert item['record_inputs'] == decisions['OBS-11']['prepared_record_input_sha256_by_side'][item['side']]
+        else:
+            assert 'record_inputs' not in item
     assert _pointer(index_path) == sources['index'] and _pointer(config_path) == index['inputs'][0]['configuration']
     report = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
-    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 4
+    expected_bound = 2 * (len(stock_checks) + 1)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == expected_bound
+    if include_status:
+        assert {row['side']: row['record_inputs'] for row in report['rows'] if row['check_id'] == 'OBS-11'} == (
+            decisions['OBS-11']['prepared_record_input_sha256_by_side'])
     assert not report['engine_executed'] and not report['ready_for_execution'] and report['actual_results'] is None
     prepared = application.update_readiness(pack, envs, confirmed, materialized)
     assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
@@ -340,7 +408,7 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     original = target.read_bytes()
     target.write_bytes(original + b'\n')
     changed = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
-    assert changed['file_binding_valid_sides'] == 3
+    assert changed['file_binding_valid_sides'] == expected_bound - len(stock_checks)
     stock_row = next(row for row in changed['rows'] if row['check_id'] == 'SUP-04' and row['side'] == 'candidate')
     assert not stock_row['file_binding_valid']
 
@@ -353,6 +421,6 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     wrong_index = output / 'wrong-index.json'
     wrong_index.write_bytes(canonical_json(joined))
     wrong_path = readiness.audit(wrong_index, pack=pack)
-    assert wrong_path['file_binding_valid_sides'] == 3
+    assert wrong_path['file_binding_valid_sides'] == expected_bound - 1
     stock_row = next(row for row in wrong_path['rows'] if row['check_id'] == 'SUP-04' and row['side'] == 'candidate')
     assert not stock_row['file_binding_valid']

@@ -1110,6 +1110,11 @@
       "manifest_sha256": "edcb54ccbc55ca242d8eaa93ebb5f5844895ef6e06558a52a416b2685d0265b3",
       "reviewed_by": "Codex / LIF-05 and LIF-16 pinned paired transition preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T04:26:07+00:00"
+    },
+    {
+      "manifest_sha256": "bb5a9b6caa659c5e4d07827a7e1eb24880b8e48ead71fcbcc6117514a7b83432",
+      "reviewed_by": "Codex / LIF-05 and LIF-16 pinned model reference scopes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T07:00:43+00:00"
     }
   ]
 }

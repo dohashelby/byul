@@ -27,6 +27,7 @@ def _pointer(path):
     ('LIF-16', 'same-pod-restart', None),
     ('LIF-05', 'selection-changed', 'MVP_TRANSITION_SELECTION_CHANGED'),
     ('LIF-16', 'raw-target-changed', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('LIF-05', 'lab-target', 'MVP_TRANSITION_GENERATION_TARGET_MISMATCH'),
     ('LIF-05', 'wrong-before-env', 'MVP_TRANSITION_BEFORE_ENVIRONMENT_MISMATCH'),
     ('LIF-16', 'other-release', 'MVP_TRANSITION_GENERATION_ENVIRONMENT_MISMATCH'),
     ('LIF-16', 'other-target-release', 'MVP_TRANSITION_GENERATION_TARGET_MISMATCH'),
@@ -44,7 +45,8 @@ def test_materializes_one_paired_redeployment_check_without_collection(external,
     monkeypatch.setattr(transition.KubernetesHTTP, '__call__', forbidden)
     monkeypatch.setattr(transition.LifecycleTransitionExecutor, 'run', forbidden)
     monkeypatch.setattr(fixture, 'environment', partial(fixture.environment, origin=DataOrigin.DECLARED))
-    pack, envs, _, cfg = fixture._configuration(external, check_id, change=case, mvp_inputs=True)
+    pack, envs, _, cfg = fixture._configuration(external, check_id, change=case, mvp_inputs=True,
+                                               lab=case == 'lab-target')
     confirmed = policy(pack.ref(), scope={'include': [check_id]}, values={}, data_origin=DataOrigin.DECLARED,
                        status='CONFIRMED', confirmed_by='EXAMPLE operator', confirmed_at=T0)
     policy_path = external / 'policy.json'

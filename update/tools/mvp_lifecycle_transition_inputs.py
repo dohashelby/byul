@@ -52,7 +52,8 @@ def _generations(selection, release, captured):
         if (not env.hash_ok() or env.data_origin == 'EXAMPLE'
                 or (env.engine.name, env.engine.version, env.engine.image_digest) != expected):
             raise ValueError('MVP_TRANSITION_GENERATION_ENVIRONMENT_MISMATCH')
-        if (type(target) is not dict or target.get('environment_ref') != env.ref().model_dump(mode='json')
+        if (type(target) is not dict or target.get('lab') is not False or target.get('synthetic', False) is not False
+                or target.get('environment_ref') != env.ref().model_dump(mode='json')
                 or target.get('observed_version') != env.engine.version):
             raise ValueError('MVP_TRANSITION_GENERATION_TARGET_MISMATCH')
         if (type(prepared) is not dict
@@ -139,6 +140,7 @@ def prepare(policy_path, selection_path, expected_selection_sha256, output, *, p
         protected.append(pack.path)
     store_path = None if store is None else _plain_path(Path(store))
     directory = reserve_output(Path(output), protected=protected)
+    directory.chmod(0o700)
     spec['store'] = str(directory / 'store' if store_path is None else store_path)
     config = j02_run_config.build_config(spec)
     config['update']['allowed_checks'] = [check_id]

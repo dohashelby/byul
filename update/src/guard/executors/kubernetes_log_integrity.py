@@ -19,6 +19,7 @@ from pathlib import Path
 import re
 import time
 
+from guard.configuration import COLLECTION_STATUS_SNAPSHOT_OPTION
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.kubernetes_http import LOG_INTEGRITY_PROFILE, KubernetesBindingError, KubernetesHTTP
 from . import log_collection_gap
@@ -29,7 +30,7 @@ from .log_integrity_parser import MAX_CAPTURE_BYTES
 from .owned_capture import EXTENDED_RECORDING_PROFILE, _FILE_READER, strict_json
 
 _SETTINGS = {"target", "kubectl_binary", "request_timeout", "max_duration_seconds", "max_total_requests",
-             "max_id_bytes", "max_events", "endpoint"}
+             "max_id_bytes", "max_events", "endpoint", COLLECTION_STATUS_SNAPSHOT_OPTION}
 _STAMP = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})) ")
 ATTACH_SETTLE_SECONDS = 1.0
 SOURCE_PROFILE = "kubernetes-cri-time-attach-bytes-v1"
@@ -77,6 +78,19 @@ def _read_collection_status(ctx, session):
     finally:
         if reader.report().get("parent_cleanup_unverified"):
             ctx._collection_status_cleanup.append("COLLECTION_STATUS_PARENT_CLEANUP_UNVERIFIED")
+
+
+def _snapshot_target(raw, env):
+    target = strict_json(raw)
+    if (type(target) is not dict or target.get("lab") is not False
+            or target.get("environment_ref") != env.ref().model_dump(mode="json")):
+        raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID")
+    return target
+
+
+def snapshot_target_sha256(raw, env):
+    """Hash a bounded saved OBS-11 declaration in the exact environment scope."""
+    return sha256_hex(canonical_json(_snapshot_target(raw, env)))
 
 
 def align_attach(lines, attach_raw):
@@ -134,6 +148,13 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
     def validate_policy(self, check, values):
         if type(self.cfg) is not dict or set(self.cfg) - _SETTINGS:
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID")
+        if COLLECTION_STATUS_SNAPSHOT_OPTION in self.cfg:
+            from .run_binding import stages_for
+
+            if (self.cfg[COLLECTION_STATUS_SNAPSHOT_OPTION] is not True
+                    or check.id != "OBS-11" or check.executor != self.name
+                    or check.collection_profile != log_collection_gap.PROFILE or stages_for(check) != (2,)):
+                raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID")
         if getattr(check, "collection_profile", None) == log_collection_gap.PROFILE:
             log_collection_gap.validate_policy(values)  # 상태 기록 위치는 probe Pod 고정 경로라 컨테이너 설정이 없다
             return
@@ -143,14 +164,19 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         return KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 300),
             binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=LOG_INTEGRITY_PROFILE)
 
-    def _collection_target(self, *, expected_target_sha256=None):
+    def _collection_target(self, env, *, expected_target_sha256=None):
         from guard.adapters.vllm_file_read_sensor import dependency
 
-        target = strict_json(dependency(self.cfg["target"], None))
+        snapshot = COLLECTION_STATUS_SNAPSHOT_OPTION in self.cfg
+        pins = [pin for pin in (expected_target_sha256, self._expected_target_sha256) if pin is not None]
+        if snapshot and not pins:
+            raise ValueError
+        raw = dependency(self.cfg["target"], None)
+        target = _snapshot_target(raw, env) if snapshot else strict_json(raw)
         if type(target) is not dict:
             raise ValueError
         digest = sha256_hex(canonical_json(target))
-        if any(pin is not None and pin != digest for pin in (expected_target_sha256, self._expected_target_sha256)):
+        if any(pin != digest for pin in pins):
             raise ValueError
         return target
 
@@ -161,7 +187,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         self.validate_policy(check, values)
         try:
             float(self.cfg.get("request_timeout", 30))
-            target = self._collection_target(expected_target_sha256=expected_target_sha256)
+            target = self._collection_target(env, expected_target_sha256=expected_target_sha256)
         except (KeyError, TypeError, ValueError, OverflowError, OSError):
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID") from None
         try:
@@ -177,7 +203,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
                 raise ValueError
             self.validate_policy(check, policy_values)
             if status_profile:
-                target = self._collection_target()
+                target = self._collection_target(env)
             else:
                 target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
                 if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target)) != self._expected_target_sha256:

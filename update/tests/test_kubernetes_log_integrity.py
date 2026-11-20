@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pytest
 
 from guard.adapters.vllm import VllmAdapter
+from guard.configuration import COLLECTION_STATUS_SNAPSHOT_OPTION
 from guard.executors import kubernetes_log_integrity as module
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.executors.log_integrity import _ENV
@@ -283,9 +284,13 @@ def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_pat
             executor.run(gap_check(), env, values, VllmAdapter(), tmp_path / 'work')
 
 
-@pytest.mark.parametrize('change', [None, 'changed-owner', 'duplicate-field', 'oversize'])
-def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, monkeypatch, change):
+@pytest.mark.parametrize(('change', 'snapshot'), [
+    (None, False), (None, True), ('changed-owner', False), ('duplicate-field', False), ('oversize', False),
+])
+def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, monkeypatch, change, snapshot):
     env, declaration = _saved_status_target('candidate')
+    if snapshot:
+        declaration['lab'] = False
     path = tmp_path / 'saved-target.json'
     raw = canonical_json(declaration)
     path.write_bytes(raw)
@@ -294,11 +299,16 @@ def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, 
     def forbidden(*args, **kwargs):
         pytest.fail('OBS-11 fixture dispatched runtime I/O')
 
-    executor = module.KubernetesLogIntegrityExecutor({'target': str(path)}, runner=forbidden,
-                                                     expected_target_sha256=digest)
+    settings = {'target': str(path)}
+    if snapshot:
+        settings[COLLECTION_STATUS_SNAPSHOT_OPTION] = True
+        assert module.snapshot_target_sha256(raw, env) == digest
+        with pytest.raises(ValueError):
+            module.snapshot_target_sha256(raw.decode(), env)
+    executor = module.KubernetesLogIntegrityExecutor(settings, runner=forbidden, expected_target_sha256=digest)
     monkeypatch.setattr(module, '_read_collection_status', forbidden)
     definition = gap_check()
-    executor.prepared_collection_status(definition, env, GAP_VALUES, expected_target_sha256=digest)
+    executor.prepared_collection_status(definition, env, GAP_VALUES, expected_target_sha256=None if snapshot else digest)
     if change is not None:
         if change == 'changed-owner':
             declaration['kubernetes']['probe']['pod_uid'] = '00000000-0000-0000-0000-000000000003'
@@ -335,6 +345,50 @@ def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, 
     assert summary['file_sha256'] == sha256_hex(record_bytes)
     assert summary['record_sha256'] == sha256_hex(canonical_json(document))
     assert summary['selected_record_timeline'] == [row] and not summary['producer_authenticated']
+
+
+@pytest.mark.parametrize('case', [
+    'missing-pin', 'preparation-pin-only', 'wrong-pin', 'conflicting-pins', 'lab', 'wrong-environment',
+    'nonliteral-option', 'legacy-check', 'other-executor', 'obs09',
+])
+def test_obs11_snapshot_rejects_unbound_or_out_of_scope_inputs_before_transport(tmp_path, monkeypatch, case):
+    env, declaration = _saved_status_target('candidate')
+    declaration['lab'] = case == 'lab'
+    if case == 'wrong-environment':
+        declaration['environment_ref']['sha256'] = 'f' * 64
+    raw = canonical_json(declaration)
+    if case in {'lab', 'wrong-environment'}:
+        with pytest.raises(ValueError, match='^KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID$'):
+            module.snapshot_target_sha256(raw, env)
+    path = tmp_path / 'saved-target.json'
+    path.write_bytes(raw)
+    digest = sha256_hex(raw)
+    definition = gap_check()
+    if case == 'legacy-check':
+        root = Path(__file__).resolve().parents[1]
+        definition = load_pack(root / 'reference/pack-seeds/PACK-BASELINE-33').checks['OBS-11']
+    elif case == 'other-executor':
+        definition = definition.model_copy(update={'executor': 'observation_state'})
+    elif case == 'obs09':
+        definition = check()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Unbound OBS-11 snapshot fixture attempted collection')
+
+    constructor_pin = {'missing-pin': None, 'preparation-pin-only': None, 'wrong-pin': '0' * 64}.get(case, digest)
+    preparation_pin = {'preparation-pin-only': digest, 'conflicting-pins': '0' * 64}.get(case)
+    settings = {'target': str(path), COLLECTION_STATUS_SNAPSHOT_OPTION: 1 if case == 'nonliteral-option' else True}
+    executor = module.KubernetesLogIntegrityExecutor(settings, runner=forbidden, expected_target_sha256=constructor_pin)
+    monkeypatch.setattr(module, '_read_collection_status', forbidden)
+    if case == 'preparation-pin-only':
+        executor.prepared_collection_status(definition, env, GAP_VALUES, expected_target_sha256=preparation_pin)
+    monkeypatch.setattr(executor, '_transport', forbidden)
+    if case != 'preparation-pin-only':
+        with pytest.raises(ValueError, match='^KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID$'):
+            executor.prepared_collection_status(definition, env, GAP_VALUES, expected_target_sha256=preparation_pin)
+    if case != 'conflicting-pins':
+        with pytest.raises(ValueError, match='^KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID$'):
+            executor.run(definition, env, GAP_VALUES, VllmAdapter(), tmp_path / 'work')
 
 
 def test_obs11_record_from_the_probe_pod_reuses_the_original_evaluation(tmp_path, monkeypatch):

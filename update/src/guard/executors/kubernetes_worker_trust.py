@@ -80,6 +80,16 @@ def collect(ctx):
         diagnostics.append('WORKER_TRUST_MARKERS_AMBIGUOUS')
     if not stable_rows:
         diagnostics.append('WORKER_TRUST_PROCESS_METADATA_UNAVAILABLE')
+    capture_diagnostics = None
+    if (record is not None and scope_gap is None and record['available'] is True
+            and record['binding_verified_before_after'] is True
+            and record['binding_before'] == ctx.cprobe.binding['engine'] == record['binding_after']
+            and type(record['packet']) is dict):
+        packet = record['packet']
+        # The decoded packet already bounds and allowlists these codes.
+        capture_diagnostics = {'packet': packet['diagnostic_codes'],
+                               'process_rows': sorted({code for row in packet['processes']
+                                                       for code in row['diagnostic_codes']})}
     observations = {
         'worker_trust_group_map': {'value': mapping if mapping else None, 'collected': bool(mapping)},
         'worker_trust_groups_missing': {'value': missing if stable_rows else None, 'collected': bool(stable_rows)},
@@ -91,6 +101,7 @@ def collect(ctx):
     summary = {'profile': PROFILE, 'target_sha256': ctx.cprobe.target_sha256,
                'binding_verified': bool(record and record['binding_verified_before_after']),
                'capture_status': capture_status(record) if record else None,
+               'process_capture_diagnostics': capture_diagnostics,
                'process_inventory_stable': bool(stable_rows and record['packet']['pid_inventory_stable']),
                'stable_process_rows': len(stable_rows), 'ambiguous_processes': ambiguous, 'diagnostic_codes': diagnostics,
                'reader_pid_namespace_sha256': sha256_hex(canonical_json(subject['pid_namespace_inode'])) if subject else None,

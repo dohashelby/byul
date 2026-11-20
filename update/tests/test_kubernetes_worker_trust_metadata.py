@@ -87,6 +87,13 @@ def test_worker_marker_map_uses_owned_read_only_metadata(tmp_path, case, complet
     assert summary['worker_role_authenticated'] is False and summary['process_pid_namespace_membership_verified'] is False
     if completed:
         assert summary['capture_status']['stage'] == 'complete'
+    if case == 'partial-process':
+        assert summary['process_capture_diagnostics'] == {'packet': [], 'process_rows': [
+            'PROCESS_ENVIRONMENT_NAMES_UNAVAILABLE', 'PROCESS_STATUS_UNAVAILABLE']}
+    elif case == 'reader-only':
+        assert summary['process_capture_diagnostics'] == {'packet': ['PROCESS_SET_EMPTY'], 'process_rows': []}
+    elif case in {'cleanup-incomplete', 'replaced', 'mount-changed', 'reader-unexcluded'}:
+        assert summary['process_capture_diagnostics'] is None
     if case == 'cleanup-incomplete':
         assert world.received_packet_sha256 is not None
         assert summary['capture_status'] == {'stage': 'packet_transport', 'packet_sha256': world.received_packet_sha256}

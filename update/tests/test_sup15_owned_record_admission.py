@@ -127,15 +127,17 @@ def test_sup06_preflight_checks_only_a_declared_worker_shard_file(external):
         executor.prepared_supply_roles(PACK.checks['SUP-06'], env, values)
 
 
-@pytest.mark.parametrize('case', [
-    'matched', 'other-manifest', 'wrong-session', 'other-record-owner', 'other-callback-target', 'disabled',
+@pytest.mark.parametrize(('case', 'version'), [
+    ('matched', '0.30.0'), ('matched', '0.31.0'), ('other-manifest', '0.31.0'),
+    ('wrong-session', '0.31.0'), ('other-record-owner', '0.31.0'),
+    ('other-callback-target', '0.31.0'), ('disabled', '0.31.0'),
 ])
-def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, monkeypatch, case):
+def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, monkeypatch, case, version):
     from guard.collectors import engine_callbacks, worker_shard_producer
     from tests.test_b12_supply_consumers import fixture
     from tests.test_kubernetes_request_binding import target as callback_target_fixture
 
-    env, settings, pins = _sup16_roles(external, '0.31.0')
+    env, settings, pins = _sup16_roles(external, version)
     callback_root = external / 'callback-assets'
     callback_manifest = engine_callbacks.prepare_assets(callback_root, worker_shards=case != 'disabled')
     manifest_path = callback_root / 'manifest.json'
@@ -153,6 +155,7 @@ def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, m
     normal = json.loads(Path(settings['normal']['target']).read_bytes())
     owner = normal['kubernetes']['engine']
     callback_target = callback_target_fixture(env)
+    callback_target['observed_version'] = version
     callback_target['kubernetes'].update(context=normal['kubernetes']['context'], run_id=normal['run_id'],
                                          engine=deepcopy(owner))
     callback_target['engine'].update(image_digest=env.engine.image_digest, trusted_url=f"http://{owner['pod_ip']}:8000")
@@ -170,6 +173,7 @@ def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, m
              'prepared_sha256': callback_digest, 'session': session}
     assert scope['target_sha256'] != pins['supply_normal_target_sha256']
     processes = {}
+    # Reuse the recorded event shapes as offline examples for either target declaration.
     witness = fixture('worker_shard_k3d_20261108.json')['cases']['sharded']['rows']
     for row in witness:
         fields = row.get('fields')

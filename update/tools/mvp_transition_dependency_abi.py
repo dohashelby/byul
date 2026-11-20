@@ -8,6 +8,7 @@ import sys
 from types import CodeType
 
 from guard.adapters import vllm_ready_endpoint_contract as endpoint
+from guard.adapters import vllm_weight_iteration_sensor as weight_iteration
 from guard.adapters import vllm_worker_generation_contract as generation
 from guard.adapters import vllm_worker_startup_contract as startup
 from guard.adapters.vllm_lifecycle_sensor import code_digest
@@ -45,6 +46,15 @@ IMAGE_DIGESTS = {
     "baseline": "sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
     "candidate": "sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
 }
+# The saved SUP06 OCI receipt (SHA256 bb913cec393eb8bb8d2768a50cedc02f82c2481c0311713918cb3e23d969edc7)
+# covers these two files only. It does not establish the installed models/utils.py.
+_WEIGHT_SOURCE_PINS = {
+    "baseline": {
+        weight_iteration.DEFAULT: "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
+        weight_iteration.WEIGHTS: "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b",
+    },
+    "candidate": weight_iteration.SOURCE_ADDITIONS,
+}
 
 
 def _runtime():
@@ -56,8 +66,8 @@ def _runtime():
     return runtime
 
 
-def _point_codes(path, module, expected_sha256, points):
-    filename = FILES[module]
+def _point_codes(path, module, expected_sha256, points, *, filename=None):
+    filename = FILES[module] if filename is None else filename
     raw, _ = _read(_plain_path(path), max_bytes=131072)
     if sha256_hex(raw) != expected_sha256:
         raise ValueError(f"TRANSITION_DEPENDENCY_SOURCE_MISMATCH: {module}")
@@ -116,16 +126,49 @@ def _measure(side, directory, runtime):
     }
 
 
-def measure(baseline, candidate):
+def _measure_weight_iteration(side, directory, runtime):
+    pins = _WEIGHT_SOURCE_PINS[side]
+    approved = weight_iteration.RUNTIME_POINT_CODES.get(runtime)
+    if approved is None or approved.keys() != weight_iteration.POINTS:
+        raise ValueError("TRANSITION_WEIGHT_ITERATION_REFERENCE_ABI_UNAVAILABLE")
+    unverified = {}
+    measured = {}
+    for module in sorted(set(weight_iteration.POINT_SOURCES.values())):
+        selected = {point for point, source in weight_iteration.POINT_SOURCES.items() if source == module}
+        if module not in pins:
+            unverified[module] = sorted(selected)
+            continue
+        filename = module.replace(".", "/") + ".py"
+        # /16 identifies module-level functions as weight_utils.<function> in its table.
+        qualnames = {point.removeprefix("weight_utils."): point for point in selected}
+        codes = _point_codes(directory / filename, module, pins[module], qualnames.keys(), filename=filename)
+        measured.update({qualnames[name]: digest for name, digest in codes.items()})
+
+    complete = not unverified
+    matching = measured == approved if complete else None
+    if side == "candidate" and matching is not True:
+        raise ValueError("TRANSITION_WEIGHT_ITERATION_REFERENCE_ABI_MISMATCH")
+    return {
+        "complete": complete, "source_sha256": pins, "point_codes": measured,
+        "unverified_modules": unverified, "matches_approved_point_codes": matching,
+    }
+
+
+def measure(baseline, candidate, *, include_weight_iteration=False):
     """Return candidate inputs for review with the existing code hash semantics."""
     runtime = _runtime()
     releases = versions()
     if any(releases[side]["image"].rsplit("@", 1)[-1] != pin for side, pin in IMAGE_DIGESTS.items()):
         raise ValueError("TRANSITION_DEPENDENCY_IMAGE_MISMATCH")
+    sides = {}
+    for side, root in (("baseline", baseline), ("candidate", candidate)):
+        directory = Path(root)
+        sides[side] = {"image": releases[side]["image"], **_measure(side, directory, runtime)}
+        if include_weight_iteration:
+            sides[side]["weight_iteration"] = _measure_weight_iteration(side, directory, runtime)
     return {
         "schema": SCHEMA, "runtime": runtime, "engine_executed": False, "producer_registered": False,
-        "sides": {side: {"image": releases[side]["image"], **_measure(side, Path(directory), runtime)}
-                  for side, directory in (("baseline", baseline), ("candidate", candidate))},
+        "sides": sides,
     }
 
 
@@ -133,8 +176,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", required=True, type=Path, help="Pinned 0.30.0 extraction root containing vllm/")
     parser.add_argument("--candidate", required=True, type=Path, help="Pinned 0.31.0 extraction root containing vllm/")
+    parser.add_argument("--weight-iteration", action="store_true",
+        help="Also replay reviewed /16 weight-iterator dependencies and mark unverified installed slots")
     args = parser.parse_args(argv)
-    print(json.dumps(measure(args.baseline, args.candidate), sort_keys=True, indent=2))
+    print(json.dumps(measure(args.baseline, args.candidate, include_weight_iteration=args.weight_iteration),
+        sort_keys=True, indent=2))
 
 
 if __name__ == "__main__":

@@ -149,11 +149,17 @@
     },
     "vllm/model_executor/model_loader/default_loader.py.txt": {
       "source": "vllm/model_executor/model_loader/default_loader.py",
-      "sha256": "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8"
+      "sha256": "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
+      "bytes": 18754,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt byul-installed-vllm-sup06-index-source-receipt/1; SHA256 bb913cec393eb8bb8d2768a50cedc02f82c2481c0311713918cb3e23d969edc7"
     },
     "vllm/model_executor/model_loader/weight_utils.py.txt": {
       "source": "vllm/model_executor/model_loader/weight_utils.py",
-      "sha256": "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b"
+      "sha256": "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b",
+      "bytes": 60910,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt byul-installed-vllm-sup06-index-source-receipt/1; SHA256 bb913cec393eb8bb8d2768a50cedc02f82c2481c0311713918cb3e23d969edc7"
     },
     "vllm/v1/worker/worker_base.py.txt": {
       "source": "vllm/v1/worker/worker_base.py",

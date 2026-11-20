@@ -131,6 +131,7 @@ def test_sup06_preflight_checks_only_a_declared_worker_shard_file(external):
     ('matched', '0.30.0'), ('matched', '0.31.0'), ('other-manifest', '0.31.0'),
     ('wrong-session', '0.31.0'), ('other-record-owner', '0.31.0'),
     ('other-callback-target', '0.31.0'), ('disabled', '0.31.0'),
+    ('foreign-producer', '0.31.0'), ('closed-prefix', '0.31.0'),
 ])
 def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, monkeypatch, case, version):
     from guard.collectors import engine_callbacks, worker_shard_producer
@@ -188,6 +189,11 @@ def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, m
     required = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_required'}
     assigned = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_assigned'}
     assert len(required) == 2 and required == assigned
+    if case == 'foreign-producer':
+        record['producer'] = {'name': 'example-other-worker-shard', 'version': '1',
+                              'source_sha256': sha256_hex(b'EXAMPLE other worker producer')}
+    elif case == 'closed-prefix':
+        record['completeness']['source_ended'] = True
     worker_path = external / 'callback-worker-shard-input.json'
     raw = canonical_json(record)
     worker_path.write_bytes(raw)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from inspect import CO_GENERATOR
 import json
 from pathlib import Path
 import sys
@@ -46,12 +47,13 @@ IMAGE_DIGESTS = {
     "baseline": "sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
     "candidate": "sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
 }
-# The saved SUP06 OCI receipt (SHA256 bb913cec393eb8bb8d2768a50cedc02f82c2481c0311713918cb3e23d969edc7)
-# covers these two files only. It does not establish the installed models/utils.py.
+# The baseline files are bound by the SUP06 OCI receipt and its models/utils.py
+# successor, recorded with the original bytes in the baseline fixture provenance.
 _WEIGHT_SOURCE_PINS = {
     "baseline": {
         weight_iteration.DEFAULT: "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
         weight_iteration.WEIGHTS: "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b",
+        weight_iteration.MODELS: "570a2eb26c7274c9790b6ff42e3fd30403ad6534c68d256f4d867d22e2924919",
     },
     "candidate": weight_iteration.SOURCE_ADDITIONS,
 }
@@ -66,7 +68,7 @@ def _runtime():
     return runtime
 
 
-def _point_codes(path, module, expected_sha256, points, *, filename=None):
+def _point_codes(path, module, expected_sha256, points, *, filename=None, require_generator=False):
     filename = FILES[module] if filename is None else filename
     raw, _ = _read(_plain_path(path), max_bytes=131072)
     if sha256_hex(raw) != expected_sha256:
@@ -78,6 +80,8 @@ def _point_codes(path, module, expected_sha256, points, *, filename=None):
         if qualname in points:
             if qualname in found:
                 raise ValueError(f"TRANSITION_DEPENDENCY_POINT_AMBIGUOUS: {module}.{qualname}")
+            if require_generator and not code.co_flags & CO_GENERATOR:
+                raise ValueError(f"TRANSITION_DEPENDENCY_GENERATOR_REQUIRED: {module}.{qualname}")
             found[qualname] = code_digest(normalized(code, filename))
         for value in code.co_consts:
             if type(value) is CodeType:
@@ -131,26 +135,25 @@ def _measure_weight_iteration(side, directory, runtime):
     approved = weight_iteration.RUNTIME_POINT_CODES.get(runtime)
     if approved is None or approved.keys() != weight_iteration.POINTS:
         raise ValueError("TRANSITION_WEIGHT_ITERATION_REFERENCE_ABI_UNAVAILABLE")
-    unverified = {}
+    modules = set(weight_iteration.POINT_SOURCES.values())
+    if pins.keys() != modules:
+        raise ValueError("TRANSITION_WEIGHT_ITERATION_SOURCE_SCOPE_INCOMPLETE")
     measured = {}
-    for module in sorted(set(weight_iteration.POINT_SOURCES.values())):
+    for module in sorted(modules):
         selected = {point for point, source in weight_iteration.POINT_SOURCES.items() if source == module}
-        if module not in pins:
-            unverified[module] = sorted(selected)
-            continue
         filename = module.replace(".", "/") + ".py"
         # /16 identifies module-level functions as weight_utils.<function> in its table.
         qualnames = {point.removeprefix("weight_utils."): point for point in selected}
-        codes = _point_codes(directory / filename, module, pins[module], qualnames.keys(), filename=filename)
+        codes = _point_codes(directory / filename, module, pins[module], qualnames.keys(),
+                              filename=filename, require_generator=True)
         measured.update({qualnames[name]: digest for name, digest in codes.items()})
 
-    complete = not unverified
-    matching = measured == approved if complete else None
-    if side == "candidate" and matching is not True:
+    matching = measured == approved
+    if side == "candidate" and not matching:
         raise ValueError("TRANSITION_WEIGHT_ITERATION_REFERENCE_ABI_MISMATCH")
     return {
-        "complete": complete, "source_sha256": pins, "point_codes": measured,
-        "unverified_modules": unverified, "matches_approved_point_codes": matching,
+        "complete": True, "source_sha256": pins, "point_codes": measured,
+        "matches_approved_point_codes": matching,
     }
 
 
@@ -177,7 +180,7 @@ def main(argv=None):
     parser.add_argument("--baseline", required=True, type=Path, help="Pinned 0.30.0 extraction root containing vllm/")
     parser.add_argument("--candidate", required=True, type=Path, help="Pinned 0.31.0 extraction root containing vllm/")
     parser.add_argument("--weight-iteration", action="store_true",
-        help="Also replay reviewed /16 weight-iterator dependencies and mark unverified installed slots")
+        help="Also compile the three pinned /16 dependencies and verify their five generator points")
     args = parser.parse_args(argv)
     print(json.dumps(measure(args.baseline, args.candidate, include_weight_iteration=args.weight_iteration),
         sort_keys=True, indent=2))

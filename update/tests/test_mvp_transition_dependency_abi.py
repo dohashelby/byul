@@ -1,6 +1,7 @@
 """Check compile-time fingerprint parity with the existing approved tables."""
 from pathlib import Path
 import json
+import re
 
 import pytest
 
@@ -24,6 +25,7 @@ _WEIGHT_FIXTURES = {
     "baseline": {
         abi.weight_iteration.DEFAULT: "vllm-0.30.0/vllm/model_executor/model_loader/default_loader.py.txt",
         abi.weight_iteration.WEIGHTS: "vllm-0.30.0/vllm/model_executor/model_loader/weight_utils.py.txt",
+        abi.weight_iteration.MODELS: "vllm-0.30.0/vllm/model_executor/models/utils.py.txt",
     },
     "candidate": {
         abi.weight_iteration.DEFAULT: "weight-iteration-native/default_loader.py.txt",
@@ -60,13 +62,6 @@ def test_paired_installed_sources_reproduce_transition_point_tables(tmp_path):
                 assert row["image"].endswith("@" + abi.IMAGE_DIGESTS[side])
                 assert row["sha256"] == abi._WEIGHT_SOURCE_PINS[side][module]
             path.write_bytes(raw)
-    # Staging known bytes from a different release at the unverified baseline
-    # slot cannot make it a reviewed installed dependency.
-    models_path = abi.weight_iteration.MODELS.replace(".", "/") + ".py"
-    unverified_path = tmp_path / "baseline" / models_path
-    unverified_path.parent.mkdir(parents=True, exist_ok=True)
-    unverified_path.write_bytes((tmp_path / "candidate" / models_path).read_bytes())
-
     result = abi.measure(tmp_path / "baseline", tmp_path / "candidate", include_weight_iteration=True)
     assert result["schema"] == abi.SCHEMA
     assert result["runtime"] == abi._runtime()
@@ -86,16 +81,14 @@ def test_paired_installed_sources_reproduce_transition_point_tables(tmp_path):
     approved = abi.weight_iteration.RUNTIME_POINT_CODES[result["runtime"]]
     assert candidate["weight_iteration"] == {
         "complete": True, "source_sha256": abi.weight_iteration.SOURCE_ADDITIONS,
-        "point_codes": approved, "unverified_modules": {}, "matches_approved_point_codes": True,
+        "point_codes": approved, "matches_approved_point_codes": True,
     }
     baseline_weights = baseline["weight_iteration"]
-    missing_points = ["AutoWeightsLoader._load_module", "AutoWeightsLoader._load_param"]
-    assert baseline_weights["unverified_modules"] == {abi.weight_iteration.MODELS: missing_points}
-    assert baseline_weights["point_codes"].keys() == approved.keys() - set(missing_points)
+    assert baseline_weights["point_codes"].keys() == approved.keys()
     assert all(digest != approved[point] for point, digest in baseline_weights["point_codes"].items())
     assert baseline_weights["source_sha256"].keys() == set(_WEIGHT_FIXTURES["baseline"])
-    assert baseline_weights["complete"] is False
-    assert baseline_weights["matches_approved_point_codes"] is None
+    assert baseline_weights["complete"] is True
+    assert baseline_weights["matches_approved_point_codes"] is False
 
     module = abi.generation.MP
     target = tmp_path / "baseline" / abi.FILES[module]
@@ -104,12 +97,12 @@ def test_paired_installed_sources_reproduce_transition_point_tables(tmp_path):
         abi.measure(tmp_path / "baseline", tmp_path / "candidate")
 
 
-def test_pinned_weight_source_rejects_foreign_bytes(tmp_path):
-    iteration = abi.weight_iteration
-    fixture = _WEIGHT_FIXTURES["candidate"][iteration.DEFAULT]
-    filename = "vllm/model_executor/model_loader/default_loader.py"
-    path = tmp_path / filename
-    path.parent.mkdir(parents=True)
-    path.write_bytes((FIXTURES / fixture).read_bytes())
-    with pytest.raises(ValueError, match=r"^TRANSITION_DEPENDENCY_SOURCE_MISMATCH: vllm\.model_executor\.model_loader\.default_loader$"):
+@pytest.mark.parametrize("foreign", [abi.weight_iteration.DEFAULT, abi.weight_iteration.MODELS])
+def test_pinned_weight_source_rejects_foreign_bytes(tmp_path, foreign):
+    for module, baseline_path in _WEIGHT_FIXTURES["baseline"].items():
+        source = _WEIGHT_FIXTURES["candidate"][module] if module == foreign else baseline_path
+        path = tmp_path / (module.replace(".", "/") + ".py")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((FIXTURES / source).read_bytes())
+    with pytest.raises(ValueError, match=f"^TRANSITION_DEPENDENCY_SOURCE_MISMATCH: {re.escape(foreign)}$"):
         abi._measure_weight_iteration("baseline", tmp_path, abi._runtime())

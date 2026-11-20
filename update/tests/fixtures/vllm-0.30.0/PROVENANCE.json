@@ -195,6 +195,13 @@
       "bytes": 10525,
       "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
       "provenance": "Installed Linux amd64 OCI source receipt byul-pinned-image-source-receipt/1; SHA256 2c0b6197045657ae00ba7aac110557ffe92cc9844c8d31831601eaed469c98ea"
+    },
+    "vllm/model_executor/models/utils.py.txt": {
+      "source": "vllm/model_executor/models/utils.py",
+      "sha256": "570a2eb26c7274c9790b6ff42e3fd30403ad6534c68d256f4d867d22e2924919",
+      "bytes": 41138,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt guard-oci-installed-source-readback/1; SHA256 3d2e056b7316b416a9cb9ab30a526778cc51400f29d8ad31d3adf8b4aa8d1f44"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

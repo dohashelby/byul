@@ -57,6 +57,9 @@ _WEIGHT_SOURCE_PINS = {
     },
     "candidate": weight_iteration.SOURCE_ADDITIONS,
 }
+# Independently read from installation layer 7 of each pinned OCI image.
+_CONNECTION_SOURCE_PINS = dict.fromkeys(IMAGE_DIGESTS,
+    "3b1591b340a6e8f68eab4af6a6ed158d51c9c35bb5b500827b677bf97e8afd51")
 
 
 def _runtime():
@@ -157,18 +160,46 @@ def _measure_weight_iteration(side, directory, runtime):
     }
 
 
-def measure(baseline, candidate, *, include_weight_iteration=False):
+def _measure_connection(path, side, runtime):
+    generation_points = generation.CONNECTION_CODES.get(runtime)
+    endpoint_points = endpoint.DELEGATE_CODES.get(runtime)
+    if (generation.CONNECTION_FILENAME != endpoint.CONNECTION_FILENAME
+            or generation_points is None or generation_points.keys() != {"send", "close"}
+            or endpoint_points is None or endpoint_points.keys() != {"recv", "fileno"}):
+        raise ValueError("TRANSITION_CONNECTION_REFERENCE_ABI_UNAVAILABLE")
+    points = {f"_ConnectionBase.{name}": name for name in generation_points.keys() | endpoint_points.keys()}
+    pin = _CONNECTION_SOURCE_PINS[side]
+    codes = _point_codes(Path(path), "multiprocessing.connection", pin, points.keys(),
+                         filename=generation.CONNECTION_FILENAME)
+    measured = {points[qualname]: digest for qualname, digest in codes.items()}
+    expected = {"/21": generation_points, "/22": endpoint_points}
+    by_profile = {profile: {point: measured[point] for point in table} for profile, table in expected.items()}
+    return {
+        "source_scope": "image_installation_layer",
+        "source_path": "usr/lib/" + generation.CONNECTION_FILENAME,
+        "source_sha256": pin,
+        "point_codes": by_profile,
+        "matches_approved_point_codes": {profile: actual == expected[profile] for profile, actual in by_profile.items()},
+    }
+
+
+def measure(baseline, candidate, *, include_weight_iteration=False, baseline_connection=None, candidate_connection=None):
     """Return candidate inputs for review with the existing code hash semantics."""
+    if (baseline_connection is None) != (candidate_connection is None):
+        raise ValueError("TRANSITION_CONNECTION_PAIRED_INPUTS_REQUIRED")
     runtime = _runtime()
     releases = versions()
     if any(releases[side]["image"].rsplit("@", 1)[-1] != pin for side, pin in IMAGE_DIGESTS.items()):
         raise ValueError("TRANSITION_DEPENDENCY_IMAGE_MISMATCH")
     sides = {}
-    for side, root in (("baseline", baseline), ("candidate", candidate)):
+    for side, root, connection in (("baseline", baseline, baseline_connection),
+                                   ("candidate", candidate, candidate_connection)):
         directory = Path(root)
         sides[side] = {"image": releases[side]["image"], **_measure(side, directory, runtime)}
         if include_weight_iteration:
             sides[side]["weight_iteration"] = _measure_weight_iteration(side, directory, runtime)
+        if connection is not None:
+            sides[side]["stdlib_connection"] = _measure_connection(connection, side, runtime)
     return {
         "schema": SCHEMA, "runtime": runtime, "engine_executed": False, "producer_registered": False,
         "sides": sides,
@@ -181,8 +212,13 @@ def main(argv=None):
     parser.add_argument("--candidate", required=True, type=Path, help="Pinned 0.31.0 extraction root containing vllm/")
     parser.add_argument("--weight-iteration", action="store_true",
         help="Also compile the three pinned /16 dependencies and verify their five generator points")
+    parser.add_argument("--baseline-connection", type=Path, help="Pinned baseline installed connection.py source file")
+    parser.add_argument("--candidate-connection", type=Path, help="Pinned candidate installed connection.py source file")
     args = parser.parse_args(argv)
-    print(json.dumps(measure(args.baseline, args.candidate, include_weight_iteration=args.weight_iteration),
+    if (args.baseline_connection is None) != (args.candidate_connection is None):
+        parser.error("--baseline-connection and --candidate-connection must be supplied together")
+    print(json.dumps(measure(args.baseline, args.candidate, include_weight_iteration=args.weight_iteration,
+        baseline_connection=args.baseline_connection, candidate_connection=args.candidate_connection),
         sort_keys=True, indent=2))
 
 

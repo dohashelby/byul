@@ -1,0 +1,38 @@
+{
+  "scope": "Source-only from independently verified OCI installation layers. Final image filesystem, live interpreter and runtime delegate unverified.",
+  "receipt_sha256": "309469bb313d60297596adcc828620dc8e9fc65e345b9222511af1f267248277",
+  "license": {
+    "fixture": "LICENSE.txt",
+    "source_path": "usr/lib/python3.12/LICENSE.txt",
+    "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+    "bytes": 13936
+  },
+  "baseline": {
+    "fixture": "connection.py.txt",
+    "source_path": "usr/lib/python3.12/multiprocessing/connection.py",
+    "sha256": "3b1591b340a6e8f68eab4af6a6ed158d51c9c35bb5b500827b677bf97e8afd51",
+    "bytes": 41382,
+    "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+    "config_sha256": "sha256:d076d77d8dade699041dbcb6bb989a058e51b532e6367f13f80b5a4e63ee5c53",
+    "layer": {
+      "index": 7,
+      "sha256": "sha256:7060cfcdc2e779fa9e90fea3ceac792b39bd79954736267d84c4559ee0ee31de",
+      "bytes": 233434151
+    },
+    "cpython_header_version": "3.12.3"
+  },
+  "candidate": {
+    "fixture": "connection.py.txt",
+    "source_path": "usr/lib/python3.12/multiprocessing/connection.py",
+    "sha256": "3b1591b340a6e8f68eab4af6a6ed158d51c9c35bb5b500827b677bf97e8afd51",
+    "bytes": 41382,
+    "image": "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+    "config_sha256": "sha256:c76d0e2225a4b1cb1e2109ace39639f55e714abd1a7a427acc8b0bbd7f6a83b3",
+    "layer": {
+      "index": 7,
+      "sha256": "sha256:ff96814e538e458a868365b660a2d572942fb9e5b7a7221249b999467726096c",
+      "bytes": 233477263
+    },
+    "cpython_header_version": "3.12.3"
+  }
+}

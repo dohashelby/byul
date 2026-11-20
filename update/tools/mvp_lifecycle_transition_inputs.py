@@ -2,7 +2,9 @@
 
 import argparse
 from pathlib import Path
+import tomllib
 
+from guard.configuration import bounded_metadata_scopes, merge_config, update_allowed_checks
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.select import _in_scope
 from guard.executors import lifecycle_transition as transition, run_binding
@@ -19,9 +21,10 @@ INDEX_NAME = 'readiness.json'
 _CONFIG_INVALID = 'MVP_TRANSITION_SELECTION_INVALID'
 _FILE_CHANGED = 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'
 _FILE_LIMITS = {'environment': 262144, 'target': 65536, 'prepared': 262144}
+_METADATA_INVALID = 'MVP_TRANSITION_METADATA_INPUT_INVALID'
 
 
-def _selected_file(pointer, limit, captured):
+def _pinned_bytes(pointer, limit, captured):
     if (type(pointer) is not dict or pointer.keys() != {'path', 'sha256'}
             or type(pointer['path']) is not str or not pointer['path'] or not transition._sha(pointer['sha256'])):
         raise ValueError(_CONFIG_INVALID)
@@ -30,6 +33,11 @@ def _selected_file(pointer, limit, captured):
     if sha256_hex(raw) != pointer['sha256']:
         raise ValueError(_FILE_CHANGED)
     captured.append((path, raw, identity, limit))
+    return path, raw
+
+
+def _selected_file(pointer, limit, captured):
+    path, raw = _pinned_bytes(pointer, limit, captured)
     return str(path), strict_json(raw, limit=limit)
 
 
@@ -116,13 +124,95 @@ def _prepared_sides(selection, check, releases, issued_at, captured):
         yield side, {'executor': settings, 'run_binding': binding}, {**before_pointer, 'path': before_path}
 
 
+def _prebound_metadata(source, pack, policy, primary_refs, captured):
+    from tools import mvp_metadata_wiring as metadata
+
+    sides = set(readiness.SIDES)
+    if (type(source) is not dict or source.keys() != {'index', 'targets'}
+            or type(source['targets']) is not dict or source['targets'].keys() != sides):
+        raise ValueError(_METADATA_INVALID)
+    index_path, raw = _pinned_bytes(source['index'], 262144, captured)
+    index = strict_json(raw, limit=262144)
+    ordinary = set(metadata.CHECK_EXECUTORS) - set(metadata.RECORD_SNAPSHOT_OPTIONS) - set(metadata.PREBOUND_RECORD_EXECUTORS)
+    if (type(index) is not dict or index.keys() != {'schema', 'pack_ref', 'inputs'}
+            or index['schema'] != readiness.SCHEMA or index['pack_ref'] != pack.ref().model_dump(mode='json')
+            or type(index['inputs']) is not list or not 2 <= len(index['inputs']) <= 2 * len(ordinary)):
+        raise ValueError(_METADATA_INVALID)
+    entries, env_pointers = {}, {}
+    config_pointer = policy_pointer = None
+    for item in index['inputs']:
+        if (type(item) is not dict or item.keys() != {'check_id', 'side', 'environment', 'policy', 'configuration'}
+                or type(item['check_id']) is not str or item['check_id'] not in ordinary
+                or type(item['side']) is not str or item['side'] not in sides):
+            raise ValueError(_METADATA_INVALID)
+        key = item['check_id'], item['side']
+        if key in entries:
+            raise ValueError('MVP_TRANSITION_METADATA_DUPLICATE')
+        if config_pointer is None:
+            config_pointer, policy_pointer = item['configuration'], item['policy']
+        if (config_pointer != item['configuration'] or policy_pointer != item['policy']
+                or env_pointers.setdefault(item['side'], item['environment']) != item['environment']):
+            raise ValueError(_METADATA_INVALID)
+        entries[key] = {role: value for role, value in item.items() if role != 'configuration'}
+
+    _, raw = _pinned_bytes(config_pointer, 262144, captured)
+    config = tomllib.loads(raw.decode('utf-8'))
+    update = config.get('update', {})
+    if (type(update) is not dict or update.get('mode') != 'external'
+            or update.get('kubernetes_candidate_binding', 'prebound') != 'prebound'):
+        raise ValueError('MVP_TRANSITION_PREBOUND_METADATA_REQUIRED')
+    allowed = update_allowed_checks(config, pack)
+    if (not allowed or not allowed <= ordinary or set(entries) != {(check_id, side) for check_id in allowed for side in sides}
+            or config.keys() - {'store', 'adapter', 'update', 'executors', 'sides', 'check_config'}
+            or update.keys() - {'mode', 'allowed_checks', 'kubernetes_candidate_binding'}
+            or type(config.get('sides')) is not dict or config['sides'].keys() != sides
+            or config.get('executors') != {metadata.CHECK_EXECUTORS[check_id]: 'kubernetes' for check_id in allowed}):
+        raise ValueError(_METADATA_INVALID)
+    overrides = config.get('check_config', {})
+    expected = {check_id: {metadata.CHECK_OPTIONS[check_id]: True} for check_id in allowed
+                if check_id in metadata.CHECK_OPTIONS}
+    node = overrides.get('SUP-04') if type(overrides) is dict else None
+    if ('SUP-04' in allowed and type(node) is dict and node.keys() == {'node_image_verification'}
+            and node['node_image_verification'] in metadata.NODE_IMAGE_PROFILES):
+        expected['SUP-04'] = node
+    if overrides != expected:
+        raise ValueError(_METADATA_INVALID)
+
+    _, policy_doc = _selected_file(policy_pointer, 262144, captured)
+    saved_policy = Policy.model_validate(policy_doc)
+    if not saved_policy.hash_ok() or saved_policy.ref() != policy.ref():
+        raise ValueError('MVP_TRANSITION_METADATA_POLICY_MISMATCH')
+    for side in readiness.SIDES:
+        _, env_doc = _selected_file(env_pointers[side], 262144, captured)
+        env = Environment.model_validate(env_doc)
+        if (not env.hash_ok() or env.ref().model_dump(mode='json') != primary_refs[side]
+                or config.get('adapter') != {'name': env.engine.name}):
+            raise ValueError('MVP_TRANSITION_METADATA_ENVIRONMENT_MISMATCH')
+        path, target = _selected_file(source['targets'][side], 65536, captured)
+        if type(target) is not dict or target.get('synthetic', False) is not False:
+            raise ValueError(_METADATA_INVALID)
+        metadata._transport(target, env)
+        if config['sides'][side] != {name: {'target': path} for name in config['executors']}:
+            raise ValueError(_METADATA_INVALID)
+
+    report = readiness.audit(index_path, pack=pack)
+    admitted = {(row['check_id'], row['side']) for row in report['rows'] if row['file_binding_valid']}
+    if admitted != set(entries):
+        raise ValueError('MVP_TRANSITION_METADATA_READINESS_UNVERIFIED')
+    return config, list(entries.values()), index_path.parent
+
+
 def prepare(policy_path, selection_path, expected_selection_sha256, output, *, pack, store=None):
     """Validate one pinned selection and publish a new guard.toml and readiness index."""
     return prepare_many(policy_path, [(selection_path, expected_selection_sha256)], output, pack=pack, store=store)
 
 
-def prepare_many(policy_path, selections, output, *, pack, store=None):
-    """Publish one or two independently pinned selections for the same paired environments."""
+def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_metadata=None):
+    """Publish passive readiness inputs for one or two pinned lifecycle selections.
+
+    A prebound metadata input provides its standard source index pointer under
+    ``index`` and one independently pinned target per side under ``targets``.
+    """
     if (not isinstance(selections, (list, tuple)) or not 1 <= len(selections) <= len(transition.REDEPLOY_CHECKS)
             or any(not isinstance(pair, (list, tuple)) or len(pair) != 2 for pair in selections)):
         raise ValueError(_CONFIG_INVALID)
@@ -164,6 +254,19 @@ def prepare_many(policy_path, selections, output, *, pack, store=None):
             prepared_roots.extend(Path(row['prepared']).parent for row in entry['executor']['generations'])
             inputs.append({'check_id': check_id, 'side': side, 'environment': environment, 'policy': policy_pointer})
 
+    directory = _plain_path(Path(output))
+    store_path = None if store is None else _plain_path(Path(store))
+    spec['store'] = str(directory / 'store' if store_path is None else store_path)
+    config = j02_run_config.build_config(spec)
+    config['update']['allowed_checks'] = sorted(documents)
+    if prebound_metadata is not None:
+        metadata, metadata_inputs, metadata_root = _prebound_metadata(prebound_metadata, pack, policy, primary_refs, captured)
+        config = merge_config(metadata, config)
+        config['update']['allowed_checks'] = [*metadata['update']['allowed_checks'], *sorted(documents)]
+        allowed = update_allowed_checks(config, pack)
+        bounded_metadata_scopes((merge_config(config, side) for side in config['sides'].values()), pack, allowed)
+        inputs = [*metadata_inputs, *inputs]
+        prepared_roots.append(metadata_root)
     for path, original, identity, limit in captured:
         if _read(path, max_bytes=limit) != (original, identity):
             raise ValueError(_FILE_CHANGED)
@@ -171,12 +274,8 @@ def prepare_many(policy_path, selections, output, *, pack, store=None):
     protected = [readiness.ROOT, *(path for path, _, _, _ in captured), *prepared_roots]
     if pack.path is not None:
         protected.append(pack.path)
-    store_path = None if store is None else _plain_path(Path(store))
-    directory = reserve_output(Path(output), protected=protected)
+    directory = reserve_output(directory, protected=protected)
     directory.chmod(0o700)
-    spec['store'] = str(directory / 'store' if store_path is None else store_path)
-    config = j02_run_config.build_config(spec)
-    config['update']['allowed_checks'] = sorted(documents)
     config_path = directory / CONFIG_NAME
     j02_run_config.write_config(config, config_path)
     pointer = {'path': str(config_path), 'sha256': sha256_hex(_read(config_path, max_bytes=262144)[0])}

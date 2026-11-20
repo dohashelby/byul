@@ -16,6 +16,8 @@ from tests import test_redeployment_preflight as fixture
 from tests.builders import T0, policy
 from tests.test_lifecycle_capture import external
 from tools import mvp_lifecycle_transition_inputs as materializer, mvp_live_readiness as readiness
+from tools import mvp_metadata_wiring as metadata
+from tools.j02_run_config import write_config
 
 
 def _pointer(path):
@@ -226,3 +228,86 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
     assert not report['engine_executed'] and not report['ready_for_execution'] and report['actual_results'] is None
     prepared = application.update_readiness(pack, envs, confirmed, config)
     assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
+
+
+@pytest.mark.parametrize('case,error', [
+    ('prebound', None),
+    ('staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
+    ('duplicate', 'MVP_TRANSITION_METADATA_DUPLICATE'),
+    ('other-policy', 'MVP_TRANSITION_METADATA_POLICY_MISMATCH'),
+    ('other-env', 'MVP_TRANSITION_METADATA_ENVIRONMENT_MISMATCH'),
+    ('changed-target', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('output-alias', 'outside source inputs'),
+])
+def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, monkeypatch, case, error):
+    _offline_only(monkeypatch)
+    check_id = 'LIF-16'
+    pack, envs, _, cfg = fixture._configuration(external, check_id, mvp_inputs=True, lab=False)
+    policy_values = {'SUP-04': {'approved_image_digests': [env.engine.image_digest for env in envs]}}
+    confirmed = policy(pack.ref(), scope={'include': ['SUP-04', check_id]}, values=policy_values,
+                       data_origin=DataOrigin.DECLARED, status='CONFIRMED',
+                       confirmed_by='EXAMPLE operator', confirmed_at=T0)
+    policy_path = external / 'policy.json'
+    policy_path.write_bytes(canonical_json(confirmed.to_dict()))
+    stock = external / 'separate-metadata'
+    stock.mkdir()
+    stock_policy = policy_path
+    if case == 'other-policy':
+        stock_policy = stock / 'policy.json'
+        stock_policy.write_bytes(canonical_json(confirmed.model_copy(update={'id': 'POL-OTHER-FIXTURE'}).seal().to_dict()))
+    sides, stock_sources = {}, {}
+    for side, env in zip(readiness.SIDES, envs, strict=True):
+        rows = cfg['sides'][side]['check_config'][check_id]['generations']
+        sides[side] = _selected_side(env, rows, cfg['run_binding'][check_id])
+        base = rows[0]
+        target = json.loads(Path(base['target']).read_bytes())
+        env_path = Path(base['environment'])
+        if case == 'other-env' and side == 'candidate':
+            alternate = env.model_copy(update={'id': 'ENV-OTHER-FIXTURE'}).seal()
+            env_path = stock / 'candidate-env.json'
+            env_path.write_bytes(canonical_json(alternate.to_dict()))
+            target['environment_ref'] = alternate.ref().model_dump(mode='json')
+        path = stock / f'{side}-target.json'
+        path.write_bytes(canonical_json(target))
+        stock_sources[side] = {'target': path, 'environment': env_path}
+
+    stock_config, stock_rows, _ = metadata.assemble(stock_sources, stock_policy, pack=pack, store=stock / 'store')
+    assert stock_config['update']['allowed_checks'] == ['SUP-04']
+    if case == 'staged':
+        stock_config = metadata.staged_config(stock_config, stock / 'later-target.json')
+    if case == 'duplicate':
+        stock_rows.append(stock_rows[0])
+    config_path = stock / 'guard.toml'
+    index_path = stock / 'input-sources.json'
+    write_config(stock_config, config_path)
+    index = readiness.template(pack)
+    index['inputs'] = [{**row, 'configuration': _pointer(config_path)} for row in stock_rows]
+    index_path.write_bytes(canonical_json(index))
+    sources = {'index': _pointer(index_path), 'targets': {side: _pointer(paths['target'])
+                                                        for side, paths in stock_sources.items()}}
+    if case == 'changed-target':
+        target = stock_sources['candidate']['target']
+        target.write_bytes(target.read_bytes() + b'\n')
+
+    selection = external / 'lifecycle-selection.json'
+    selection.write_bytes(canonical_json({'schema': materializer.SELECTION_SCHEMA, 'check_id': check_id,
+                                          'policy_ref': confirmed.ref().model_dump(mode='json'), 'sides': sides}))
+    selections = [(selection, _pointer(selection)['sha256'])]
+    output = (stock if case == 'output-alias' else external) / 'joint'
+    if error is not None:
+        with pytest.raises(ValueError, match=error):
+            materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=sources)
+        assert not output.exists()
+        return
+
+    materialized, joined = materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=sources)
+    assert materialized['update']['allowed_checks'] == ['SUP-04', check_id]
+    for side in readiness.SIDES:
+        settings = materialized['sides'][side]
+        assert settings['container_config'] == stock_config['sides'][side]['container_config']
+        assert set(settings['check_config']) == set(settings['run_binding']) == {check_id}
+    assert all(item['configuration'] == _pointer(output / 'guard.toml') for item in joined['inputs'])
+    assert _pointer(index_path) == sources['index'] and _pointer(config_path) == index['inputs'][0]['configuration']
+    report = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 4
+    assert not report['engine_executed'] and not report['ready_for_execution'] and report['actual_results'] is None

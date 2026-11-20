@@ -270,12 +270,16 @@ def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_pat
 @pytest.mark.parametrize('change', [None, 'changed-owner', 'duplicate-field', 'oversize'])
 def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, monkeypatch, change):
     from tests.test_kubernetes_request_binding import target as owned_target
+    from tests.test_model_mapping import declared_mapping
     from tools.mvp_versions import versions
 
     release = versions()['candidate']
+    model_env, mapping = declared_mapping()
     env = environment(engine={'name': release['engine'], 'version': release['version'], 'image_digest': release['image']},
-                      model={'id': 'EXAMPLE-repository-id', 'revision': 'EXAMPLE-revision'})
+                      model=model_env.model)
     declaration = owned_target(env)
+    declaration['model_mapping'] = {**mapping, 'environment_ref': env.ref().model_dump(mode='json'),
+                                    'served_model_name': 'fixture-model'}
     declaration['observed_version'] = release['version']
     declaration['engine']['image_digest'] = release['image']
     declaration['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])

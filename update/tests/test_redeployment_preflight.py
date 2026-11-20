@@ -34,7 +34,7 @@ def _write(path, value):
 
 
 def _generation(directory, name, identity, *, version, owner=None, profile=None, context="fixture-context",
-                mvp_inputs=False):
+                mvp_inputs=False, lab=True):
     directory.mkdir()
     if mvp_inputs:
         image = next(row["image"] for row in versions().values() if row["version"] == version)
@@ -52,10 +52,11 @@ def _generation(directory, name, identity, *, version, owner=None, profile=None,
                        "pod_uid": str(UUID(int=identity)), "container_id": f"containerd://{identity:064x}"}
     target["kubernetes"]["engine"] = {**engine, "image": image, "image_id": image}
     target["engine"]["image_digest"] = image
-    target.update(schema="guard-kubernetes-request-binding-target/1", environment_ref=env.ref().model_dump(mode="json"),
+    target.update(schema="guard-kubernetes-request-binding-target/1", lab=lab,
+                  environment_ref=env.ref().model_dump(mode="json"),
                   observed_version=version, comparison_config={"EXAMPLE_launch_label": name},
                   model_mapping={"repository_id": env.model.id, "revision": env.model.revision, "api_model": "EXAMPLE-serving"})
-    native = {"schema": "guard-kubernetes-lifecycle-target/1", "lab": True, "run_id": target["kubernetes"]["run_id"],
+    native = {"schema": "guard-kubernetes-lifecycle-target/1", "lab": lab, "run_id": target["kubernetes"]["run_id"],
               "environment_ref": target["environment_ref"], "kubernetes": {key: target["kubernetes"][key]
                                                                           for key in ("context", "engine")}}
     reference = _write(directory / "reference.json", {"schema": "guard.model-manifest/1", "scope": "all",
@@ -68,7 +69,7 @@ def _generation(directory, name, identity, *, version, owner=None, profile=None,
                  "target": _write(directory / "target.json", target), "prepared": str(prepared / "manifest.json")}
 
 
-def _configuration(external, check_id, *, change=None, mvp_inputs=False):
+def _configuration(external, check_id, *, change=None, mvp_inputs=False, lab=True):
     pack = load_pack(REPOSITORY / "update" / "packs" / "PACK-BASELINE")
     pol = policy(pack.ref(), scope={"include": [check_id]}, values={})
     cfg = {"adapter": {"name": "vllm"}, "executors": {"lifecycle_transition": "kubernetes"},
@@ -80,7 +81,7 @@ def _configuration(external, check_id, *, change=None, mvp_inputs=False):
     for i, side in enumerate(("baseline", "candidate")):
         version = "0.30.0" if side == "baseline" and change not in {"same-release-owners", "reused-session"} else "0.31.0"
         env, old = _generation(external / f"{side}-old", "old", 100 + 2 * i, version=version,
-                               mvp_inputs=mvp_inputs)
+                               mvp_inputs=mvp_inputs, lab=lab)
         owner = None
         after_version = version
         if side == "candidate":
@@ -100,7 +101,7 @@ def _configuration(external, check_id, *, change=None, mvp_inputs=False):
             _, new = _generation(external / f"{side}-new", "new", 101 + 2 * i, version=after_version,
                                  owner=owner, profile=lifecycle_transition.endpoint_sensor.PROFILE,
                                  context="fixture-restore" if side == "candidate" and change == "restore-context" else "fixture-context",
-                                 mvp_inputs=mvp_inputs)
+                                 mvp_inputs=mvp_inputs, lab=lab)
         if side == "baseline":
             baseline_new = new
         elif change == "invalid-http-model":

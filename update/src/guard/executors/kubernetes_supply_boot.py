@@ -296,10 +296,16 @@ class KubernetesSupplyBootExecutor:
                                    target_sha256=digest, prepared_sha256=prepared_sha256)
         result = worker_shards(record, scope, values)
         if owner is not None:
+            from guard.collectors.worker_shard_producer import producer
+
             generation = owner['pod_uid'], owner['container_id'].removeprefix('containerd://'), owner['restart_count']
-            if (scope['session'] != callback_session or any(
-                    (row['pod_uid'], row['container_id'], row['restart_count']) != generation for row in record['bindings'])):
+            if (scope['session'] != callback_session or record['producer'] != producer()
+                    or record['completeness']['source_ended'] is not False or any(
+                        (row['pod_uid'], row['container_id'], row['restart_count']) != generation
+                        for row in record['bindings'])):
                 raise ValueError('B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH')
+            # A supplied checkpoint can retain candidates without independent live owner proof.
+            result = {**result, 'violations': []}
         return record, scope, result
 
     def _collect_role(self, check, env, values, role, *, role_inputs=None):

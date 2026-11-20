@@ -7,6 +7,7 @@ import subprocess
 
 import pytest
 
+from guard.executors.retry_record_contract import TARGET_BINDING_KEY
 from guard.models import Environment, Policy, canonical_json, sha256_hex
 from tests.test_a1_retry_record_contract import example as retry_example
 from tests.test_mvp_metadata_wiring import sources
@@ -85,8 +86,21 @@ def test_materialized_retry_scopes_join_both_sides_without_collection(tmp_path, 
     assert decisions["LIF-12"]["configuration_enabled"]
     for side, item in published.items():
         assert item["record_session"] == declarations[side]["record_session"]
+        binding = {key: declarations[side][key] for key in ("environment_ref", "target_sha256")}
+        assert item[TARGET_BINDING_KEY] == binding
+        assert config["sides"][side]["check_config"]["LIF-12"][TARGET_BINDING_KEY] == binding
         emitted = json.loads(Path(item["retry_scope"]).read_bytes())
         assert emitted["subjects"] == declarations[side]["subjects"]
         assert emitted["producer_source_sha256"] == declarations[side]["record_producer"]["sha256"]
         assert emitted["policy_sha256"] == sha256_hex(canonical_json(values))
         assert emitted["limits"] == values["retry_limits"]
+
+    target_path = paths["candidate"]["target"]
+    target = json.loads(target_path.read_bytes())
+    target["kubernetes"]["probe"]["pod_uid"] = "2187f050-0a54-41ea-8c12-f03c406400cc"
+    target_path.write_bytes(canonical_json(target))
+    config, _, decisions = wiring.assemble(paths, policy_path, pack=pack, store=tmp_path / "store",
+                                           retry_record_inputs=published)
+    assert config["update"]["allowed_checks"] == []
+    assert decisions["LIF-12"] == {
+        "configuration_enabled": False, "sides": {"baseline": None, "candidate": "RETRY_CONFIGURATION_INVALID"}}

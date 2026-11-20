@@ -93,7 +93,10 @@ def prepare(inputs, policy_path, selection_path, expected_selection_sha256, outp
         scopes[side] = canonical_json(scope)
         if len(scopes[side]) > MAX_BYTES:
             raise ValueError("MVP_RETRY_SCOPE_TOO_LARGE")
-        bindings[side] = {"record_session": declaration["record_session"], "record_producer": str(producer_path)}
+        bindings[side] = {"record_session": declaration["record_session"], "record_producer": str(producer_path),
+                          retry.TARGET_BINDING_KEY: {
+                              "environment_ref": env.ref().model_dump(mode="json"),
+                              "target_sha256": transport.target_sha256}}
         protected.extend((env_path, target_path, producer_path))
 
     directory = reserve_output(Path(output), protected=protected)
@@ -114,13 +117,17 @@ def prepare(inputs, policy_path, selection_path, expected_selection_sha256, outp
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pack", type=Path, default=readiness.ROOT / "packs/PACK-BASELINE")
-    parser.add_argument("--policy", type=Path, required=True)
-    parser.add_argument("--selection", type=Path, required=True)
-    parser.add_argument("--selection-sha256", required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--policy", type=Path, required=True, help="Confirmed sealed policy with LIF-12 limits")
+    parser.add_argument("--selection", type=Path, required=True,
+        help="Pinned JSON with policy_ref and each side's environment_ref, target_sha256, run_id, record_session, "
+             "record_producer (path and SHA256), producer identity, configuration and native-source SHA256, and subjects")
+    parser.add_argument("--selection-sha256", required=True, help="Independent SHA256 of the exact selection file bytes")
+    parser.add_argument("--output", type=Path, required=True,
+        help="New directory for the scopes and retry-record-inputs.json with saved owner bindings")
     for side in readiness.SIDES:
         for role in ("environment", "target"):
-            parser.add_argument(f"--{side}-{role}", type=Path, required=True)
+            parser.add_argument(f"--{side}-{role}", type=Path, required=True,
+                help=f"Saved {side} {role} JSON matching the pinned selection")
     args = parser.parse_args(argv)
     inputs = {side: {role: getattr(args, f"{side}_{role}") for role in ("environment", "target")}
               for side in readiness.SIDES}

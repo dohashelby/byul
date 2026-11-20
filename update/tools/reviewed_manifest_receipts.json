@@ -1075,6 +1075,11 @@
       "manifest_sha256": "41c8374126255dfabdd28c5ee5e41961e5de1fe15db9d32bfc927dd77f6a0437",
       "reviewed_by": "Codex / SUP-06 same-call native shard index observation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T00:21:21+00:00"
+    },
+    {
+      "manifest_sha256": "96d558be388338bebf67df3da7aa9cd4f2157b668e20ffac38b8a34006143d3d",
+      "reviewed_by": "Codex / SUP-06 callback capture and boot input binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T00:41:21+00:00"
     }
   ]
 }

@@ -2044,6 +2044,12 @@ def test_obs11_snapshot_uses_the_locked_plan_owner_and_side_session(tmp_path, mo
 
     monkeypatch.setattr(observer.KubernetesLogIntegrityExecutor, 'run', inspect_pin)
     if case == 'audit':
+        managed = {'executors': {'log_integrity': 'real'}, 'adapter': cfg['adapter'],
+                   'check_config': cfg['check_config']}
+        monkeypatch.setattr(application, '_managed_config', forbid_io)
+        with pytest.raises(ValueError, match='^COLLECTION_STATUS_SNAPSHOT_SCOPE_INVALID$'):
+            application.execute_validation(store, pack, envs[0], pol, managed, tmp_path / 'managed', utcnow())
+        assert not (tmp_path / 'managed').exists()
         with pytest.raises(ValueError, match='^COLLECTION_STATUS_SNAPSHOT_SCOPE_INVALID$'):
             run.run_plan(store, pack, plan, rc)
         assert not seen and not list(store.iter_kind('EVD'))

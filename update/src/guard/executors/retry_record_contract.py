@@ -15,6 +15,7 @@ POLICY_TYPES = {key: 'str' for key in (
     'retry_validity_start', 'retry_validity_end', 'retry_policy_mode')}
 POLICY_TYPES['retry_max_record_delay_ms'] = 'int'
 DECISION_KEY = 'retry_limits'
+TARGET_BINDING_KEY = 'retry_target_binding'
 OBSERVATIONS = {key: 'list' for key in (
     'retry_record_snapshots', 'retry_event_declarations', 'retry_attempt_candidates',
     'retry_family_candidates', 'retry_cost_candidates', 'retry_missing',

@@ -74,7 +74,9 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
 
     def _validate_configuration(self, env):
         if set(self.cfg) - {'target', 'retry_scope', 'prepared', 'kubectl_binary', 'max_duration_seconds',
-                            RETRY_RECORD_SNAPSHOT_OPTION}:
+                            RETRY_RECORD_SNAPSHOT_OPTION, contract.TARGET_BINDING_KEY}:
+            raise ValueError
+        if contract.TARGET_BINDING_KEY in self.cfg and self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is not True:
             raise ValueError
         if 'prepared' in self.cfg and (type(self.cfg['prepared']) is not str or not self.cfg['prepared']):
             raise ValueError
@@ -89,6 +91,10 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
                 or target_hash != values['retry_target_sha256']
                 or any(pin is not None and pin != target_hash for pin in expected_pins)):
             raise ValueError
+        if contract.TARGET_BINDING_KEY in self.cfg:
+            target_binding = {'environment_ref': env.ref().model_dump(mode='json'), 'target_sha256': target_hash}
+            if canonical_json(self.cfg[contract.TARGET_BINDING_KEY]) != canonical_json(target_binding):
+                raise ValueError
         image = target['kubernetes']['engine']['image']
         if type(image) is not str or '@sha256:' not in image:
             raise ValueError

@@ -159,6 +159,7 @@ def test_retry_snapshot_scope_keeps_sibling_executors_out_of_the_option():
 @pytest.mark.parametrize("pin,target_problem", [
     ("exact", None), ("missing", None), ("different", None),
     ("exact", "missing"), ("exact", "changed"), ("exact", "symlink"),
+    ("exact", "prepared-owner"), ("exact", "prepared-environment"),
 ])
 def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_path, pin, target_problem):
     from guard.adapters.vllm import VllmAdapter
@@ -173,6 +174,9 @@ def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_pat
     target_path = tmp_path / "normal-target.json"
     target_path.write_bytes(canonical_json(world.target))
     cfg = {"target": str(target_path), "retry_scope": str(scope_path), RETRY_RECORD_SNAPSHOT_OPTION: True}
+    prepared_binding = retry_executor.contract.TARGET_BINDING_KEY
+    if target_problem in {"prepared-owner", "prepared-environment"}:
+        cfg[prepared_binding] = {"environment_ref": environment.ref().model_dump(mode="json"), "target_sha256": digest}
     selected_pin = {"exact": digest, "missing": None, "different": "0" * 64}[pin]
     executor = KubernetesRequestTerminationExecutor(cfg, runner=world.runner, expected_target_sha256=selected_pin)
     check = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE").checks["LIF-12"]
@@ -183,6 +187,10 @@ def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_pat
             target_path.unlink()
         elif target_problem == "changed":
             target_path.write_bytes(canonical_json({**world.target, "observed_version": "changed"}))
+        elif target_problem == "prepared-owner":
+            cfg[prepared_binding]["target_sha256"] = "0" * 64
+        elif target_problem == "prepared-environment":
+            cfg[prepared_binding]["environment_ref"]["sha256"] = "0" * 64
         else:
             original = target_path.rename(tmp_path / "same-target-bytes.json")
             target_path.symlink_to(original.name)

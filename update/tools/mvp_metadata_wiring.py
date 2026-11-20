@@ -18,6 +18,7 @@ from guard.core.execution_recipe import validate_policy_time
 from guard.core.run import RunConfig, _blocked_reason
 from guard.core.select import _in_scope, select
 from guard.executors import passive_api_hop, registry, run_binding, template_supply_approval as template_supply
+from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
 from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snapshot_owner
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
 from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
@@ -90,6 +91,8 @@ def _paired_record_inputs(value, check_id):
     fields = {'record_session', *file_fields}
     if check_id == 'OBS-01':
         fields.add('test_actors')
+    if check_id == 'LIF-12' and any(type(entry) is dict and RETRY_TARGET_BINDING in entry for entry in value.values()):
+        fields.add(RETRY_TARGET_BINDING)
     bindings = {}
     for side, entry in value.items():
         if type(entry) is not dict or set(entry) != fields:
@@ -103,6 +106,14 @@ def _paired_record_inputs(value, check_id):
                 _read(source)
             bindings[side][field] = str(source)
     return bindings
+
+
+def _record_scope_settings(check_id, run_cfg):
+    scope_file = RECORD_SCOPE_FILES[check_id]
+    settings = {scope_file: run_cfg.pop(scope_file)}
+    if check_id == 'LIF-12' and RETRY_TARGET_BINDING in run_cfg:
+        settings[RETRY_TARGET_BINDING] = run_cfg.pop(RETRY_TARGET_BINDING)
+    return settings
 
 
 def _gateway_record_inputs(value):
@@ -323,7 +334,7 @@ def _prebound_record_binding(check, env, values, *, policy, side, target_pointer
     settings = {'target': target_pointer['path'], CHECK_OPTIONS[check.id]: True}
     run_cfg = dict(record_inputs)
     if check.id == 'LIF-12':
-        settings['retry_scope'] = run_cfg.pop('retry_scope')
+        settings.update(_record_scope_settings(check.id, run_cfg))
     elif run_binding.stages_for(check) != (2,):
         raise ValueError('METADATA_COLLECTION_STATUS_PROFILE_UNAVAILABLE')
     _, effective = run_binding.effective_values(check, settings, env, values,
@@ -573,9 +584,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 settings[check.executor] = {'target': target_pointer['path']}
             if check_id in records:
                 run_cfg = dict(records[check_id][side])
-                scope_file = RECORD_SCOPE_FILES.get(check_id)
-                if scope_file is not None:
-                    settings.setdefault('check_config', {})[check_id] = {scope_file: run_cfg.pop(scope_file)}
+                if check_id in RECORD_SCOPE_FILES:
+                    settings.setdefault('check_config', {})[check_id] = _record_scope_settings(check_id, run_cfg)
                 if check_id == 'OBS-01' and SNAPSHOT_SOURCE in run_cfg:
                     settings.setdefault('check_config', {})[check_id] = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
                 settings.setdefault('run_binding', {})[check_id] = run_cfg

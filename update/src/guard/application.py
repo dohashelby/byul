@@ -480,6 +480,8 @@ def _validation_inputs(env, cfg: dict):
         raise ValueError("PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID")
     if cilium_egress_status_requested(cfg):
         raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+    if collection_status_snapshot_requested(cfg):
+        raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
     if installed_plugin_inventory_requested(cfg):
         raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
     if normal_compile_cache_requested(cfg):
@@ -655,8 +657,6 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 transition_requested = bool(_kubernetes_transition_configurations(effective_sides)[1])
         validate_pack(pack)
         if single:
-            if collection_status_snapshot_requested(cfg):
-                raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
             effective, managed = _validation_inputs(envs[0], cfg)
             prepared = ("managed", {"single": effective}, {"single": managed})
         else:

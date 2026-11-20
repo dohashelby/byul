@@ -20,7 +20,11 @@ from tools.mvp_versions import versions
 
 SCHEMA = "guard-mvp-transition-dependency-abi/1"
 SYNC = "instrument_otel.<locals>.sync_wrapper"
-FILES = {**startup.SOURCE_FILENAMES, **generation.FILENAMES, **endpoint.FILENAMES}
+_STARTUP_MODULES = (startup.WORKER, startup.TRACING, startup.OTEL, startup.UTILS)
+FILES = {
+    **{module: startup.SOURCE_FILENAMES[module] for module in _STARTUP_MODULES},
+    **generation.FILENAMES, **endpoint.FILENAMES,
+}
 # The baseline pins come from the exact approved Linux amd64 GPU image's
 # installed-source receipt. They are inputs to compile-time review only.
 _BASELINE = {
@@ -34,7 +38,8 @@ _BASELINE = {
 }
 SOURCE_PINS = {
     "baseline": _BASELINE,
-    "candidate": {**startup.SOURCE_SHA256, **generation.SOURCE_SHA256, **endpoint.SOURCE_SHA256},
+    "candidate": {**{module: startup.SOURCE_SHA256[module] for module in _STARTUP_MODULES},
+                  **generation.SOURCE_SHA256, **endpoint.SOURCE_SHA256},
 }
 IMAGE_DIGESTS = {
     "baseline": "sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",

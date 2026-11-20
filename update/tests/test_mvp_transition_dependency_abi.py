@@ -1,5 +1,6 @@
 """Check compile-time fingerprint parity with the existing approved tables."""
 from pathlib import Path
+import re
 
 import pytest
 
@@ -19,6 +20,7 @@ _CANDIDATE = {
 
 
 def test_candidate_source_bytes_reproduce_approved_point_tables(tmp_path):
+    assert abi.FILES.keys() == abi.SOURCE_PINS["baseline"].keys() == _CANDIDATE.keys()
     for module, source in _CANDIDATE.items():
         path = tmp_path / abi.FILES[module]
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,5 +48,5 @@ def test_baseline_installed_byte_fixtures_measure_distinct_point_codes(module, f
     measured = abi._point_codes(source, module, abi.SOURCE_PINS["baseline"][module], points)
     assert measured.keys() == points
     assert all(measured[point] != approved[point] for point in points)
-    with pytest.raises(ValueError, match="^TRANSITION_DEPENDENCY_SOURCE_MISMATCH: "):
+    with pytest.raises(ValueError, match=f"^TRANSITION_DEPENDENCY_SOURCE_MISMATCH: {re.escape(module)}$"):
         abi._point_codes(source, module, abi.SOURCE_PINS["candidate"][module], points)

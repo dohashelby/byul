@@ -170,6 +170,31 @@ def inputs_manifest(cfg, *, generation_identities=None):
     return manifest
 
 
+def generation_native_target(target, env, *, require_lab=True):
+    """Return the native reader's owner projection of a generation target."""
+    binding = target['kubernetes']
+    native = {
+        'schema': 'guard-kubernetes-lifecycle-target/1',
+        'lab': target['lab'],
+        'run_id': binding['run_id'],
+        'environment_ref': env.ref().model_dump(mode='json'),
+        'kubernetes': {'context': binding['context'], 'engine': deepcopy(binding['engine'])},
+    }
+    if native['lab'] is False and (target.get('synthetic', False) is not False
+            or env.data_origin == DataOrigin.EXAMPLE):
+        raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+    validate_target(native, env, require_lab=require_lab)
+    return native
+
+
+def validate_generation_http_target(target, env):
+    """Check the HTTP owner and model mapping without opening a connection."""
+    try:
+        KubernetesHTTP(target, env, duration=1, profile=REQUEST_BINDING_PROFILE)
+    except (KubernetesBindingError, OSError):
+        raise ValueError('TRANSITION_GENERATION_HTTP_TARGET_INVALID') from None
+
+
 def _validate_redeployment(generations, phases):
     before = generations[phases['before']]
     if before.key in (phases['after'], phases['recovered']):
@@ -197,12 +222,7 @@ def _validate_redeployment(generations, phases):
             raise ValueError('TRANSITION_DISTINCT_GENERATIONS_REQUIRED')
         restarts.add(restart)
         containers.add(container)
-        # Validate the existing HTTP target and model mapping before any incoming
-        # request. Constructing the transport only verifies local inputs.
-        try:
-            KubernetesHTTP(generation.target, generation.env, duration=1, profile=REQUEST_BINDING_PROFILE)
-        except (KubernetesBindingError, OSError):
-            raise ValueError('TRANSITION_GENERATION_HTTP_TARGET_INVALID') from None
+        validate_generation_http_target(generation.target, generation.env)
 
 
 def load_generations(cfg, env, values, check_id=None):
@@ -232,13 +252,7 @@ def load_generations(cfg, env, values, check_id=None):
             if prepared['profile'] not in {generation_sensor.PROFILE, endpoint_sensor.PROFILE}:
                 raise ValueError
             sessions.add(prepared['session'])
-            native = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': target['lab'],
-                'run_id': target['kubernetes']['run_id'], 'environment_ref': selected_env.ref().model_dump(mode='json'),
-                'kubernetes': {'context': target['kubernetes']['context'], 'engine': target['kubernetes']['engine']}}
-            if native['lab'] is False and (target.get('synthetic', False) is not False
-                    or selected_env.data_origin == DataOrigin.EXAMPLE):
-                raise ValueError
-            validate_target(native, selected_env, require_lab=not pinned_redeployment)
+            native = generation_native_target(target, selected_env, require_lab=not pinned_redeployment)
             from guard.collectors.model_read_scope import validate_binding
             validate_binding(prepared, selected_env, native)
             generations[row['id']] = Generation(row['id'], selected_env, target, native, prepared)

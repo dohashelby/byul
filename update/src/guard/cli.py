@@ -468,10 +468,18 @@ def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
 
 
 @app.command("prepare-model-read-scope")
-def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path = typer.Option(...,"--target"),
-    model_manifest: Path = typer.Option(...,"--model-manifest"),model_root: str = typer.Option(...,"--model-root"),
-    output: Path = typer.Option(...,"--output"),nonsecret_model_weights: bool = typer.Option(False,"--nonsecret-model-weights"),
-    hash_model_bytes: bool = typer.Option(False,"--hash-model-bytes"),max_hash_bytes: int = typer.Option(2**31,"--max-hash-bytes")) -> None:
+def prepare_model_read_scope(
+    env: Path = typer.Option(..., "--env"),
+    target: Path = typer.Option(..., "--target"),
+    model_manifest: Path = typer.Option(..., "--model-manifest"),
+    model_root: str = typer.Option(..., "--model-root"),
+    output: Path = typer.Option(..., "--output"),
+    nonsecret_model_weights: bool = typer.Option(False, "--nonsecret-model-weights"),
+    hash_model_bytes: bool = typer.Option(False, "--hash-model-bytes"),
+    max_hash_bytes: int = typer.Option(2**31, "--max-hash-bytes"),
+    target_sha256: str | None = typer.Option(None, "--target-sha256", help="저장된 정상 HTTP 대상 파일의 바이트 해시"),
+    model_manifest_sha256: str | None = typer.Option(None, "--model-manifest-sha256", help="승인 모델 참조 파일의 바이트 해시"),
+) -> None:
     """선언한 비밀 아닌 safetensors 참조 범위를 만든다. 모델 파일을 읽지 않는다."""
     from guard.collectors.file import load_environment
     from guard.collectors.model_read_scope import build_scope
@@ -479,14 +487,23 @@ def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path 
     from guard.collectors.route_observations import validate_output
     from guard.models import canonical_json
     try:
-        environment=load_environment(env)
-        with target.open('rb') as stream:topology=strict_json(stream.read(65537))
-        value=build_scope(environment,topology,model_manifest,model_root,nonsecret_model_weights=nonsecret_model_weights,
-            hash_model_bytes=hash_model_bytes,max_hash_bytes=max_hash_bytes)
-        validate_output(output,Path(__file__).resolve().parents[3]);destination=output.absolute()
-        with destination.open('xb') as stream:stream.write(canonical_json(value))
-    except (OSError,ValueError,TypeError):
-        typer.echo("MODEL_READ_SCOPE_PREPARATION_FAILED");raise typer.Exit(2)
+        scope_options = {"nonsecret_model_weights": nonsecret_model_weights,
+                         "hash_model_bytes": hash_model_bytes, "max_hash_bytes": max_hash_bytes}
+        if target_sha256 is None and model_manifest_sha256 is None:
+            environment = load_environment(env)
+            with target.open("rb") as stream:
+                topology = strict_json(stream.read(65537))
+            value = build_scope(environment, topology, model_manifest, model_root, **scope_options)
+        else:
+            from guard.executors.lifecycle_transition_scope import prepare_scope
+            value = prepare_scope(env, target, model_manifest, model_root, expected_target_sha256=target_sha256,
+                                  approved_manifest_sha256=model_manifest_sha256, **scope_options)
+        validate_output(output, Path(__file__).resolve().parents[3])
+        with output.absolute().open("xb") as stream:
+            stream.write(canonical_json(value))
+    except (OSError, ValueError, TypeError):
+        typer.echo("MODEL_READ_SCOPE_PREPARATION_FAILED")
+        raise typer.Exit(2)
     typer.echo(json.dumps({"prepared":True,"model_files_read":False,"approval_verified":False}))
 
 

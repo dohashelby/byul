@@ -790,7 +790,7 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
     from guard.core.select import select
     from guard.executors.base import EvidenceDraft
     from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
-    from guard.models import DataOrigin, ExecStatus, Mode, Side, canonical_json, sha256_hex
+    from guard.models import DataOrigin, ExecStatus, Mode, Side, canonical_json, sha256_hex, utcnow
     from guard.store import Store
     from guard.store.packs import put_pack
 

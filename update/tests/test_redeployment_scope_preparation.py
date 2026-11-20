@@ -57,8 +57,8 @@ def test_public_pinned_scope_produces_a_preparable_generation(external, declared
     manifest_path = assets / 'manifest.json'
     prepared = load_prepared(manifest_path)
     assert prepared['engine_started'] is False and prepared['product_connected'] is False
-    bound_scope = validate_binding(prepared, env, native)
-    assert bound_scope['manifest_bytes_sha256'] == reference_pin
+    validate_binding(prepared, env, native)
+    assert prepared['model_read_scope']['manifest_bytes_sha256'] == reference_pin
     deployed_scope = json.loads((assets / 'model-read-scope.json').read_bytes())
     assert deployed_scope['session'] == prepared['session']
     assert deployed_scope['input_scope_sha256'] == sha256_hex(output.read_bytes())

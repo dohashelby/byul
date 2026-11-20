@@ -48,7 +48,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_I
                                  NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_STARTUP_LOAD_OPTION,
-                                 NORMAL_STREAM_OPTION)
+                                 NORMAL_STREAM_OPTION, RETRY_RECORD_SNAPSHOT_OPTION)
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
@@ -725,6 +725,8 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             elif key == 'record_target_sha256' and record_digests is not None:
                 values[key] = files[key] = _verified_record_access_sha256(
                     key, executor_cfg, record_digests['target'], 'RUN_BINDING_RECORD_ACCESS_TARGET_CHANGED')
+            elif key == 'retry_target_sha256' and executor_cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+                values[key] = files[key] = file_hash(check.id, key, executor_cfg, require_regular_json=True)
             elif key == 'rank_prepared_sha256' and expected_rank_prepared_file is not None:
                 from .lifecycle_common_input_consumption import _read
                 try:

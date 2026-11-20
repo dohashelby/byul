@@ -216,6 +216,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             rank_common_files = {}
             retry_path = retry_targets.get(side.value) if item.check_id == "LIF-12" else None
             retry_target_snapshots = {retry_path: None} if retry_path is not None else None
+            retry_snapshot_digests = {} if retry_path is not None else None
             if plan.inputs.execution_recipe_sha256 is not None:
                 from .execution_recipe import configuration_sha256
                 if configuration_sha256(requested, envs, plan=plan, target_snapshots=retry_target_snapshots,
@@ -225,7 +226,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                                         supply_record_digests=supply_record_digests,
                                         missing_native_route_prepared_sides=missing_route_prepared,
                                         rank_common_files=rank_common_files,
-                                        record_access_digests=record_access_digests) != plan.inputs.execution_recipe_sha256:
+                                        record_access_digests=record_access_digests,
+                                        retry_snapshot_digests=retry_snapshot_digests) != plan.inputs.execution_recipe_sha256:
                     raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
@@ -258,7 +260,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                            native_route_prepared_absent=side.value in missing_route_prepared,
                            rank_common_files=rank_common_files.get(side.value),
                            record_access_digests=record_access_digests,
-                           retry_target_bytes=retry_target_snapshots[retry_path] if retry_target_snapshots else None)
+                           retry_target_bytes=retry_target_snapshots[retry_path] if retry_target_snapshots else None,
+                           retry_snapshot_files=retry_snapshot_digests.get(side.value) if retry_snapshot_digests else None)
             try:
                 store.put(evd)
             except Exception:
@@ -281,7 +284,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
              policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
              transition_manifests=None, initialization_digests=None, response_route_digests=None,
              supply_record_digests=None, native_route_prepared_absent=False, rank_common_files=None,
-             record_access_digests=None, retry_target_bytes=None) -> Evidence:
+             record_access_digests=None, retry_target_bytes=None, retry_snapshot_files=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -326,6 +329,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             retry_target = snapshot_target_sha256(retry_target_bytes, env)
         except ValueError:
             return stopped(ExecStatus.NOT_RUN, "RUN_BINDING_RETRY_SNAPSHOT_TARGET_UNAVAILABLE")
+        if retry_snapshot_files is None:
+            return stopped(ExecStatus.NOT_RUN, "RUN_BINDING_RETRY_SNAPSHOT_FILES_UNAVAILABLE")
         key = "_kubernetes_target_sha256_by_executor"
         hashes = raw.get(key)
         raw = {**raw, key: {**(hashes if type(hashes) is dict else {}), item.executor: retry_target}}
@@ -422,12 +427,16 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                     raise run_binding.RunBindingUnavailable('RUN_BINDING_RANK_COMMON_FILES_UNAVAILABLE')
                 raw = {**raw, '_rank_common_files': rank_common_files}
                 target_options['expected_rank_prepared_file'] = rank_common_files['prepared']
-            binding, policy_values = run_binding.effective_values(
+            computed_binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
                 run_cfg=run_binding.run_config(cfg.raw, check.id), policy_ref=plan.inputs.policy, **target_options)
-            if retry_target is not None and policy_values.get("retry_target_sha256") != retry_target:
-                raise run_binding.RunBindingUnavailable("RUN_BINDING_RETRY_SNAPSHOT_TARGET_CHANGED")
+            if retry_target is not None:
+                if policy_values.get("retry_target_sha256") != retry_target:
+                    raise run_binding.RunBindingUnavailable("RUN_BINDING_RETRY_SNAPSHOT_TARGET_CHANGED")
+                if any(policy_values.get(key) != digest for key, digest in retry_snapshot_files.items()):
+                    raise run_binding.RunBindingUnavailable("RUN_BINDING_RETRY_SNAPSHOT_FILES_CHANGED")
+            binding = computed_binding
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)

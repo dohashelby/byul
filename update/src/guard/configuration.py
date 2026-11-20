@@ -295,7 +295,7 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or retry_in_base and any(cid != "LIF-12" and pack.checks[cid].executor == retry_executor
                                              for cid in allowed_checks)):
                 raise ValueError(retry_error)
-            scoped["LIF-12"] = (settings, None)
+            scoped["LIF-12"] = (settings, bindings.get("LIF-12") if type(bindings) is dict else None)
         stream_cases = {}
         for check_id, (executor, option, scope_error) in _NORMAL_ONLY_CASES.items():
             overlay = overlays.get(check_id) if type(overlays) is dict else None

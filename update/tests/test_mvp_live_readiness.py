@@ -776,7 +776,10 @@ def test_record_declarations_match_runtime_input_contracts(
             assert 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']
 
 
-@pytest.mark.parametrize("case", ["audit", "unsealed", "changed-under-lock", "exact"])
+@pytest.mark.parametrize("case", [
+    "audit", "unsealed", "changed-under-lock", "exact",
+    "scope-before-lock", "producer-before-lock", "scope-under-lock", "producer-under-lock",
+])
 def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeypatch, record_access_context, case):
     from guard import application
     from guard.core import run as core
@@ -794,10 +797,13 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
     store = Store(tmp_path / "store")
     put_pack(store, pack.path)
     plan = select(pack, selected_envs, pol, mode=mode)
-    if case in {"exact", "changed-under-lock"}:
+    if case not in {"audit", "unsealed"}:
         plan = bind_recipe(plan, cfg, selected_envs)
     store.put_many([*selected_envs, pol, plan])
-    target_path = Path(cfg["sides"]["candidate"]["request_termination"]["target"])
+    candidate = cfg["sides"]["candidate"]
+    target_path = Path(candidate["request_termination"]["target"])
+    scope_path = Path(candidate["request_termination"]["retry_scope"])
+    producer_path = Path(candidate["run_binding"]["LIF-12"]["record_producer"])
     digest = sha256_hex(canonical_json(json.loads(target_path.read_bytes())))
     called = []
 
@@ -805,6 +811,8 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
         assert case == "exact"
         called.append(env.ref())
         assert executor.expected_target_sha256 == values["retry_target_sha256"] == digest
+        assert values["retry_scope_sha256"] == sha256_hex(scope_path.read_bytes())
+        assert values["retry_record_source_sha256"] == sha256_hex(producer_path.read_bytes())
         return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
                              normal_control={"attempted": False})
 
@@ -818,13 +826,25 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
         assert not called and not list(store.iter_kind("EVD"))
         return
 
-    if case == "changed-under-lock":
+    if case.endswith("-before-lock"):
+        path = scope_path if case.startswith("scope-") else producer_path
+        path.write_bytes(path.read_bytes() + b'\n')
+        with pytest.raises(ValueError, match="^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$"):
+            core.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+        assert not called and not list(store.iter_kind("EVD"))
+        return
+
+    if case.endswith("-under-lock"):
         original = core._run_one
 
         def change_before_binding(*args, **kwargs):
-            target = json.loads(target_path.read_bytes())
-            target["model_mapping"]["api_model"] = "fixture-alternate-model"
-            target_path.write_bytes(canonical_json(target))
+            if case == "changed-under-lock":
+                target = json.loads(target_path.read_bytes())
+                target["model_mapping"]["api_model"] = "fixture-alternate-model"
+                target_path.write_bytes(canonical_json(target))
+            else:
+                path = scope_path if case.startswith("scope-") else producer_path
+                path.write_bytes(path.read_bytes() + b'\n')
             return original(*args, **kwargs)
 
         monkeypatch.setattr(core, "_run_one", change_before_binding)
@@ -836,9 +856,13 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
         assert evd.execution.run_binding["files"]["retry_target_sha256"] == digest
     else:
         assert not called and evd.execution.status is ExecStatus.NOT_RUN
-        reason = "RUN_BINDING_RETRY_SNAPSHOT_TARGET_CHANGED" if case == "changed-under-lock" else (
-            "RUN_BINDING_RETRY_SNAPSHOT_TARGET_UNAVAILABLE")
-        assert evd.execution.abort_reason == reason
+        assert evd.execution.abort_reason == {
+            "unsealed": "RUN_BINDING_RETRY_SNAPSHOT_TARGET_UNAVAILABLE",
+            "changed-under-lock": "RUN_BINDING_RETRY_SNAPSHOT_TARGET_CHANGED",
+            "scope-under-lock": "RUN_BINDING_RETRY_SNAPSHOT_FILES_CHANGED",
+            "producer-under-lock": "RUN_BINDING_RETRY_SNAPSHOT_FILES_CHANGED",
+        }[case]
+        assert evd.execution.run_binding is None
 
 
 @pytest.mark.parametrize('late', [False, True])

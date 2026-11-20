@@ -10,7 +10,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                          transition_manifests=None, plan=None, initialization_digests=None,
                          response_route_digests=None, supply_record_digests=None,
                          missing_native_route_prepared_sides=None, rank_common_files=None,
-                         record_access_digests=None):
+                         record_access_digests=None, retry_snapshot_digests=None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
@@ -25,7 +25,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
         return value
     inputs = {}
     captured_digests = {}
-    from guard.configuration import normal_file_reads_requested
+    from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION, normal_file_reads_requested
     normal_file_reads = normal_file_reads_requested(cfg)
     late_candidate = cfg.get('update', {}).get('kubernetes_candidate_binding') == 'after_baseline'
     def files(value, location=()):
@@ -114,6 +114,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     response_routes = {}
     supply_inputs = {}
     record_access_inputs = {}
+    retry_snapshot_inputs = {}
     missing_route_prepared = set()
     rank_inputs = {}
     rank_update = eligible.get('LIF-08') == 'rank_failure'
@@ -134,6 +135,7 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
     prebound_route_record = prebound and eligible.get('REQ-02') == 'route_record'
     prebound_record_access = (prebound and eligible.get('OBS-06') == 'record_access'
                               and plan.item('OBS-06').check_revision >= OBS06_STAGE4_MIN_CHECK_REVISION)
+    prebound_retry_snapshot = prebound and eligible.get('LIF-12') == 'request_termination'
     supply_checks = [check_id for check_id, executor in eligible.items()
                      if prebound and executor == 'supply_boot' and check_id in SUPPLY_RECORD_CHECKS]
     for side, env in sides.items():
@@ -206,6 +208,17 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
                         }
                 except (KeyError, OSError, TypeError, ValueError):
                     record_access_inputs[side] = None
+        if (prebound_retry_snapshot and side in ('baseline', 'candidate')
+                and effective.get('executors', {}).get('request_termination') == 'kubernetes'):
+            try:
+                settings = for_check(effective, 'request_termination', 'LIF-12').get('request_termination', {})
+                if type(settings) is dict and settings.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+                    retry_snapshot_inputs[side] = {
+                        'retry_scope_sha256': file_hash('LIF-12', 'retry_scope_sha256', settings),
+                        'retry_record_source_sha256': producer_sha256(bindings['LIF-12']['record_producer']),
+                    }
+            except (KeyError, OSError, TypeError, ValueError):
+                retry_snapshot_inputs[side] = None
         if (supply_checks and side in ('baseline', 'candidate') and type(bindings) is dict
                 and effective.get('executors', {}).get('supply_boot') == 'kubernetes'):
             for check_id in supply_checks:
@@ -248,6 +261,10 @@ def configuration_sha256(cfg, environments=(), *, target_snapshots=None, normal_
         recipe['record_access_file_sha256_by_side'] = record_access_inputs
     if record_access_digests is not None:
         record_access_digests.update(record_access_inputs)
+    if retry_snapshot_inputs:
+        recipe['retry_snapshot_files_by_side'] = retry_snapshot_inputs
+    if retry_snapshot_digests is not None:
+        retry_snapshot_digests.update(retry_snapshot_inputs)
     if missing_route_prepared:
         recipe['missing_native_route_prepared_sides'] = sorted(missing_route_prepared)
     if missing_native_route_prepared_sides is not None:

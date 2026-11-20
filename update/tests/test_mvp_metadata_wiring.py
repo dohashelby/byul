@@ -1988,6 +1988,103 @@ def test_obs11_canonical_prepare_uses_exact_side_sessions_without_default_activa
     assert next(row for row in blocked['checks'] if row['check'] == 'inputs')['detail'] == 'RUN_BINDING_CONFIG_INVALID'
 
 
+def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path, monkeypatch, sources):
+    from tests.test_a1_retry_record_contract import example as retry_example
+
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('Saved record input assembly must not start a runtime or contact a target')
+
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    pack, sides, policy_path = sources
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    approved = json.loads((tool.readiness.ROOT / 'docs/dev-1/mvp-enterprise-policy-20261116.json').read_bytes())
+    obs_policy = {row['key']: row['value'] for row in approved['decisions'] if row['check_id'] == 'OBS-11'}
+    scope_seed, retry_policy, _, _ = retry_example()
+    lif_policy = {key: retry_policy[key] for key in ('retry_policy_mode', 'retry_max_record_delay_ms')}
+    lif_policy['retry_limits'] = scope_seed['limits']
+    pol = original.model_copy(update={'values': {'LIF-12': lif_policy, 'OBS-11': obs_policy},
+        'scope': original.scope.model_copy(update={'include': ['LIF-12', 'OBS-11']})}).seal()
+    _write(policy_path, pol.to_dict())
+
+    envs, retries, status = [], {}, {}
+    for number, (side, paths) in enumerate(sides.items(), 1):
+        env = tool.Environment.model_validate_json(paths['environment'].read_bytes())
+        envs.append(env)
+        target = json.loads(paths['target'].read_bytes())
+        producer = tmp_path / f'{side}-fixture-producer.py'
+        producer.write_text('# Inert declared source for file binding tests\n', encoding='utf-8')
+        scope = {**scope_seed, 'run_id': target['kubernetes']['run_id'],
+                 'image_digest': env.engine.image_digest.rsplit('@', 1)[1], 'model_revision': env.model.revision,
+                 'model_inventory_sha256': env.model.inventory_sha256, 'policy_sha256': sha256_hex(canonical_json(lif_policy)),
+                 'producer_source_sha256': sha256_hex(producer.read_bytes())}
+        retries[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
+                         'retry_scope': str(_write(tmp_path / f'{side}-retry-scope.json', scope))}
+        status[side] = {'record_session': f'{10 + number:032x}'}
+
+    options = {'pack': pack, 'store': tmp_path / 'store'}
+    default, _, decisions = tool.assemble(sides, policy_path, **options)
+    assert not {'LIF-12', 'OBS-11'}.intersection(decisions)
+    assert default['update']['allowed_checks'] == []
+    for option, pair in (('retry_record_inputs', retries), ('collection_status_bindings', status)):
+        with pytest.raises(ValueError, match='^OBSERVATION_PAIRED_RUN_BINDINGS_REQUIRED$'):
+            tool.assemble(sides, policy_path, **options, **{option: {'baseline': pair['baseline']}})
+
+    invalid = {**status, 'candidate': {'record_session': 'invalid'}}
+    only_retry, _, decisions = tool.assemble(sides, policy_path, **options,
+                                             retry_record_inputs=retries, collection_status_bindings=invalid)
+    assert only_retry['update']['allowed_checks'] == ['LIF-12']
+    assert decisions['OBS-11'] == {'configuration_enabled': False,
+                                  'sides': {'baseline': None, 'candidate': 'RUN_BINDING_CONFIG_INVALID'}}
+
+    output = tmp_path / 'assembled-status'
+    argv = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(options['store']),
+            '--retry-record-inputs', str(_write(tmp_path / 'retry-inputs.json', retries)),
+            '--collection-status-bindings', str(_write(tmp_path / 'status-bindings.json', status))]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            argv.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', [*argv, '--output', str(output)])
+    tool.main()
+    config = tomllib.loads((output / 'guard.toml').read_text(encoding='utf-8'))
+    assert config['update'] == {'mode': 'external', 'allowed_checks': ['LIF-12', 'OBS-11']}
+    assert config['executors'] == {'request_termination': 'kubernetes', 'log_integrity': 'kubernetes'}
+    for side, paths in sides.items():
+        merged = merge_config(config, config['sides'][side])
+        assert for_check(merged, 'request_termination', 'LIF-12')['request_termination'] == {
+            'target': str(paths['target']), 'retry_record_snapshot_only': True, 'retry_scope': retries[side]['retry_scope']}
+        assert for_check(merged, 'request_termination', 'REQ-12')['request_termination'] == {'target': str(paths['target'])}
+        assert merged['run_binding']['LIF-12'] == {key: retries[side][key] for key in ('record_session', 'record_producer')}
+        assert merged['run_binding']['OBS-11'] == status[side]
+    ready = application.update_readiness(pack, envs, pol, config)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+    audit = json.loads((output / 'readiness.json').read_bytes())
+    assert audit['active_checks'] == 69 and audit['sides'] == 138 and audit['file_binding_valid_sides'] == 4
+    assert not audit['engine_executed'] and not audit['ready_for_execution'] and audit['actual_results'] is None
+    for row in audit['rows']:
+        if row['check_id'] in config['update']['allowed_checks']:
+            assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'
+    with pytest.raises(ValueError, match='^METADATA_RECORDS_REQUIRE_PREBOUND_PAIR$'):
+        tool.staged_config(config, tmp_path / 'unbound-candidate.json')
+
+    candidate_scope = Path(retries['candidate']['retry_scope'])
+    assemble = tool.assemble
+
+    def replace_scope_after_assembly(*args, **kwargs):
+        result = assemble(*args, **kwargs)
+        scope = json.loads(candidate_scope.read_bytes())
+        _write(candidate_scope, {**scope, 'run_id': 'foreign-fixture-run'})
+        return result
+
+    declined = tmp_path / 'declined-status'
+    monkeypatch.setattr(tool, 'assemble', replace_scope_after_assembly)
+    monkeypatch.setattr(sys, 'argv', [*argv, '--output', str(declined)])
+    with pytest.raises(ValueError, match='^METADATA_RECORD_INPUT_PUBLICATION_UNVERIFIED$'):
+        tool.main()
+    assert declined.is_dir() and not any(declined.iterdir())
+    assert not options['store'].exists()
+
+
 def test_shared_ipc_checks_keep_distinct_recipe_pinned_targets(tmp_path, monkeypatch, sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())

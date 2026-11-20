@@ -41,6 +41,8 @@ from tools.j02_run_config import write_config
 from tools.mvp_a_input_preflight import _code, _pairs, _read
 from tools.mvp_versions import versions
 
+PREBOUND_RECORD_EXECUTORS = {'LIF-12': 'request_termination', 'OBS-11': 'log_integrity'}
+RECORD_SCOPE_FILES = {'PLT-12': 'copy_inventory', 'LIF-12': 'retry_scope'}
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
                    'SUP-03': 'template_validation', 'SUP-07': 'supply_boot', 'SUP-10': 'supply_boot', 'SUP-12': 'supply_boot',
                    'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
@@ -49,12 +51,12 @@ CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', '
                    'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
                    'LIF-01': 'supply_boot', 'LIF-03': 'stream_buffer', 'LIF-04': 'stream_buffer',
                    'REQ-09': 'input_validation', 'REQ-10': 'sampling_validation', 'REQ-20': 'engine_sensor',
-                   passive_api_hop.CHECK: passive_api_hop.EXECUTOR}
+                   passive_api_hop.CHECK: passive_api_hop.EXECUTOR, **PREBOUND_RECORD_EXECUTORS}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
-               if cid not in {*RECORD_SNAPSHOT_OPTIONS, 'OBS-02', 'PLT-02', 'LIF-01', 'LIF-03', 'LIF-04',
+               if cid not in {*RECORD_SNAPSHOT_OPTIONS, *PREBOUND_RECORD_EXECUTORS, 'OBS-02', 'PLT-02', 'LIF-01', 'LIF-03', 'LIF-04',
                               'PLT-07', 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-07', 'SUP-10', 'SUP-12', passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
-METADATA_EXECUTORS = frozenset(CHECK_EXECUTORS.values())
+METADATA_EXECUTORS = frozenset(name for cid, name in CHECK_EXECUTORS.items() if cid not in PREBOUND_RECORD_EXECUTORS)
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
 
 
@@ -81,9 +83,13 @@ def _transport(target, env):
 def _paired_record_inputs(value, check_id):
     if type(value) is not dict or set(value) != set(readiness.SIDES):
         raise ValueError('OBSERVATION_PAIRED_RUN_BINDINGS_REQUIRED')
-    is_copy = check_id == 'PLT-12'
-    fields = {'record_session', 'record_producer', 'copy_inventory' if is_copy else 'test_actors'}
-    file_fields = ('record_producer', 'copy_inventory') if is_copy else ('record_producer',)
+    scope_file = RECORD_SCOPE_FILES.get(check_id)
+    file_fields = () if check_id == 'OBS-11' else ('record_producer',)
+    if scope_file is not None:
+        file_fields = (*file_fields, scope_file)
+    fields = {'record_session', *file_fields}
+    if check_id == 'OBS-01':
+        fields.add('test_actors')
     bindings = {}
     for side, entry in value.items():
         if type(entry) is not dict or set(entry) != fields:
@@ -93,7 +99,8 @@ def _paired_record_inputs(value, check_id):
             if type(entry[field]) is not str or not entry[field]:
                 raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
             source = Path(entry[field]).absolute()
-            _read(source)
+            if check_id not in PREBOUND_RECORD_EXECUTORS:
+                _read(source)
             bindings[side][field] = str(source)
     return bindings
 
@@ -163,6 +170,8 @@ def staged_config(config, fresh_candidate_target):
         raise ValueError('GATEWAY_RECORDS_REQUIRE_PREBOUND_PAIR')
     if normal_file_reads_requested(config):
         raise ValueError('SUP05_NORMAL_PREPARATIONS_REQUIRE_PREBOUND_PAIR')
+    if any(name in config['executors'] for name in PREBOUND_RECORD_EXECUTORS.values()):
+        raise ValueError('METADATA_RECORDS_REQUIRE_PREBOUND_PAIR')
     result = deepcopy(config)
     result['update']['kubernetes_candidate_binding'] = 'after_baseline'
     for name in result['executors']:
@@ -310,6 +319,29 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=Fals
     return dict.fromkeys(executors, new.target_sha256), gaps
 
 
+def _prebound_record_reason(check, env, values, *, policy, side, target_path, target_sha256, record_inputs):
+    settings = {'target': target_path}
+    run_cfg = dict(record_inputs)
+    if check.id == 'LIF-12':
+        settings.update(retry_scope=run_cfg.pop('retry_scope'))
+        settings[CHECK_OPTIONS[check.id]] = True
+    elif run_binding.stages_for(check) != (2,):
+        return 'METADATA_COLLECTION_STATUS_PROFILE_UNAVAILABLE'
+    try:
+        _, effective = run_binding.effective_values(check, settings, env, values,
+            side=side, attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
+            run_cfg=run_cfg, policy_ref=policy.ref())
+        executor = registry.build_executor(check.executor, 'kubernetes', {check.executor: settings},
+                                           engine=env.engine.name, version=env.engine.version)
+        if check.id == 'LIF-12':
+            executor.prepared_retry_records(check, env, effective, expected_target_sha256=target_sha256)
+        else:
+            executor.prepared_collection_status(check, env, effective, expected_target_sha256=target_sha256)
+    except (KeyError, OSError, TypeError, ValueError) as error:
+        return _code(error)
+    return None
+
+
 def _check_reason(check, env, target, transport, values, *, policy, side, target_path, record_inputs):
     if not _in_scope(check.id, policy):
         return 'MVP_POLICY_SCOPE_MISMATCH'
@@ -317,6 +349,9 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return 'MVP_POLICY_VALUE_MISSING'
     if check.executor != CHECK_EXECUTORS[check.id]:
         return 'METADATA_EXECUTOR_UNAVAILABLE'
+    if check.id in PREBOUND_RECORD_EXECUTORS:
+        return _prebound_record_reason(check, env, values, policy=policy, side=side, target_path=target_path,
+                                       target_sha256=transport.target_sha256, record_inputs=record_inputs)
     if check.id == passive_api_hop.CHECK:
         try:
             passive_api_hop.validate_policy(check, values)
@@ -442,7 +477,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
              gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
              normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False,
              cilium_egress_status=False, normal_startup_load=False, normal_compile_cache=False,
-             normal_safetensors_reader=False, normal_graph_capture=False, sup05_normal_preparations=None):
+             normal_safetensors_reader=False, normal_graph_capture=False, sup05_normal_preparations=None,
+             retry_record_inputs=None, collection_status_bindings=None):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -475,7 +511,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
               'update': {'mode': 'external'}, 'executors': {}, 'sides': {side: {} for side in sides}}
     candidates = {}
     records = {check_id: _paired_record_inputs(value, check_id) for check_id, value in
-               (('OBS-01', observation_run_bindings), ('PLT-12', copy_record_inputs)) if value is not None}
+               (('OBS-01', observation_run_bindings), ('PLT-12', copy_record_inputs),
+                ('LIF-12', retry_record_inputs), ('OBS-11', collection_status_bindings)) if value is not None}
     if gateway_record_inputs is not None:
         if 'OBS-01' in records:
             raise ValueError('GATEWAY_RECORD_INPUT_MODE_CONFLICT')
@@ -528,8 +565,9 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 settings[check.executor] = {'target': target_pointer['path']}
             if check_id in records:
                 run_cfg = dict(records[check_id][side])
-                if check_id == 'PLT-12':
-                    settings.setdefault('check_config', {})[check_id] = {'copy_inventory': run_cfg.pop('copy_inventory')}
+                scope_file = RECORD_SCOPE_FILES.get(check_id)
+                if scope_file is not None:
+                    settings.setdefault('check_config', {})[check_id] = {scope_file: run_cfg.pop(scope_file)}
                 if check_id == 'OBS-01' and SNAPSHOT_SOURCE in run_cfg:
                     settings.setdefault('check_config', {})[check_id] = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
                 settings.setdefault('run_binding', {})[check_id] = run_cfg
@@ -545,7 +583,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     bounded_metadata_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
     shared_checks = ('SUP-03', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03',
                      'LIF-04', 'REQ-09', 'REQ-20',
-                     *RECORD_SNAPSHOT_OPTIONS, passive_api_hop.CHECK)
+                     *RECORD_SNAPSHOT_OPTIONS, *PREBOUND_RECORD_EXECUTORS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
         plan = select(pack, [base, candidate], policy, mode='update')
@@ -572,8 +610,8 @@ def _write_input_sources(index, pack, bindings, config_ref):
         'inputs': [{**entry, 'configuration': config_ref} for entry in bindings]}, indent=2), encoding='utf-8')
 
 
-def _publish_prebound_sup05(output, *, config, bindings, checks, pack, preparations):
-    with TemporaryDirectory(dir=output, prefix='.sup05-preflight-') as directory:
+def _publish_prebound(output, *, config, bindings, checks, pack, preparations, record_checks):
+    with TemporaryDirectory(dir=output, prefix='.prebound-preflight-') as directory:
         staging = Path(directory)
         config_path = staging / 'guard.toml'
         index = staging / 'input-sources.json'
@@ -581,10 +619,15 @@ def _publish_prebound_sup05(output, *, config, bindings, checks, pack, preparati
         config_sha256 = sha256(config_path.read_bytes()).hexdigest()
         _write_input_sources(index, pack, bindings, {'path': str(config_path), 'sha256': config_sha256})
         result = readiness.audit(index, pack=pack, sup05_normal_preparations=preparations)
-        verified = {row['side'] for row in result['rows'] if row['check_id'] == 'SUP-05'
-                    and row['file_binding_valid'] and row.get('sup05_normal_preparation') == preparations[row['side']]}
-        if verified != set(readiness.SIDES):
-            raise ValueError('SUP05_NORMAL_PREPARATION_PUBLICATION_UNVERIFIED')
+        verified = {(row['check_id'], row['side']) for row in result['rows'] if row['file_binding_valid']}
+        for check_id in record_checks:
+            if any((check_id, side) not in verified for side in readiness.SIDES):
+                raise ValueError('METADATA_RECORD_INPUT_PUBLICATION_UNVERIFIED')
+        if preparations is not None:
+            verified_sup05 = {row['side'] for row in result['rows'] if row['check_id'] == 'SUP-05'
+                              and row['file_binding_valid'] and row.get('sup05_normal_preparation') == preparations[row['side']]}
+            if verified_sup05 != set(readiness.SIDES):
+                raise ValueError('SUP05_NORMAL_PREPARATION_PUBLICATION_UNVERIFIED')
         if sha256(config_path.read_bytes()).hexdigest() != config_sha256:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
 
@@ -645,6 +688,10 @@ def main():
                         help='Read the source-checked ordinary CUDA graph capture completion for REQ-20')
     parser.add_argument('--copy-record-inputs', type=Path,
                         help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
+    parser.add_argument('--retry-record-inputs', type=Path,
+                        help='Paired LIF-12 inputs with an existing producer, session and sealed retry scope')
+    parser.add_argument('--collection-status-bindings', type=Path,
+                        help='Paired OBS-11 session declarations for existing owned collection status records')
     parser.add_argument('--candidate-target-after-baseline', type=Path,
                         help='Unpublished target path for the operator-managed second phase')
     args = parser.parse_args()
@@ -654,6 +701,8 @@ def main():
     observation = _source(args.observation_run_bindings)[0] if args.observation_run_bindings else None
     gateway = _source(args.gateway_record_inputs)[0] if args.gateway_record_inputs else None
     copies = _source(args.copy_record_inputs)[0] if args.copy_record_inputs else None
+    retries = _source(args.retry_record_inputs)[0] if args.retry_record_inputs else None
+    collection_status = _source(args.collection_status_bindings)[0] if args.collection_status_bindings else None
     sup05_preparations = None
     if args.sup05_normal_preparations is not None:
         raw, _ = _read(_plain_path(args.sup05_normal_preparations), max_bytes=65536)
@@ -672,7 +721,8 @@ def main():
                                         normal_compile_cache=args.normal_compile_cache,
                                         normal_safetensors_reader=args.normal_safetensors_reader,
                                         normal_graph_capture=args.normal_graph_capture,
-                                        sup05_normal_preparations=sup05_preparations)
+                                        sup05_normal_preparations=sup05_preparations, retry_record_inputs=retries,
+                                        collection_status_bindings=collection_status)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]
@@ -685,13 +735,20 @@ def main():
     if copies is not None:
         protected.extend([args.copy_record_inputs, *(row[key] for row in copies.values()
                          for key in ('record_producer', 'copy_inventory'))])
+    if retries is not None:
+        protected.extend([args.retry_record_inputs, *(row[key] for row in retries.values()
+                         for key in ('record_producer', 'retry_scope'))])
+    if collection_status is not None:
+        protected.append(args.collection_status_bindings)
     if sup05_preparations is not None:
         # Each receipt's directory contains all files emitted by prepare-sup05-normal.
         protected.extend([args.sup05_normal_preparations, *(Path(row['path']).parent for row in sup05_preparations.values())])
     output = reserve_output(args.output, protected=protected)
-    if sup05_preparations is not None and checks['SUP-05']['configuration_enabled']:
-        _publish_prebound_sup05(output, config=config, bindings=bindings, checks=checks,
-                               pack=pack, preparations=sup05_preparations)
+    bound_records = {cid for cid in PREBOUND_RECORD_EXECUTORS if checks.get(cid, {}).get('configuration_enabled')}
+    enabled_preparations = (sup05_preparations if checks.get('SUP-05', {}).get('configuration_enabled') else None)
+    if bound_records or enabled_preparations is not None:
+        _publish_prebound(output, config=config, bindings=bindings, checks=checks, pack=pack,
+                          preparations=enabled_preparations, record_checks=bound_records)
         return
     config_path = output / ('preliminary-guard.toml' if staged is not None else 'guard.toml')
     write_config(config, config_path)

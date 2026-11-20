@@ -127,6 +127,104 @@ def test_sup06_preflight_checks_only_a_declared_worker_shard_file(external):
         executor.prepared_supply_roles(PACK.checks['SUP-06'], env, values)
 
 
+@pytest.mark.parametrize('case', [
+    'matched', 'other-manifest', 'wrong-session', 'other-record-owner', 'other-callback-target', 'disabled',
+])
+def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, monkeypatch, case):
+    from guard.collectors import engine_callbacks, worker_shard_producer
+    from tests.test_b12_supply_consumers import fixture
+    from tests.test_kubernetes_request_binding import target as callback_target_fixture
+
+    env, settings, pins = _sup16_roles(external, '0.31.0')
+    callback_root = external / 'callback-assets'
+    callback_manifest = engine_callbacks.prepare_assets(callback_root, worker_shards=case != 'disabled')
+    manifest_path = callback_root / 'manifest.json'
+    callback_digest = sha256_hex(canonical_json(callback_manifest))
+    assert callback_digest != pins['supply_normal_prepared_sha256']
+    session = callback_manifest['session']
+    if case == 'wrong-session':
+        session = ('0' if session[0] != '0' else '1') + session[1:]
+    if case == 'other-manifest':
+        other = external / 'other-callback-assets'
+        other_manifest = engine_callbacks.prepare_assets(other, worker_shards=True)
+        assert sha256_hex(canonical_json(other_manifest)) != callback_digest
+        manifest_path = other / 'manifest.json'
+
+    normal = json.loads(Path(settings['normal']['target']).read_bytes())
+    owner = normal['kubernetes']['engine']
+    callback_target = callback_target_fixture(env)
+    callback_target['kubernetes'].update(context=normal['kubernetes']['context'], run_id=normal['run_id'],
+                                         engine=deepcopy(owner))
+    callback_target['engine'].update(image_digest=env.engine.image_digest, trusted_url=f"http://{owner['pod_ip']}:8000")
+    challenge = json.loads(Path(settings['challenge']['target']).read_bytes())['kubernetes']['engine']
+    if case == 'other-callback-target':
+        callback_target['kubernetes']['engine']['pod_uid'] = challenge['pod_uid']
+        owner = callback_target['kubernetes']['engine']
+    elif case == 'other-record-owner':
+        owner = challenge
+    callback_target_path = external / 'callback-target.json'
+    callback_target_bytes = canonical_json(callback_target)
+    callback_target_path.write_bytes(callback_target_bytes)
+    scope = {'environment_ref': env.ref().model_dump(mode='json'),
+             'target_sha256': sha256_hex(callback_target_bytes),
+             'prepared_sha256': callback_digest, 'session': session}
+    assert scope['target_sha256'] != pins['supply_normal_target_sha256']
+    processes = {}
+    witness = fixture('worker_shard_k3d_20261108.json')['cases']['sharded']['rows']
+    for row in witness:
+        fields = row.get('fields')
+        if fields is None:
+            continue
+        pid, ticks = fields['pid'], fields['start_ticks']
+        process = processes.setdefault((pid, ticks), {'pid': pid, 'start_ticks': ticks, 'events': []})
+        process['events'].append({**row, 'session_sha256': sha256_hex(session.encode())})
+    record, source = worker_shard_producer.record_from_processes(list(processes.values()), pod=owner, **scope)
+    assert not record['completeness']['source_ended']
+    assert not source['supported'] and not source['producer_authenticated']
+    required = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_required'}
+    assigned = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_assigned'}
+    assert len(required) == 2 and required == assigned
+    worker_path = external / 'callback-worker-shard-input.json'
+    raw = canonical_json(record)
+    worker_path.write_bytes(raw)
+    settings['normal']['worker_shard_input'] = {'path': str(worker_path), 'sha256': sha256_hex(raw),
+        'scope': scope, 'callback_prepared': str(manifest_path), 'callback_target': str(callback_target_path)}
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Offline callback role fixture attempted runtime I/O')
+
+    executor = KubernetesSupplyBootExecutor(settings, runner=forbidden)
+    check = PACK.checks['SUP-06']
+    values = base_values(env, check.id, pins)
+    if case == 'matched':
+        assert set(executor.prepared_supply_roles(check, env, values)) == {'normal', 'challenge'}
+    else:
+        with pytest.raises(ValueError, match='^B_WORKER_SHARD_INPUT_UNAVAILABLE$'):
+            executor.prepared_supply_roles(check, env, values)
+
+    def unavailable():
+        raise ValueError('EXAMPLE runtime owner unavailable')
+
+    monkeypatch.setattr(executor, '_role_reader', lambda *args: SimpleNamespace(snapshot=unavailable))
+    part = executor._collect_role(check, env, values, 'normal')
+    row = part['row']
+    assert part['packet'] is None and not row['collected'] and not row['owner_binding_verified']
+    assert 'SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE' in row['diagnostic_codes']
+    if case != 'matched':
+        assert 'B_WORKER_SHARD_INPUT_UNAVAILABLE' in row['diagnostic_codes']
+        assert 'worker_shards' not in part and 'worker_shard_input' not in row
+        return
+
+    retained_input = row['worker_shard_input']
+    assert retained_input['data_origin'] == 'EXAMPLE' and retained_input['record_sha256'] == sha256_hex(raw)
+    assert not retained_input['complete'] and not retained_input['violations']
+    reported = retained_input['reported_source']
+    assert reported['file_sha256'] == sha256_hex(raw) and reported['target_sha256'] == scope['target_sha256']
+    assert reported['prepared_sha256'] == callback_digest and reported['session_sha256'] == sha256_hex(session.encode())
+    assert reported['environment_ref'] == scope['environment_ref'] and reported['events'] == record['events']
+    assert not reported['owner_binding_verified']
+
+
 @pytest.mark.parametrize(('check_id', 'version'), [('SUP-09', '0.30.0'), ('SUP-11', '0.31.0')])
 def test_dynamic_supply_prepares_distinct_declared_challenge_roles(external, check_id, version):
     env, settings, pins = _sup16_roles(external, version)

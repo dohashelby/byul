@@ -35,8 +35,13 @@ def _scope_call(env, target, reference, destination):
             '--model-root', '/models', '--output', str(destination), '--nonsecret-model-weights']
 
 
-def test_public_pinned_scope_produces_a_preparable_generation(external, declared_generation):
+@pytest.mark.parametrize('include_observed_version', [True, False])
+def test_public_pinned_scope_produces_a_preparable_generation(external, declared_generation, include_observed_version):
     env, before, env_path, target_path, reference = declared_generation
+    if not include_observed_version:
+        target = json.loads(target_path.read_bytes())
+        del target['observed_version']
+        target_path.write_bytes(canonical_json(target))
     output = external / 'scope.json'
     target_pin, reference_pin = (sha256_hex(path.read_bytes()) for path in (target_path, reference))
     result = CliRunner().invoke(app, [*_scope_call(env_path, target_path, reference, output),
@@ -89,6 +94,7 @@ def test_public_pinned_scope_produces_a_preparable_generation(external, declared
     ('synthetic', 'TRANSITION_SCOPE_GENERATION_TARGET_INVALID'),
     ('wrong-env', 'TRANSITION_SCOPE_GENERATION_TARGET_INVALID'),
     ('wrong-version', 'TRANSITION_SCOPE_GENERATION_TARGET_INVALID'),
+    ('null-version', 'TRANSITION_SCOPE_GENERATION_TARGET_INVALID'),
     ('wrong-probe', 'TRANSITION_GENERATION_HTTP_TARGET_INVALID'),
     ('wrong-model', 'MODEL_READ_SCOPE_MANIFEST_BINDING_INVALID'),
 ])
@@ -120,8 +126,8 @@ def test_pinned_scope_rejects_changed_or_unbound_sources(external, declared_gene
             target['synthetic'] = True
         elif case == 'wrong-env':
             target['environment_ref']['sha256'] = '0' * 64
-        elif case == 'wrong-version':
-            target['observed_version'] = '0.30.0'
+        elif case in {'wrong-version', 'null-version'}:
+            target['observed_version'] = '0.30.0' if case == 'wrong-version' else None
         else:
             target['kubernetes']['probe']['pod_uid'] = target['kubernetes']['engine']['pod_uid']
         target_path.write_bytes(canonical_json(target))

@@ -25,12 +25,14 @@ def _pointer(path):
 @pytest.mark.parametrize(('check_id', 'case', 'error'), [
     ('LIF-05', 'ordinary', None),
     ('LIF-16', 'same-pod-restart', None),
+    ('LIF-05', 'no-observed-version', None),
     ('LIF-05', 'selection-changed', 'MVP_TRANSITION_SELECTION_CHANGED'),
     ('LIF-16', 'raw-target-changed', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
     ('LIF-05', 'lab-target', 'MVP_TRANSITION_GENERATION_TARGET_MISMATCH'),
     ('LIF-05', 'wrong-before-env', 'MVP_TRANSITION_BEFORE_ENVIRONMENT_MISMATCH'),
     ('LIF-16', 'other-release', 'MVP_TRANSITION_GENERATION_ENVIRONMENT_MISMATCH'),
     ('LIF-16', 'other-target-release', 'MVP_TRANSITION_GENERATION_TARGET_MISMATCH'),
+    ('LIF-16', 'null-observed-version', 'MVP_TRANSITION_GENERATION_TARGET_MISMATCH'),
     ('LIF-05', 'cross-side-owner', 'TRANSITION_GENERATION_SIDE_REUSE'),
     ('LIF-16', 'duplicate-offset', 'TRANSITION_POLICY_INVALID'),
     ('LIF-05', 'manifest-rewritten', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
@@ -67,9 +69,13 @@ def test_materializes_one_paired_redeployment_check_without_collection(external,
     target = Path(after['target']['path'])
     if case == 'raw-target-changed':
         target.write_bytes(target.read_bytes() + b'\n')
-    elif case == 'other-target-release':
+    elif case in {'no-observed-version', 'other-target-release', 'null-observed-version'}:
         declaration = json.loads(target.read_bytes())
-        target.write_bytes(canonical_json({**declaration, 'observed_version': '0.30.0'}))
+        if case == 'no-observed-version':
+            del declaration['observed_version']
+        else:
+            declaration['observed_version'] = '0.30.0' if case == 'other-target-release' else None
+        target.write_bytes(canonical_json(declaration))
         after['target'] = _pointer(target)
     elif case == 'wrong-before-env':
         candidate['environment_ref'] = Environment.model_validate_json(

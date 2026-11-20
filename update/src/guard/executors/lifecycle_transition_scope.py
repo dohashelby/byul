@@ -29,7 +29,8 @@ def prepare_scope(environment, target_file, model_manifest, model_root, *, expec
     path = _plain_path(Path(target_file))
     target = strict_json(dependency(path, expected_target_sha256), limit=65536)
     if (type(target) is not dict or target.get('lab') is not False or target.get('synthetic', False) is not False
-            or target.get('engine_kind') != env.engine.name or target.get('observed_version') != env.engine.version
+            or target.get('engine_kind') != env.engine.name
+            or ('observed_version' in target and target['observed_version'] != env.engine.version)
             or target.get('environment_ref') != env.ref().model_dump(mode='json')):
         raise ValueError('TRANSITION_SCOPE_GENERATION_TARGET_INVALID')
     validate_generation_http_target(target, env)

@@ -54,7 +54,7 @@ def _generations(selection, release, captured):
             raise ValueError('MVP_TRANSITION_GENERATION_ENVIRONMENT_MISMATCH')
         if (type(target) is not dict or target.get('lab') is not False or target.get('synthetic', False) is not False
                 or target.get('environment_ref') != env.ref().model_dump(mode='json')
-                or target.get('observed_version') != env.engine.version):
+                or ('observed_version' in target and target['observed_version'] != env.engine.version)):
             raise ValueError('MVP_TRANSITION_GENERATION_TARGET_MISMATCH')
         if (type(prepared) is not dict
                 or prepared.get('profile') not in (transition.generation_sensor.PROFILE, transition.endpoint_sensor.PROFILE)):

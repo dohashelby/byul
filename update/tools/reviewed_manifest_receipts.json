@@ -1085,6 +1085,11 @@
       "manifest_sha256": "1dbfe55a0af91dc87b439c5b9de4233e05dcbf4c473d8e89d426f8fc8f85ae5d",
       "reviewed_by": "Codex / OBS-09 pinned replay and redeployment preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T01:05:04+00:00"
+    },
+    {
+      "manifest_sha256": "103add7e0f0a6cd966c1fa60cac628af4b5a3c81b0fe1383fd590b283f3f9f30",
+      "reviewed_by": "Codex / LIF-12 passive input and local observation diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T01:36:55+00:00"
     }
   ]
 }

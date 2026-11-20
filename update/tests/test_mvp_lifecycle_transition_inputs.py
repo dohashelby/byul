@@ -11,14 +11,16 @@ import pytest
 
 from guard import application
 from guard.executors import kubernetes_log_integrity, lifecycle_transition as transition
+from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
 from guard.models import DataOrigin, Environment, canonical_json, sha256_hex
 from tests import test_redeployment_preflight as fixture
 from tests.builders import T0, policy
+from tests.test_a1_retry_record_contract import example as retry_example
 from tests.test_kubernetes_log_integrity import GAP_VALUES
 from tests.test_lifecycle_capture import external
 from tests.test_model_mapping import declared_mapping
 from tools import mvp_lifecycle_transition_inputs as materializer, mvp_live_readiness as readiness
-from tools import mvp_metadata_wiring as metadata
+from tools import mvp_metadata_wiring as metadata, mvp_retry_record_inputs as retry_inputs
 from tools.j02_run_config import write_config
 
 
@@ -45,6 +47,26 @@ def _offline_only(monkeypatch):
     monkeypatch.setattr(transition.KubernetesHTTP, '__call__', forbidden)
     monkeypatch.setattr(transition.LifecycleTransitionExecutor, 'run', forbidden)
     monkeypatch.setattr(fixture, 'environment', partial(fixture.environment, origin=DataOrigin.DECLARED))
+
+
+def _retry_pair(directory, sources, pack, policy_path, confirmed, example_scope):
+    sides = {}
+    for number, (side, files) in enumerate(sources.items(), 1):
+        target = json.loads(files['target'].read_bytes())
+        producer = directory / f'{side}-producer.txt'
+        producer.write_bytes(b'# Inert EXAMPLE source; never executed\n')
+        sides[side] = {'environment_ref': target['environment_ref'], 'target_sha256': sha256_hex(canonical_json(target)),
+                       'run_id': target['kubernetes']['run_id'], 'record_session': f'{number + 10:032x}',
+                       'record_producer': _pointer(producer),
+                       'subjects': [row for row in example_scope['subjects'] if row['scenario'] == 'NORMAL'],
+                       **{key: example_scope[key] for key in ('producer_id', 'producer_code_sha256',
+                                                             'configuration_sha256', 'native_source_sha256')}}
+    selection = directory / 'retry-selection.json'
+    selection.write_bytes(canonical_json({'schema': retry_inputs.SELECTION_SCHEMA,
+        'policy_ref': confirmed.ref().model_dump(mode='json'), 'sides': sides}))
+    output = directory / 'prepared-retry'
+    retry_inputs.prepare(sources, policy_path, selection, _pointer(selection)['sha256'], output, pack=pack)
+    return json.loads((output / 'retry-record-inputs.json').read_bytes())
 
 
 @pytest.mark.parametrize(('check_id', 'case', 'error'), [
@@ -240,6 +262,15 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
     ('obs11-session-pin', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
     ('obs11-stray-binding', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
     ('obs11-staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
+    ('lif12', None),
+    ('lif12-without-optional-target', None),
+    ('lif12-missing-pins', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('lif12-session-pin', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('lif12-raw-target', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('lif12-changed-scope', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('lif12-changed-producer', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('lif12-canonical-target', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('lif12-late-scope-change', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
     ('staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
     ('duplicate', 'MVP_TRANSITION_METADATA_DUPLICATE'),
     ('other-policy', 'MVP_TRANSITION_METADATA_POLICY_MISMATCH'),
@@ -252,8 +283,9 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
 def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, monkeypatch, case, error):
     _offline_only(monkeypatch)
     check_id = 'LIF-16'
-    include_status = case.startswith('obs11')
-    if include_status:
+    include_status = case.startswith('obs11') or case == 'lif12'
+    include_retry = case.startswith('lif12')
+    if include_status or include_retry:
         _, mapping = declared_mapping()
         build_environment = fixture.environment
 
@@ -271,6 +303,11 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     policy_values = {'SUP-04': {'approved_image_digests': [env.engine.image_digest for env in envs]}}
     stock_checks = ['SUP-04']
     status_sessions = None
+    if include_retry:
+        stock_checks.append('LIF-12')
+        retry_scope, retry_values, _, _ = retry_example()
+        policy_values['LIF-12'] = {key: retry_values[key] for key in ('retry_policy_mode', 'retry_max_record_delay_ms')}
+        policy_values['LIF-12']['retry_limits'] = retry_scope['limits']
     if include_status:
         stock_checks.append('OBS-11')
         policy_values['OBS-11'] = {key: value for key, value in GAP_VALUES.items() if key != 'collection_session'}
@@ -297,7 +334,7 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         sides[side] = _selected_side(env, rows, cfg['run_binding'][check_id])
         base = rows[0]
         target = json.loads(Path(base['target']).read_bytes())
-        if include_status:
+        if include_status or include_retry:
             target['model_mapping'] = {**mapping, 'environment_ref': env.ref().model_dump(mode='json'),
                                        'inventory_sha256': env.model.inventory_sha256}
         env_path = Path(base['environment'])
@@ -310,8 +347,15 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         path.write_bytes(canonical_json(target))
         stock_sources[side] = {'target': path, 'environment': env_path}
 
-    stock_config, stock_rows, decisions = metadata.assemble(stock_sources, stock_policy, pack=pack, store=stock / 'store',
-                                                            collection_status_bindings=status_sessions)
+    retry_bindings = None
+    if include_retry:
+        retry_bindings = _retry_pair(external, stock_sources, pack, stock_policy, confirmed, retry_scope)
+        if case == 'lif12-without-optional-target':
+            for declaration in retry_bindings.values():
+                del declaration[RETRY_TARGET_BINDING]
+    stock_config, stock_rows, decisions = metadata.assemble(
+        stock_sources, stock_policy, pack=pack, store=stock / 'store',
+        collection_status_bindings=status_sessions, retry_record_inputs=retry_bindings)
     assert stock_config['update']['allowed_checks'] == stock_checks
     if case == 'staged':
         stock_config = metadata.staged_config(stock_config, stock / 'later-target.json')
@@ -323,27 +367,33 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         stock_config['check_config']['PLT-06']['worker_trust_metadata_only'] = 1
     config_path = stock / 'guard.toml'
     index_path = stock / 'input-sources.json'
-    if include_status:
+    record_checks = {'LIF-12', 'OBS-11'} & set(stock_checks)
+    if record_checks:
         metadata._publish_prebound(stock, config=stock_config, bindings=stock_rows, checks=decisions,
-                                   pack=pack, preparations=None, record_checks={'OBS-11'})
+                                   pack=pack, preparations=None, record_checks=record_checks)
         index = json.loads(index_path.read_bytes())
-        status = next(row for row in index['inputs'] if row['check_id'] == 'OBS-11' and row['side'] == 'candidate')
-        if case == 'obs11-missing-pins':
-            del status['record_inputs']
+        modified_check = 'LIF-12' if include_retry else 'OBS-11'
+        record = next(row for row in index['inputs'] if row['check_id'] == modified_check and row['side'] == 'candidate')
+        if case in {'obs11-missing-pins', 'lif12-missing-pins'}:
+            del record['record_inputs']
         elif case == 'obs11-target-pin':
-            status['record_inputs']['target_file_sha256'] = '0' * 64
-        elif case == 'obs11-session-pin':
-            status['record_inputs']['record_session_sha256'] = '0' * 64
-        if case == 'obs11-stray-binding':
+            record['record_inputs']['target_file_sha256'] = '0' * 64
+        elif case in {'obs11-session-pin', 'lif12-session-pin'}:
+            record['record_inputs']['record_session_sha256'] = '0' * 64
+        elif case == 'obs11-stray-binding':
             stock_config['sides']['candidate']['run_binding']['LIF-12'] = {'record_session': '3' * 32}
-        if case == 'obs11-staged':
+        elif case == 'obs11-staged':
             stock_config['update']['kubernetes_candidate_binding'] = 'after_baseline'
-        if case in {'obs11-stray-binding', 'obs11-staged'}:
+        elif case == 'lif12-canonical-target':
+            binding = stock_config['sides']['candidate']['check_config']['LIF-12'][RETRY_TARGET_BINDING]
+            binding['target_sha256'] = '0' * 64
+        if case in {'obs11-stray-binding', 'obs11-staged', 'lif12-canonical-target'}:
             write_config(stock_config, config_path)
             config_pointer = _pointer(config_path)
             for row in index['inputs']:
                 row['configuration'] = config_pointer
-        if case != 'obs11':
+        if case in {'obs11-missing-pins', 'obs11-target-pin', 'obs11-session-pin', 'obs11-stray-binding',
+                    'obs11-staged', 'lif12-missing-pins', 'lif12-session-pin', 'lif12-canonical-target'}:
             index_path.write_bytes(canonical_json(index))
     else:
         write_config(stock_config, config_path)
@@ -352,9 +402,25 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         index_path.write_bytes(canonical_json(index))
     sources = {'index': _pointer(index_path), 'targets': {side: _pointer(paths['target'])
                                                         for side, paths in stock_sources.items()}}
-    if case == 'changed-target':
+    if case in {'changed-target', 'lif12-raw-target'}:
         target = stock_sources['candidate']['target']
         target.write_bytes(target.read_bytes() + b'\n')
+        if case == 'lif12-raw-target':
+            sources['targets']['candidate'] = _pointer(target)
+    if case in {'lif12-changed-scope', 'lif12-changed-producer'}:
+        key = 'retry_scope' if case == 'lif12-changed-scope' else 'record_producer'
+        path = Path(retry_bindings['candidate'][key])
+        path.write_bytes(path.read_bytes() + b'\n')
+    elif case == 'lif12-late-scope-change':
+        original_audit = readiness.audit
+
+        def replace_after_audit(*args, **kwargs):
+            result = original_audit(*args, **kwargs)
+            path = Path(retry_bindings['candidate']['retry_scope'])
+            path.write_bytes(path.read_bytes() + b'\n')
+            return result
+
+        monkeypatch.setattr(readiness, 'audit', replace_after_audit)
 
     selection = external / 'lifecycle-selection.json'
     selection.write_bytes(canonical_json({'schema': materializer.SELECTION_SCHEMA, 'check_id': check_id,
@@ -378,31 +444,47 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     for side in readiness.SIDES:
         settings = materialized['sides'][side]
         assert settings['container_config'] == stock_config['sides'][side]['container_config']
-        assert set(settings['check_config']) == {check_id}
-        assert set(settings['run_binding']) == ({check_id, 'OBS-11'} if include_status else {check_id})
+        assert set(settings['check_config']) == {check_id} | (record_checks & {'LIF-12'})
+        assert set(settings['run_binding']) == {check_id} | record_checks
         if include_status:
             assert settings['log_integrity'] == stock_config['sides'][side]['log_integrity']
             assert settings['run_binding']['OBS-11'] == status_sessions[side]
+        if include_retry:
+            assert settings['request_termination'] == stock_config['sides'][side]['request_termination']
+            assert settings['check_config']['LIF-12'] == stock_config['sides'][side]['check_config']['LIF-12']
+            assert settings['run_binding']['LIF-12'] == {
+                key: retry_bindings[side][key] for key in ('record_session', 'record_producer')}
     assert all(item['configuration'] == _pointer(output / 'guard.toml') for item in joined['inputs'])
     for item in joined['inputs']:
         if item['check_id'] in stock_checks:
             assert item['target'] == sources['targets'][item['side']]
         else:
             assert 'target' not in item
-        if item['check_id'] == 'OBS-11':
-            assert item['record_inputs'] == decisions['OBS-11']['prepared_record_input_sha256_by_side'][item['side']]
+        if item['check_id'] in record_checks:
+            assert item['record_inputs'] == decisions[item['check_id']]['prepared_record_input_sha256_by_side'][item['side']]
         else:
             assert 'record_inputs' not in item
     assert _pointer(index_path) == sources['index'] and _pointer(config_path) == index['inputs'][0]['configuration']
     report = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
     expected_bound = 2 * (len(stock_checks) + 1)
     assert report['sides'] == 138 and report['file_binding_valid_sides'] == expected_bound
-    if include_status:
-        assert {row['side']: row['record_inputs'] for row in report['rows'] if row['check_id'] == 'OBS-11'} == (
-            decisions['OBS-11']['prepared_record_input_sha256_by_side'])
+    for record_check in record_checks:
+        assert {row['side']: row['record_inputs'] for row in report['rows'] if row['check_id'] == record_check} == (
+            decisions[record_check]['prepared_record_input_sha256_by_side'])
     assert not report['engine_executed'] and not report['ready_for_execution'] and report['actual_results'] is None
     prepared = application.update_readiness(pack, envs, confirmed, materialized)
     assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
+
+    if include_retry:
+        for role in ('retry_scope', 'record_producer'):
+            path = Path(retry_bindings['candidate'][role])
+            original = path.read_bytes()
+            path.write_bytes(original + b'\n')
+            changed = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
+            assert changed['file_binding_valid_sides'] == expected_bound - 1
+            retry_row = next(row for row in changed['rows'] if row['check_id'] == 'LIF-12' and row['side'] == 'candidate')
+            assert not retry_row['file_binding_valid']
+            path.write_bytes(original)
 
     target = stock_sources['candidate']['target']
     original = target.read_bytes()

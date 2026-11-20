@@ -8,6 +8,8 @@ from guard.configuration import bounded_metadata_scopes, merge_config, update_al
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.select import _in_scope
 from guard.executors import lifecycle_transition as transition, run_binding
+from guard.executors.owned_capture import MAX_BYTES as MAX_RETRY_SCOPE_BYTES
+from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
 from guard.models import Environment, Policy, canonical_json, load_pack, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.update_validation import _plain_path, reserve_output
@@ -22,17 +24,19 @@ _CONFIG_INVALID = 'MVP_TRANSITION_SELECTION_INVALID'
 _FILE_CHANGED = 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'
 _FILE_LIMITS = {'environment': 262144, 'target': 65536, 'prepared': 262144}
 _METADATA_INVALID = 'MVP_TRANSITION_METADATA_INPUT_INVALID'
+_RECORD_INPUT_MISMATCH = 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'
+_RECORD_CHECKS = {'LIF-12', 'OBS-11'}
 
 
-def _pinned_bytes(pointer, limit, captured):
+def _pinned_bytes(pointer, limit, captured, *, min_bytes=1):
     if (type(pointer) is not dict or pointer.keys() != {'path', 'sha256'}
             or type(pointer['path']) is not str or not pointer['path'] or not transition._sha(pointer['sha256'])):
         raise ValueError(_CONFIG_INVALID)
     path = _plain_path(Path(pointer['path']))
-    raw, identity = _read(path, max_bytes=limit)
+    raw, identity = _read(path, min_bytes=min_bytes, max_bytes=limit)
     if sha256_hex(raw) != pointer['sha256']:
         raise ValueError(_FILE_CHANGED)
-    captured.append((path, raw, identity, limit))
+    captured.append((path, raw, identity, min_bytes, limit))
     return path, raw
 
 
@@ -85,7 +89,7 @@ def _selection(selection_path, expected_selection_sha256, captured):
             or selection['check_id'] not in transition.REDEPLOY_CHECKS
             or type(selection['sides']) is not dict or selection['sides'].keys() != sides):
         raise ValueError(_CONFIG_INVALID)
-    captured.append((selection_path, raw, selected_identity, 262144))
+    captured.append((selection_path, raw, selected_identity, 1, 262144))
     return selection
 
 
@@ -124,6 +128,40 @@ def _prepared_sides(selection, check, releases, issued_at, captured):
         yield side, {'executor': settings, 'run_binding': binding}, {**before_pointer, 'path': before_path}
 
 
+def _snapshot_record_settings(side_settings, records, target_pointer, target_binding, captured):
+    bindings = side_settings.get('run_binding') if type(side_settings) is dict else None
+    if type(bindings) is not dict or bindings.keys() != records.keys():
+        raise ValueError(_METADATA_INVALID)
+    expected = {'run_binding': bindings}
+    for check_id, pins in records.items():
+        binding = bindings[check_id]
+        retry = check_id == 'LIF-12'
+        keys = {'record_session', 'record_producer'} if retry else {'record_session'}
+        if type(binding) is not dict or binding.keys() != keys:
+            raise ValueError(_METADATA_INVALID)
+        session = run_binding._session(binding['record_session'])
+        digests = {'target_file_sha256': target_pointer['sha256'],
+                   'record_session_sha256': sha256_hex(session.encode('ascii'))}
+        expected_keys = digests.keys() | ({'retry_scope_sha256', 'retry_record_source_sha256'} if retry else set())
+        if (type(pins) is not dict or pins.keys() != expected_keys
+                or any(pins[key] != digest for key, digest in digests.items())):
+            raise ValueError(_RECORD_INPUT_MISMATCH)
+        if retry:
+            overlays = side_settings.get('check_config')
+            scope = overlays.get(check_id) if type(overlays) is dict else None
+            if (type(scope) is not dict or scope.keys() - {'retry_scope', RETRY_TARGET_BINDING}
+                    or 'retry_scope' not in scope):
+                raise ValueError(_METADATA_INVALID)
+            if RETRY_TARGET_BINDING in scope and scope[RETRY_TARGET_BINDING] != target_binding:
+                raise ValueError(_RECORD_INPUT_MISMATCH)
+            _pinned_bytes({'path': scope['retry_scope'], 'sha256': pins['retry_scope_sha256']},
+                          MAX_RETRY_SCOPE_BYTES, captured)
+            _pinned_bytes({'path': binding['record_producer'], 'sha256': pins['retry_record_source_sha256']},
+                          run_binding._MAX_PRODUCER_BYTES, captured, min_bytes=0)
+            expected['check_config'] = {check_id: scope}
+    return expected
+
+
 def _prebound_metadata(source, pack, policy, primary_refs, captured):
     from tools import mvp_metadata_wiring as metadata
 
@@ -136,7 +174,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     index_path, raw = _pinned_bytes(source['index'], 262144, captured)
     index = strict_json(raw, limit=262144)
     ordinary = set(metadata.CHECK_EXECUTORS) - set(metadata.RECORD_SNAPSHOT_OPTIONS) - set(metadata.PREBOUND_RECORD_EXECUTORS)
-    supported = ordinary | {'OBS-11'}
+    supported = ordinary | _RECORD_CHECKS
     if (type(index) is not dict or index.keys() != {'schema', 'pack_ref', 'inputs'}
             or index['schema'] != readiness.SCHEMA or index['pack_ref'] != pack.ref().model_dump(mode='json')
             or type(index['inputs']) is not list or not 2 <= len(index['inputs']) <= 2 * len(supported)):
@@ -147,7 +185,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         if type(item) is not dict or type(item.get('check_id')) is not str or item['check_id'] not in supported:
             raise ValueError(_METADATA_INVALID)
         fields = {'check_id', 'side', 'environment', 'policy', 'configuration'}
-        if item['check_id'] == 'OBS-11':
+        if item['check_id'] in _RECORD_CHECKS:
             fields.add('record_inputs')
         if item.keys() != fields or type(item['side']) is not str or item['side'] not in sides:
             raise ValueError(_METADATA_INVALID)
@@ -199,21 +237,15 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         path, target = _selected_file(source['targets'][side], 65536, captured)
         if type(target) is not dict or target.get('synthetic', False) is not False:
             raise ValueError(_METADATA_INVALID)
-        metadata._transport(target, env)
+        transport = metadata._transport(target, env)
         side_settings = config['sides'][side]
         expected_side = {name: {'target': path} for name in config['executors']}
         target_pointers[side] = {'path': path, 'sha256': source['targets'][side]['sha256']}
-        if 'OBS-11' in allowed:
-            bindings = side_settings.get('run_binding') if type(side_settings) is dict else None
-            status = bindings.get('OBS-11') if type(bindings) is dict else None
-            if type(status) is not dict or status.keys() != {'record_session'}:
-                raise ValueError(_METADATA_INVALID)
-            session = run_binding._session(status['record_session'])
-            expected_side['run_binding'] = {'OBS-11': {'record_session': session}}
-            record_inputs = {'target_file_sha256': target_pointers[side]['sha256'],
-                             'record_session_sha256': sha256_hex(session.encode('ascii'))}
-            if entries['OBS-11', side]['record_inputs'] != record_inputs:
-                raise ValueError('MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH')
+        records = {check_id: entries[check_id, side]['record_inputs'] for check_id in sorted(allowed & _RECORD_CHECKS)}
+        if records:
+            target_binding = {'environment_ref': primary_refs[side], 'target_sha256': transport.target_sha256}
+            expected_side.update(_snapshot_record_settings(
+                side_settings, records, target_pointers[side], target_binding, captured))
         if side_settings != expected_side:
             raise ValueError(_METADATA_INVALID)
 
@@ -236,7 +268,7 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
 
     A prebound metadata input provides its standard source index pointer under
     ``index`` and one independently pinned target per side under ``targets``.
-    An OBS-11 row must also carry its verified collection-status input digests.
+    OBS-11 and LIF-12 rows must also carry their verified snapshot input digests.
     A pinned file pointer to that declaration is also accepted.
     """
     if (not isinstance(selections, (list, tuple)) or not 1 <= len(selections) <= len(transition.REDEPLOY_CHECKS)
@@ -258,7 +290,7 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
             or policy.data_origin == 'EXAMPLE'):
         raise ValueError('MVP_TRANSITION_CONFIRMED_POLICY_REQUIRED')
     validate_policy_time(policy)
-    captured.append((policy_path, policy_raw, policy_identity, 262144))
+    captured.append((policy_path, policy_raw, policy_identity, 1, 262144))
     policy_pointer = {'path': str(policy_path), 'sha256': sha256_hex(policy_raw)}
     policy_ref = policy.ref().model_dump(mode='json')
 
@@ -293,11 +325,11 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
         bounded_metadata_scopes((merge_config(config, side) for side in config['sides'].values()), pack, allowed)
         inputs = [*metadata_inputs, *inputs]
         prepared_roots.append(metadata_root)
-    for path, original, identity, limit in captured:
-        if _read(path, max_bytes=limit) != (original, identity):
+    for path, original, identity, minimum, limit in captured:
+        if _read(path, min_bytes=minimum, max_bytes=limit) != (original, identity):
             raise ValueError(_FILE_CHANGED)
 
-    protected = [readiness.ROOT, *(path for path, _, _, _ in captured), *prepared_roots]
+    protected = [readiness.ROOT, *(entry[0] for entry in captured), *prepared_roots]
     if pack.path is not None:
         protected.append(pack.path)
     directory = reserve_output(directory, protected=protected)

@@ -1105,6 +1105,11 @@
       "manifest_sha256": "77dc0350af37f158e4492a08b1b659a4ee526e2cfc0884e90b5f9bac92c484a5",
       "reviewed_by": "Codex / OBS-11 status and LIF-12 selected target binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T03:12:39+00:00"
+    },
+    {
+      "manifest_sha256": "edcb54ccbc55ca242d8eaa93ebb5f5844895ef6e06558a52a416b2685d0265b3",
+      "reviewed_by": "Codex / LIF-05 and LIF-16 pinned paired transition preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T04:26:07+00:00"
     }
   ]
 }

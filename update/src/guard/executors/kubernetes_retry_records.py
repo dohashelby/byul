@@ -107,9 +107,16 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
         return KubernetesHTTP(target, env, duration=self.cfg.get('max_duration_seconds', 120),
             binary=self.cfg.get('kubectl_binary', 'kubectl'), runner=self.runner, profile=REQUIRED_EVENT_PROFILE)
 
+    def _read_stable_target(self):
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+        if type(target) is not dict:
+            raise ValueError('RETRY_CONFIGURATION_INVALID')
+        return target
+
     def prepared_retry_records(self, check, env, values, *, expected_target_sha256=None):
         """Validate the sealed LIF-12 local declarations without reading a record or calling the target."""
-        from guard.adapters.vllm_file_read_sensor import dependency
         from .run_binding import stages_for
 
         self.validate_policy(check, values)
@@ -121,9 +128,7 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
             self._validate_configuration(env)
             if env.ref().sha256 != values['retry_environment_sha256']:
                 raise ValueError
-            target = strict_json(dependency(self.cfg['target'], None), limit=65536)
-            if type(target) is not dict:
-                raise ValueError
+            target = self._read_stable_target()
             self._bound_scope(target, env, values, expected_target_sha256=expected_target_sha256)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             raise ValueError('RETRY_CONFIGURATION_INVALID') from None
@@ -143,8 +148,11 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
             start, end = contract.normalize_policy(policy_values)
             if env.ref().sha256 != policy_values['retry_environment_sha256'] or not start <= utcnow() <= end:
                 raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            if self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+                target = self._read_stable_target()
+            else:
+                with Path(self.cfg['target']).open('rb') as stream:
+                    target = strict_json(stream.read(65537), limit=65536)
             scope = self._bound_scope(target, env, policy_values)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             raise ValueError('RETRY_CONFIGURATION_INVALID') from None

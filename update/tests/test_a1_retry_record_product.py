@@ -156,8 +156,11 @@ def test_retry_snapshot_scope_keeps_sibling_executors_out_of_the_option():
             bounded_metadata_scopes([{**cfg, **unsafe}, cfg], pack, allowed)
 
 
-@pytest.mark.parametrize("pin", ["exact", "missing", "different"])
-def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_path, pin):
+@pytest.mark.parametrize("pin,target_problem", [
+    ("exact", None), ("missing", None), ("different", None),
+    ("exact", "missing"), ("exact", "changed"), ("exact", "symlink"),
+])
+def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_path, pin, target_problem):
     from guard.adapters.vllm import VllmAdapter
     from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION
     from guard.models import DataOrigin
@@ -174,7 +177,21 @@ def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_pat
     executor = KubernetesRequestTerminationExecutor(cfg, runner=world.runner, expected_target_sha256=selected_pin)
     check = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE").checks["LIF-12"]
 
-    if pin != "exact":
+    if target_problem is not None:
+        executor.prepared_retry_records(check, environment, values)
+        if target_problem == "missing":
+            target_path.unlink()
+        elif target_problem == "changed":
+            target_path.write_bytes(canonical_json({**world.target, "observed_version": "changed"}))
+        else:
+            original = target_path.rename(tmp_path / "same-target-bytes.json")
+            target_path.symlink_to(original.name)
+
+    if pin != "exact" or target_problem is not None:
+        def forbidden(*args, **kwargs):
+            pytest.fail("An invalid retry snapshot target must be rejected before transport dispatch")
+
+        executor = KubernetesRequestTerminationExecutor(cfg, runner=forbidden, expected_target_sha256=selected_pin)
         with pytest.raises(ValueError, match="^RETRY_CONFIGURATION_INVALID$"):
             executor.prepared_retry_records(check, environment, values)
         with pytest.raises(ValueError, match="^RETRY_CONFIGURATION_INVALID$"):

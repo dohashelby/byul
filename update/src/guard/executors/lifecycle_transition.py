@@ -43,6 +43,7 @@ PROFILES = {
 PHASES = ('before', 'during', 'after', 'recovered')
 REDEPLOY_CHECKS = frozenset({'LIF-05', 'LIF-16'})
 REDEPLOY_SIDE_REUSE = 'TRANSITION_GENERATION_SIDE_REUSE'
+GENERATION_MANIFEST_PIN = 'generation_manifest_sha256'
 POLICY_TYPES = {'transition_inputs_sha256': 'str',
     **{f'transition_{phase}_at': 'str' for phase in PHASES},
     **{f'transition_{phase}_generation': 'str' for phase in PHASES}}
@@ -118,6 +119,11 @@ def _manifest_row(key, env, target, prepared):
         'target_sha256': sha256_hex(canonical_json(target)), 'prepared_sha256': sha256_hex(canonical_json(prepared))}
 
 
+def _verify_manifest_pin(cfg, digest):
+    if cfg.get(GENERATION_MANIFEST_PIN, digest) != digest:
+        raise ValueError('TRANSITION_GENERATION_MANIFEST_CHANGED')
+
+
 def generation_identity(target, env, prepared):
     """Declared owner, release and producer session for side separation."""
     binding = target['kubernetes']
@@ -155,11 +161,13 @@ def inputs_manifest(cfg, *, generation_identities=None):
             manifest.append(_manifest_row(row['id'], env, target, prepared))
             if generation_identities is not None:
                 identities.add(generation_identity(target, env, prepared))
-        if generation_identities is not None:
-            generation_identities.update(identities)
-        return manifest
     except (KeyError, TypeError, ValueError, OSError, RuntimeError):
         raise ValueError('TRANSITION_CONFIGURATION_INVALID') from None
+    if GENERATION_MANIFEST_PIN in cfg:
+        _verify_manifest_pin(cfg, sha256_hex(canonical_json(manifest)))
+    if generation_identities is not None:
+        generation_identities.update(identities)
+    return manifest
 
 
 def _validate_redeployment(generations, phases):
@@ -202,7 +210,7 @@ def load_generations(cfg, env, values, check_id=None):
     from guard.collectors.lifecycle import load_prepared
     values = normalize_policy_values(values)
     try:
-        if set(cfg) - {'generations', 'kubectl_binary', 'request_timeout', 'max_duration_seconds'}:
+        if set(cfg) - {'generations', GENERATION_MANIFEST_PIN, 'kubectl_binary', 'request_timeout', 'max_duration_seconds'}:
             raise ValueError
         rows = cfg['generations']
         if type(rows) is not list or not 1 <= len(rows) <= 4:
@@ -231,7 +239,8 @@ def load_generations(cfg, env, values, check_id=None):
             validate_binding(prepared, selected_env, native)
             generations[row['id']] = Generation(row['id'], selected_env, target, native, prepared)
             manifest.append(_manifest_row(row['id'], selected_env, target, prepared))
-        if sha256_hex(canonical_json(manifest)) != values['transition_inputs_sha256']:
+        digest = sha256_hex(canonical_json(manifest))
+        if digest != values['transition_inputs_sha256']:
             raise ValueError
         if set(values['transition_phase_generation'].values()) - set(generations):
             raise ValueError
@@ -239,6 +248,7 @@ def load_generations(cfg, env, values, check_id=None):
             raise ValueError
     except (KeyError, TypeError, ValueError, OSError, RuntimeError):
         raise ValueError('TRANSITION_CONFIGURATION_INVALID') from None
+    _verify_manifest_pin(cfg, digest)
     if check_id in REDEPLOY_CHECKS:
         _validate_redeployment(generations, values['transition_phase_generation'])
     return generations, manifest

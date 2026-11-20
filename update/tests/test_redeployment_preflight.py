@@ -262,6 +262,36 @@ def test_side_reuse_blocks_the_transition_and_leaves_unselected_inputs_nonblocki
     assert evidence.execution.abort_reason == "executor 'supply_boot' not configured in guard.toml [executors]"
 
 
+@pytest.mark.parametrize("check_id", ["LIF-05", "LIF-16"])
+def test_prepared_generation_pin_rejects_a_rewrite_before_a_new_plan(external, tmp_path, monkeypatch, check_id):
+    pack, envs, pol, cfg = _configuration(external, check_id)
+    for side in ("baseline", "candidate"):
+        settings = cfg["sides"][side]["check_config"][check_id]
+        manifest = lifecycle_transition.inputs_manifest(settings)
+        settings[lifecycle_transition.GENERATION_MANIFEST_PIN] = sha256_hex(canonical_json(manifest))
+    monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", _forbidden)
+    monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
+    report = application.update_readiness(pack, envs, pol, cfg)
+    assert next(row for row in report["checks"] if row["check"] == "inputs")["ok"], report
+
+    candidate = cfg["sides"]["candidate"]["check_config"][check_id]
+    target = Path(candidate["generations"][1]["target"])
+    changed = json.loads(target.read_bytes())
+    changed["comparison_config"] = {"EXAMPLE_launch_label": "rewritten before selection"}
+    _write(target, changed)
+
+    with pytest.raises(ValueError, match="TRANSITION_GENERATION_MANIFEST_CHANGED"):
+        lifecycle_transition.inputs_manifest(candidate)
+    report = application.update_readiness(pack, envs, pol, cfg)
+    assert not next(row for row in report["checks"] if row["check"] == "inputs")["ok"], report
+    store = Store(tmp_path / "store")
+    plan = _bound_plan(store, pack, envs, pol, cfg)
+    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+    assert evidence.execution.status == ExecStatus.NOT_RUN
+    assert evidence.execution.abort_reason == "RUN_BINDING_TRANSITION_GENERATIONS_UNAVAILABLE"
+    assert evidence.execution.run_binding is None
+
+
 @pytest.mark.parametrize("replace_after_check", [False, True])
 @pytest.mark.parametrize("check_id", ["LIF-05", "LIF-06"])
 def test_run_rejects_changed_generation_manifest_before_runtime(

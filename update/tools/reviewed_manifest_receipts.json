@@ -1080,6 +1080,11 @@
       "manifest_sha256": "96d558be388338bebf67df3da7aa9cd4f2157b668e20ffac38b8a34006143d3d",
       "reviewed_by": "Codex / SUP-06 callback capture and boot input binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T00:41:21+00:00"
+    },
+    {
+      "manifest_sha256": "1dbfe55a0af91dc87b439c5b9de4233e05dcbf4c473d8e89d426f8fc8f85ae5d",
+      "reviewed_by": "Codex / OBS-09 pinned replay and redeployment preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T01:05:04+00:00"
     }
   ]
 }

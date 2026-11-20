@@ -433,7 +433,21 @@ class LifecycleTransitionExecutor:
 
     def prepared_generations(self, check, env, values):
         """Validate local generation files and scope without sampling or dispatch."""
-        return load_generations(self.cfg, env, values, check.id)
+        result = load_generations(self.cfg, env, values, check.id)
+        if check.id in REDEPLOY_CHECKS:
+            self._transport_settings()
+        return result
+
+    def _transport_settings(self):
+        timeout = self.cfg.get('request_timeout', 30)
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+        duration = self.cfg.get('max_duration_seconds', 300)
+        binary = self.cfg.get('kubectl_binary', 'kubectl')
+        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
+                or type(binary) is not str or not binary.strip()):
+            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+        return timeout, duration, binary
 
     def _reader(self, generation):
         return KubernetesLifecycleReader(generation.native_target, generation.env, generation.prepared,
@@ -545,14 +559,7 @@ class LifecycleTransitionExecutor:
                 matches = self.expected_target == next(iter(approved.values()))
             if not matches:
                 raise ValueError('TRANSITION_EXPLICIT_GENERATION_TARGET_APPROVAL_REQUIRED')
-        timeout = self.cfg.get('request_timeout', 30)
-        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
-            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
-        duration = self.cfg.get('max_duration_seconds', 300)
-        binary = self.cfg.get('kubectl_binary', 'kubectl')
-        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
-                or type(binary) is not str or not binary.strip()):
-            raise ValueError('TRANSITION_CONFIGURATION_INVALID')
+        timeout, _, _ = self._transport_settings()
         started = self.clock()
         if not started <= schedule['before'] or (schedule['recovered'] - started).total_seconds() > 250:
             raise ValueError('TRANSITION_MUST_START_BEFORE_SCHEDULE')

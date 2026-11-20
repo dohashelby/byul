@@ -150,6 +150,22 @@ def test_public_preparation_validates_declared_generation_files(external, monkey
     assert any("installed native producer" in reason for reason in report["limitations"])
 
 
+@pytest.mark.parametrize(("check_id", "option", "value"), [
+    ("LIF-05", "request_timeout", 0),
+    ("LIF-05", "max_duration_seconds", 0),
+    ("LIF-16", "kubectl_binary", " "),
+])
+def test_public_redeployment_preparation_rejects_unusable_transport_settings(
+        external, monkeypatch, check_id, option, value):
+    monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
+    monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "_verify", _forbidden)
+    pack, envs, pol, cfg = _configuration(external, check_id)
+    cfg["sides"]["candidate"]["check_config"][check_id][option] = value
+    report = application.update_readiness(pack, envs, pol, cfg)
+    inputs = next(row for row in report["checks"] if row["check"] == "inputs")
+    assert not inputs["ok"] and inputs["detail"] == "TRANSITION_CONFIGURATION_INVALID"
+
+
 @pytest.mark.parametrize(("check_id", "change", "error"), [
     ("LIF-05", None, None),
     ("LIF-06", "same-owner", None),

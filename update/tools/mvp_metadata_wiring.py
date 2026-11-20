@@ -740,11 +740,11 @@ def main():
     if staged is not None:
         protected.append(args.candidate_target_after_baseline)
     if observation is not None:
-        protected.extend([args.observation_run_bindings, *(row['record_producer'] for row in observation.values())])
+        protected.extend([args.observation_run_bindings, *(Path(row['record_producer']) for row in observation.values())])
     if gateway is not None:
-        protected.extend([args.gateway_record_inputs, *(row['record_producer'] for row in gateway.values())])
+        protected.extend([args.gateway_record_inputs, *(Path(row['record_producer']) for row in gateway.values())])
     if copies is not None:
-        protected.extend([args.copy_record_inputs, *(row[key] for row in copies.values()
+        protected.extend([args.copy_record_inputs, *(Path(row[key]) for row in copies.values()
                          for key in ('record_producer', 'copy_inventory'))])
     if retries is not None:
         protected.extend([args.retry_record_inputs, *(Path(row[key]) for row in retries.values()

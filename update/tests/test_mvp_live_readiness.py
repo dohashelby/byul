@@ -414,6 +414,7 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
     from tests.builders import environment, policy
     from tests.test_kubernetes_log_integrity import GAP_VALUES
     from tests.test_kubernetes_request_binding import target as owned_target
+    from tests.test_model_mapping import declared_mapping
     from tools.j02_run_config import write_config
     from tools.mvp_versions import versions
 
@@ -429,11 +430,13 @@ def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, 
     cfg = {'adapter': {'name': 'vllm'}, 'executors': {'log_integrity': 'kubernetes'},
            'update': {'allowed_checks': [check_id]}, 'sides': {}}
     envs, env_paths = [], {}
+    model_env, mapping = declared_mapping()
     for index, (side, row) in enumerate(versions().items(), start=1):
-        env = environment(id=f'ENV-OBS11-{side.upper()}', model={'id': 'EXAMPLE', 'revision': 'r1'},
+        env = environment(id=f'ENV-OBS11-{side.upper()}', model=model_env.model,
             engine={'name': row['engine'], 'version': row['version'], 'image_digest': row['image']},
             runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE', 'driver': 'EXAMPLE'})
         declaration = owned_target(env)
+        declaration['model_mapping'] = {**mapping, 'environment_ref': env.ref().model_dump(mode='json')}
         declaration['observed_version'] = row['version']
         declaration['engine']['image_digest'] = row['image']
         declaration['kubernetes']['engine'].update(image=row['image'], image_id=row['image'])

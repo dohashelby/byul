@@ -324,9 +324,35 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         assert settings['container_config'] == stock_config['sides'][side]['container_config']
         assert set(settings['check_config']) == set(settings['run_binding']) == {check_id}
     assert all(item['configuration'] == _pointer(output / 'guard.toml') for item in joined['inputs'])
+    for item in joined['inputs']:
+        if item['check_id'] == 'SUP-04':
+            assert item['target'] == sources['targets'][item['side']]
+        else:
+            assert 'target' not in item
     assert _pointer(index_path) == sources['index'] and _pointer(config_path) == index['inputs'][0]['configuration']
     report = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
     assert report['sides'] == 138 and report['file_binding_valid_sides'] == 4
     assert not report['engine_executed'] and not report['ready_for_execution'] and report['actual_results'] is None
     prepared = application.update_readiness(pack, envs, confirmed, materialized)
     assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared
+
+    target = stock_sources['candidate']['target']
+    original = target.read_bytes()
+    target.write_bytes(original + b'\n')
+    changed = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
+    assert changed['file_binding_valid_sides'] == 3
+    stock_row = next(row for row in changed['rows'] if row['check_id'] == 'SUP-04' and row['side'] == 'candidate')
+    assert not stock_row['file_binding_valid']
+
+    target.write_bytes(original)
+    alternate = stock / 'same-bytes-different-path.json'
+    alternate.write_bytes(original)
+    pointer = next(row for row in joined['inputs'] if row['check_id'] == 'SUP-04' and row['side'] == 'candidate')
+    pointer['target'] = _pointer(alternate)
+    assert pointer['target']['sha256'] == sources['targets']['candidate']['sha256']
+    wrong_index = output / 'wrong-index.json'
+    wrong_index.write_bytes(canonical_json(joined))
+    wrong_path = readiness.audit(wrong_index, pack=pack)
+    assert wrong_path['file_binding_valid_sides'] == 3
+    stock_row = next(row for row in wrong_path['rows'] if row['check_id'] == 'SUP-04' and row['side'] == 'candidate')
+    assert not stock_row['file_binding_valid']

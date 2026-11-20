@@ -185,6 +185,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     saved_policy = Policy.model_validate(policy_doc)
     if not saved_policy.hash_ok() or saved_policy.ref() != policy.ref():
         raise ValueError('MVP_TRANSITION_METADATA_POLICY_MISMATCH')
+    target_pointers = {}
     for side in readiness.SIDES:
         _, env_doc = _selected_file(env_pointers[side], 262144, captured)
         env = Environment.model_validate(env_doc)
@@ -197,12 +198,14 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         metadata._transport(target, env)
         if config['sides'][side] != {name: {'target': path} for name in config['executors']}:
             raise ValueError(_METADATA_INVALID)
+        target_pointers[side] = {'path': path, 'sha256': source['targets'][side]['sha256']}
 
     report = readiness.audit(index_path, pack=pack)
     admitted = {(row['check_id'], row['side']) for row in report['rows'] if row['file_binding_valid']}
     if admitted != set(entries):
         raise ValueError('MVP_TRANSITION_METADATA_READINESS_UNVERIFIED')
-    return config, list(entries.values()), index_path.parent
+    pinned_entries = [{**row, 'target': target_pointers[row['side']]} for row in entries.values()]
+    return config, pinned_entries, index_path.parent
 
 
 def prepare(policy_path, selection_path, expected_selection_sha256, output, *, pack, store=None):

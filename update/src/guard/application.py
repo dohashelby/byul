@@ -28,7 +28,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, GATEWAY_RECOR
                                  normal_safetensors_reader_requested,
                                  normal_serving_readiness_requested,
                                  normal_startup_load_requested,
-                                 normal_token_input_requested, update_allowed_checks)
+                                 normal_token_input_requested, retry_record_snapshot_requested, update_allowed_checks)
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
@@ -171,6 +171,7 @@ def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
             or normal_serving_readiness_requested(cfg)
             or normal_startup_load_requested(cfg)
             or normal_token_input_requested(cfg)
+            or retry_record_snapshot_requested(cfg)
             or any(normal_token_input_requested(raw) for raw in sides.values())):
         bounded_metadata_scopes((merge_config(cfg, sides.get(side, {})) for side in ("baseline", "candidate")),
                                 pack, allowed_checks)
@@ -840,7 +841,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     if (kube and prebound and item.check_id == "LIF-12" and not c.get("lab_activation")
                             and isinstance(executor, KubernetesRequestTerminationExecutor)
                             and run_binding.stages_for(check_def) == (1, 2, 3, 4)):
-                        executor.prepared_retry_records(check_def, selected_env, values)
+                        executor.prepared_retry_records(check_def, selected_env, values,
+                                                        expected_target_sha256=expected_target)
                         continue  # The validated record reader has no role keys.
                     if (kube and isinstance(executor, LifecycleTransitionExecutor)
                             and run_binding.is_lifecycle_generation_binding(check_def)):

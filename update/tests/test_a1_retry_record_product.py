@@ -138,6 +138,60 @@ def test_retry_readiness_uses_the_exact_owned_scope_without_collecting(tmp_path,
             executor.prepared_retry_records(check, environment, values, expected_target_sha256=digest)
 
 
+def test_retry_snapshot_scope_keeps_sibling_executors_out_of_the_option():
+    from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION, bounded_metadata_scopes, for_check
+
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    allowed = {"LIF-10", "LIF-12", "REQ-12"}
+    cfg = {"executors": {"request_termination": "kubernetes"},
+           "check_config": {"LIF-12": {RETRY_RECORD_SNAPSHOT_OPTION: True}}}
+    scopes = bounded_metadata_scopes([cfg, deepcopy(cfg)], pack, allowed)
+    assert all(set(scope) == {"LIF-12"} for scope in scopes)
+    assert "request_termination" not in for_check(cfg, "request_termination", "LIF-10")
+
+    for unsafe in ({"request_termination": {RETRY_RECORD_SNAPSHOT_OPTION: True}},
+                   {**cfg, "lab_activation": {"EXAMPLE": True}},
+                   {**cfg, "update": {"kubernetes_candidate_binding": "staged"}}):
+        with pytest.raises(ValueError, match="^RETRY_RECORD_SNAPSHOT_SCOPE_INVALID$"):
+            bounded_metadata_scopes([{**cfg, **unsafe}, cfg], pack, allowed)
+
+
+@pytest.mark.parametrize("pin", ["exact", "missing", "different"])
+def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_path, pin):
+    from guard.adapters.vllm import VllmAdapter
+    from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION
+    from guard.models import DataOrigin
+
+    environment, world, scope, values, _, _, scope_path = inputs(tmp_path)
+    world.target["lab"] = False
+    values[retry_executor.contract.DECISION_KEY] = deepcopy(scope["limits"])
+    digest = sha256_hex(canonical_json(world.target))
+    values["retry_target_sha256"] = world.retry_packet["target_sha256"] = digest
+    target_path = tmp_path / "normal-target.json"
+    target_path.write_bytes(canonical_json(world.target))
+    cfg = {"target": str(target_path), "retry_scope": str(scope_path), RETRY_RECORD_SNAPSHOT_OPTION: True}
+    selected_pin = {"exact": digest, "missing": None, "different": "0" * 64}[pin]
+    executor = KubernetesRequestTerminationExecutor(cfg, runner=world.runner, expected_target_sha256=selected_pin)
+    check = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE").checks["LIF-12"]
+
+    if pin != "exact":
+        with pytest.raises(ValueError, match="^RETRY_CONFIGURATION_INVALID$"):
+            executor.prepared_retry_records(check, environment, values)
+        with pytest.raises(ValueError, match="^RETRY_CONFIGURATION_INVALID$"):
+            executor.run(check, environment, values, VllmAdapter(), tmp_path / "work")
+        assert world.reads == 0 and world.sent == []
+        return
+
+    executor.prepared_retry_records(check, environment, values)
+    assert world.reads == 0
+    draft = executor.run(check, environment, values, VllmAdapter(), tmp_path / "work")
+    assert world.reads == 2 and world.sent == []
+    assert draft.data_origin is DataOrigin.EXAMPLE and not draft.normal_control.attempted
+    assert draft.observations["retry_records_collected"].value is True
+    assert draft.observations["automatic_retry_verified"].value is False
+    assert draft.observations["retry_scope_complete"].value is False
+
+
 @pytest.mark.parametrize('mode',['normal','unresolved','declared-forbidden','declared-cost','manual-only','missing-event',
     'duplicate-event','event-conflict','seq-gap','wrong-actor','wrong-generation','wrong-source','raw-field','trust-claim',
     'partial','empty','after-invalid','producer-changed','snapshot-changed','missing','recovered','final-missing',

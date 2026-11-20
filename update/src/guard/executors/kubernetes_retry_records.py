@@ -1,6 +1,7 @@
 """Read-only LIF12 declarations using the existing owned OBS01 file reader."""
 
 from guard.adapters.engine_profiles import supports
+from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION
 from pathlib import Path
 import os
 import stat
@@ -47,14 +48,22 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         super().__init__(cfg, environ=environ)
         self.runner, self.expected_target = runner, expected_target_sha256
+        if self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+            self.version += '+record-snapshot'
 
     def validate_policy(self, check, values):
         if check.id != 'LIF-12' or getattr(check, 'collection_profile', None) != contract.PROFILE:
             raise ValueError('RETRY_PROFILE_UNSUPPORTED')
         contract.normalize_policy(values)
+        if RETRY_RECORD_SNAPSHOT_OPTION in self.cfg:
+            from .run_binding import stages_for
+            if (self.cfg[RETRY_RECORD_SNAPSHOT_OPTION] is not True or check.executor != self.name
+                    or stages_for(check) != (1, 2, 3, 4) or contract.DECISION_KEY not in values):
+                raise ValueError('RETRY_PROFILE_UNSUPPORTED')
 
     def _validate_configuration(self, env):
-        if set(self.cfg) - {'target', 'retry_scope', 'prepared', 'kubectl_binary', 'max_duration_seconds'}:
+        if set(self.cfg) - {'target', 'retry_scope', 'prepared', 'kubectl_binary', 'max_duration_seconds',
+                            RETRY_RECORD_SNAPSHOT_OPTION}:
             raise ValueError
         if 'prepared' in self.cfg and (type(self.cfg['prepared']) is not str or not self.cfg['prepared']):
             raise ValueError
@@ -63,8 +72,11 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
 
     def _bound_scope(self, target, env, values, *, expected_target_sha256=None):
         target_hash = sha256_hex(canonical_json(target))
-        pins = (values['retry_target_sha256'], self.expected_target, expected_target_sha256)
-        if target.get('lab') is not True or any(pin is not None and pin != target_hash for pin in pins):
+        snapshot_only = self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True
+        expected_pins = (self.expected_target, expected_target_sha256)
+        if (target.get('lab') is not (not snapshot_only) or snapshot_only and all(pin is None for pin in expected_pins)
+                or target_hash != values['retry_target_sha256']
+                or any(pin is not None and pin != target_hash for pin in expected_pins)):
             raise ValueError
         image = target['kubernetes']['engine']['image']
         if type(image) is not str or '@sha256:' not in image:
@@ -159,7 +171,7 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
         try:
             reader = RequiredEventReader(ctx.cprobe, ctx.target, values['retry_session'],
                 binary=self.cfg.get('kubectl_binary', 'kubectl'), duration=self.cfg.get('max_duration_seconds', 120),
-                runner=self.runner or capture_pipes)
+                runner=self.runner or capture_pipes, snapshot_only=self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True)
             reader.snapshot()
             collect_stage('before')
             reader.snapshot()

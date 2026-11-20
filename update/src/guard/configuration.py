@@ -48,12 +48,15 @@ _NORMAL_ONLY_CASES = {
     "SUP-12": ("supply_boot", NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
     "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
 }
+RETRY_RECORD_SNAPSHOT_OPTION = "retry_record_snapshot_only"
+RETRY_RECORD_SNAPSHOT_SCOPE_ERROR = "RETRY_RECORD_SNAPSHOT_SCOPE_INVALID"
 RECORD_SNAPSHOT_OPTIONS = {
     "OBS-01": "record_snapshot_only",
     "PLT-12": "copy_record_snapshot_only",
 }
 KUBERNETES_BOUND_CHECK_OPTIONS = {
     **RECORD_SNAPSHOT_OPTIONS,
+    "LIF-12": RETRY_RECORD_SNAPSHOT_OPTION,
     **{check_id: option for check_id, (_, option, _) in _NORMAL_ONLY_CASES.items()},
     "OBS-04": "local_observation_only",
     "PLT-02": "protected_path_metadata_only",
@@ -138,6 +141,10 @@ def _validate_normal_option_placement(raw, option, paths, error):
             path = path[2:]
         if value is not True or path not in paths:
             raise ValueError(error)
+
+
+def retry_record_snapshot_requested(raw):
+    return next(_option_occurrences(raw, RETRY_RECORD_SNAPSHOT_OPTION), None) is not None
 
 
 def normal_request_latency_requested(raw):
@@ -267,6 +274,28 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
             sessions = [binding.get("record_session") for _, binding in scoped.values() if type(binding) is dict]
             if len(sessions) == 2 and sessions[0] == sessions[1]:
                 raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SESSIONS_MUST_DIFFER")
+        retry_option = RETRY_RECORD_SNAPSHOT_OPTION
+        retry_error = RETRY_RECORD_SNAPSHOT_SCOPE_ERROR
+        retry_executor = "request_termination"
+        _validate_normal_option_placement(raw, retry_option, {
+            (retry_executor, retry_option),
+            (CHECK_CONFIG, "LIF-12", retry_option),
+        }, retry_error)
+        retry_base = raw.get(retry_executor)
+        retry_overlay = overlays.get("LIF-12") if type(overlays) is dict else None
+        retry_in_base = type(retry_base) is dict and retry_option in retry_base
+        if retry_in_base or type(retry_overlay) is dict and retry_option in retry_overlay:
+            settings = for_check(raw, retry_executor, "LIF-12").get(retry_executor, {})
+            update = raw.get("update", {})
+            if (allowed_checks is None or "LIF-12" not in allowed_checks
+                    or raw.get("executors", {}).get(retry_executor) != "kubernetes"
+                    or update.get("mode", "external") != "external"
+                    or update.get("kubernetes_candidate_binding", "prebound") != "prebound"
+                    or raw.get("lab_activation")
+                    or retry_in_base and any(cid != "LIF-12" and pack.checks[cid].executor == retry_executor
+                                             for cid in allowed_checks)):
+                raise ValueError(retry_error)
+            scoped["LIF-12"] = (settings, None)
         stream_cases = {}
         for check_id, (executor, option, scope_error) in _NORMAL_ONLY_CASES.items():
             overlay = overlays.get(check_id) if type(overlays) is dict else None

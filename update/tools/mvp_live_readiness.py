@@ -38,7 +38,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNA
                                  normal_safetensors_reader_requested,
                                  normal_serving_readiness_requested,
                                  normal_startup_load_requested,
-                                 normal_token_input_requested, validate_sup05_preparation_receipt)
+                                 normal_token_input_requested, retry_record_snapshot_requested, validate_sup05_preparation_receipt)
 from guard.core.select import _in_scope, check_policy_value
 from guard.executors import passive_api_hop, registry, run_binding
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
@@ -242,7 +242,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
            or normal_request_latency_requested(raw)
            or normal_serving_readiness_requested(raw)
            or normal_startup_load_requested(raw)
-           or normal_token_input_requested(raw) for raw in side_configs.values()):
+           or normal_token_input_requested(raw)
+           or retry_record_snapshot_requested(raw) for raw in side_configs.values()):
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
     passive_hop = check.id == passive_api_hop.CHECK and passive_api_hop.validate_scope(
         pack, side_configs.values(), allowed, explicitly_requested=passive_api_hop.requested(config))

@@ -605,6 +605,7 @@ def test_prebound_owned_preflights_share_the_declared_target_limits(
 
 
 def _record_declarations(tmp_path, record_access_context, check_id, damage=None):
+    from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION
     from guard.executors import credential_copy_contract as copy
     from guard.executors.observation_contract import MANDATORY_FIELDS
     from guard.executors.retry_record_contract import DECISION_KEY as RETRY_DECISION_KEY
@@ -664,7 +665,7 @@ def _record_declarations(tmp_path, record_access_context, check_id, damage=None)
             settings['subjects'] = str(subjects_path)
         else:
             target = http_target(env)
-            target.update(lab=retry_records, observed_version=row['version'])
+            target.update(lab=retry_records and damage != 'normal-snapshot', observed_version=row['version'])
             target['engine']['image_digest'] = row['image']
             target['kubernetes']['engine'].update(image=row['image'], image_id=row['image'])
             if side == 'candidate' and damage == 'model':
@@ -685,6 +686,8 @@ def _record_declarations(tmp_path, record_access_context, check_id, damage=None)
                 scope_path = tmp_path / f'{side}-retry-scope.json'
                 scope_path.write_bytes(canonical_json(scope))
                 settings.update(retry_scope=str(scope_path), prepared=str(tmp_path / 'unused-legacy-prepared.json'))
+                if damage == 'normal-snapshot':
+                    settings[RETRY_RECORD_SNAPSHOT_OPTION] = True
         target_path.write_bytes(canonical_json(target))
         cfg['sides'][side] = {check.executor: settings, 'run_binding': {check_id: run_cfg}}
         env_path = tmp_path / f'{side}-env.json'
@@ -702,6 +705,7 @@ def _no_record_collection(*args, **kwargs):
     ('OBS-01', None, None),
     ('OBS-01', 'model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('LIF-12', None, None),
+    ('LIF-12', 'normal-snapshot', None),
     ('LIF-12', 'scope', 'RETRY_CONFIGURATION_INVALID'),
     ('LIF-12', 'scope_changed', 'MVP_INPUT_FILE_CHANGED'),
     ('OBS-06', None, None),

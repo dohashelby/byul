@@ -143,22 +143,25 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         return KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 300),
             binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=LOG_INTEGRITY_PROFILE)
 
-    def prepared_collection_status(self, check, env, values, *, expected_target_sha256=None):
-        """Validate the saved OBS-11 target and session before any status collection."""
+    def _collection_target(self, *, expected_target_sha256=None):
         from guard.adapters.vllm_file_read_sensor import dependency
 
+        target = strict_json(dependency(self.cfg["target"], None))
+        if type(target) is not dict:
+            raise ValueError
+        digest = sha256_hex(canonical_json(target))
+        if any(pin is not None and pin != digest for pin in (expected_target_sha256, self._expected_target_sha256)):
+            raise ValueError
+        return target
+
+    def prepared_collection_status(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the saved OBS-11 target and session before any status collection."""
         if check.id != "OBS-11" or check.collection_profile != log_collection_gap.PROFILE:
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID")
         self.validate_policy(check, values)
         try:
             float(self.cfg.get("request_timeout", 30))
-            target = strict_json(dependency(self.cfg["target"], None))
-            if type(target) is not dict:
-                raise ValueError
-            digest = sha256_hex(canonical_json(target))
-            if any(pin is not None and pin != digest for pin in
-                   (expected_target_sha256, self._expected_target_sha256)):
-                raise ValueError
+            target = self._collection_target(expected_target_sha256=expected_target_sha256)
         except (KeyError, TypeError, ValueError, OverflowError, OSError):
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID") from None
         try:
@@ -167,13 +170,17 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
             raise ValueError(str(error)) from None
 
     def run(self, check, env, policy_values, adapter, workdir):
+        status_profile = getattr(check, "collection_profile", None) == log_collection_gap.PROFILE
         try:
             if adapter is None:
                 raise ValueError
             self.validate_policy(check, policy_values)
-            target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
-            if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target)) != self._expected_target_sha256:
-                raise ValueError
+            if status_profile:
+                target = self._collection_target()
+            else:
+                target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
+                if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target)) != self._expected_target_sha256:
+                    raise ValueError
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID") from None
         transport = self._transport(target, env)
@@ -183,7 +190,6 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         ctx = Ctx(check=check, env=env, adapter=adapter, target=view, policy_values=policy_values,
                   timeout=float(self.cfg.get("request_timeout", 30)), allow_mutating=False, keys={}, secrets=[],
                   cprobe=transport, workdir=workdir, started=utcnow())
-        status_profile = getattr(check, "collection_profile", None) == log_collection_gap.PROFILE
         if status_profile:
             ctx._collection_target = target
             ctx._collection_status_cleanup = []

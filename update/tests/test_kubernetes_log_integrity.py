@@ -267,6 +267,69 @@ def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_pat
             executor.prepared_collection_status(gap_check(), env, values, expected_target_sha256=expected)
 
 
+@pytest.mark.parametrize('change', [None, 'changed-owner', 'duplicate-field', 'oversize'])
+def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, monkeypatch, change):
+    from tests.test_kubernetes_request_binding import target as owned_target
+    from tools.mvp_versions import versions
+
+    release = versions()['candidate']
+    env = environment(engine={'name': release['engine'], 'version': release['version'], 'image_digest': release['image']},
+                      model={'id': 'EXAMPLE-repository-id', 'revision': 'EXAMPLE-revision'})
+    declaration = owned_target(env)
+    declaration['observed_version'] = release['version']
+    declaration['engine']['image_digest'] = release['image']
+    declaration['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])
+    path = tmp_path / 'saved-target.json'
+    raw = canonical_json(declaration)
+    path.write_bytes(raw)
+    digest = sha256_hex(raw)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('OBS-11 fixture dispatched runtime I/O')
+
+    executor = module.KubernetesLogIntegrityExecutor({'target': str(path)}, runner=forbidden,
+                                                     expected_target_sha256=digest)
+    monkeypatch.setattr(module, '_read_collection_status', forbidden)
+    definition = gap_check()
+    executor.prepared_collection_status(definition, env, GAP_VALUES, expected_target_sha256=digest)
+    if change is not None:
+        if change == 'changed-owner':
+            declaration['kubernetes']['probe']['pod_uid'] = '00000000-0000-0000-0000-000000000003'
+            path.write_bytes(canonical_json(declaration))
+        elif change == 'duplicate-field':
+            path.write_bytes(b'{"lab":true,' + raw[1:])
+        else:
+            path.write_bytes(raw + b' ' * 65536)
+        if change != 'changed-owner':
+            assert canonical_json(json.loads(path.read_bytes())) == raw
+        monkeypatch.setattr(executor, '_transport', forbidden)
+        with pytest.raises(ValueError, match='^KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID$'):
+            executor.run(definition, env, GAP_VALUES, VllmAdapter(), tmp_path / 'work')
+        return
+
+    row = {'record': 'request', 'event_at_ms': 10, 'arrived_at_ms': 11, 'gap_marked_at_ms': None,
+           'alert_at_ms': None, 'dependent_result': None, 'clock_uncertainty_ms': 1}
+    document = status(env, [row])['document']
+    record_bytes = canonical_json(document) + b'\n'
+    read_sessions = []
+
+    def read_status(ctx, session):
+        assert ctx._collection_target == declaration and ctx.cprobe.target_sha256 == digest
+        assert ctx.env.ref() == env.ref()
+        read_sessions.append(session)
+        return document, sha256_hex(record_bytes)
+
+    monkeypatch.setattr(module, '_read_collection_status', read_status)
+    draft = executor.run(definition, env, GAP_VALUES, VllmAdapter(), tmp_path / 'work')
+    assert read_sessions == [GAP_VALUES['collection_session']]
+    assert draft.status.value == 'COMPLETED' and draft.data_origin.value == 'EXAMPLE'
+    assert draft.observations['collection_normal_arrivals'].value == ['request']
+    summary = json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+    assert summary['file_sha256'] == sha256_hex(record_bytes)
+    assert summary['record_sha256'] == sha256_hex(canonical_json(document))
+    assert summary['selected_record_timeline'] == [row] and not summary['producer_authenticated']
+
+
 def test_obs11_record_from_the_probe_pod_reuses_the_original_evaluation(tmp_path, monkeypatch):
     env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE}, model={'id': 'fixture-model'})
     late = {'record': 'request', 'event_at_ms': 0, 'arrived_at_ms': None, 'gap_marked_at_ms': 5000, 'alert_at_ms': None,

@@ -747,7 +747,7 @@ def main():
         protected.extend([args.copy_record_inputs, *(row[key] for row in copies.values()
                          for key in ('record_producer', 'copy_inventory'))])
     if retries is not None:
-        protected.extend([args.retry_record_inputs, *(row[key] for row in retries.values()
+        protected.extend([args.retry_record_inputs, *(Path(row[key]) for row in retries.values()
                          for key in ('record_producer', 'retry_scope'))])
     if collection_status is not None:
         protected.append(args.collection_status_bindings)

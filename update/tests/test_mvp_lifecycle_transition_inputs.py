@@ -9,6 +9,7 @@ import tomllib
 
 import pytest
 
+from guard import application
 from guard.executors import lifecycle_transition as transition
 from guard.models import DataOrigin, Environment, canonical_json, sha256_hex
 from tests import test_redeployment_preflight as fixture
@@ -20,6 +21,26 @@ from tools import mvp_lifecycle_transition_inputs as materializer, mvp_live_read
 def _pointer(path):
     path = Path(path)
     return {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+
+
+def _selected_side(env, rows, binding):
+    return {'environment_ref': env.ref().model_dump(mode='json'),
+            'generations': [{key: value if key == 'id' else _pointer(value) for key, value in row.items()}
+                            for row in rows],
+            'phase_generation': dict(binding['phase_generation']),
+            'sample_offsets_ms': dict(binding['sample_offsets_ms'])}
+
+
+def _offline_only(monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail('Offline lifecycle input materialization attempted to launch or contact a target')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    monkeypatch.setattr(transition.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(transition.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(transition.LifecycleTransitionExecutor, 'run', forbidden)
+    monkeypatch.setattr(fixture, 'environment', partial(fixture.environment, origin=DataOrigin.DECLARED))
 
 
 @pytest.mark.parametrize(('check_id', 'case', 'error'), [
@@ -38,15 +59,7 @@ def _pointer(path):
     ('LIF-05', 'manifest-rewritten', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
 ])
 def test_materializes_one_paired_redeployment_check_without_collection(external, monkeypatch, check_id, case, error):
-    def forbidden(*args, **kwargs):
-        pytest.fail('Offline lifecycle input materialization attempted to launch or contact a target')
-
-    monkeypatch.setattr(socket, 'socket', forbidden)
-    monkeypatch.setattr(subprocess, 'Popen', forbidden)
-    monkeypatch.setattr(transition.KubernetesHTTP, '_verify', forbidden)
-    monkeypatch.setattr(transition.KubernetesHTTP, '__call__', forbidden)
-    monkeypatch.setattr(transition.LifecycleTransitionExecutor, 'run', forbidden)
-    monkeypatch.setattr(fixture, 'environment', partial(fixture.environment, origin=DataOrigin.DECLARED))
+    _offline_only(monkeypatch)
     pack, envs, _, cfg = fixture._configuration(external, check_id, change=case, mvp_inputs=True,
                                                lab=case == 'lab-target')
     confirmed = policy(pack.ref(), scope={'include': [check_id]}, values={}, data_origin=DataOrigin.DECLARED,
@@ -57,11 +70,7 @@ def test_materializes_one_paired_redeployment_check_without_collection(external,
     sides = {}
     for side, env in zip(readiness.SIDES, envs, strict=True):
         rows = cfg['sides'][side]['check_config'][check_id]['generations']
-        sides[side] = {'environment_ref': env.ref().model_dump(mode='json'),
-                       'generations': [{key: value if key == 'id' else _pointer(value) for key, value in row.items()}
-                                       for row in rows],
-                       'phase_generation': dict(binding['phase_generation']),
-                       'sample_offsets_ms': dict(binding['sample_offsets_ms'])}
+        sides[side] = _selected_side(env, rows, binding)
 
     candidate = sides['candidate']
     candidate['sample_offsets_ms']['recovered'] += 100
@@ -138,3 +147,82 @@ def test_materializes_one_paired_redeployment_check_without_collection(external,
     report = readiness.audit(index_path, pack=pack)
     changed = next(row for row in report['rows'] if row['check_id'] == check_id and row['side'] == 'candidate')
     assert not changed['file_binding_valid']
+
+
+@pytest.mark.parametrize('case,error', [
+    ('paired', None),
+    ('duplicate', 'MVP_TRANSITION_SELECTION_DUPLICATE'),
+    ('foreign-policy', 'MVP_TRANSITION_CONFIRMED_POLICY_REQUIRED'),
+    ('second-pin-changed', 'MVP_TRANSITION_SELECTION_CHANGED'),
+    ('different-before', 'MVP_TRANSITION_PAIRED_ENVIRONMENT_MISMATCH'),
+])
+def test_both_redeployment_checks_share_one_configuration(external, monkeypatch, case, error):
+    _offline_only(monkeypatch)
+    checks = ('LIF-05', 'LIF-16')
+    pack, envs, _, cfg = fixture._configuration(external, checks[0], mvp_inputs=True, lab=False)
+    confirmed = policy(pack.ref(), scope={'include': list(checks)}, values={}, data_origin=DataOrigin.DECLARED,
+                       status='CONFIRMED', confirmed_by='EXAMPLE operator', confirmed_at=T0)
+    policy_path = external / 'policy.json'
+    policy_path.write_bytes(canonical_json(confirmed.to_dict()))
+    policy_ref = confirmed.ref().model_dump(mode='json')
+    payload = {check_id: {'schema': materializer.SELECTION_SCHEMA, 'check_id': check_id,
+                          'policy_ref': policy_ref, 'sides': {}} for check_id in checks}
+    binding = cfg['run_binding'][checks[0]]
+    for index, (side, env) in enumerate(zip(readiness.SIDES, envs, strict=True)):
+        rows = cfg['sides'][side]['check_config'][checks[0]]['generations']
+        payload[checks[0]]['sides'][side] = _selected_side(env, rows, binding)
+        old = rows[0]
+        if case == 'different-before' and side == 'candidate':
+            env, old = fixture._generation(external / 'foreign-before', 'old', 200, version=env.engine.version,
+                                           mvp_inputs=True, lab=False)
+        _, restored = fixture._generation(external / f'{side}-restored', 'restored', 300 + index,
+                                          version=env.engine.version, mvp_inputs=True, lab=False,
+                                          profile=transition.endpoint_sensor.PROFILE)
+        restored_binding = {'phase_generation': {**binding['phase_generation'], 'after': 'restored',
+                                                  'recovered': 'restored'},
+                            'sample_offsets_ms': {**binding['sample_offsets_ms'], 'recovered': 4500}}
+        payload[checks[1]]['sides'][side] = _selected_side(env, [old, restored], restored_binding)
+
+    if case == 'duplicate':
+        payload[checks[1]]['check_id'] = checks[0]
+    elif case == 'foreign-policy':
+        other = confirmed.model_copy(update={'id': 'POL-OTHER-EXAMPLE'}).seal()
+        payload[checks[1]]['policy_ref'] = other.ref().model_dump(mode='json')
+    selections = []
+    for check_id, document in payload.items():
+        path = external / f'{check_id}-selection.json'
+        path.write_bytes(canonical_json(document))
+        digest = '0' * 64 if case == 'second-pin-changed' and check_id == checks[1] else _pointer(path)['sha256']
+        selections.append((path, digest))
+
+    output = external / 'assembled'
+    if error is not None:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            materializer.prepare_many(policy_path, selections, output, pack=pack)
+        assert not output.exists()
+        return
+
+    args = ['--pack', str(pack.path), '--policy', str(policy_path), '--output', str(output)]
+    for path, digest in selections:
+        args.extend(['--selection', str(path), '--selection-sha256', digest])
+    materializer.main(args)
+    config = tomllib.loads((output / materializer.CONFIG_NAME).read_text(encoding='utf-8'))
+    index_path = output / materializer.INDEX_NAME
+    index = json.loads(index_path.read_bytes())
+    assert config['update'] == {'mode': 'external', 'allowed_checks': list(checks)}
+    assert config['executors'] == {'lifecycle_transition': 'kubernetes'}
+    assert {(item['check_id'], item['side']) for item in index['inputs']} == {
+        (check_id, side) for check_id in checks for side in readiness.SIDES}
+    for side in readiness.SIDES:
+        settings = config['sides'][side]
+        assert set(settings['check_config']) == set(settings['run_binding']) == set(checks)
+        l05, l16 = (settings['check_config'][check_id] for check_id in checks)
+        assert l05['generations'][0] == l16['generations'][0]
+        assert l05[transition.GENERATION_MANIFEST_PIN] != l16[transition.GENERATION_MANIFEST_PIN]
+        assert settings['run_binding']['LIF-05']['phase_generation']['after'] == 'new'
+        assert settings['run_binding']['LIF-16']['phase_generation']['after'] == 'restored'
+    report = readiness.audit(index_path, pack=pack)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 4
+    assert not report['engine_executed'] and not report['ready_for_execution'] and report['actual_results'] is None
+    prepared = application.update_readiness(pack, envs, confirmed, config)
+    assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['ok'], prepared

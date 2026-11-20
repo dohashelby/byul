@@ -22,7 +22,7 @@ import time
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.kubernetes_http import LOG_INTEGRITY_PROFILE, KubernetesBindingError, KubernetesHTTP
 from . import log_collection_gap
-from .http_common import Ctx
+from .http_common import Ctx, request_model
 from .kubernetes_lifecycle_capture import KubernetesCaptureError, KubernetesLifecycleReader
 from .log_integrity import _ENV, LogIntegrityExecutor, _pinned_image
 from .log_integrity_parser import MAX_CAPTURE_BYTES
@@ -165,9 +165,10 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         except (KeyError, TypeError, ValueError, OverflowError, OSError):
             raise ValueError("KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID") from None
         try:
-            self._transport(target, env)
+            transport = self._transport(target, env)
         except KubernetesBindingError as error:
             raise ValueError(str(error)) from None
+        request_model(env, target, transport=transport)
 
     def run(self, check, env, policy_values, adapter, workdir):
         status_profile = getattr(check, "collection_profile", None) == log_collection_gap.PROFILE

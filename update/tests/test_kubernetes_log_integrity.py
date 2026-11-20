@@ -215,6 +215,24 @@ def status(env, rows):
                          'environment_ref': env.ref().model_dump(mode='json'), 'events': rows}}
 
 
+def _saved_status_target(side):
+    from tests.test_kubernetes_request_binding import target as owned_target
+    from tests.test_model_mapping import declared_mapping
+    from tools.mvp_versions import versions
+
+    release = versions()[side]
+    model_env, mapping = declared_mapping()
+    env = environment(engine={'name': release['engine'], 'version': release['version'], 'image_digest': release['image']},
+                      model=model_env.model)
+    declaration = owned_target(env)
+    declaration['model_mapping'] = {**mapping, 'environment_ref': env.ref().model_dump(mode='json'),
+                                    'served_model_name': 'fixture-model'}
+    declaration['observed_version'] = release['version']
+    declaration['engine']['image_digest'] = release['image']
+    declaration['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])
+    return env, declaration
+
+
 @pytest.mark.parametrize(('case', 'error'), [
     ('baseline', None),
     ('candidate', None),
@@ -225,29 +243,24 @@ def status(env, rows):
     ('executor-digest', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
     ('non-object', 'KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'),
     ('unbound-session', 'COLLECTION_GAP_POLICY_INVALID'),
+    ('legacy-model-mapping', 'MODEL_MAPPING_INVALID'),
 ])
 def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_path, monkeypatch, case, error):
-    from tests.test_kubernetes_request_binding import target as owned_target
-    from tools.mvp_versions import versions
-
     def forbidden(*args, **kwargs):
         pytest.fail('OBS-11 preparation must not contact the target or load its status file')
 
     monkeypatch.setattr(KubernetesHTTP, '_verify', forbidden)
     monkeypatch.setattr(KubernetesHTTP, '__call__', forbidden)
     monkeypatch.setattr(module, '_read_collection_status', forbidden)
-    release = versions()['baseline' if case == 'baseline' else 'candidate']
-    env = environment(engine={'name': release['engine'], 'version': release['version'], 'image_digest': release['image']},
-                      model={'id': 'EXAMPLE-repository-id', 'revision': 'EXAMPLE-revision'})
-    target = owned_target(env)
-    target['observed_version'] = release['version']
-    target['engine']['image_digest'] = release['image']
-    target['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])
+    env, target = _saved_status_target('baseline' if case == 'baseline' else 'candidate')
     if case == 'owner-alias':
         roles = target['kubernetes']
         roles['probe']['pod_uid'] = roles['engine']['pod_uid']
     elif case == 'non-object':
         target = []
+    elif case == 'legacy-model-mapping':
+        target['model_mapping'] = {'repository_id': env.model.id, 'revision': env.model.revision,
+                                   'api_model': target['model_mapping']['served_model_name']}
     raw = canonical_json(target)
     path = tmp_path / 'saved-target.json'
     path.write_bytes(raw)
@@ -265,24 +278,14 @@ def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_pat
     else:
         with pytest.raises(ValueError, match=f'^{error}$'):
             executor.prepared_collection_status(gap_check(), env, values, expected_target_sha256=expected)
+    if case == 'legacy-model-mapping':
+        with pytest.raises(ValueError, match='^MODEL_MAPPING_INVALID$'):
+            executor.run(gap_check(), env, values, VllmAdapter(), tmp_path / 'work')
 
 
 @pytest.mark.parametrize('change', [None, 'changed-owner', 'duplicate-field', 'oversize'])
 def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, monkeypatch, change):
-    from tests.test_kubernetes_request_binding import target as owned_target
-    from tests.test_model_mapping import declared_mapping
-    from tools.mvp_versions import versions
-
-    release = versions()['candidate']
-    model_env, mapping = declared_mapping()
-    env = environment(engine={'name': release['engine'], 'version': release['version'], 'image_digest': release['image']},
-                      model=model_env.model)
-    declaration = owned_target(env)
-    declaration['model_mapping'] = {**mapping, 'environment_ref': env.ref().model_dump(mode='json'),
-                                    'served_model_name': 'fixture-model'}
-    declaration['observed_version'] = release['version']
-    declaration['engine']['image_digest'] = release['image']
-    declaration['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])
+    env, declaration = _saved_status_target('candidate')
     path = tmp_path / 'saved-target.json'
     raw = canonical_json(declaration)
     path.write_bytes(raw)

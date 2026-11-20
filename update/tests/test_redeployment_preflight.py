@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+from functools import partial
 from pathlib import Path
 from uuid import UUID
 
@@ -15,8 +16,9 @@ from guard.collectors.model_read_scope import build_scope
 from guard.core.execution_recipe import bind_recipe
 from guard.core.run import run_plan
 from guard.core.select import select
-from guard.executors import lifecycle_transition
+from guard.executors import lifecycle_transition, run_binding
 from guard.executors.base import EvidenceDraft
+from guard.executors.kubernetes_lifecycle_capture import KubernetesCaptureError, KubernetesLifecycleReader
 from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import put_pack
@@ -291,6 +293,28 @@ def test_prepared_generation_pin_rejects_a_rewrite_before_a_new_plan(external, t
     assert evidence.execution.status == ExecStatus.NOT_RUN
     assert evidence.execution.abort_reason == "RUN_BINDING_TRANSITION_GENERATIONS_UNAVAILABLE"
     assert evidence.execution.run_binding is None
+
+
+def test_non_lab_generations_require_the_pin_and_reject_the_seal_program(external, monkeypatch):
+    monkeypatch.setitem(_generation.__globals__, "environment", partial(environment, origin=DataOrigin.DECLARED))
+    pack, envs, _, cfg = _configuration(external, "LIF-05", lab=False)
+    definition = pack.checks["LIF-05"]
+    settings = cfg["sides"]["baseline"]["check_config"]["LIF-05"]
+    _, values = run_binding.compute(definition, settings, envs[0], side="baseline", attempt_id="test",
+                                    issued_at=utcnow(), run_cfg=cfg["run_binding"]["LIF-05"])
+    with pytest.raises(ValueError, match="TRANSITION_CONFIGURATION_INVALID"):
+        lifecycle_transition.load_generations(settings, envs[0], values, definition.id)
+    settings[lifecycle_transition.GENERATION_MANIFEST_PIN] = values["transition_inputs_sha256"]
+    executor = lifecycle_transition.LifecycleTransitionExecutor(settings, runner=_forbidden)
+    generations, _ = executor.prepared_generations(definition, envs[0], values)
+    generation = generations["old"]
+    with pytest.raises(ValueError, match="KUBERNETES_CAPTURE_TARGET_INVALID"):
+        KubernetesLifecycleReader(generation.native_target, generation.env, generation.prepared, runner=_forbidden)
+    reader = executor._reader(generation)
+    with pytest.raises(KubernetesCaptureError):
+        reader.exec_bounded(reader.binding["engine"]["container"],
+                            ["python3", "-c", reader.programs["seal"], reader.session, str(reader.file_read_limit)],
+                            timeout=5, max_bytes=4096)
 
 
 @pytest.mark.parametrize("replace_after_check", [False, True])

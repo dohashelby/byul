@@ -212,6 +212,7 @@ def load_generations(cfg, env, values, check_id=None):
     try:
         if set(cfg) - {'generations', GENERATION_MANIFEST_PIN, 'kubectl_binary', 'request_timeout', 'max_duration_seconds'}:
             raise ValueError
+        pinned_redeployment = check_id in REDEPLOY_CHECKS and GENERATION_MANIFEST_PIN in cfg
         rows = cfg['generations']
         if type(rows) is not list or not 1 <= len(rows) <= 4:
             raise ValueError
@@ -234,11 +235,16 @@ def load_generations(cfg, env, values, check_id=None):
             native = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': target['lab'],
                 'run_id': target['kubernetes']['run_id'], 'environment_ref': selected_env.ref().model_dump(mode='json'),
                 'kubernetes': {'context': target['kubernetes']['context'], 'engine': target['kubernetes']['engine']}}
-            validate_target(native, selected_env)
+            if native['lab'] is False and (target.get('synthetic', False) is not False
+                    or selected_env.data_origin == DataOrigin.EXAMPLE):
+                raise ValueError
+            validate_target(native, selected_env, require_lab=not pinned_redeployment)
             from guard.collectors.model_read_scope import validate_binding
             validate_binding(prepared, selected_env, native)
             generations[row['id']] = Generation(row['id'], selected_env, target, native, prepared)
             manifest.append(_manifest_row(row['id'], selected_env, target, prepared))
+        if len({generation.native_target['lab'] for generation in generations.values()}) != 1:
+            raise ValueError
         digest = sha256_hex(canonical_json(manifest))
         if digest != values['transition_inputs_sha256']:
             raise ValueError
@@ -462,13 +468,14 @@ class LifecycleTransitionExecutor:
     def _reader(self, generation):
         return KubernetesLifecycleReader(generation.native_target, generation.env, generation.prepared,
             runner=self.runner, binary=self.cfg.get('kubectl_binary', 'kubectl'),
+            read_only=generation.native_target['lab'] is False,
             duration=self.cfg.get('max_duration_seconds', 300))
 
     def _capture(self, generation):
         reader = generation.reader; engine = reader.binding['engine']
         packet = capture_session(reader, generation.native_target, container=engine['container'], image=engine['image'],
             prepared=generation.prepared, owner_identity=reader.owner_identity, read_file=reader.read_file,
-            image_check=reader.image_check)
+            image_check=reader.image_check, checkpoint=generation.native_target.get('lab') is False)
         # Reuse the exact profile's producer/consumer contract. Projection failure
         # cannot discard successfully captured independent request/native facts.
         try:
@@ -561,7 +568,8 @@ class LifecycleTransitionExecutor:
         policy_values = normalize_policy_values(policy_values)
         self.validate_policy(check, policy_values)
         schedule = normalize_policy(policy_values)
-        generations, manifest = load_generations(self.cfg, env, policy_values)
+        pinned_redeployment = check.id in REDEPLOY_CHECKS and GENERATION_MANIFEST_PIN in self.cfg
+        generations, manifest = load_generations(self.cfg, env, policy_values, check.id if pinned_redeployment else None)
         if self.expected_target is not None:
             approved = {row['id']: row['target_sha256'] for row in manifest}
             matches = self.expected_target == approved
@@ -620,10 +628,11 @@ class LifecycleTransitionExecutor:
             previous = generations[policy_values['transition_phase_generation']['before']]
             retirement = self._observe_retirement(previous, samples)
         retired_generation = retirement['generation'] if retirement else None
+        read_only = all(generation.target.get('lab') is False for generation in generations.values())
         for generation in generations.values():
             if generation.reader is None:
                 continue
-            if generation.key != retired_generation:
+            if not read_only and generation.key != retired_generation:
                 try:
                     if generation.reader.seal_session().get('sealed') is not True:
                         cleanup.append('TRANSITION_SESSION_SEAL_UNAVAILABLE:' + generation.key)
@@ -635,7 +644,7 @@ class LifecycleTransitionExecutor:
                     cleanup.append('TRANSITION_PARENT_CLEANUP_UNVERIFIED:' + generation.key)
             except Exception:
                 cleanup.append('TRANSITION_READER_REPORT_UNAVAILABLE:' + generation.key)
-        sample('sealed', retired_generation=retired_generation)
+        sample('final' if read_only else 'sealed', retired_generation=retired_generation)
         projection = project(samples, trials, retain_receipts=check.id == 'LIF-06')
         before = next(t for t in trials if t['case_id'] == 'before')
         inflight_row = next(t for t in trials if t['case_id'] == 'inflight')

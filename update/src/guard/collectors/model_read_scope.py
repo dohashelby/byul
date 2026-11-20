@@ -11,7 +11,7 @@ from guard.executors.owned_capture import strict_json
 def build_scope(env,target,manifest_path,model_root,*,nonsecret_model_weights,hash_model_bytes=False,
                 max_hash_bytes=sensor.MAX_HASH_BYTES,approved_manifest_sha256=None):
     from guard.executors.kubernetes_lifecycle_capture import validate_target
-    validate_target(target,env)
+    validate_target(target,env,require_lab=False)
     if (type(env.model.id) is not str or not env.model.id or type(env.model.revision) is not str or not env.model.revision
             or not sensor.fingerprint(env.model.inventory_sha256)):raise ValueError('MODEL_READ_SCOPE_MODEL_BINDING_REQUIRED')
     if (nonsecret_model_weights is not True or type(model_root) is not str or not model_root.startswith('/')

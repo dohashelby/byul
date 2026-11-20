@@ -42,9 +42,9 @@ from .session_seal import SESSION_SEALER,LARGE_SESSION_SEALER
 PROFILE = "kubernetes-owned-lifecycle-read-v1"
 
 
-def validate_target(target,env):
+def validate_target(target,env,*,require_lab=True):
     """Keep runtime binding access inside the executor boundary, including dry runs."""
-    return validate_capture_target(target,env)
+    return validate_capture_target(target,env,require_lab=require_lab)
 
 
 class KubernetesCaptureError(ValueError):
@@ -64,8 +64,12 @@ def supervised_source(source):
 
 
 class KubernetesLifecycleReader:
-    def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None,node_image_verification=None):
+    def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None,node_image_verification=None,
+                 read_only=False):
         if node_image_verification not in (None,"local-containerd-v1"):raise KubernetesCaptureError()
+        if read_only and (target.get("lab") is not False or node_image_verification is not None
+                or prepared.get("profile") not in {generation_sensor.PROFILE, endpoint_sensor.PROFILE}):
+            raise KubernetesCaptureError()
         self.node_image_verification=node_image_verification;self.node_image_receipts=[];self.node_image_proof_failures=0
         if prepared.get('profile')==release_observation.RANK_PROFILE and not supports(env.engine.name,env.engine.version,'rank_release_rows'):
             raise KubernetesCaptureError()
@@ -76,9 +80,10 @@ class KubernetesLifecycleReader:
             raise KubernetesCaptureError()
         from guard.collectors.model_read_scope import validate_binding
         validate_binding(prepared,env,target)
-        self._initialize(validate_target(target,env),target,prepared,binary=binary,duration=duration,runner=runner)
+        self._initialize(validate_target(target,env,require_lab=not read_only),target,prepared,
+                         binary=binary,duration=duration,runner=runner,read_only=read_only)
 
-    def _initialize(self,binding,target,prepared,*,binary,duration,runner):
+    def _initialize(self,binding,target,prepared,*,binary,duration,runner,read_only=False):
         # Internal reuse only: callers must supply their profile's validated binding.
         self.binding=binding
         if (type(binary) is not str or not binary.strip() or type(duration) not in (int,float)
@@ -86,6 +91,7 @@ class KubernetesLifecycleReader:
                 or type(prepared.get("session")) is not str or re.fullmatch(r"[0-9a-f]{32}",prepared["session"]) is None):
             raise KubernetesCaptureError()
         self.target_sha256=sha256_hex(canonical_json(target));self.lab=target.get("lab")is True
+        self.read_only=read_only
         self.session=prepared["session"]
         is_approved_read = approved_file_read(prepared.get("profile"))
         self.file_read_profile = LARGE_RECORDING_PROFILE if prepared.get("profile")==sglang_sensor.PROFILE else EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,init_release.PROFILE,profiler_sensor.PROFILE,release_observation.STREAM_PROFILE,release_observation.PROFILER_PROFILE,release_observation.RANK_PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else None
@@ -172,7 +178,7 @@ class KubernetesLifecycleReader:
             return "inventory"
         if argv[2]==ROLLING_INVENTORY_READER and len(argv)==4 and max_bytes==131072 and argv[3]==self.session:
             return "inventory_rolling"
-        if (argv[2]==self.programs["seal"] and len(argv)==5 and max_bytes==4096 and argv[3]==self.session
+        if (argv[2]==self.programs["seal"] and not self.read_only and len(argv)==5 and max_bytes==4096 and argv[3]==self.session
                 and argv[4]==str(self.file_read_limit)):
             return "seal"
         raise KubernetesCaptureError()

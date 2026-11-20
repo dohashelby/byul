@@ -146,10 +146,10 @@ class Clock:
         with self.lock: self.value += timedelta(seconds=seconds)
 
 
-def harness(monkeypatch, *, failure=None, observed_packet=None):
+def harness(monkeypatch, *, failure=None, observed_packet=None, lab=True):
     clock = Clock(); entered = threading.Event(); release = threading.Event(); log = []; ids = {}
     env = environment()
-    generations = {key: subject.Generation(key, env, {'lab': True}, {}, {'session': str(i) * 32})
+    generations = {key: subject.Generation(key, env, {'lab': lab}, {}, {'session': str(i) * 32})
         for i, key in enumerate(('old', 'new', 'restored'), 1)}
     monkeypatch.setattr(subject, 'load_generations', lambda *a: (generations, []))
     executor = subject.LifecycleTransitionExecutor({}, runner=lambda *a: None, clock=clock.now, wait=clock.wait)
@@ -203,6 +203,16 @@ def test_normal_transition_ongoing_request_and_recovery_all_profiles(monkeypatch
     if check(profile).id == 'LIF-16':
         assert 'tamper_activation_and_rejection_unverified' in draft.observations['transition_missing'].value
     assert PRIVATE not in draft.artifacts[0].path.read_text(encoding='utf-8')
+
+
+def test_read_only_redeployment_does_not_seal_the_producer_session(monkeypatch, tmp_path):
+    executor, env, log = harness(monkeypatch, lab=False)
+    draft = executor.run(check(), env, policy(), None, tmp_path)
+    assert not any(action == 'seal' for action, _ in log)
+    artifact = json.loads(draft.artifacts[0].path.read_bytes())
+    assert artifact['samples'][-1]['phase'] == 'final'
+    assert draft.data_origin == DataOrigin.EXAMPLE  # Injected transport.
+    assert not draft.observations['activation_scope_complete'].value
 
 
 def test_external_scalar_approval_cannot_cover_other_generation_targets(monkeypatch, tmp_path):

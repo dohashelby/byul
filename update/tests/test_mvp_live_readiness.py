@@ -824,6 +824,12 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
     monkeypatch.setattr(subprocess, "Popen", _no_record_collection)
     rc = application.run_config(cfg)
     if case == "audit":
+        managed = {'executors': {'request_termination': 'real'}, 'adapter': cfg['adapter'],
+                   'check_config': {'LIF-12': {'retry_record_snapshot_only': True}}}
+        monkeypatch.setattr(application, '_managed_config', _no_record_collection)
+        with pytest.raises(ValueError, match="^RETRY_RECORD_SNAPSHOT_SCOPE_INVALID$"):
+            application.execute_validation(store, pack, envs[0], pol, managed, tmp_path / 'managed', utcnow())
+        assert not (tmp_path / 'managed').exists()
         with pytest.raises(ValueError, match="^RETRY_RECORD_SNAPSHOT_SCOPE_INVALID$"):
             core.run_plan(store, pack, plan, rc)
         assert not called and not list(store.iter_kind("EVD"))

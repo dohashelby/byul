@@ -20,6 +20,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, COLLECTION_ST
                                  NORMAL_REQUEST_LATENCY_SCOPE_ERROR, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_SCOPE_ERROR,
+                                 RETRY_RECORD_SNAPSHOT_SCOPE_ERROR,
                                  bounded_metadata_scopes, cilium_egress_status_requested, collection_status_snapshot_requested, for_check,
                                  installed_plugin_inventory_requested,
                                  normal_compile_cache_requested,
@@ -482,6 +483,8 @@ def _validation_inputs(env, cfg: dict):
         raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
     if collection_status_snapshot_requested(cfg):
         raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
+    if retry_record_snapshot_requested(cfg):
+        raise ValueError(RETRY_RECORD_SNAPSHOT_SCOPE_ERROR)
     if installed_plugin_inventory_requested(cfg):
         raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
     if normal_compile_cache_requested(cfg):

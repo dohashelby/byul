@@ -228,10 +228,10 @@ class KubernetesSupplyBootExecutor:
         if check.id == 'SUP-05' and roles['normal'][1]['session'] == roles['challenge'][1]['session']:
             raise ValueError('SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED')
         if check.id == 'SUP-06':
-            for role, (_, _, digest) in roles.items():
+            for role, (target, _, digest) in roles.items():
                 if 'worker_shard_input' in self.cfg[role]:
                     try:
-                        self._worker_shard_input(env, values, role, digest)
+                        self._worker_shard_input(env, values, role, target, digest)
                     except (KeyError, TypeError, ValueError, OSError):
                         raise ValueError('B_WORKER_SHARD_INPUT_UNAVAILABLE') from None
         return roles
@@ -260,13 +260,47 @@ class KubernetesSupplyBootExecutor:
                                 binary=self.cfg.get("kubectl_binary", "kubectl"),
                                 duration=self.cfg.get("max_duration_seconds", 120))
 
-    def _worker_shard_input(self, env, values, role, digest):
+    def _worker_shard_callback_scope(self, config, env, lifecycle_target):
+        from guard.collectors.engine_callbacks import load_prepared
+        from guard.runtime.engine_http import ENGINE_CALLBACK_PROFILE, KubernetesBindingError, KubernetesHTTP
+
+        try:
+            target_path = config.pop('callback_target')
+            prepared_path = config.pop('callback_prepared')
+            if any(type(path) is not str or not path for path in (target_path, prepared_path)):
+                raise ValueError
+            with Path(target_path).open('rb') as stream:
+                target = strict_json(stream.read(65537), limit=65536)
+            prepared = load_prepared(prepared_path)
+            if type(target) is not dict or prepared.get('worker_shards') is not True:
+                raise ValueError
+            # The preflight constructor only validates the declared target.
+            callback = KubernetesHTTP(target, env, duration=120, profile=ENGINE_CALLBACK_PROFILE).binding
+            lifecycle = validate_target(lifecycle_target, env)
+            if any(callback[key] != lifecycle[key] for key in ('context', 'run_id', 'engine')):
+                raise ValueError
+            return sha256_hex(canonical_json(target)), sha256_hex(canonical_json(prepared)), prepared["session"], callback['engine']
+        except (KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
+            raise ValueError('B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH') from None
+
+    def _worker_shard_input(self, env, values, role, target, digest):
         from .common_consumption import load_input, worker_shards
 
-        record, scope = load_input(self.cfg[role]['worker_shard_input'],
-            environment_ref=env.ref().model_dump(mode='json'), target_sha256=digest,
-            prepared_sha256=values[f'supply_{role}_prepared_sha256'])
-        return record, scope, worker_shards(record, scope, values)
+        config = self.cfg[role]['worker_shard_input']
+        prepared_sha256 = values[f'supply_{role}_prepared_sha256']
+        owner = None
+        if type(config) is dict and {'callback_target', 'callback_prepared'} & config.keys():
+            config = config.copy()
+            digest, prepared_sha256, callback_session, owner = self._worker_shard_callback_scope(config, env, target)
+        record, scope = load_input(config, environment_ref=env.ref().model_dump(mode='json'),
+                                   target_sha256=digest, prepared_sha256=prepared_sha256)
+        result = worker_shards(record, scope, values)
+        if owner is not None:
+            generation = owner['pod_uid'], owner['container_id'].removeprefix('containerd://'), owner['restart_count']
+            if (scope['session'] != callback_session or any(
+                    (row['pod_uid'], row['container_id'], row['restart_count']) != generation for row in record['bindings'])):
+                raise ValueError('B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH')
+        return record, scope, result
 
     def _collect_role(self, check, env, values, role, *, role_inputs=None):
         """역할 하나의 세션. 입력·연결 오류는 진단 코드로만 남기고 앞선 역할을 지우지 않는다."""
@@ -284,7 +318,7 @@ class KubernetesSupplyBootExecutor:
                 if check.id != "SUP-06":
                     raise ValueError("B_WORKER_SHARD_CHECK_UNSUPPORTED")
                 settings = self.cfg[role]["worker_shard_input"]
-                record, scope, result["worker_shards"] = self._worker_shard_input(env, values, role, digest)
+                record, scope, result["worker_shards"] = self._worker_shard_input(env, values, role, target, digest)
                 # Preserve the validated record's own worker/event binding. The
                 # local file check does not independently verify its live owner.
                 row["worker_shard_input"] = {

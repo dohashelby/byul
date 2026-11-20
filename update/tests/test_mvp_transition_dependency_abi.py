@@ -1,6 +1,6 @@
 """Check compile-time fingerprint parity with the existing approved tables."""
 from pathlib import Path
-import re
+import json
 
 import pytest
 
@@ -8,6 +8,9 @@ from tools import mvp_transition_dependency_abi as abi
 
 
 FIXTURES = Path(__file__).with_name("fixtures")
+_BASELINE = {module: f"vllm-0.30.0/{path}.txt" for module, path in abi.FILES.items()}
+_BASELINE[abi.generation.MP] = "vllm-mp-030/multiproc_executor.py"
+_BASELINE[abi.startup.WORKER] = "profiler-native-030/gpu_worker.py.txt"
 _CANDIDATE = {
     abi.generation.MP: "vllm-mp-031/multiproc_executor.py",
     abi.generation.WRAPPER: "worker-generation-native/worker_base.py.txt",
@@ -19,34 +22,40 @@ _CANDIDATE = {
 }
 
 
-def test_candidate_source_bytes_reproduce_approved_point_tables(tmp_path):
-    assert abi.FILES.keys() == abi.SOURCE_PINS["baseline"].keys() == _CANDIDATE.keys()
-    for module, source in _CANDIDATE.items():
-        path = tmp_path / abi.FILES[module]
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes((FIXTURES / source).read_bytes())
+def test_paired_installed_sources_reproduce_transition_point_tables(tmp_path):
+    provenance = json.loads((FIXTURES / "vllm-0.30.0/PROVENANCE.json").read_bytes())["files"]
+    for side, fixtures in (("baseline", _BASELINE), ("candidate", _CANDIDATE)):
+        assert fixtures.keys() == abi.FILES.keys() == abi.SOURCE_PINS[side].keys()
+        for module, source in fixtures.items():
+            path = tmp_path / side / abi.FILES[module]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            raw = (FIXTURES / source).read_bytes()
+            if side == "baseline" and source.startswith("vllm-0.30.0/"):
+                row = provenance[source.split("/", 1)[1]]
+                assert row["source"] == abi.FILES[module]
+                assert row["bytes"] == len(raw)
+                assert row["sha256"] == abi.SOURCE_PINS[side][module]
+                assert row["image"].endswith("@" + abi.IMAGE_DIGESTS[side])
+            path.write_bytes(raw)
 
-    result = abi._measure("candidate", tmp_path, abi._runtime())
-    assert result["matches_approved_point_codes"] == dict.fromkeys(("/20", "/21", "/22"), True)
-    assert result["source_sha256"] == abi.SOURCE_PINS["candidate"]
-    assert result["tracing_dependencies"].keys() == {"instrument", *abi.startup.BACKEND_NAMES}
+    result = abi.measure(tmp_path / "baseline", tmp_path / "candidate")
+    assert result["schema"] == abi.SCHEMA
+    assert result["runtime"] == abi._runtime()
+    assert result["engine_executed"] is False
+    assert result["producer_registered"] is False
+    baseline, candidate = (result["sides"][side] for side in ("baseline", "candidate"))
+    for side, row in result["sides"].items():
+        assert row["source_sha256"] == abi.SOURCE_PINS[side]
+        assert row["image"].endswith("@" + abi.IMAGE_DIGESTS[side])
+        assert row["tracing_dependencies"].keys() == {"instrument", *abi.startup.BACKEND_NAMES}
+    profiles = ("/20", "/21", "/22")
+    assert candidate["matches_approved_point_codes"] == dict.fromkeys(profiles, True)
+    assert baseline["matches_approved_point_codes"] == dict.fromkeys(profiles, False)
+    for profile in profiles:
+        assert baseline["point_codes"][profile].keys() == candidate["point_codes"][profile].keys()
 
-
-@pytest.mark.parametrize("module,fixture", [
-    (abi.generation.MP, "vllm-mp-030/multiproc_executor.py"),
-    (abi.startup.WORKER, "profiler-native-030/gpu_worker.py.txt"),
-])
-def test_baseline_installed_byte_fixtures_measure_distinct_point_codes(module, fixture):
-    source = FIXTURES / fixture
-    runtime = abi._runtime()
-    if module == abi.generation.MP:
-        points = abi.generation.TARGETS[module].keys() | abi.endpoint.POINTS
-        approved = abi.generation.POINT_CODES[runtime] | abi.endpoint.POINT_CODES[runtime]
-    else:
-        points = abi.startup.SPAN_NAMES.keys()
-        approved = abi.STARTUP_POINTS[runtime]["worker"]
-    measured = abi._point_codes(source, module, abi.SOURCE_PINS["baseline"][module], points)
-    assert measured.keys() == points
-    assert all(measured[point] != approved[point] for point in points)
-    with pytest.raises(ValueError, match=f"^TRANSITION_DEPENDENCY_SOURCE_MISMATCH: {re.escape(module)}$"):
-        abi._point_codes(source, module, abi.SOURCE_PINS["candidate"][module], points)
+    module = abi.generation.MP
+    target = tmp_path / "baseline" / abi.FILES[module]
+    target.write_bytes((tmp_path / "candidate" / abi.FILES[module]).read_bytes())
+    with pytest.raises(ValueError, match=r"^TRANSITION_DEPENDENCY_SOURCE_MISMATCH: vllm\.v1\.executor\.multiproc_executor$"):
+        abi.measure(tmp_path / "baseline", tmp_path / "candidate")

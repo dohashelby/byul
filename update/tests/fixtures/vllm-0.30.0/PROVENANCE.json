@@ -154,6 +154,41 @@
     "vllm/model_executor/model_loader/weight_utils.py.txt": {
       "source": "vllm/model_executor/model_loader/weight_utils.py",
       "sha256": "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b"
+    },
+    "vllm/v1/worker/worker_base.py.txt": {
+      "source": "vllm/v1/worker/worker_base.py",
+      "sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c",
+      "bytes": 14284,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt byul-pinned-image-source-receipt/1; SHA256 2c0b6197045657ae00ba7aac110557ffe92cc9844c8d31831601eaed469c98ea"
+    },
+    "vllm/tracing/__init__.py.txt": {
+      "source": "vllm/tracing/__init__.py",
+      "sha256": "2d8167917906a5005629b018f79026f7229e3a6a22fa24663385908688eef261",
+      "bytes": 4308,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt byul-pinned-image-source-receipt/1; SHA256 2c0b6197045657ae00ba7aac110557ffe92cc9844c8d31831601eaed469c98ea"
+    },
+    "vllm/tracing/otel.py.txt": {
+      "source": "vllm/tracing/otel.py",
+      "sha256": "215e1f9f16f390124222eaf5b33ace987e059376623c3118a034f94ee00ddbb9",
+      "bytes": 8534,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt byul-pinned-image-source-receipt/1; SHA256 2c0b6197045657ae00ba7aac110557ffe92cc9844c8d31831601eaed469c98ea"
+    },
+    "vllm/tracing/utils.py.txt": {
+      "source": "vllm/tracing/utils.py",
+      "sha256": "2463b04ccfa8fc97d5cdb423accf50bb601c422322e72e241ccc0b1b2610305d",
+      "bytes": 2809,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt byul-pinned-image-source-receipt/1; SHA256 2c0b6197045657ae00ba7aac110557ffe92cc9844c8d31831601eaed469c98ea"
+    },
+    "vllm/utils/system_utils.py.txt": {
+      "source": "vllm/utils/system_utils.py",
+      "sha256": "837e6ff0ab524c06c048d6b42d4f35b77baba2e9d9e57837fe333ca0aaee1cfb",
+      "bytes": 10525,
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "Installed Linux amd64 OCI source receipt byul-pinned-image-source-receipt/1; SHA256 2c0b6197045657ae00ba7aac110557ffe92cc9844c8d31831601eaed469c98ea"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

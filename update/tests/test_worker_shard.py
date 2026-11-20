@@ -4,12 +4,17 @@
 (2026-11-08, arm64, EXAMPLE). 사례: 단일 파일(opt-125m bin), 같은 가중치를 safetensors shard 2개+index로 나눈 사본, 그 사본에서 shard 하나 삭제.
 """
 from copy import deepcopy
+from itertools import count
 import json
+import os
 from pathlib import Path
+import sys
+from types import CodeType, FunctionType, ModuleType, SimpleNamespace
 
 import pytest
 
 from guard.adapters import vllm_worker_shard_callback as callback
+from guard.adapters.vllm_engine_callback_sensor import EngineCallbacks, Sink
 from guard.collectors import engine_callbacks
 from guard.collectors import gpu_common_inputs as contract
 from guard.collectors import worker_shard_producer as producer
@@ -69,6 +74,127 @@ def test_registered_producer_makes_the_sharded_record_complete(monkeypatch):
     monkeypatch.setitem(contract.SUPPORTED_PRODUCERS, (source['name'], source['version']), source['source_sha256'])
     _, result = build(case('sharded')['rows'])
     assert result['complete'] is True and result['producer_authenticated'] is False
+
+
+def _selected_code(fixture_name, *scope):
+    path = FIXTURE.parent / 'vllm-0.30.0/vllm/model_executor/model_loader' / fixture_name
+    code = compile(path.read_bytes(), str(path), 'exec', dont_inherit=True, optimize=0)
+    for name in scope:
+        code = next(child for child in code.co_consts if type(child) is CodeType and child.co_name == name)
+    return path, code
+
+
+@pytest.mark.parametrize('selection', ['observed', 'absent-index', 'different-alias', 'flag-off'])
+def test_vllm_030_selected_native_index_flows_through_the_worker_shard_writer(
+        tmp_path, monkeypatch, selection):
+    shards = [tmp_path / name for name in ('part-a.safetensors', 'part-b.safetensors')]
+    shard_bytes = [b'EXAMPLE first shard', b'EXAMPLE other shard data']
+    for shard, data in zip(shards, shard_bytes):
+        shard.write_bytes(data)
+    index = tmp_path / 'model.safetensors.index.json'
+    has_index = selection != 'absent-index'
+    if has_index:
+        index.write_text(json.dumps({'weight_map': {'layer_a': shards[0].name, 'layer_b': shards[1].name}}),
+                         encoding='utf-8')
+
+    native_reads, guard_reads = [], []
+    os_open = os.open
+
+    def native_index_open(path):
+        assert path == str(index)
+        native_reads.append(path)
+        return index.open(encoding='utf-8')
+
+    def checked_os_open(path, *args, **kwargs):
+        if path in (index, str(index)):
+            guard_reads.append(path)
+            raise AssertionError('Only the ordinary native helper may read the index')
+        return os_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, 'open', checked_os_open)
+    monkeypatch.setattr(callback, '_start_ticks', lambda: 123)
+    monkeypatch.setattr(callback, '_tp_rank', lambda: 0)
+
+    helper = ModuleType(callback.WEIGHTS)
+    helper_file, filter_code = _selected_code('weight_utils.py.txt', callback.FILTER)
+    helper.__dict__.update(__file__=str(helper_file), os=SimpleNamespace(path=os.path),
+                           json=SimpleNamespace(load=json.load), open=native_index_open)
+    native_filter = FunctionType(filter_code, vars(helper))
+    setattr(helper, callback.FILTER, native_filter)
+    loader_alias = FunctionType(filter_code, vars(helper)) if selection == 'different-alias' else native_filter
+    monkeypatch.setitem(sys.modules, helper.__name__, helper)
+
+    loader = ModuleType(callback.LOADER)
+    class_name = 'DefaultModelLoader'
+    loader_file, prepare_code = _selected_code('default_loader.py.txt', class_name, '_prepare_weights')
+    _, track_code = _selected_code('default_loader.py.txt', class_name, 'track_weights_loading')
+    matching_paths = [str(shard) for shard in shards]
+
+    def matching_shards(pattern):
+        assert pattern == str(tmp_path / '*.safetensors')
+        return matching_paths
+
+    loader.__dict__.update(__file__=str(loader_file), SAFE_WEIGHTS_INDEX_NAME=index.name,
+                            os=SimpleNamespace(path=os.path), glob=SimpleNamespace(glob=matching_shards),
+                            maybe_download_from_modelscope=lambda path, revision: None)
+    setattr(loader, callback.FILTER, loader_alias)
+    prepare = FunctionType(prepare_code, vars(loader))
+    loader.DefaultModelLoader = type(class_name, (), {
+        '__module__': loader.__name__, '_prepare_weights': prepare,
+        'track_weights_loading': FunctionType(track_code, vars(loader)),
+    })
+    monkeypatch.setitem(sys.modules, loader.__name__, loader)
+
+    flag_on = selection != 'flag-off'
+    sink = Sink(tmp_path)
+    ticks = count(1_000_000)
+    callbacks = EngineCallbacks(SCOPE['session'], b'w' * 32, sink, worker_shards=flag_on,
+                                context_provider=lambda: {}, clock=lambda: next(ticks))
+    try:
+        assert callbacks.instrument(loader) is flag_on
+        instance = loader.DefaultModelLoader()
+        instance.load_config = SimpleNamespace(load_format='safetensors')
+        assert instance._prepare_weights(str(tmp_path), None, None, False, None) == (
+            str(tmp_path), matching_paths, True)
+    finally:
+        if sink.fd is not None:
+            os.close(sink.fd)
+
+    assert native_reads == ([str(index)] if has_index else [])
+    assert not guard_reads
+    assert getattr(helper, callback.FILTER) is native_filter
+    if not flag_on:
+        assert getattr(loader, callback.FILTER) is loader_alias
+        assert loader.DefaultModelLoader._prepare_weights is prepare
+        assert not sink.path.exists()
+        return
+
+    raw = sink.path.read_text(encoding='utf-8')
+    rows = [json.loads(line) for line in raw.splitlines()]
+    returned, = [row for row in rows if row['schema'] == callback.SCHEMA and row['phase'] == 'RETURN']
+    assert returned['entry_qualified_before'] is returned['entry_qualified_after'] is True
+    assert returned['runtime_context_injected'] is True
+    assert returned['native_profile_installed'] is False
+    fields = returned['fields']
+    keyed = [callbacks.shard.fingerprint('shard:' + shard.name) for shard in shards]
+    assert fields['files'] == keyed and fields['file_bytes'] == [len(data) for data in shard_bytes]
+    # A normal index selecting every shard produces a fresh list with unchanged contents.
+    observed = selection == 'observed'
+    assert fields['index_present'] is (True if observed else None)
+    assert fields['required'] == (sorted(keyed) if observed else None)
+    assert all(value not in raw for value in [str(tmp_path), index.name, *(shard.name for shard in shards)])
+
+    record, result = build(rows)
+    assert {event['shard_sha256']: event['bytes'] for event in record['events']
+            if event['event'] == 'shard_assigned'} == dict(zip(keyed, fields['file_bytes']))
+    assert {event['shard_sha256'] for event in record['events'] if event['event'] == 'shard_required'} == (
+        set(keyed) if observed else set())
+    projection = common_consumption.worker_shards(record, SCOPE, {})
+    assert 'GPU_INPUT_PRODUCER_UNSUPPORTED' in projection['missing']
+    index_gap = 'WORKER_SHARD_INDEX_UNOBSERVED'
+    assert (index_gap in record['completeness']['diagnostic_codes']) == (not observed)
+    assert (f'GPU_INPUT_PRODUCER_DIAGNOSTIC:{index_gap}' in projection['missing']) == (not observed)
+    assert not result['producer_authenticated'] and not projection['complete'] and not projection['violations']
 
 
 def test_relative_index_symlink_preserves_observed_required_and_assigned_shards(tmp_path):

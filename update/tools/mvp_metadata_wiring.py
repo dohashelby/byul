@@ -319,30 +319,30 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=Fals
     return dict.fromkeys(executors, new.target_sha256), gaps
 
 
-def _prebound_record_reason(check, env, values, *, policy, side, target_path, target_sha256, record_inputs):
-    settings = {'target': target_path}
+def _prebound_record_binding(check, env, values, *, policy, side, target_pointer, target_sha256, record_inputs):
+    settings = {'target': target_pointer['path']}
     run_cfg = dict(record_inputs)
     if check.id == 'LIF-12':
-        settings.update(retry_scope=run_cfg.pop('retry_scope'))
+        settings['retry_scope'] = run_cfg.pop('retry_scope')
         settings[CHECK_OPTIONS[check.id]] = True
     elif run_binding.stages_for(check) != (2,):
-        return 'METADATA_COLLECTION_STATUS_PROFILE_UNAVAILABLE'
-    try:
-        _, effective = run_binding.effective_values(check, settings, env, values,
-            side=side, attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
-            run_cfg=run_cfg, policy_ref=policy.ref())
-        executor = registry.build_executor(check.executor, 'kubernetes', {check.executor: settings},
-                                           engine=env.engine.name, version=env.engine.version)
-        if check.id == 'LIF-12':
-            executor.prepared_retry_records(check, env, effective, expected_target_sha256=target_sha256)
-        else:
-            executor.prepared_collection_status(check, env, effective, expected_target_sha256=target_sha256)
-    except (KeyError, OSError, TypeError, ValueError) as error:
-        return _code(error)
-    return None
+        raise ValueError('METADATA_COLLECTION_STATUS_PROFILE_UNAVAILABLE')
+    _, effective = run_binding.effective_values(check, settings, env, values,
+        side=side, attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
+        run_cfg=run_cfg, policy_ref=policy.ref())
+    executor = registry.build_executor(check.executor, 'kubernetes', {check.executor: settings},
+                                       engine=env.engine.name, version=env.engine.version)
+    digests = {'target_file_sha256': target_pointer['sha256'],
+               'record_session_sha256': sha256(run_cfg['record_session'].encode('ascii')).hexdigest()}
+    if check.id == 'LIF-12':
+        executor.prepared_retry_records(check, env, effective, expected_target_sha256=target_sha256)
+        digests.update({key: effective[key] for key in ('retry_scope_sha256', 'retry_record_source_sha256')})
+    else:
+        executor.prepared_collection_status(check, env, effective, expected_target_sha256=target_sha256)
+    return digests
 
 
-def _check_reason(check, env, target, transport, values, *, policy, side, target_path, record_inputs):
+def _check_reason(check, env, target, transport, values, *, policy, side, target_pointer, record_inputs, record_pins):
     if not _in_scope(check.id, policy):
         return 'MVP_POLICY_SCOPE_MISMATCH'
     if any(key.required and key.key not in values for key in check.policy_params):
@@ -350,8 +350,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
     if check.executor != CHECK_EXECUTORS[check.id]:
         return 'METADATA_EXECUTOR_UNAVAILABLE'
     if check.id in PREBOUND_RECORD_EXECUTORS:
-        return _prebound_record_reason(check, env, values, policy=policy, side=side, target_path=target_path,
-                                       target_sha256=transport.target_sha256, record_inputs=record_inputs)
+        try:
+            record_pins[side] = _prebound_record_binding(check, env, values, policy=policy, side=side,
+                target_pointer=target_pointer, target_sha256=transport.target_sha256, record_inputs=record_inputs)
+        except (KeyError, OSError, TypeError, ValueError) as error:
+            return _code(error)
+        return None
     if check.id == passive_api_hop.CHECK:
         try:
             passive_api_hop.validate_policy(check, values)
@@ -359,6 +363,7 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
             return str(exc)
         return None
     try:
+        target_path = target_pointer['path']
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
         if check.id in readiness.STARTUP_OBSERVERS:
             config[check.executor]['target'] = target_path
@@ -532,10 +537,14 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     for check_id in check_ids:
         check = pack.checks[check_id]
         values = policy.values.get(check_id) or {}
+        record_pins = {}
         reasons = {side: _check_reason(check, env, target, transport, values, policy=policy, side=side,
-                                       target_path=target_pointer['path'], record_inputs=records.get(check_id, {}).get(side))
+                                       target_pointer=target_pointer, record_inputs=records.get(check_id, {}).get(side),
+                                       record_pins=record_pins)
                    for side, (env, target, transport, _, target_pointer) in sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
+        if record_pins.keys() == set(readiness.SIDES):
+            candidates[check_id]['prepared_record_input_sha256_by_side'] = record_pins
     normal_file_read_settings = {}
     if sup05_normal_preparations is not None:
         references = readiness._sup05_preparation_refs(sup05_normal_preparations)
@@ -618,11 +627,13 @@ def _publish_prebound(output, *, config, bindings, checks, pack, preparations, r
         write_config(config, config_path)
         config_sha256 = sha256(config_path.read_bytes()).hexdigest()
         _write_input_sources(index, pack, bindings, {'path': str(config_path), 'sha256': config_sha256})
-        result = readiness.audit(index, pack=pack, sup05_normal_preparations=preparations)
+        record_pins = {(check_id, side): checks[check_id]['prepared_record_input_sha256_by_side'][side]
+                       for check_id in record_checks for side in readiness.SIDES}
+        result = readiness.audit(index, pack=pack, sup05_normal_preparations=preparations,
+                                 expected_record_inputs=record_pins)
         verified = {(row['check_id'], row['side']) for row in result['rows'] if row['file_binding_valid']}
-        for check_id in record_checks:
-            if any((check_id, side) not in verified for side in readiness.SIDES):
-                raise ValueError('METADATA_RECORD_INPUT_PUBLICATION_UNVERIFIED')
+        if record_pins.keys() - verified:
+            raise ValueError('METADATA_RECORD_INPUT_PUBLICATION_UNVERIFIED')
         if preparations is not None:
             verified_sup05 = {row['side'] for row in result['rows'] if row['check_id'] == 'SUP-05'
                               and row['file_binding_valid'] and row.get('sup05_normal_preparation') == preparations[row['side']]}

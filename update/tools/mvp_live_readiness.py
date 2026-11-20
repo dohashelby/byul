@@ -193,7 +193,8 @@ def _paired_normal_control_requested(raw):
     return False
 
 
-def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_normal_preparation=None):
+def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_normal_preparation=None,
+             expected_record_inputs=None):
     files, identities = {}, {}
     for role in ('environment', 'policy', 'configuration'):
         pointer = source[role]
@@ -478,6 +479,18 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             side=source['side'], attempt_id='mvp-offline-readiness', issued_at=issued_at,
             valid_from=policy.valid_from, valid_until=policy.valid_until,
             run_cfg=run_cfg, policy_ref=policy.ref(), **binding_options)
+        if expected_record_inputs is not None:
+            if check.id == 'LIF-12' and retry_records:
+                session_key = 'retry_session'
+            elif check.id == 'OBS-11' and collection_status:
+                session_key = 'collection_session'
+            else:
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            actual_record_inputs = {'target_file_sha256': sha256_hex(raw_target),
+                                    'record_session_sha256': sha256_hex(effective[session_key].encode('ascii')),
+                                    **record_digests}
+            if actual_record_inputs != expected_record_inputs:
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
         # Use the same executor configuration and policy validation as runtime.
         try:
             executor = registry.build_executor(check.executor, implementation, config,
@@ -603,12 +616,13 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             **({NORMAL_TOKEN_INPUT_OPTION: True} if normal_token_input else {})}
 
 
-def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_preparations=None):
+def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_preparations=None, expected_record_inputs=None):
     if side is not None and (type(side) is not str or side not in SIDES):
         raise ValueError('MVP_SIDE_SELECTION_INVALID')
     selected_sides = SIDES if side is None else (side,)
     preparations = (_sup05_preparation_refs(sup05_normal_preparations)
                     if sup05_normal_preparations is not None else {})
+    record_requirements = expected_record_inputs or {}
     pack = pack or load_pack(ROOT / 'packs/PACK-BASELINE')
     active = {cid: check for cid, check in pack.checks.items() if not check.retired}
     raw, _ = _read(index_file)
@@ -654,8 +668,9 @@ def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_prep
             else:
                 try:
                     preparation = preparations.get(selected_side) if cid == 'SUP-05' else None
+                    record_inputs = record_requirements.get((cid, selected_side))
                     row.update(_inspect(sources[cid, selected_side], check, pack, now, redeployment_identities,
-                                        sup05_normal_preparation=preparation))
+                        sup05_normal_preparation=preparation, expected_record_inputs=record_inputs))
                 except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as error:
                     row['blocking_codes'] = [_code(error)]
             if requires_native_matrix and not row.get(NORMAL_TOKEN_INPUT_OPTION):

@@ -2061,6 +2061,14 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
     audit = json.loads((output / 'readiness.json').read_bytes())
     assert audit['active_checks'] == 69 and audit['sides'] == 138 and audit['file_binding_valid_sides'] == 4
     assert not audit['engine_executed'] and not audit['ready_for_execution'] and audit['actual_results'] is None
+    for side, paths in sides.items():
+        obs_pins = audit['metadata_wiring']['OBS-11']['prepared_record_input_sha256_by_side'][side]
+        retry_pins = audit['metadata_wiring']['LIF-12']['prepared_record_input_sha256_by_side'][side]
+        assert obs_pins == {'target_file_sha256': sha256_hex(paths['target'].read_bytes()),
+                            'record_session_sha256': sha256_hex(status[side]['record_session'].encode('ascii'))}
+        assert retry_pins['target_file_sha256'] == obs_pins['target_file_sha256']
+        assert retry_pins['retry_scope_sha256'] == sha256_hex(Path(retries[side]['retry_scope']).read_bytes())
+        assert retry_pins['retry_record_source_sha256'] == sha256_hex(Path(retries[side]['record_producer']).read_bytes())
     for row in audit['rows']:
         if row['check_id'] in config['update']['allowed_checks']:
             assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'
@@ -2072,8 +2080,8 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
 
     def replace_scope_after_assembly(*args, **kwargs):
         result = assemble(*args, **kwargs)
-        scope = json.loads(candidate_scope.read_bytes())
-        _write(candidate_scope, {**scope, 'run_id': 'foreign-fixture-run'})
+        assert result[2]['LIF-12']['configuration_enabled']
+        candidate_scope.write_bytes(candidate_scope.read_bytes() + b'\n')
         return result
 
     declined = tmp_path / 'declined-status'

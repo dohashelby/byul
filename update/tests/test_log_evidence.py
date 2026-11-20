@@ -311,7 +311,8 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
 def test_saved_obs09_baseline_replay_uses_the_pinned_environment(tmp_path, scope):
     from types import SimpleNamespace
 
-    from guard.adapters.vllm import NATIVE_LOG_REPLAY_BASELINE_IMAGE, VllmAdapter
+    from guard.adapters.engine_provider import NATIVE_LOG_REPLAY_BASELINE_IMAGE, get_provider
+    from guard.adapters.vllm import VllmAdapter
     from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
     from guard.log_evidence import _obs09
     from guard.models import canonical_json, sha256_hex
@@ -322,7 +323,7 @@ def test_saved_obs09_baseline_replay_uses_the_pinned_environment(tmp_path, scope
     image = "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE
     other_image = "vllm/vllm-openai@sha256:" + "f" * 64
     adapter = VllmAdapter()
-    profile = adapter.native_log_replay_profile(image, "0.30.0")
+    profile = get_provider("vllm").evidence_contract("native_log_replay_profile", image, "0.30.0")
     assert profile["request_logger_line"] == 63
     assert adapter.native_log_contract(image, "0.30.0") is None
 

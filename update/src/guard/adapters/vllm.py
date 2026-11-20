@@ -30,7 +30,6 @@ CHAT_REVIEWED_IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed2
 # and config digest. Consumer source bytes were inspected in the OCI layers.
 REQUEST_BINDING_GPU_IMAGE = "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
 REQUEST_BINDING_GPU_032_IMAGE = "vllm/vllm-openai@sha256:6ee133356d49ed24cee03dd0cda3d3980279a11c107ce3e752c89e76540f41c9"
-NATIVE_LOG_REPLAY_BASELINE_IMAGE = "vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
 TYPE_TEMPLATE_PROFILE = "guard-type-boundary-v1"
 TYPE_TEMPLATE_SHA256 = "38110f6e668d55f240ecfde0d38f5fecc7c11a742d76823ffd9d0918abb9fe36"
 TYPE_TEMPLATE_PATH = "/guard-assets/chat/guard-type-boundary-v1.jinja"
@@ -507,23 +506,6 @@ class VllmAdapter:
         if image_digest not in (CHAT_REVIEWED_IMAGE, REQUEST_BINDING_GPU_IMAGE) or engine_version != "0.31.0":
             return None
         return fixed_native_log_profile("request-info-v1")
-
-    def native_log_replay_profile(self, image_digest: str, engine_version: str) -> dict | None:
-        """Reviewed additional source mapping for offline saved log evidence."""
-        if (engine_version, image_digest) not in {
-                ("0.30.0", NATIVE_LOG_REPLAY_BASELINE_IMAGE),
-                ("0.30.0", "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE)}:
-            return None
-        # Exact logger, formatter and ordinary INFO entry from the installed
-        # linux/amd64 manifest. The existing live profile has separate scope.
-        sources = [
-            {"path": "vllm/logger.py", "sha256": "17a9293737985a6e5f68c5d7dd848b4c9ac666e55e9c867ae6a4db84a2c7645c", "lines": "22-69,173-202"},
-            {"path": "vllm/logging_utils/formatter.py", "sha256": "d8caa69bf25884f6d4f59ca1b3c27e1162f7ab775874b236afc32e0696d5fe7c", "lines": "59-75"},
-            {"path": "vllm/entrypoints/serve/utils/request_logger.py", "sha256": "c4212c34eafb043be73503079d0cbb880148b5fb476b5264736865e4667cb83e", "lines": "35-68"},
-        ]
-        contract = fixed_native_log_profile("request-info-v1")
-        contract.update(logger_sha256=sources[0]["sha256"], formatter_sha256=sources[1]["sha256"], sources=sources)
-        return {"contract": contract, "request_logger_line": 63}
 
     def template_rejection_evidence(self, response: dict, *, kind: str,
                                     prompt_tokens: int | None = None, output_tokens: int | None = None,

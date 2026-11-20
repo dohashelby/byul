@@ -12,6 +12,7 @@ from guard.runtime import generation_readiness
 
 ENGINE_PORT = CONTAINER_PORT
 CACHE_ENV = {'VLLM_CACHE_ROOT': '/guard-cache/vllm', 'TORCHINDUCTOR_CACHE_DIR': '/guard-cache/torchinductor'}
+NATIVE_LOG_REPLAY_BASELINE_IMAGE = "vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
 
 
 class EngineProvider:
@@ -124,7 +125,28 @@ class VllmProvider(EngineProvider):
         from .vllm_release_profiles import release_profile
         return release_profile(version)
 
+    def native_log_replay_profile(self, image_digest: str, engine_version: str) -> dict | None:
+        """Reviewed additional source mapping for offline saved log evidence."""
+        if (engine_version, image_digest) not in {
+                ("0.30.0", NATIVE_LOG_REPLAY_BASELINE_IMAGE),
+                ("0.30.0", "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE)}:
+            return None
+        # Exact logger, formatter and ordinary INFO entry from the installed
+        # linux/amd64 manifest. The existing live profile has separate scope.
+        sources = [
+            {"path": "vllm/logger.py", "sha256": "17a9293737985a6e5f68c5d7dd848b4c9ac666e55e9c867ae6a4db84a2c7645c", "lines": "22-69,173-202"},
+            {"path": "vllm/logging_utils/formatter.py", "sha256": "d8caa69bf25884f6d4f59ca1b3c27e1162f7ab775874b236afc32e0696d5fe7c", "lines": "59-75"},
+            {"path": "vllm/entrypoints/serve/utils/request_logger.py", "sha256": "c4212c34eafb043be73503079d0cbb880148b5fb476b5264736865e4667cb83e", "lines": "35-68"},
+        ]
+        from .vllm import fixed_native_log_profile
+
+        contract = fixed_native_log_profile("request-info-v1")
+        contract.update(logger_sha256=sources[0]["sha256"], formatter_sha256=sources[1]["sha256"], sources=sources)
+        return {"contract": contract, "request_logger_line": 63}
+
     def evidence_contract(self, name, *args):
+        if name == "native_log_replay_profile":
+            return self.native_log_replay_profile(*args)
         if name == "startup_load_source":
             from .vllm_startup_load import source_profile
             return source_profile(*args)

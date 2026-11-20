@@ -270,6 +270,7 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
     ('lif12-changed-scope', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
     ('lif12-changed-producer', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
     ('lif12-canonical-target', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('lif12-one-sided-target-binding', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
     ('lif12-late-scope-change', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
     ('staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
     ('duplicate', 'MVP_TRANSITION_METADATA_DUPLICATE'),
@@ -387,13 +388,16 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         elif case == 'lif12-canonical-target':
             binding = stock_config['sides']['candidate']['check_config']['LIF-12'][RETRY_TARGET_BINDING]
             binding['target_sha256'] = '0' * 64
-        if case in {'obs11-stray-binding', 'obs11-staged', 'lif12-canonical-target'}:
+        elif case == 'lif12-one-sided-target-binding':
+            del stock_config['sides']['candidate']['check_config']['LIF-12'][RETRY_TARGET_BINDING]
+        if case in {'obs11-stray-binding', 'obs11-staged', 'lif12-canonical-target', 'lif12-one-sided-target-binding'}:
             write_config(stock_config, config_path)
             config_pointer = _pointer(config_path)
             for row in index['inputs']:
                 row['configuration'] = config_pointer
         if case in {'obs11-missing-pins', 'obs11-target-pin', 'obs11-session-pin', 'obs11-stray-binding',
-                    'obs11-staged', 'lif12-missing-pins', 'lif12-session-pin', 'lif12-canonical-target'}:
+                    'obs11-staged', 'lif12-missing-pins', 'lif12-session-pin', 'lif12-canonical-target',
+                    'lif12-one-sided-target-binding'}:
             index_path.write_bytes(canonical_json(index))
     else:
         write_config(stock_config, config_path)

@@ -249,6 +249,12 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         if side_settings != expected_side:
             raise ValueError(_METADATA_INVALID)
 
+    if 'LIF-12' in allowed:
+        retry_target_presence = {RETRY_TARGET_BINDING in settings['check_config']['LIF-12']
+                                 for settings in config['sides'].values()}
+        if len(retry_target_presence) != 1:
+            raise ValueError(_METADATA_INVALID)
+
     report = readiness.audit(index_path, pack=pack)
     admitted = {(row['check_id'], row['side']): row for row in report['rows'] if row['file_binding_valid']}
     if admitted.keys() != entries.keys() or any(admitted[key].get('record_inputs') != entry.get('record_inputs')

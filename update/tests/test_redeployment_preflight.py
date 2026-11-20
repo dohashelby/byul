@@ -296,7 +296,7 @@ def test_prepared_generation_pin_rejects_a_rewrite_before_a_new_plan(external, t
 
 
 def test_non_lab_generations_require_the_pin_and_reject_the_seal_program(external, monkeypatch):
-    monkeypatch.setitem(_generation.__globals__, "environment", partial(environment, origin=DataOrigin.DECLARED))
+    monkeypatch.setitem(globals(), "environment", partial(environment, origin=DataOrigin.DECLARED))
     pack, envs, _, cfg = _configuration(external, "LIF-05", lab=False)
     definition = pack.checks["LIF-05"]
     settings = cfg["sides"]["baseline"]["check_config"]["LIF-05"]
@@ -306,6 +306,8 @@ def test_non_lab_generations_require_the_pin_and_reject_the_seal_program(externa
         lifecycle_transition.load_generations(settings, envs[0], values, definition.id)
     settings[lifecycle_transition.GENERATION_MANIFEST_PIN] = values["transition_inputs_sha256"]
     executor = lifecycle_transition.LifecycleTransitionExecutor(settings, runner=_forbidden)
+    with pytest.raises(ValueError, match="TRANSITION_PAIRED_GENERATION_PLAN_REQUIRED"):
+        executor.run(definition, envs[0], values, None, external / "unbound")
     generations, _ = executor.prepared_generations(definition, envs[0], values)
     generation = generations["old"]
     with pytest.raises(ValueError, match="KUBERNETES_CAPTURE_TARGET_INVALID"):
@@ -315,6 +317,53 @@ def test_non_lab_generations_require_the_pin_and_reject_the_seal_program(externa
         reader.exec_bounded(reader.binding["engine"]["container"],
                             ["python3", "-c", reader.programs["seal"], reader.session, str(reader.file_read_limit)],
                             timeout=5, max_bytes=4096)
+
+
+@pytest.mark.parametrize("mode", ["unbound", "staged", "audit", "prebound"])
+def test_pinned_redeployment_executes_only_with_the_prebound_update_plan(
+        external, tmp_path, monkeypatch, mode):
+    check_id = "LIF-05"
+    monkeypatch.setitem(globals(), "environment", partial(environment, origin=DataOrigin.DECLARED))
+    pack, envs, pol, cfg = _configuration(external, check_id, lab=False)
+    for side in ("baseline", "candidate"):
+        settings = cfg["sides"][side]["check_config"][check_id]
+        manifest = lifecycle_transition.inputs_manifest(settings)
+        settings[lifecycle_transition.GENERATION_MANIFEST_PIN] = sha256_hex(canonical_json(manifest))
+
+    store = Store(tmp_path / "store")
+    side = Side.candidate
+    if mode == "staged":
+        cfg["update"]["kubernetes_candidate_binding"] = "staged"
+    if mode in {"prebound", "staged"}:
+        plan = _bound_plan(store, pack, envs, pol, cfg)
+    else:
+        if mode == "audit":
+            cfg.update(cfg.pop("sides")["baseline"])
+            envs = envs[:1]
+            side = Side.single
+        put_pack(store, pack.path)
+        for obj in [*envs, pol]:
+            store.put(obj)
+        plan = select(pack, envs, pol, mode="audit" if mode == "audit" else "update")
+        store.put(plan)
+
+    def collect(executor, check, env, values, *_args):
+        assert mode == "prebound"
+        assert executor.expected_manifest == values["transition_inputs_sha256"]
+        generations, _ = executor.prepared_generations(check, env, values)
+        assert all(row.target["lab"] is False for row in generations.values())
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={"attempted": False})
+
+    monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", collect)
+    monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
+    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=side)
+    if mode == "prebound":
+        assert evidence.execution.status == ExecStatus.COMPLETED
+    else:
+        assert evidence.execution.status == ExecStatus.NOT_RUN
+        assert evidence.execution.abort_reason == "RUN_BINDING_TRANSITION_PAIRED_PLAN_REQUIRED"
+        assert evidence.execution.run_binding is None
 
 
 @pytest.mark.parametrize("replace_after_check", [False, True])

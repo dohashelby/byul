@@ -262,6 +262,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                            passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
                            source_ref=source_refs.get(side),
                            transition_manifests=transition_manifests, initialization_digests=initialization_digests,
+                           prebound_external_update=prebound_external_update,
                            response_route_digests=response_route_digests, supply_record_digests=supply_record_digests,
                            native_route_prepared_absent=side.value in missing_route_prepared,
                            rank_common_files=rank_common_files.get(side.value),
@@ -290,7 +291,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
              policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
              transition_manifests=None, initialization_digests=None, response_route_digests=None,
              supply_record_digests=None, native_route_prepared_absent=False, rank_common_files=None,
-             record_access_digests=None, record_target_bytes=None, retry_snapshot_files=None) -> Evidence:
+             record_access_digests=None, record_target_bytes=None, retry_snapshot_files=None,
+             prebound_external_update=False) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -384,7 +386,12 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             **_normalize(check, draft),
         ).seal()
     from guard.executors import run_binding
-    from guard.executors.lifecycle_transition import REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE
+    from guard.executors.lifecycle_transition import GENERATION_MANIFEST_PIN, REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE
+    transition = check.executor == 'lifecycle_transition' and cfg.executors[item.executor] == 'kubernetes'
+    pinned_redeployment = (transition and check.id in REDEPLOY_CHECKS and type(section) is dict
+                           and GENERATION_MANIFEST_PIN in section)
+    if pinned_redeployment and (not prebound_external_update or 2 not in run_binding.stages_for(check)):
+        return stopped(ExecStatus.NOT_RUN, 'RUN_BINDING_TRANSITION_PAIRED_PLAN_REQUIRED')
     if run_binding.keys_for(check):
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
@@ -403,14 +410,17 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                         raise run_binding.RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_FILES_UNAVAILABLE')
                     target_options["expected_normal_file_sha256"] = cfg.normal_file_read_sha256
             if (transition_manifests is not None and (check.id == 'LIF-06' or check.id in REDEPLOY_CHECKS)
-                    and check.executor == 'lifecycle_transition' and cfg.executors[item.executor] == 'kubernetes'
-                    and 2 in run_binding.stages_for(check)):
+                    and transition and 2 in run_binding.stages_for(check)):
                 expected_manifest = transition_manifests.get(common["side"].value + ":" + check.id)
                 if expected_manifest == REDEPLOY_SIDE_REUSE:
                     raise run_binding.RunBindingUnavailable("RUN_BINDING_" + REDEPLOY_SIDE_REUSE)
                 if expected_manifest is None:
                     raise run_binding.RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_UNAVAILABLE')
                 target_options["expected_transition_manifest_sha256"] = expected_manifest
+                if pinned_redeployment:
+                    if section[GENERATION_MANIFEST_PIN] != expected_manifest:
+                        raise run_binding.RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_CHANGED')
+                    raw = {**raw, '_transition_generation_manifest_sha256': expected_manifest}
             if (initialization_digests is not None and check.id in run_binding.INITIALIZATION_CHECKS
                     and check.executor == 'initialization' and cfg.executors[item.executor] == 'kubernetes'
                     and {1, 2}.issubset(run_binding.stages_for(check))):

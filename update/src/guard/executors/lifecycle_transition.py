@@ -432,12 +432,14 @@ class LifecycleTransitionExecutor:
     name = 'lifecycle_transition'
     version = '0.1.0'
 
-    def __init__(self, cfg, *, runner=None, clock=None, wait=None, expected_target_sha256=None):
+    def __init__(self, cfg, *, runner=None, clock=None, wait=None, expected_target_sha256=None,
+                 expected_manifest_sha256=None):
         self.b_common_inputs = deepcopy(cfg.get('common_inputs'))
         self.b_cpu_support_input = deepcopy(cfg.get('cpu_support_input'))
         self.cfg = {k: v for k, v in cfg.items() if k not in {'common_inputs', 'cpu_support_input'}}; self.runner = runner; self.clock = clock or utcnow
         self.wait = wait or time.sleep
         self.expected_target = expected_target_sha256
+        self.expected_manifest = expected_manifest_sha256
 
     def validate_policy(self, check, values):
         if PROFILES.get(getattr(check, 'collection_profile', None)) != check.id:
@@ -569,6 +571,9 @@ class LifecycleTransitionExecutor:
         self.validate_policy(check, policy_values)
         schedule = normalize_policy(policy_values)
         pinned_redeployment = check.id in REDEPLOY_CHECKS and GENERATION_MANIFEST_PIN in self.cfg
+        if pinned_redeployment and (not _sha(self.expected_manifest)
+                or self.cfg[GENERATION_MANIFEST_PIN] != self.expected_manifest):
+            raise ValueError('TRANSITION_PAIRED_GENERATION_PLAN_REQUIRED')
         generations, manifest = load_generations(self.cfg, env, policy_values, check.id if pinned_redeployment else None)
         if self.expected_target is not None:
             approved = {row['id']: row['target_sha256'] for row in manifest}

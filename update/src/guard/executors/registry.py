@@ -105,7 +105,9 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "rank_failure:common-input": lambda cfg: _rank_record_input(cfg),
     "engine_sensor:kubernetes": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="kubernetes", expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "engine_sensor:source-cpu": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="source-cpu"),
-    "lifecycle_transition:kubernetes": lambda cfg: LifecycleTransitionExecutor(cfg.get("lifecycle_transition", {}), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "lifecycle_transition:kubernetes": lambda cfg: LifecycleTransitionExecutor(
+        cfg.get("lifecycle_transition", {}), expected_target_sha256=cfg.get("_kubernetes_target_sha256"),
+        expected_manifest_sha256=cfg.get("_transition_generation_manifest_sha256")),
     "profiler_observation:source-cpu": lambda cfg: KubernetesProfilerObservationExecutor(cfg.get("profiler_observation", {}), implementation="source-cpu"),
     "boundary_egress:kubernetes": lambda cfg: kubernetes_boundary_egress(cfg.get("boundary_egress", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "native_route:kubernetes": lambda cfg: KubernetesNativeRouteExecutor(cfg.get("native_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),

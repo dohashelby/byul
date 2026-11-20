@@ -776,6 +776,71 @@ def test_record_declarations_match_runtime_input_contracts(
             assert 'EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes']
 
 
+@pytest.mark.parametrize("case", ["audit", "unsealed", "changed-under-lock", "exact"])
+def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeypatch, record_access_context, case):
+    from guard import application
+    from guard.core import run as core
+    from guard.core.execution_recipe import bind_recipe
+    from guard.core.select import select
+    from guard.executors.base import EvidenceDraft
+    from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
+    from guard.models import DataOrigin, ExecStatus, Mode, Side, canonical_json, sha256_hex
+    from guard.store import Store
+    from guard.store.packs import put_pack
+
+    pack, envs, pol, cfg, _ = _record_declarations(tmp_path, record_access_context, "LIF-12", "normal-snapshot")
+    selected_envs = envs[:1] if case == "audit" else envs
+    mode = Mode.audit if case == "audit" else Mode.update
+    store = Store(tmp_path / "store")
+    put_pack(store, pack.path)
+    plan = select(pack, selected_envs, pol, mode=mode)
+    if case in {"exact", "changed-under-lock"}:
+        plan = bind_recipe(plan, cfg, selected_envs)
+    store.put_many([*selected_envs, pol, plan])
+    target_path = Path(cfg["sides"]["candidate"]["request_termination"]["target"])
+    digest = sha256_hex(canonical_json(json.loads(target_path.read_bytes())))
+    called = []
+
+    def reader(executor, check, env, values, adapter, workdir):
+        assert case == "exact"
+        called.append(env.ref())
+        assert executor.expected_target_sha256 == values["retry_target_sha256"] == digest
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={"attempted": False})
+
+    monkeypatch.setattr(KubernetesRequestTerminationExecutor, "run", reader)
+    monkeypatch.setattr(socket, "socket", _no_record_collection)
+    monkeypatch.setattr(subprocess, "Popen", _no_record_collection)
+    rc = application.run_config(cfg)
+    if case == "audit":
+        with pytest.raises(ValueError, match="^RETRY_RECORD_SNAPSHOT_SCOPE_INVALID$"):
+            core.run_plan(store, pack, plan, rc)
+        assert not called and not list(store.iter_kind("EVD"))
+        return
+
+    if case == "changed-under-lock":
+        original = core._run_one
+
+        def change_before_binding(*args, **kwargs):
+            target = json.loads(target_path.read_bytes())
+            target["model_mapping"]["api_model"] = "fixture-alternate-model"
+            target_path.write_bytes(canonical_json(target))
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(core, "_run_one", change_before_binding)
+
+    evd, = core.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+    if case == "exact":
+        assert called == [envs[1].ref()]
+        assert evd.execution.status is ExecStatus.COMPLETED and evd.data_origin is DataOrigin.EXAMPLE
+        assert evd.execution.run_binding["files"]["retry_target_sha256"] == digest
+    else:
+        assert not called and evd.execution.status is ExecStatus.NOT_RUN
+        reason = "RUN_BINDING_RETRY_SNAPSHOT_TARGET_CHANGED" if case == "changed-under-lock" else (
+            "RUN_BINDING_RETRY_SNAPSHOT_TARGET_UNAVAILABLE")
+        assert evd.execution.abort_reason == reason
+
+
 @pytest.mark.parametrize('late', [False, True])
 @pytest.mark.parametrize('source', ['target', 'subjects', 'record_producer'])
 def test_obs06_rejects_changed_plan_inputs_before_collection(

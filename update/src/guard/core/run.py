@@ -22,9 +22,9 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, INSTALLED_PLU
                                  NORMAL_SAFETENSORS_READER_SCOPE_ERROR, normal_safetensors_reader_requested,
                                  NORMAL_SERVING_READINESS_SCOPE_ERROR, normal_request_latency_requested,
                                  NORMAL_STARTUP_LOAD_SCOPE_ERROR, normal_startup_load_requested,
-                                 UPDATE_CHECK_OUTSIDE_SCOPE, bounded_metadata_scopes, merge_config,
-                                 normal_serving_readiness_requested, normal_token_input_requested,
-                                 update_allowed_checks)
+                                 RETRY_RECORD_SNAPSHOT_SCOPE_ERROR, UPDATE_CHECK_OUTSIDE_SCOPE,
+                                 bounded_metadata_scopes, merge_config, normal_serving_readiness_requested,
+                                 normal_token_input_requested, retry_record_snapshot_requested, update_allowed_checks)
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -145,6 +145,8 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
             raise ValueError(NORMAL_SAFETENSORS_READER_SCOPE_ERROR)
         if any(normal_token_input_requested(config) for config in configurations):
             raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
+        if any(retry_record_snapshot_requested(config) for config in configurations):
+            raise ValueError(RETRY_RECORD_SNAPSHOT_SCOPE_ERROR)
     validate_policy_time(store.resolve(plan.inputs.policy))
     environments = [store.resolve(r) for r in plan.inputs.environments]
     if (plan.inputs.execution_recipe_sha256 is not None
@@ -176,6 +178,13 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                              and requested.get('update', {}).get('mode', 'external') == 'external')
     prebound_external_update = (bound_external_update
         and requested.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
+    retry_targets = {}
+    if prebound_external_update:
+        for side_name, scope in zip(sides, expected, strict=True):
+            if "LIF-12" in scope:
+                path = scope["LIF-12"][0].get("target")
+                if isinstance(path, (str, Path)) and path:
+                    retry_targets[side_name] = Path(path)
 
     plan_ref = plan.ref()
     pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
@@ -205,9 +214,12 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
             record_access_digests = {} if prebound_external_update else None
             missing_route_prepared = set()
             rank_common_files = {}
+            retry_path = retry_targets.get(side.value) if item.check_id == "LIF-12" else None
+            retry_target_snapshots = {retry_path: None} if retry_path is not None else None
             if plan.inputs.execution_recipe_sha256 is not None:
                 from .execution_recipe import configuration_sha256
-                if configuration_sha256(requested, envs, plan=plan, transition_manifests=transition_manifests,
+                if configuration_sha256(requested, envs, plan=plan, target_snapshots=retry_target_snapshots,
+                                        transition_manifests=transition_manifests,
                                         initialization_digests=initialization_digests,
                                         response_route_digests=response_route_digests,
                                         supply_record_digests=supply_record_digests,
@@ -245,7 +257,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                            response_route_digests=response_route_digests, supply_record_digests=supply_record_digests,
                            native_route_prepared_absent=side.value in missing_route_prepared,
                            rank_common_files=rank_common_files.get(side.value),
-                           record_access_digests=record_access_digests)
+                           record_access_digests=record_access_digests,
+                           retry_target_bytes=retry_target_snapshots[retry_path] if retry_target_snapshots else None)
             try:
                 store.put(evd)
             except Exception:
@@ -268,7 +281,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
              policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
              transition_manifests=None, initialization_digests=None, response_route_digests=None,
              supply_record_digests=None, native_route_prepared_absent=False, rank_common_files=None,
-             record_access_digests=None) -> Evidence:
+             record_access_digests=None, retry_target_bytes=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -306,7 +319,17 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         elif (type(policy_values.get('required_targets')) is list
                 and 'gateway' in policy_values['required_targets']):
             return stopped(ExecStatus.NOT_RUN, GATEWAY_TARGET_REQUIRED)
-    if (option and type(section) is dict and section.get(option) is True
+    retry_target = None
+    if check.id == "LIF-12" and type(section) is dict and section.get(option) is True:
+        from guard.executors.kubernetes_retry_records import snapshot_target_sha256
+        try:
+            retry_target = snapshot_target_sha256(retry_target_bytes, env)
+        except ValueError:
+            return stopped(ExecStatus.NOT_RUN, "RUN_BINDING_RETRY_SNAPSHOT_TARGET_UNAVAILABLE")
+        key = "_kubernetes_target_sha256_by_executor"
+        hashes = raw.get(key)
+        raw = {**raw, key: {**(hashes if type(hashes) is dict else {}), item.executor: retry_target}}
+    elif (option and type(section) is dict and section.get(option) is True
             and type(check_hashes) is dict and check.id in check_hashes):
         # The public paired update derives this pin from the recipe's own
         # snapshot. Share the normal factory interface with staged launches.
@@ -403,6 +426,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
                 run_cfg=run_binding.run_config(cfg.raw, check.id), policy_ref=plan.inputs.policy, **target_options)
+            if retry_target is not None and policy_values.get("retry_target_sha256") != retry_target:
+                raise run_binding.RunBindingUnavailable("RUN_BINDING_RETRY_SNAPSHOT_TARGET_CHANGED")
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)

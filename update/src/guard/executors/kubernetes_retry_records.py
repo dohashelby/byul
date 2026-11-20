@@ -15,6 +15,17 @@ from .owned_capture import MAX_BYTES
 from . import retry_record_contract as contract
 
 
+def snapshot_target_sha256(raw, env):
+    """Canonical target identity of the exact prebound execution-recipe bytes."""
+    if type(raw) is not bytes:
+        raise ValueError('RETRY_CONFIGURATION_INVALID')
+    target = strict_json(raw, limit=65536)
+    if (type(target) is not dict or target.get('lab') is not False
+            or target.get('environment_ref') != env.ref().model_dump(mode='json')):
+        raise ValueError('RETRY_CONFIGURATION_INVALID')
+    return sha256_hex(canonical_json(target))
+
+
 def load_scope(path, expected_hash, **binding):
     selected = os.lstat(path)
     if not stat.S_ISREG(selected.st_mode):

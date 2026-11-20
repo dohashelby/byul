@@ -1095,6 +1095,11 @@
       "manifest_sha256": "67b8768e6ffac47bec831002ce8f03fcedd19e8cee587166d05ceaa635f658cb",
       "reviewed_by": "Codex / Paired LIF-12 and OBS-11 record input binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T02:16:44+00:00"
+    },
+    {
+      "manifest_sha256": "e5cb9b236370385f51b2f24f3e236b103e6061e43c4ed8db5e0b47abcad7d692",
+      "reviewed_by": "Codex / OBS-11 canonical model mapping preflight / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T02:34:03+00:00"
     }
   ]
 }

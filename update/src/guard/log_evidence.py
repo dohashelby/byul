@@ -68,14 +68,33 @@ def _persisted_text(capture):
             raise ValueError("persisted stderr capture hash/byte count differs")
 
 
-def _obs09(store, evd, sample, values):
+def _replay_native_for_environment(sample, environment):
+    from guard.adapters.engine_provider import get_provider
+
+    try:
+        provider = get_provider(environment.engine.name)
+    except ValueError:
+        provider = None
+    profile = (provider.evidence_contract("native_log_replay_profile", environment.engine.image_digest,
+                                         environment.engine.version) if provider is not None else None)
+    if profile is None:
+        return replay_native(sample)
+    if sample.get("native_contract_sha256") != sha256_hex(canonical_json(profile["contract"])):
+        raise ValueError("saved native contract differs from the reviewed environment")
+    for identity in (sample["source_identity_before"], sample["source_identity_after"]):
+        if identity is not None and identity["image"] != environment.engine.image_digest:
+            raise ValueError("saved native identity differs from the pinned environment")
+    return replay_native(sample, request_logger_line=profile["request_logger_line"])
+
+
+def _obs09(store, evd, sample, values, environment):
     capture, trials = sample["capture"], sample["trials"]
     projected = sample.get("schema") == NATIVE_SCHEMA
     version = evd.execution.executor.version
     if projected:
         if version not in _NATIVE_PROJECTION_VERSIONS:
             raise ValueError("saved native projection differs from executor version")
-        analysis = replay_native(sample)
+        analysis = _replay_native_for_environment(sample, environment)
     elif version == "0.2.1":
         _persisted_text(capture)
     else:
@@ -370,7 +389,7 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 if profile == LEGACY_JSON_PROFILE:
                     limitations.append("OBS-03: historical JSON parser retained; duplicate-key/non-finite rejection is not retroactively claimed")
             else:
-                obs, complete = _obs09(store, evd, sample, values)
+                obs, complete = _obs09(store, evd, sample, values, resolve(expected_env))
                 if sample.get("schema") == NATIVE_SCHEMA:
                     row["replay_basis"] = "stored_native_predicate_transcript"
                     row["raw_source_replayed"] = False

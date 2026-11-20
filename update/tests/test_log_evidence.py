@@ -307,6 +307,73 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     assert result["checks"][0]["verdicts"]["security"] == ("FAIL" if changes.get("duplicate") else "UNKNOWN" if changes else "PASS")
 
 
+@pytest.mark.parametrize("scope", ["matched", "different-image", "different-version", "different-contract", "different-source"])
+def test_saved_obs09_baseline_replay_uses_the_pinned_environment(tmp_path, scope):
+    from types import SimpleNamespace
+
+    from guard.adapters.vllm import NATIVE_LOG_REPLAY_BASELINE_IMAGE, VllmAdapter
+    from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
+    from guard.log_evidence import _obs09
+    from guard.models import canonical_json, sha256_hex
+    from tests.builders import environment
+    from tests.test_log_integrity import VALUES
+    from tests.test_native_artifact_privacy import fixture
+
+    image = "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE
+    other_image = "vllm/vllm-openai@sha256:" + "f" * 64
+    adapter = VllmAdapter()
+    profile = adapter.native_log_replay_profile(image, "0.30.0")
+    assert profile["request_logger_line"] == 63
+    assert adapter.native_log_contract(image, "0.30.0") is None
+
+    def record_identity(capture, trials, before, after):
+        for identity in [before, after]:
+            identity.update(image=image, image_id=image)
+
+    _, _, _, sample = fixture(change=record_identity, cases=("before", "after"), request_logger_line=63)
+    sample["native_contract_sha256"] = sha256_hex(canonical_json(profile["contract"]))
+    collection = replay_native(sample, request_logger_line=63)["collection"]
+    collection.update(capture_window=sample["capture"]["window"], redaction=PROFILE)
+    document = render_projection(collection)
+    sample["display_sha256"] = sha256_hex(document.encode())
+    artifacts = []
+    for name, content in (("log_integrity_events.json", json.dumps(envelope(collection))),
+                          ("log_integrity_display.html", document)):
+        path = tmp_path / name
+        path.write_text(content, encoding="utf-8")
+        artifacts.append(SimpleNamespace(name=name, path=path, bytes=path.stat().st_size))
+
+    fixture_evd = SimpleNamespace(artifacts=artifacts, execution=SimpleNamespace(executor=SimpleNamespace(version="0.3.1")))
+    original = environment(engine={"name": "vllm", "version": "0.30.0", "image_digest": image},
+                           model={"id": "EXAMPLE-baseline"})
+    obs, complete = _obs09(tmp_path, fixture_evd, sample, VALUES, original)
+    assert not complete and obs["normal_controls"] and obs["log_trials_reached"] == ["before", "after"]
+
+    if scope in {"different-image", "different-version"}:
+        original = environment(engine={"name": "vllm", "version": "0.31.0" if scope == "different-version" else "0.30.0",
+                                      "image_digest": other_image if scope == "different-image" else image},
+                               model={"id": "EXAMPLE-baseline"})
+    elif scope == "different-contract":
+        sample["native_contract_sha256"] = "b" * 64
+    elif scope == "different-source":
+        sample["source_identity_after"]["image"] = other_image
+
+    samples = tmp_path / "log_integrity_samples.json"
+    samples.write_text(json.dumps(envelope(sample)), encoding="utf-8")
+    artifacts.append(SimpleNamespace(name=samples.name, path=samples))
+    draft = SimpleNamespace(status=SimpleNamespace(value="COMPLETED"), artifacts=artifacts, challenges=[],
+                           normal_control={"attempted": True, "succeeded": True},
+                           observations={key: {"value": value, "collected": True} for key, value in obs.items()})
+    store = save_native_integrity_report(tmp_path, draft, original, "0.3.1")
+    result = analyze_saved_logs(store)
+    assert result["accepted"] is (scope == "matched"), result
+    assert result["original_inventory_preserved"] and result["official"] is False
+    if result["accepted"]:
+        row, = result["checks"]
+        assert row["status"] == "PROJECTION_REPLAY_MATCH" and row["verdicts"]["security"] == "UNKNOWN"
+        assert row["coverage_complete"] is False and row["raw_source_replayed"] is False
+
+
 @pytest.mark.parametrize("version,accepted", [("0.3.1+k8s.1", True), ("0.3.1+k8s.2", True), ("0.3.1+k8s.99", False)])
 def test_native_kubernetes_transcript_replays_partial_cri_evidence(tmp_path, monkeypatch, version, accepted):
     from tests.test_kubernetes_log_integrity import run

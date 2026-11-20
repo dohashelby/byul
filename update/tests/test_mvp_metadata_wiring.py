@@ -2160,11 +2160,21 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
     audit = json.loads((output / 'readiness.json').read_bytes())
     assert audit['active_checks'] == 69 and audit['sides'] == 138 and audit['file_binding_valid_sides'] == 4
     assert not audit['engine_executed'] and not audit['ready_for_execution'] and audit['actual_results'] is None
+    index_path = output / 'input-sources.json'
+    index = json.loads(index_path.read_bytes())
+    published = {(row['check_id'], row['side']): row for row in index['inputs']}
+    replay = tool.readiness.audit(index_path, pack=pack)
+    assert replay['file_binding_valid_sides'] == 4
+    replayed = {(row['check_id'], row['side']): row for row in replay['rows']}
     for side, paths in sides.items():
         obs_pins = audit['metadata_wiring']['OBS-11']['prepared_record_input_sha256_by_side'][side]
         retry_pins = audit['metadata_wiring']['LIF-12']['prepared_record_input_sha256_by_side'][side]
         assert obs_pins == {'target_file_sha256': sha256_hex(paths['target'].read_bytes()),
                             'record_session_sha256': sha256_hex(status[side]['record_session'].encode('ascii'))}
+        assert published['OBS-11', side]['record_inputs'] == obs_pins
+        assert replayed['OBS-11', side]['record_inputs'] == obs_pins
+        assert 'record_inputs' not in published['LIF-12', side]
+        assert 'record_inputs' not in replayed['LIF-12', side]
         assert retry_pins['target_file_sha256'] == obs_pins['target_file_sha256']
         assert retry_pins['retry_scope_sha256'] == sha256_hex(Path(retries[side]['retry_scope']).read_bytes())
         assert retry_pins['retry_record_source_sha256'] == sha256_hex(Path(retries[side]['record_producer']).read_bytes())
@@ -2173,6 +2183,46 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
             assert row['file_binding_valid'] and row['binding_schema'] == 'guard-run-binding/2'
     with pytest.raises(ValueError, match='^METADATA_RECORDS_REQUIRE_PREBOUND_PAIR$'):
         tool.staged_config(config, tmp_path / 'unbound-candidate.json')
+
+    key = ('OBS-11', 'candidate')
+
+    def assert_candidate_unverified(report, code):
+        assert report['file_binding_valid_sides'] == 3
+        row = next(row for row in report['rows'] if (row['check_id'], row['side']) == key)
+        assert not row['file_binding_valid'] and code in row['blocking_codes']
+        assert 'record_inputs' not in row
+
+    wrong_pins = {**published[key]['record_inputs'], 'record_session_sha256': '0' * 64}
+    conflict = tool.readiness.audit(index_path, pack=pack, expected_record_inputs={key: wrong_pins})
+    assert_candidate_unverified(conflict, 'MVP_INPUT_FILE_CHANGED')
+
+    candidate_target = sides['candidate']['target']
+    original_target = candidate_target.read_bytes()
+    candidate_target.write_bytes(original_target + b'\n')
+    changed = tool.readiness.audit(index_path, pack=pack)
+    candidate_target.write_bytes(original_target)
+    assert_candidate_unverified(changed, 'MVP_INPUT_FILE_CHANGED')
+
+    changed_config = deepcopy(config)
+    changed_config['sides']['candidate']['run_binding']['OBS-11']['record_session'] = 'c' * 32
+    changed_path = tmp_path / 'rebound-status.toml'
+    tool.write_config(changed_config, changed_path)
+    original_pointer = published[key]['configuration']
+    published[key]['configuration'] = {'path': str(changed_path), 'sha256': sha256_hex(changed_path.read_bytes())}
+    rebound_index = _write(tmp_path / 'rebound-status-index.json', index)
+    assert_candidate_unverified(tool.readiness.audit(rebound_index, pack=pack), 'MVP_INPUT_FILE_CHANGED')
+
+    del changed_config['check_config']['OBS-11']
+    unscoped_path = tmp_path / 'unscoped-status.toml'
+    tool.write_config(changed_config, unscoped_path)
+    published[key]['configuration'] = {'path': str(unscoped_path), 'sha256': sha256_hex(unscoped_path.read_bytes())}
+    unscoped_index = _write(tmp_path / 'unscoped-status-index.json', index)
+    assert_candidate_unverified(tool.readiness.audit(unscoped_index, pack=pack), 'MVP_RECORD_INPUT_SCOPE_INVALID')
+
+    published[key]['configuration'] = original_pointer
+    published[key]['record_inputs'] = {**published[key]['record_inputs'], 'record_session_sha256': 'A' * 64}
+    malformed_index = _write(tmp_path / 'malformed-status-index.json', index)
+    assert_candidate_unverified(tool.readiness.audit(malformed_index, pack=pack), 'MVP_RECORD_INPUT_REFERENCE_INVALID')
 
     candidate_scope = Path(retries['candidate']['retry_scope'])
     assemble = tool.assemble

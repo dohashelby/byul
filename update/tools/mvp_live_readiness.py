@@ -69,6 +69,7 @@ SCHEMA = 'guard-mvp-live-input-sources/1'
 SIDES = ('baseline', 'candidate')
 _INPUT_FILES = ('environment', 'policy', 'configuration')
 _INPUT_ROW_FIELDS = {'check_id', 'side', *_INPUT_FILES}
+_COLLECTION_STATUS_DIGESTS = {'target_file_sha256', 'record_session_sha256'}
 STARTUP_OBSERVERS = {
     'LIF-01': ('startup_load_source', normal_startup_load_transport, 'NORMAL_STARTUP_LOAD'),
     'SUP-07': ('compile_cache_source', normal_compile_cache_transport, 'NORMAL_COMPILE_CACHE'),
@@ -196,11 +197,14 @@ def _paired_normal_control_requested(raw):
     return False
 
 
+def _is_sha256(value):
+    return type(value) is str and len(value) == 64 and all(c in '0123456789abcdef' for c in value)
+
+
 def _read_input(pointer, *, configured_target=None):
     if (type(pointer) is not dict or set(pointer) != {'path', 'sha256'}
             or type(pointer['path']) is not str or not pointer['path']
-            or type(pointer['sha256']) is not str or len(pointer['sha256']) != 64
-            or any(c not in '0123456789abcdef' for c in pointer['sha256'])):
+            or not _is_sha256(pointer['sha256'])):
         raise ValueError('MVP_INPUT_REFERENCE_INVALID')
     path = pointer['path']
     if configured_target is not None:
@@ -323,6 +327,17 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
                       and {1, 2}.issubset(run_binding.stages_for(check)))
     collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
                          and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
+    if 'record_inputs' in source:
+        if (not collection_status or not prebound_kubernetes or run_binding.stages_for(check) != (2,)
+                or cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-11']) is not True):
+            raise ValueError('MVP_RECORD_INPUT_SCOPE_INVALID')
+        record_inputs = source['record_inputs']
+        if (type(record_inputs) is not dict or record_inputs.keys() != _COLLECTION_STATUS_DIGESTS
+                or not all(_is_sha256(digest) for digest in record_inputs.values())):
+            raise ValueError('MVP_RECORD_INPUT_REFERENCE_INVALID')
+        if expected_record_inputs is not None and record_inputs != expected_record_inputs:
+            raise ValueError('MVP_INPUT_FILE_CHANGED')
+        expected_record_inputs = record_inputs
     local_metadata = (check.id in {'OBS-04', 'PLT-06'} and implementation == 'kubernetes'
                       and requested_update.get('mode', 'external') == 'external'
                       and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS[check.id]) is True)
@@ -625,6 +640,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             'environment_origin': env.data_origin.value, 'implementation': implementation,
             'binding_schema': binding['schema'] if binding else None,
             'files': {role: source[role] for role in files}, 'blocking_codes': blockers,
+            **({'record_inputs': source['record_inputs']} if 'record_inputs' in source else {}),
             **({NORMAL_FILE_READS_OPTION: True} if normal_file_reads else {}),
             **({'sup05_normal_preparation': sup05_normal_preparation} if sup05_normal_preparation is not None else {}),
             **({NORMAL_GRAPH_CAPTURE_OPTION: True} if normal_graph_capture else {}),
@@ -655,7 +671,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_prep
         raise ValueError('MVP_SOURCE_INDEX_INVALID')
     sources = {}
     for item in index['inputs']:
-        if (type(item) is not dict or set(item) - {'target'} != _INPUT_ROW_FIELDS
+        if (type(item) is not dict or set(item) - {'target', 'record_inputs'} != _INPUT_ROW_FIELDS
                 or item['check_id'] not in active or item['side'] not in SIDES):
             raise ValueError('MVP_SOURCE_INDEX_INVALID')
         if item['side'] not in selected_sides:

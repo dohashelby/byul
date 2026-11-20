@@ -589,7 +589,10 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 if check_id == 'OBS-01' and SNAPSHOT_SOURCE in run_cfg:
                     settings.setdefault('check_config', {})[check_id] = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
                 settings.setdefault('run_binding', {})[check_id] = run_cfg
-            bindings.append({'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer})
+            binding = {'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer}
+            if check_id == 'OBS-11':
+                binding['record_inputs'] = dict(decision['prepared_record_input_sha256_by_side'][side])
+            bindings.append(binding)
         if check_id == 'SUP-04' and node_image_verification is not None:
             config.setdefault('check_config', {})[check_id] = {'node_image_verification': node_image_verification}
         if check_id in CHECK_OPTIONS:

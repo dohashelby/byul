@@ -17,6 +17,7 @@ from . import gpu_common_inputs as contract
 
 PRODUCER_NAME = 'guard-engine-callback-worker-shard-load'
 PRODUCER_VERSION = '2'
+_CALLBACK_POINTS = frozenset(point for points in callback.TARGETS.values() for point in points)
 
 
 def producer():
@@ -28,6 +29,11 @@ def producer():
 
 def _ms(row):
     return max(0, int(row.get('operation_finished_ns') or row.get('operation_started_ns') or 0) // 10**6)
+
+
+def _valid_shard_hashes(value):
+    return (type(value) is list and 0 < len(value) <= callback.MAX_FILES
+            and all(contract._check(shard, 'sha') for shard in value))
 
 
 def events_from(rows):
@@ -72,8 +78,7 @@ def events_from(rows):
                 required = f.get('files') or []
                 codes.add('REQUIRED_FROM_ASSIGNED')
             elif index_present is True:
-                if (type(required) is not list or not 0 < len(required) <= callback.MAX_FILES
-                        or any(not contract._check(shard, 'sha') for shard in required)):
+                if not _valid_shard_hashes(required):
                     required = None
                     codes.add('WORKER_SHARD_INDEX_UNREADABLE')
             else:
@@ -117,6 +122,60 @@ def record(rows, *, pod, environment_ref, target_sha256, prepared_sha256, sessio
                               'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
     return value, contract.validate(value, kind='worker-shard-load', environment_ref=environment_ref,
                                     target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+
+
+def _page_fields_valid(point, phase, fields):
+    if 'tp_rank' not in fields or not contract._check(fields['tp_rank'], 'opt_int'):
+        return False
+    if point == 'WorkerProc.monitor_death_pipe' and phase == 'CALL':
+        return ('rank' in fields and contract._check(fields['rank'], 'opt_int')
+                and type(fields.get('ready_candidate')) is bool)
+    if point == 'DefaultModelLoader.track_weights_loading' and phase == 'RETURN':
+        return fields.get('completed') is True
+    if point != callback.PREPARE or phase != 'RETURN':
+        return True
+    files, sizes = fields.get('files'), fields.get('file_bytes')
+    index_present, required = fields.get('index_present'), fields.get('required')
+    return (_valid_shard_hashes(files)
+            and type(sizes) is list and len(sizes) == len(files)
+            and all(contract._check(size, 'opt_int') for size in sizes)
+            and 'index_present' in fields and contract._check(index_present, 'opt_bool')
+            and 'required' in fields and (required is None or index_present is True and _valid_shard_hashes(required)))
+
+
+def record_from_processes(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session):
+    """Project only page-scoped worker rows. A checkpoint is an open prefix."""
+    session_sha256 = hashlib.sha256(session.encode()).hexdigest()
+    rows = []
+    scope_mismatch = False
+    for process in processes:
+        if type(process) is not dict or type(process.get('events')) is not list:
+            scope_mismatch = True
+            continue
+        pid, ticks = process.get('pid'), process.get('start_ticks')
+        valid_process = contract._check(pid, 'int') and pid > 0 and contract._check(ticks, 'int')
+        for row in process['events']:
+            if type(row) is not dict or row.get('schema') != callback.SCHEMA:
+                continue
+            fields, point, phase = row.get('fields'), row.get('point'), row.get('phase')
+            started, finished = row.get('operation_started_ns'), row.get('operation_finished_ns')
+            if (not valid_process or row.get('session_sha256') != session_sha256
+                    or not contract._check(row.get('process_sha256'), 'sha')
+                    or type(point) is not str or point not in _CALLBACK_POINTS
+                    or phase not in ('CALL', 'RETURN', 'RAISE') or row.get('entry_qualified_before') is not True
+                    or (phase != 'CALL' and row.get('entry_qualified_after') is not True)
+                    or type(fields) is not dict or type(fields.get('pid')) is not int or fields['pid'] != pid
+                    or type(fields.get('start_ticks')) is not int or fields['start_ticks'] != ticks
+                    or not contract._check(started, 'int') or not contract._check(finished, 'int') or finished < started
+                    or not _page_fields_valid(point, phase, fields)):
+                scope_mismatch = True
+                continue
+            # The converter's grouping key stays private. The page owns this process identity.
+            rows.append({**row, 'process_sha256': (pid, ticks)})
+    if scope_mismatch:
+        rows.append({'phase': 'GAP', 'code': 'WORKER_SHARD_SCOPE_MISMATCH'})
+    return record(rows, pod=pod, environment_ref=environment_ref, target_sha256=target_sha256,
+                  prepared_sha256=prepared_sha256, session=session, source_ended=False)
 
 
 def shard_rows(value):

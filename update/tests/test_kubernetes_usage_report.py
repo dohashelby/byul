@@ -223,6 +223,9 @@ class LocalUsageWorld(FullWorld):
             assert module.supervised_source(module._LOCAL_READER) in argv
             assert 'VLLM_USAGE_STATS_SERVER' not in module._LOCAL_READER
             self.snapshots += 1
+            if self.mode == 'local-transport-failed':
+                return {'returncode': 1, 'stdout_bytes': b'', 'stderr_bytes': PRIVATE.encode(),
+                        'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
             cache = self.mode.startswith('cache')
             paths = [*LOCAL_PATHS, CACHE_PATH] if cache else LOCAL_PATHS
             files = [{'path': path, 'exists': False, 'readable': True,
@@ -242,6 +245,8 @@ class LocalUsageWorld(FullWorld):
             value = {'files': files, 'settings': {'VLLM_NO_USAGE_STATS': self.mode != 'optout-missing', 'DO_NOT_TRACK': True},
                      'process_start_ticks': 90 if self.mode == 'process-changed' and self.snapshots == 2 else 88,
                      'report_root': 'cache-xdg' if cache else 'guard-default'}
+            if self.mode == 'local-projection-invalid':
+                value['process_start_ticks'] = 0
         elif 'exec' in argv and 'input_bytes' in kwargs:
             payload = json.loads(kwargs['input_bytes'])
             if 'files' in payload:
@@ -268,6 +273,8 @@ class LocalUsageWorld(FullWorld):
                 pod = json.loads(result['stdout_bytes'])
                 if self.mode in ('shared-pid', 'host-pid'):
                     pod['spec']['shareProcessNamespace' if self.mode == 'shared-pid' else 'hostPID'] = True
+                if self.mode == 'local-owner-changed' and self.snapshots:
+                    pod['metadata']['uid'] = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
                 if self.mode.startswith('cache') and pod['metadata']['name'] == self.target['kubernetes']['engine']['pod']:
                     container, = pod['spec']['containers']
                     container.update(command=ENTRYPOINT, args=LAUNCH_ARGS,
@@ -326,6 +333,8 @@ def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path
     ('cache-source-change-legacy-new', False, True, 'FAIL'),
     ('cache-launch-override', False, False, 'UNKNOWN'), ('cache-launch-mount-after', False, False, 'UNKNOWN'),
     ('cache-unqualified', False, False, 'UNKNOWN'),
+    ('local-transport-failed', False, False, 'UNKNOWN'), ('local-owner-changed', False, False, 'UNKNOWN'),
+    ('local-projection-invalid', False, False, 'UNKNOWN'),
 ])
 def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monkeypatch, mode, completed, collected, verdict):
     env, target = full_inputs()
@@ -349,10 +358,19 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monk
                                                     'usage_wait_seconds': 0}, runner=world.runner,
                                                    expected_target_sha256=sha256_hex(canonical_json(target)))
     draft = executor.run(check, env, LOCAL_VALUES, VllmAdapter(), tmp_path / 'work')
+    pre_control_failures = {
+        'shared-pid': 'USAGE_LOCAL_PRE_READ_UNVERIFIED',
+        'host-pid': 'USAGE_LOCAL_PRE_READ_UNVERIFIED',
+        'local-transport-failed': 'USAGE_LOCAL_TRANSPORT_UNAVAILABLE',
+        'local-owner-changed': 'USAGE_LOCAL_OWNER_AFTER_UNVERIFIED',
+        'local-projection-invalid': 'USAGE_LOCAL_PROJECTION_INVALID',
+    }
     assert world.snapshots == {'optout-missing': 1, 'shared-pid': 0, 'host-pid': 0,
-                               'all-unreadable': 1, 'cache-unqualified': 1, 'cache-launch-override': 1}.get(mode, 2)
-    assert world.controls == (0 if mode in {'optout-missing', 'shared-pid', 'host-pid',
-                                           'all-unreadable', 'cache-unqualified', 'cache-launch-override'} else 1)
+                               'all-unreadable': 1, 'cache-unqualified': 1, 'cache-launch-override': 1,
+                               'local-transport-failed': 1, 'local-owner-changed': 1,
+                               'local-projection-invalid': 1}.get(mode, 2)
+    assert world.controls == (0 if mode in ({'optout-missing', 'all-unreadable', 'cache-unqualified',
+                                           'cache-launch-override'} | pre_control_failures.keys()) else 1)
     expected_reads = {'cache-launch-override': 0, 'cache-launch-mount-after': 1}
     assert world.source_reads == expected_reads.get(mode, 2 if with_source else 0)
     assert draft.status == (ExecStatus.COMPLETED if completed else ExecStatus.ABORTED)
@@ -368,6 +386,12 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monk
     assert result.verdicts.security.value == verdict
     assert all(raw not in artifact.path.read_bytes() for artifact in draft.artifacts
                for raw in (PRIVATE.encode(), CACHE_PATH.encode(), b'/cache/home', SOURCE['source_root'].encode()))
+    summary = next(row for row in map(json.loads, draft.artifacts[0].path.read_text().splitlines()) if row.get('summary'))
+    if mode in pre_control_failures:
+        assert summary['local_snapshot_status'] == {'before': pre_control_failures[mode]}
+        assert summary['local_snapshot_presence'] == {}
+    elif mode == 'absent':
+        assert summary['local_snapshot_status'] == dict.fromkeys(('before', 'after'), 'USAGE_LOCAL_SNAPSHOT_VERIFIED')
     if mode == 'cache-new':
         reports = draft.observations['usage_new_local_reports'].value
         assert [report['path_sha256'] for report in reports] == [sha256_hex(CACHE_PATH.encode())]

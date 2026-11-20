@@ -426,7 +426,8 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                 pass
         qualified = _verify_usage_source(source_reader, source, ctx.target, startup)
         source_gaps = []
-        before = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
+        before, before_status = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
+        snapshot_status = {"before": before_status}
         after = None
         effective = _EFFECTIVE_PATHS[before["report_root"]] if before else None
         paths = list(dict.fromkeys([*policy_paths, *([effective] if effective else [])]))
@@ -442,7 +443,7 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                 time.sleep(wait)
                 if effective == _EFFECTIVE_PATHS["cache-xdg"]:
                     qualified = _verify_usage_source(source_reader, source, ctx.target, startup)
-                after = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
+                after, snapshot_status["after"] = self._local_snapshot(reader, policy_paths, qualified, source_gaps)
 
         diagnostics = sorted(set(source_gaps))
         if before is None:
@@ -499,6 +500,7 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
                        if effective_verified and effective == _EFFECTIVE_PATHS["cache-xdg"] else None),
                    "local_paths_complete": not gaps, "unverified_paths": [sha256_hex(path.encode()) for path in gaps],
                    "observed_paths": sorted(sha256_hex(path.encode()) for path in observed_paths),
+                   "local_snapshot_status": snapshot_status,
                    "local_snapshot_presence": {
                        stage: {sha256_hex(row["path"].encode()): row["exists"] for row in snapshot["files"]}
                        for stage, snapshot in (("before", before), ("after", after)) if snapshot is not None},
@@ -509,19 +511,26 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         return observations, normal, challenges, summary
 
     def _local_snapshot(self, reader, paths, qualified, source_gaps):
+        prior_reads = len(reader.rows)
         try:
             result = reader.exec_bounded(reader.binding["engine"]["container"],
                                          ["python3", "-c", _LOCAL_READER, ",".join(_OPTOUT_SETTINGS),
                                           "1" if qualified else "0", *paths],
                                          timeout=5, max_bytes=_SNAPSHOT_BYTES)
-            if result.owner_binding_verified is not True:
-                raise KubernetesCaptureError()
+        except (KubernetesCaptureError, AttributeError, ValueError, TypeError, OSError):
+            if (len(reader.rows) > prior_reads and reader.rows[-1]["program"] == "usage"
+                    and "KUBERNETES_READ_TRANSPORT_UNAVAILABLE" in reader.rows[-1]["diagnostic_codes"]):
+                return None, "USAGE_LOCAL_TRANSPORT_UNAVAILABLE"
+            return None, "USAGE_LOCAL_PRE_READ_UNVERIFIED"
+        if getattr(result, "owner_binding_verified", None) is not True:
+            return None, "USAGE_LOCAL_OWNER_AFTER_UNVERIFIED"
+        try:
             value = _local_snapshot_value(strict_json(result.stdout.encode(), limit=_SNAPSHOT_BYTES), paths, qualified)
             if value["report_root"] == "cache-xdg" and not qualified:
                 source_gaps.append("USAGE_EFFECTIVE_REPORT_SOURCE_UNVERIFIED")
-            return value
-        except (KubernetesCaptureError, AttributeError, ValueError, TypeError, OSError):
-            return None
+            return value, "USAGE_LOCAL_SNAPSHOT_VERIFIED"
+        except (AttributeError, ValueError, TypeError, OSError):
+            return None, "USAGE_LOCAL_PROJECTION_INVALID"
 
     def _reader(self, ctx, target, **kwargs):
         return _UsageReader(target, ctx.env, binary=self.cfg.get("kubectl_binary", "kubectl"),

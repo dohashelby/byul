@@ -368,3 +368,63 @@ def test_points_avoid_the_traced_decorators_and_assets_carry_the_flag(tmp_path):
     assert 'guard_engine_callbacks/vllm_worker_shard_callback.py' in manifest['assets']
     assert json.loads((tmp_path / 'a/settings.json').read_text())['worker_shards'] is True
     assert engine_callbacks.prepare_assets(tmp_path / 'b')['worker_shards'] is False
+
+
+@pytest.mark.parametrize('wrong_scope', (None, 'session', 'pid'))
+def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypatch, wrong_scope):
+    from typer.testing import CliRunner
+
+    from guard.cli import app
+    from guard.models import canonical_json, sha256_hex
+    from tests.test_kubernetes_sampling import normal_sampling_inputs
+    from tools import gpu_a_producers_collect as collector
+
+    assets = tmp_path / 'assets'
+    prepared_result = CliRunner().invoke(app, ['prepare-engine-callbacks', '--output', str(assets), '--worker-shards'])
+    assert prepared_result.exit_code == 0, prepared_result.output
+    prepared = engine_callbacks.load_prepared(assets)
+    assert prepared['worker_shards'] is True
+    session = prepared['session']
+    session_hash = sha256_hex(session.encode())
+    env, target, _, target_path = normal_sampling_inputs(tmp_path, '0.31.0')
+    env_path = tmp_path / 'env.json'
+    env_path.write_bytes(canonical_json(env.to_dict()))
+    target_path.write_bytes(canonical_json(target))
+
+    rows = case('sharded')['rows']
+    for row in rows:
+        if 'session_sha256' in row:
+            row['session_sha256'] = session_hash
+    assignment = next(row for row in rows if row.get('point') == callback.PREPARE and row['phase'] == 'RETURN')
+    pid, start_ticks = (assignment['fields'][key] for key in ('pid', 'start_ticks'))
+    if wrong_scope == 'session':
+        assignment['session_sha256'] = sha256_hex(b'other fixture session')
+    elif wrong_scope == 'pid':
+        assignment['fields']['pid'] += 1
+
+    class CapturedTransport:
+        def __init__(self, selected_target, selected_env, *, duration, profile):
+            assert (selected_target, selected_env.ref()) == (target, env.ref())
+            assert profile == collector.ENGINE_CALLBACK_PROFILE
+            self.binding = target['kubernetes']
+
+        def engine_attempt_events(self, selected_session, *, archive):
+            assert selected_session == session and archive is None
+            return {'processes': [{'pid': pid, 'start_ticks': start_ticks, 'events': rows}], 'truncated': False}
+
+    monkeypatch.setattr(collector, 'KubernetesHTTP', CapturedTransport)
+    result = collector.collect(env_path=env_path, target_path=target_path, prepared_dir=assets)
+    captured = result['records']['worker-shard-load']
+    record = captured['record']
+    required = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_required'}
+    assigned = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_assigned'}
+    assert required == assigned and len(assigned) == (0 if wrong_scope else 2)
+    assert {'load_completed', 'rank_ready'} <= {row['event'] for row in record['events']}
+    assert record['completeness']['source_ended'] is False
+    assert ('WORKER_SHARD_SCOPE_MISMATCH' in record['completeness']['diagnostic_codes']) is bool(wrong_scope)
+
+    scope = {'environment_ref': env.ref().model_dump(mode='json'), 'target_sha256': sha256_hex(canonical_json(target)),
+             'prepared_sha256': sha256_hex(canonical_json(prepared)), 'session': session}
+    checked = common_consumption.worker_shards(record, scope, {})
+    for validation in (captured['validation'], checked):
+        assert validation['supported'] is validation['complete'] is False

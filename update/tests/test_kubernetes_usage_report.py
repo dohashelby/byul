@@ -326,7 +326,7 @@ def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path
             path.symlink_to(moved)
         else:
             path.write_bytes(b'[]')
-        monkeypatch.setattr(executor, '_transport', forbidden)
+        monkeypatch.setattr(module.KubernetesUsageReportExecutor, '_transport', forbidden)
         with pytest.raises(ValueError, match=f'^{error}$'):
             executor.run(check, env, LOCAL_VALUES, VllmAdapter(), tmp_path / 'work')
     if error is None:

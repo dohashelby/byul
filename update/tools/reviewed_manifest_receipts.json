@@ -1100,6 +1100,11 @@
       "manifest_sha256": "e5cb9b236370385f51b2f24f3e236b103e6061e43c4ed8db5e0b47abcad7d692",
       "reviewed_by": "Codex / OBS-11 canonical model mapping preflight / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T02:34:03+00:00"
+    },
+    {
+      "manifest_sha256": "77dc0350af37f158e4492a08b1b659a4ee526e2cfc0884e90b5f9bac92c484a5",
+      "reviewed_by": "Codex / OBS-11 status and LIF-12 selected target binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T03:12:39+00:00"
     }
   ]
 }

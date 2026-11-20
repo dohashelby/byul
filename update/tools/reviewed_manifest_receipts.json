@@ -1090,6 +1090,11 @@
       "manifest_sha256": "103add7e0f0a6cd966c1fa60cac628af4b5a3c81b0fe1383fd590b283f3f9f30",
       "reviewed_by": "Codex / LIF-12 passive input and local observation diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-20T01:36:55+00:00"
+    },
+    {
+      "manifest_sha256": "67b8768e6ffac47bec831002ce8f03fcedd19e8cee587166d05ceaa635f658cb",
+      "reviewed_by": "Codex / Paired LIF-12 and OBS-11 record input binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T02:16:44+00:00"
     }
   ]
 }

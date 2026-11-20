@@ -5,6 +5,7 @@ import argparse
 from inspect import CO_GENERATOR
 import json
 from pathlib import Path
+import platform
 import sys
 from types import CodeType
 
@@ -57,6 +58,27 @@ _WEIGHT_SOURCE_PINS = {
     },
     "candidate": weight_iteration.SOURCE_ADDITIONS,
 }
+_BASELINE_WEIGHT_SOURCE_BYTES = {
+    weight_iteration.DEFAULT: 18754,
+    weight_iteration.WEIGHTS: 60910,
+    weight_iteration.MODELS: 41138,
+}
+# Linux CI source 0535361f8e875bd385a047ecf578676e0efbdf2d, job 136162548233.
+# Compile-only ABI receipt SHA256 350f42e65b60ca64a52afc04a06654ddb76396e15f5c50e19c6eb963d9a428c2.
+_BASELINE_WEIGHT_POINT_CODES = {
+    "AutoWeightsLoader._load_module": "321e0b283b2c133350486a8ccc897370bd5d80a8d5083ef244760bcb06682603",
+    "AutoWeightsLoader._load_param": "63099e39e6815bd09ddd0781f3d747213108f4d141f8d1b010fced01c5c83fdc",
+    "DefaultModelLoader.get_all_weights": "49ef474e20290aab4cb7915a455378c541c80799a4f08e0d47530e7a27fcb6d2",
+    "weight_utils.pt_weights_iterator": "a81ca82bf7221ef62e2bf5260c55685fc231a23060fbc1b48954b46cf2b50c6e",
+    "weight_utils.safetensors_weights_iterator": "2247aec26ae2bc06bb5c676cae7d74b5c52a0335631c93b6bf9dd5446f8cf0f2",
+}
+_BASELINE_WEIGHT_IDENTITY = (
+    "vllm", "0.30.0", "linux", "x86_64", "cpython-3.12.3", 0,
+)
+_BASELINE_WEIGHT_IMAGES = frozenset(
+    repository + "@" + IMAGE_DIGESTS["baseline"]
+    for repository in ("docker.io/vllm/vllm-openai", "vllm/vllm-openai")
+)
 # Independently read from installation layer 7 of each pinned OCI image.
 _CONNECTION_SOURCE_PINS = dict.fromkeys(IMAGE_DIGESTS,
     "3b1591b340a6e8f68eab4af6a6ed158d51c9c35bb5b500827b677bf97e8afd51")
@@ -71,10 +93,11 @@ def _runtime():
     return runtime
 
 
-def _point_codes(path, module, expected_sha256, points, *, filename=None, require_generator=False):
+def _point_codes(path, module, expected_sha256, points, *, filename=None, require_generator=False,
+                 expected_bytes=None):
     filename = FILES[module] if filename is None else filename
     raw, _ = _read(_plain_path(path), max_bytes=131072)
-    if sha256_hex(raw) != expected_sha256:
+    if (expected_bytes is not None and len(raw) != expected_bytes) or sha256_hex(raw) != expected_sha256:
         raise ValueError(f"TRANSITION_DEPENDENCY_SOURCE_MISMATCH: {module}")
     found = {}
 
@@ -142,13 +165,14 @@ def _measure_weight_iteration(side, directory, runtime):
     if pins.keys() != modules:
         raise ValueError("TRANSITION_WEIGHT_ITERATION_SOURCE_SCOPE_INCOMPLETE")
     measured = {}
+    source_sizes = _BASELINE_WEIGHT_SOURCE_BYTES if side == "baseline" else {}
     for module in sorted(modules):
         selected = {point for point, source in weight_iteration.POINT_SOURCES.items() if source == module}
         filename = module.replace(".", "/") + ".py"
         # /16 identifies module-level functions as weight_utils.<function> in its table.
         qualnames = {point.removeprefix("weight_utils."): point for point in selected}
         codes = _point_codes(directory / filename, module, pins[module], qualnames.keys(),
-                              filename=filename, require_generator=True)
+                              filename=filename, require_generator=True, expected_bytes=source_sizes.get(module))
         measured.update({qualnames[name]: digest for name, digest in codes.items()})
 
     matching = measured == approved
@@ -157,6 +181,19 @@ def _measure_weight_iteration(side, directory, runtime):
     return {
         "complete": True, "source_sha256": pins, "point_codes": measured,
         "matches_approved_point_codes": matching,
+    }
+
+
+def baseline_weight_profile(engine, version, image, *, sys_platform, machine, runtime, optimize):
+    """Return a compile reference for the exact baseline identity, or None."""
+    identity = (engine, version, sys_platform, machine, runtime, optimize)
+    if (identity != _BASELINE_WEIGHT_IDENTITY or type(optimize) is not int
+            or type(image) is not str or image not in _BASELINE_WEIGHT_IMAGES):
+        return None
+    return {
+        "source_sha256": dict(_WEIGHT_SOURCE_PINS["baseline"]),
+        "source_bytes": dict(_BASELINE_WEIGHT_SOURCE_BYTES),
+        "point_codes": dict(_BASELINE_WEIGHT_POINT_CODES),
     }
 
 
@@ -197,7 +234,15 @@ def measure(baseline, candidate, *, include_weight_iteration=False, baseline_con
         directory = Path(root)
         sides[side] = {"image": releases[side]["image"], **_measure(side, directory, runtime)}
         if include_weight_iteration:
-            sides[side]["weight_iteration"] = _measure_weight_iteration(side, directory, runtime)
+            weights = _measure_weight_iteration(side, directory, runtime)
+            if side == "baseline":
+                release = releases[side]
+                profile = baseline_weight_profile(release["engine"], release["version"], release["image"],
+                    sys_platform=sys.platform, machine=platform.machine(), runtime=runtime, optimize=sys.flags.optimize)
+                weights["matches_baseline_point_codes"] = None if profile is None else (
+                    weights["source_sha256"] == profile["source_sha256"]
+                    and weights["point_codes"] == profile["point_codes"])
+            sides[side]["weight_iteration"] = weights
         if connection is not None:
             sides[side]["stdlib_connection"] = _measure_connection(connection, side, runtime)
     return {

@@ -115,6 +115,10 @@ def test_paired_installed_sources_reproduce_transition_point_tables(tmp_path):
     assert baseline_weights["source_sha256"].keys() == set(_WEIGHT_FIXTURES["baseline"])
     assert baseline_weights["complete"] is True
     assert baseline_weights["matches_approved_point_codes"] is False
+    if result["runtime"] == "cpython-3.12.3" and abi.platform.machine() == "x86_64":
+        assert baseline_weights["matches_baseline_point_codes"] is True
+    else:
+        assert baseline_weights["matches_baseline_point_codes"] is None
 
     module = abi.generation.MP
     target = tmp_path / "baseline" / abi.FILES[module]
@@ -146,3 +150,28 @@ def test_connection_immutable_source_pin_rejects_appended_bytes(tmp_path):
     changed.write_bytes(raw + b"\n# Extra fixture bytes.\n")
     with pytest.raises(ValueError, match=r"^TRANSITION_DEPENDENCY_SOURCE_MISMATCH: multiprocessing\.connection$"):
         abi._measure_connection(changed, "baseline", abi._runtime())
+
+
+@pytest.mark.parametrize("override", [
+    {},
+    {"version": "0.31.0"},
+    {"image": "vllm/vllm-openai@" + abi.IMAGE_DIGESTS["candidate"]},
+    {"image": "unrelated.example/vllm-openai@" + abi.IMAGE_DIGESTS["baseline"]},
+    {"sys_platform": "darwin"},
+    {"machine": "aarch64"},
+    {"runtime": "cpython-3.12.15"},
+    {"optimize": 1},
+    {"optimize": False},
+])
+def test_baseline_weight_profile_uses_exact_release_and_compiler_identity(override):
+    identity = {"engine": "vllm", "version": "0.30.0", "image": "vllm/vllm-openai@" + abi.IMAGE_DIGESTS["baseline"],
+                "sys_platform": "linux", "machine": "x86_64", "runtime": "cpython-3.12.3", "optimize": 0}
+    selected = abi.baseline_weight_profile(**(identity | override))
+    if override:
+        assert selected is None
+    else:
+        assert selected["source_sha256"].keys() == set(_WEIGHT_FIXTURES["baseline"])
+        assert selected["source_bytes"].keys() == selected["source_sha256"].keys()
+        assert selected["point_codes"].keys() == abi.weight_iteration.POINTS
+        selected["point_codes"].clear()
+        assert abi.baseline_weight_profile(**identity)["point_codes"].keys() == abi.weight_iteration.POINTS

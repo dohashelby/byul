@@ -1140,6 +1140,11 @@
       "manifest_sha256": "0a8bbc49578a9f184935a32896d1dacd6d7906a31ff719260f39ccb65a4a75ea",
       "reviewed_by": "Codex / SUP-09 and SUP-11 reported model entry normal controls / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-21T15:34:57+00:00"
+    },
+    {
+      "manifest_sha256": "19922e2641de7cfc221318bd69b4f1831d965e926c04bf1c19ad31a444d8ba3e",
+      "reviewed_by": "Codex / OBS-09 exact candidate saved logger source / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-21T16:02:39+00:00"
     }
   ]
 }

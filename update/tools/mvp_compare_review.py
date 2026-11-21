@@ -11,13 +11,15 @@ from guard.core.compare import compare, comparison_differences
 from guard.core.judge import judge_evidence
 from guard.core.select import _in_scope, check_policy_value, evaluate_check
 from guard.executors import passive_api_hop, run_binding
-from guard.models import Ref, load_pack, weakest_origin
+from guard.models import Ref, Side, canonical_json, load_pack, sha256_hex, weakest_origin
 from guard.models.artifacts import model_closure_sha256
 from guard.models.objects import object_from_dict
+from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import validate_container_binding
 from guard.store import Store
+from guard.update_validation import _plain_path
 from guard.validation_evidence import read_objects, verify_store_files
-from tools.mvp_a_input_preflight import _pairs
+from tools.mvp_a_input_preflight import _pairs, _read
 from tools.mvp_versions import versions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -439,13 +441,61 @@ def _read_runs(pairs, *, include_artifact_store=False):
         yield (*run, Store.read_only(store)) if include_artifact_store else run
 
 
+def _replay_archived_plt08(checked, artifact_store, targets):
+    """Bind a pair of pinned target files to the original report's PLT-01 controls."""
+    reports = checked['reports']
+    original = checked['rows']['PLT-01']
+    if (len(reports) != 1 or not reports[0]['verified'] or not reports[0]['official']
+            or original.get('selected') is not True
+            or original.get('report') != reports[0]['refs']['report']
+            or any(side not in original or original[side]['blocking_codes'] for side in SIDES)):
+        raise InvalidReport('PLT08_ARCHIVED_SOURCE_UNVERIFIED')
+    plan_ref = Ref.model_validate(reports[0]['refs']['plan'])
+    sources = {side: artifact_store.resolve(Ref.model_validate(original[side]['evidence'])) for side in SIDES}
+    attempt_ids = {source.execution.attempt_id for source in sources.values()}
+    if len(attempt_ids) != 1 or not next(iter(attempt_ids)):
+        raise InvalidReport('PLT08_ARCHIVED_SOURCE_UNVERIFIED')
+    attempt_id, = attempt_ids
+    receipts, captured = {}, []
+    for side in SIDES:
+        path, digest = targets[side]
+        path = _plain_path(Path(path))
+        snapshot = _read(path, max_bytes=passive_api_hop._TARGET_BYTES)
+        raw, _ = snapshot
+        if SHA256.fullmatch(digest) is None or sha256_hex(raw) != digest:
+            raise ValueError('PLT08_ARCHIVED_TARGET_FILE_CHANGED')
+        target = strict_json(raw, limit=passive_api_hop._TARGET_BYTES)
+        target_sha256 = sha256_hex(canonical_json(target))
+        source = sources[side]
+        observations = passive_api_hop.read_passive_api_hop(artifact_store, plan_ref=plan_ref, side=Side(side),
+            attempt_id=attempt_id, source_ref=source.ref(), target=target, expected_target_sha256=target_sha256)
+        trial, = observations['api_transport_trials']['value']
+        receipts[side] = {'environment_ref': _dump(source.environment), 'source_evidence': _dump(source.ref()),
+                          'source_artifact_sha256': trial['source_artifact_sha256'],
+                          'target_file_sha256': digest, 'target_sha256': trial['target_sha256'],
+                          'observations': observations}
+        captured.append((path, snapshot))
+    try:
+        stable = all(_read(path, max_bytes=passive_api_hop._TARGET_BYTES) == snapshot for path, snapshot in captured)
+    except (OSError, ValueError):
+        stable = False
+    if not stable:
+        raise ValueError('PLT08_ARCHIVED_TARGET_FILE_CHANGED')
+    return {'report_ref': reports[0]['refs']['report'], 'plan_ref': _dump(plan_ref),
+            'attempt_id': attempt_id, 'sides': receipts}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', metavar=('RESTORED_STORE', 'ORIGINAL_REPORT'), nargs=2,
                         action='append', type=Path, required=True)
     parser.add_argument('--assignments', type=Path, help='JSON mapping from check ID to exact original RPT Ref')
+    parser.add_argument('--plt08-targets', nargs=4, metavar=('BASELINE_PATH', 'BASELINE_SHA256', 'CANDIDATE_PATH', 'CANDIDATE_SHA256'),
+                        help='Recheck the original PLT-01 pair against two pinned saved target files from one run')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    if args.plt08_targets is not None and len(args.run) != 1:
+        parser.error('--plt08-targets requires exactly one original --run')
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     if len(pack.active_checks()) != 69:
         raise ValueError('MVP_ACTIVE_SCOPE_MISMATCH')
@@ -454,7 +504,14 @@ def main():
     assignments = json.loads(args.assignments.read_bytes(), object_pairs_hook=_pairs) if args.assignments else None
     if args.assignments and type(assignments) is not dict:
         parser.error('--assignments must contain a JSON object')
-    result = review(_read_runs(args.run, include_artifact_store=True), pack=pack, expected=versions(), assignments=assignments)
+    runs = _read_runs(args.run, include_artifact_store=True)
+    if args.plt08_targets is not None:
+        runs = list(runs)
+    result = review(runs, pack=pack, expected=versions(), assignments=assignments)
+    if args.plt08_targets is not None:
+        baseline_path, baseline_sha256, candidate_path, candidate_sha256 = args.plt08_targets
+        result['archived_plt08_source_replay'] = _replay_archived_plt08(result, runs[0][3], {
+            'baseline': (baseline_path, baseline_sha256), 'candidate': (candidate_path, candidate_sha256)})
     with args.output.open('x', encoding='utf-8') as stream:
         json.dump(result, stream, ensure_ascii=False, indent=2)
 

@@ -7,13 +7,15 @@ import pytest
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.executors import passive_api_hop, run_binding
-from guard.models import canonical_json, load_pack, sha256_hex, utcnow
+from guard.models import DataOrigin, canonical_json, load_pack, sha256_hex, utcnow
 from guard.models.artifacts import model_closure_sha256
 from guard.models.objects import Execution, object_from_dict
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import put_pack
 from guard.update_acceptance import assess_update
 from tests import update_builders as builders
+from tests import test_passive_api_hop as passive_fixtures
+from tests.builders import T0
 from tests.test_update_acceptance import patch_case
 from tests.test_passive_api_hop import paired_controls
 from tools import mvp_compare_review as tool
@@ -322,3 +324,69 @@ def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_pat
         assert row['status'] == 'MEASURED_ROWS_VERIFIED'
         assert all(not row[side]['blocking_codes'] for side in tool.SIDES)
     assert not assess_update(*runs[0][:3], profile='plan-scope/2')['evidence_contract_valid']
+
+
+@pytest.mark.parametrize('damage,code', [
+    (None, None),
+    ('raw-pin', 'PLT08_ARCHIVED_TARGET_FILE_CHANGED'),
+    ('foreign-target', 'PASSIVE_API_HOP_TARGET_UNVERIFIED'),
+])
+def test_archived_plt01_targets_replay_without_a_completed_plt08_row(tmp_path, monkeypatch, damage, code):
+    build_policy = passive_fixtures.policy
+
+    def confirmed_policy(*args, **kwargs):
+        return build_policy(*args, **kwargs, data_origin=DataOrigin.DECLARED, status='CONFIRMED',
+                            confirmed_by='EXAMPLE owner', confirmed_at=T0)
+
+    monkeypatch.setattr(passive_fixtures, 'policy', confirmed_policy)
+    originals = paired_controls(tmp_path, monkeypatch, review_fixture=True)
+    pack_path = tool.ROOT / 'packs/PACK-BASELINE'
+    pack = load_pack(pack_path)
+    store, _, scope, _ = next(iter(originals.values()))
+    plan = store.resolve(scope['plan_ref'])
+    put_pack(store, pack_path)
+    as_of = utcnow()
+    judge_plan(store, pack, plan, as_of)
+    report = build_report(store, pack, plan, as_of)
+    store.put(report)
+    report_path = tmp_path / 'original-report.json'
+    report_path.write_bytes(canonical_json(report.to_dict()))
+    runs = list(tool._read_runs([(store.root, report_path)], include_artifact_store=True))
+    checked = tool.review(runs, pack=pack, expected=_expected(runs[0][:3]))
+    assert checked['reports'][0]['verified'] and checked['reports'][0]['official']
+    assert all(checked['rows']['PLT-08'][side]['execution_status'] == 'NOT_RUN' for side in tool.SIDES)
+
+    targets = {}
+    for side, (_, source, bound, _) in originals.items():
+        target_path = tmp_path / f'{side.value}-pinned-target.json'
+        raw = canonical_json(bound['target']) + b'\n'
+        target_path.write_bytes(raw)
+        targets[side.value] = (target_path, sha256_hex(raw))
+        assert sha256_hex(raw) != bound['expected_target_sha256']
+        assert checked['rows']['PLT-01'][side.value]['evidence'] == source.ref().model_dump(mode='json')
+    if damage == 'raw-pin':
+        path, _ = targets['candidate']
+        targets['candidate'] = (path, '0' * 64)
+    elif damage == 'foreign-target':
+        targets['candidate'] = targets['baseline']
+    if code:
+        with pytest.raises(ValueError, match=f'^{code}$'):
+            tool._replay_archived_plt08(checked, runs[0][3], targets)
+        return
+
+    original_db = sha256_hex(store.db_path.read_bytes())
+    snapshot = deepcopy(checked)
+    receipt = tool._replay_archived_plt08(checked, runs[0][3], targets)
+    assert checked == snapshot and sha256_hex(store.db_path.read_bytes()) == original_db
+    assert receipt['report_ref'] == report.ref().model_dump(mode='json')
+    assert receipt['plan_ref'] == plan.ref().model_dump(mode='json')
+    assert receipt['attempt_id'] == scope['attempt_id']
+    for side, (_, source, bound, _) in originals.items():
+        assert receipt['sides'][side.value] == {
+            'environment_ref': source.environment.model_dump(mode='json'),
+            'source_evidence': source.ref().model_dump(mode='json'),
+            'source_artifact_sha256': source.artifacts[0].sha256,
+            'target_file_sha256': targets[side.value][1],
+            'target_sha256': bound['expected_target_sha256'],
+            'observations': passive_api_hop.read_passive_api_hop(runs[0][3], **bound),
+        }

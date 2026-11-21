@@ -20,7 +20,9 @@ from tests.test_a1_retry_record_contract import example as retry_example
 from tests.test_kubernetes_log_integrity import GAP_VALUES
 from tests.test_lifecycle_capture import REPOSITORY, external
 from tests.test_model_mapping import declared_mapping
+from tests.test_mvp_credential_copy_inputs import owned_declarations
 from tests.test_sup05_normal_preparation import _case as sup05_case
+from tools import mvp_credential_copy_inputs as copy_inputs
 from tools import mvp_lifecycle_transition_inputs as materializer, mvp_live_readiness as readiness
 from tools import mvp_metadata_wiring as metadata, mvp_retry_record_inputs as retry_inputs
 from tools.j02_run_config import write_config
@@ -69,6 +71,24 @@ def _retry_pair(directory, sources, pack, policy_path, confirmed, example_scope)
     output = directory / 'prepared-retry'
     retry_inputs.prepare(sources, policy_path, selection, _pointer(selection)['sha256'], output, pack=pack)
     return json.loads((output / 'retry-record-inputs.json').read_bytes())
+
+
+def _copy_pair(directory, pack, envs, confirmed):
+    _, approved, _, selection = owned_declarations()
+    base = confirmed.model_copy(update={'source_document_sha256': approved.source_document_sha256}).seal()
+    environment_by_side = dict(zip(readiness.SIDES, envs, strict=True))
+    selection['base_policy_ref'] = base.ref().model_dump(mode='json')
+    selection['environments'] = {side: env.ref().model_dump(mode='json') for side, env in environment_by_side.items()}
+    policy_with_inventory, inventory = copy_inputs.materialize(base, pack, environment_by_side, selection)
+    bindings = {}
+    for number, side in enumerate(readiness.SIDES, 1):
+        inventory_path = directory / f'{side}-copy-inventory.json'
+        inventory_path.write_bytes(canonical_json(inventory))
+        producer_path = directory / f'{side}-copy-producer.txt'
+        producer_path.write_bytes(b'# Inert EXAMPLE source; never executed\n')
+        bindings[side] = {'record_session': f'{number + 20:032x}', 'record_producer': str(producer_path),
+                          'copy_inventory': str(inventory_path)}
+    return policy_with_inventory, bindings
 
 
 def _sup05_receipt(directory, env, before):
@@ -296,6 +316,13 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
     ('lif12-canonical-target', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
     ('lif12-one-sided-target-binding', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
     ('lif12-late-scope-change', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('plt12', None),
+    ('plt12-missing-pins', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('plt12-session-pin', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('plt12-changed-inventory', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('plt12-changed-producer', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('plt12-staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
+    ('plt12-overlay', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
     ('staged', 'MVP_TRANSITION_PREBOUND_METADATA_REQUIRED'),
     ('duplicate', 'MVP_TRANSITION_METADATA_DUPLICATE'),
     ('other-policy', 'MVP_TRANSITION_METADATA_POLICY_MISMATCH'),
@@ -308,8 +335,9 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
 def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, monkeypatch, case, error):
     _offline_only(monkeypatch)
     check_id = 'LIF-16'
-    include_status = case.startswith('obs11') or case == 'lif12'
-    include_retry = case.startswith('lif12')
+    include_status = case.startswith('obs11') or case in {'lif12', 'plt12'}
+    include_retry = case.startswith('lif12') or case == 'plt12'
+    include_copy = case.startswith('plt12')
     if include_status or include_retry:
         _, mapping = declared_mapping()
         build_environment = fixture.environment
@@ -328,6 +356,9 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     policy_values = {'SUP-04': {'approved_image_digests': [env.engine.image_digest for env in envs]}}
     stock_checks = ['SUP-04']
     status_sessions = None
+    if include_copy:
+        stock_checks.append('PLT-12')
+        policy_values['PLT-12'] = {'copy_max_record_delay_ms': 5000}
     if include_retry:
         stock_checks.append('LIF-12')
         retry_scope, retry_values, _, _ = retry_example()
@@ -345,6 +376,9 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     confirmed = policy(pack.ref(), scope={'include': [*stock_checks, check_id]}, values=policy_values,
                        data_origin=DataOrigin.DECLARED, status='CONFIRMED',
                        confirmed_by='EXAMPLE operator', confirmed_at=T0)
+    copy_bindings = None
+    if include_copy:
+        confirmed, copy_bindings = _copy_pair(external, pack, envs, confirmed)
     policy_path = external / 'policy.json'
     policy_path.write_bytes(canonical_json(confirmed.to_dict()))
     stock = external / 'separate-metadata'
@@ -380,7 +414,8 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
                 del declaration[RETRY_TARGET_BINDING]
     stock_config, stock_rows, decisions = metadata.assemble(
         stock_sources, stock_policy, pack=pack, store=stock / 'store',
-        collection_status_bindings=status_sessions, retry_record_inputs=retry_bindings)
+        collection_status_bindings=status_sessions, retry_record_inputs=retry_bindings, copy_record_inputs=copy_bindings,
+        prebound_copy_records=include_copy)
     assert stock_config['update']['allowed_checks'] == stock_checks
     if case == 'staged':
         stock_config = metadata.staged_config(stock_config, stock / 'later-target.json')
@@ -392,36 +427,38 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         stock_config['check_config']['PLT-06']['worker_trust_metadata_only'] = 1
     config_path = stock / 'guard.toml'
     index_path = stock / 'input-sources.json'
-    record_checks = {'LIF-12', 'OBS-11'} & set(stock_checks)
+    record_checks = {'LIF-12', 'OBS-11', 'PLT-12'} & set(stock_checks)
     if record_checks:
         metadata._publish_prebound(stock, config=stock_config, bindings=stock_rows, checks=decisions,
                                    pack=pack, preparations=None, record_checks=record_checks)
         index = json.loads(index_path.read_bytes())
-        modified_check = 'LIF-12' if include_retry else 'OBS-11'
+        modified_check = 'PLT-12' if include_copy else 'LIF-12' if include_retry else 'OBS-11'
         record = next(row for row in index['inputs'] if row['check_id'] == modified_check and row['side'] == 'candidate')
-        if case in {'obs11-missing-pins', 'lif12-missing-pins'}:
+        if case in {'obs11-missing-pins', 'lif12-missing-pins', 'plt12-missing-pins'}:
             del record['record_inputs']
         elif case == 'obs11-target-pin':
             record['record_inputs']['target_file_sha256'] = '0' * 64
-        elif case in {'obs11-session-pin', 'lif12-session-pin'}:
+        elif case in {'obs11-session-pin', 'lif12-session-pin', 'plt12-session-pin'}:
             record['record_inputs']['record_session_sha256'] = '0' * 64
         elif case == 'obs11-stray-binding':
             stock_config['sides']['candidate']['run_binding']['LIF-12'] = {'record_session': '3' * 32}
-        elif case == 'obs11-staged':
+        elif case in {'obs11-staged', 'plt12-staged'}:
             stock_config['update']['kubernetes_candidate_binding'] = 'after_baseline'
         elif case == 'lif12-canonical-target':
             binding = stock_config['sides']['candidate']['check_config']['LIF-12'][RETRY_TARGET_BINDING]
             binding['target_sha256'] = '0' * 64
         elif case == 'lif12-one-sided-target-binding':
             del stock_config['sides']['candidate']['check_config']['LIF-12'][RETRY_TARGET_BINDING]
-        if case in {'obs11-stray-binding', 'obs11-staged', 'lif12-canonical-target', 'lif12-one-sided-target-binding'}:
+        elif case == 'plt12-overlay':
+            stock_config['sides']['candidate']['check_config']['PLT-12']['target'] = str(stock_sources['candidate']['target'])
+        config_changed = case in {'obs11-stray-binding', 'obs11-staged', 'lif12-canonical-target',
+                                  'lif12-one-sided-target-binding', 'plt12-staged', 'plt12-overlay'}
+        if config_changed:
             write_config(stock_config, config_path)
             config_pointer = _pointer(config_path)
             for row in index['inputs']:
                 row['configuration'] = config_pointer
-        if case in {'obs11-missing-pins', 'obs11-target-pin', 'obs11-session-pin', 'obs11-stray-binding',
-                    'obs11-staged', 'lif12-missing-pins', 'lif12-session-pin', 'lif12-canonical-target',
-                    'lif12-one-sided-target-binding'}:
+        if config_changed or case.endswith(('-missing-pins', '-session-pin')) or case == 'obs11-target-pin':
             index_path.write_bytes(canonical_json(index))
     else:
         write_config(stock_config, config_path)
@@ -435,7 +472,11 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         target.write_bytes(target.read_bytes() + b'\n')
         if case == 'lif12-raw-target':
             sources['targets']['candidate'] = _pointer(target)
-    if case in {'lif12-changed-scope', 'lif12-changed-producer'}:
+    if case in {'plt12-changed-inventory', 'plt12-changed-producer'}:
+        key = 'copy_inventory' if case == 'plt12-changed-inventory' else 'record_producer'
+        path = Path(copy_bindings['candidate'][key])
+        path.write_bytes(path.read_bytes() + b'\n')
+    elif case in {'lif12-changed-scope', 'lif12-changed-producer'}:
         key = 'retry_scope' if case == 'lif12-changed-scope' else 'record_producer'
         path = Path(retry_bindings['candidate'][key])
         path.write_bytes(path.read_bytes() + b'\n')
@@ -472,7 +513,7 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     for side in readiness.SIDES:
         settings = materialized['sides'][side]
         assert settings['container_config'] == stock_config['sides'][side]['container_config']
-        assert set(settings['check_config']) == {check_id} | (record_checks & {'LIF-12'})
+        assert set(settings['check_config']) == {check_id} | (record_checks & {'LIF-12', 'PLT-12'})
         assert set(settings['run_binding']) == {check_id} | record_checks
         if include_status:
             assert settings['log_integrity'] == stock_config['sides'][side]['log_integrity']
@@ -482,6 +523,11 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
             assert settings['check_config']['LIF-12'] == stock_config['sides'][side]['check_config']['LIF-12']
             assert settings['run_binding']['LIF-12'] == {
                 key: retry_bindings[side][key] for key in ('record_session', 'record_producer')}
+        if include_copy:
+            assert settings['required_event_record'] == stock_config['sides'][side]['required_event_record']
+            assert settings['check_config']['PLT-12'] == {'copy_inventory': copy_bindings[side]['copy_inventory']}
+            assert settings['run_binding']['PLT-12'] == {
+                key: copy_bindings[side][key] for key in ('record_session', 'record_producer')}
     assert all(item['configuration'] == _pointer(output / 'guard.toml') for item in joined['inputs'])
     for item in joined['inputs']:
         if item['check_id'] in stock_checks:
@@ -512,6 +558,15 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
             assert changed['file_binding_valid_sides'] == expected_bound - 1
             retry_row = next(row for row in changed['rows'] if row['check_id'] == 'LIF-12' and row['side'] == 'candidate')
             assert not retry_row['file_binding_valid']
+            path.write_bytes(original)
+    if include_copy:
+        for role in ('copy_inventory', 'record_producer'):
+            path = Path(copy_bindings['candidate'][role])
+            original = path.read_bytes()
+            path.write_bytes(original + b'\n')
+            changed = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
+            valid = {(row['check_id'], row['side']) for row in changed['rows'] if row['file_binding_valid']}
+            assert len(valid) == expected_bound - 1 and ('PLT-12', 'candidate') not in valid
             path.write_bytes(original)
 
     target = stock_sources['candidate']['target']

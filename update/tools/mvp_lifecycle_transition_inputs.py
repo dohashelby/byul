@@ -10,7 +10,7 @@ from guard.core.execution_recipe import validate_policy_time
 from guard.core.select import _in_scope
 from guard.executors import lifecycle_transition as transition, run_binding
 from guard.executors.kubernetes_sup05_normal_preparation import read_normal_preparation
-from guard.executors.owned_capture import MAX_BYTES as MAX_RETRY_SCOPE_BYTES
+from guard.executors.owned_capture import MAX_BYTES as MAX_RECORD_SCOPE_BYTES
 from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
 from guard.models import Environment, Policy, canonical_json, load_pack, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -27,7 +27,11 @@ _FILE_CHANGED = 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'
 _FILE_LIMITS = {'environment': 262144, 'target': 65536, 'prepared': 262144}
 _METADATA_INVALID = 'MVP_TRANSITION_METADATA_INPUT_INVALID'
 _RECORD_INPUT_MISMATCH = 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'
-_RECORD_CHECKS = {'LIF-12', 'OBS-11'}
+_RECORD_FILES = {
+    'LIF-12': ('retry_scope', 'retry_scope_sha256', 'retry_record_source_sha256'),
+    'PLT-12': ('copy_inventory', 'copy_inventory_sha256', 'copy_record_source_sha256'),
+}
+_RECORD_CHECKS = {'OBS-11', *_RECORD_FILES}
 
 
 def _pinned_bytes(pointer, limit, captured, *, min_bytes=1):
@@ -137,30 +141,30 @@ def _snapshot_record_settings(side_settings, records, target_pointer, target_bin
     expected = {'run_binding': bindings}
     for check_id, pins in records.items():
         binding = bindings[check_id]
-        retry = check_id == 'LIF-12'
-        keys = {'record_session', 'record_producer'} if retry else {'record_session'}
+        files = _RECORD_FILES.get(check_id)
+        keys = {'record_session', 'record_producer'} if files else {'record_session'}
         if type(binding) is not dict or binding.keys() != keys:
             raise ValueError(_METADATA_INVALID)
         session = run_binding._session(binding['record_session'])
         digests = {'target_file_sha256': target_pointer['sha256'],
                    'record_session_sha256': sha256_hex(session.encode('ascii'))}
-        expected_keys = digests.keys() | ({'retry_scope_sha256', 'retry_record_source_sha256'} if retry else set())
+        expected_keys = digests.keys() | (set(files[1:]) if files else set())
         if (type(pins) is not dict or pins.keys() != expected_keys
                 or any(pins[key] != digest for key, digest in digests.items())):
             raise ValueError(_RECORD_INPUT_MISMATCH)
-        if retry:
+        if files:
+            scope_key, scope_sha256, producer_sha256 = files
             overlays = side_settings.get('check_config')
             scope = overlays.get(check_id) if type(overlays) is dict else None
-            if (type(scope) is not dict or scope.keys() - {'retry_scope', RETRY_TARGET_BINDING}
-                    or 'retry_scope' not in scope):
+            allowed_keys = {scope_key, RETRY_TARGET_BINDING} if check_id == 'LIF-12' else {scope_key}
+            if type(scope) is not dict or not {scope_key} <= scope.keys() <= allowed_keys:
                 raise ValueError(_METADATA_INVALID)
             if RETRY_TARGET_BINDING in scope and scope[RETRY_TARGET_BINDING] != target_binding:
                 raise ValueError(_RECORD_INPUT_MISMATCH)
-            _pinned_bytes({'path': scope['retry_scope'], 'sha256': pins['retry_scope_sha256']},
-                          MAX_RETRY_SCOPE_BYTES, captured)
-            _pinned_bytes({'path': binding['record_producer'], 'sha256': pins['retry_record_source_sha256']},
+            _pinned_bytes({'path': scope[scope_key], 'sha256': pins[scope_sha256]}, MAX_RECORD_SCOPE_BYTES, captured)
+            _pinned_bytes({'path': binding['record_producer'], 'sha256': pins[producer_sha256]},
                           run_binding._MAX_PRODUCER_BYTES, captured, min_bytes=0)
-            expected['check_config'] = {check_id: scope}
+            expected.setdefault('check_config', {})[check_id] = scope
     return expected
 
 
@@ -308,7 +312,7 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
 
     A prebound metadata input provides its standard source index pointer under
     ``index`` and one independently pinned target per side under ``targets``.
-    OBS-11 and LIF-12 rows must also carry their verified snapshot input digests.
+    OBS-11, LIF-12 and PLT-12 rows must also carry their verified snapshot input digests.
     SUP-05 uses the preparation receipt and separate target held by the pinned configuration.
     A pinned file pointer to that declaration is also accepted.
     """

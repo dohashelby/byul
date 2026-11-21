@@ -8,6 +8,7 @@ from guard.core.select import select
 from guard.executors import run_binding
 from guard.executors.kubernetes_model_authorization import normalize_policy
 from guard.models import DataOrigin, Gap, canonical_json, load_pack, sha256_hex
+from guard.store import Store
 from tests.builders import environment, policy
 from tools import mvp_model_grant_inputs as inputs
 from tools.mvp_runtime_policy import AMENDMENT, BASE_DECISIONS, ROOT
@@ -56,6 +57,46 @@ def test_materialized_grant_enters_existing_plan_and_policy_validator(tmp_path):
         _, _, grants, _ = normalize_policy(effective)
         assert grants == {(base.values['REQ-05']['allowed_principal_sha256'], sha256_hex(env.model.id.encode()),
                            sha256_hex(env.model.revision.encode()))}
+
+
+@pytest.mark.parametrize('replace_target', [False, True], ids=['unchanged', 'replaced-with-identical-bytes'])
+def test_prepare_checks_saved_source_identity_before_writing(tmp_path, monkeypatch, replace_target):
+    _, base, envs, targets, receipt = declarations()
+
+    def write(name, value):
+        path = tmp_path / name
+        path.write_bytes(canonical_json(value))
+        return path
+
+    policy_path = write('policy.json', base.to_dict())
+    inventory_path = write('inventory.json', receipt)
+    environment_paths = {side: write(f'{side}-env.json', env.to_dict()) for side, env in envs.items()}
+    target_paths = {side: write(f'{side}-target.json', target) for side, target in targets.items()}
+    if replace_target:
+        materialize = inputs.materialize
+
+        def replace_after_materialization(*args):
+            revised = materialize(*args)
+            source = target_paths['candidate']
+            replacement = tmp_path / 'replacement.json'
+            replacement.write_bytes(source.read_bytes())
+            replacement.replace(source)
+            return revised
+
+        monkeypatch.setattr(inputs, 'materialize', replace_after_materialization)
+
+    selection_pin = sha256_hex(inventory_path.read_bytes())
+    output, store = tmp_path / 'revised.json', tmp_path / 'store'
+    arguments = policy_path, environment_paths, target_paths, inventory_path, selection_pin, output
+    if replace_target:
+        with pytest.raises(ValueError, match='^MVP_MODEL_GRANT_SOURCE_CHANGED$'):
+            inputs.prepare(*arguments, store=store)
+        assert not output.exists() and not store.exists()
+    else:
+        ref = inputs.prepare(*arguments, store=store)
+        revised = Store.read_only(store).resolve(ref)
+        assert output.read_bytes() == canonical_json(revised.to_dict())
+        assert revised.refs[-1] == base.ref()
 
 
 @pytest.mark.parametrize('field,value,diagnostic', [

@@ -72,12 +72,19 @@ def materialize(policy, pack, environments, targets, inventory):
 
 
 def prepare(policy_path, environment_paths, target_paths, inventory_path, expected_inventory_sha256, output, *, store=None):
-    policy_raw = _read(policy_path)[0]
-    policy = Policy.model_validate(strict_json(policy_raw, limit=POLICY_MAX_BYTES))
-    environments = {side: Environment.model_validate(strict_json(_read(path)[0]))
-                    for side, path in environment_paths.items()}
-    targets = {side: strict_json(_read(path)[0]) for side, path in target_paths.items()}
-    inventory_raw = _read(inventory_path)[0]
+    sources = []
+
+    def read(path):
+        path = Path(path)
+        inspected = _read(path)
+        sources.append((path, inspected))
+        raw, _ = inspected
+        return raw
+
+    policy = Policy.model_validate(strict_json(read(policy_path), limit=POLICY_MAX_BYTES))
+    environments = {side: Environment.model_validate(strict_json(read(path))) for side, path in environment_paths.items()}
+    targets = {side: strict_json(read(path)) for side, path in target_paths.items()}
+    inventory_raw = read(inventory_path)
     if sha256_hex(inventory_raw) != expected_inventory_sha256:
         raise ValueError('MVP_MODEL_GRANT_INVENTORY_CHANGED')
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
@@ -85,6 +92,13 @@ def prepare(policy_path, environment_paths, target_paths, inventory_path, expect
     output = Path(output)
     if output.exists():
         raise FileExistsError(output)
+    for path, inspected in sources:
+        try:
+            unchanged = _read(path) == inspected
+        except (OSError, ValueError):
+            unchanged = False
+        if not unchanged:
+            raise ValueError('MVP_MODEL_GRANT_SOURCE_CHANGED')
     bound = seed_run_store(store, policy, bound)
     with output.open('xb') as stream:
         stream.write(canonical_json(bound.to_dict()))

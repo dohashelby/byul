@@ -44,6 +44,7 @@ from tools.mvp_versions import versions
 
 PREBOUND_RECORD_EXECUTORS = {'LIF-12': 'request_termination', 'OBS-11': 'log_integrity'}
 RECORD_SCOPE_FILES = {'PLT-12': 'copy_inventory', 'LIF-12': 'retry_scope'}
+_COPY_RECORD_FILE_DIGESTS = ('copy_inventory_sha256', 'copy_record_source_sha256')
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
                    'SUP-03': 'template_validation', 'SUP-07': 'supply_boot', 'SUP-10': 'supply_boot', 'SUP-12': 'supply_boot',
                    'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
@@ -81,7 +82,7 @@ def _transport(target, env):
     return transport
 
 
-def _paired_record_inputs(value, check_id):
+def _paired_record_inputs(value, check_id, *, prebound_copy_records=False):
     if type(value) is not dict or set(value) != set(readiness.SIDES):
         raise ValueError('OBSERVATION_PAIRED_RUN_BINDINGS_REQUIRED')
     scope_file = RECORD_SCOPE_FILES.get(check_id)
@@ -93,10 +94,18 @@ def _paired_record_inputs(value, check_id):
         fields.add('test_actors')
     if check_id == 'LIF-12' and any(type(entry) is dict and RETRY_TARGET_BINDING in entry for entry in value.values()):
         fields.add(RETRY_TARGET_BINDING)
+    if (check_id == 'PLT-12' and prebound_copy_records
+            and any(type(entry) is dict and 'input_sha256' in entry for entry in value.values())):
+        fields.add('input_sha256')
     bindings = {}
     for side, entry in value.items():
         if type(entry) is not dict or set(entry) != fields:
             raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
+        if 'input_sha256' in entry:
+            expected = entry['input_sha256']
+            if (type(expected) is not dict or expected.keys() != set(_COPY_RECORD_FILE_DIGESTS)
+                    or not all(readiness._is_sha256(digest) for digest in expected.values())):
+                raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
         bindings[side] = dict(entry)
         for field in file_fields:
             if type(entry[field]) is not str or not entry[field]:
@@ -333,7 +342,8 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=Fals
 def _prebound_record_binding(check, env, values, *, policy, side, target_pointer, target_sha256, record_inputs):
     settings = {'target': target_pointer['path'], CHECK_OPTIONS[check.id]: True}
     run_cfg = dict(record_inputs)
-    if check.id == 'LIF-12':
+    expected_copy_digests = run_cfg.pop('input_sha256', None) if check.id == 'PLT-12' else None
+    if check.id in RECORD_SCOPE_FILES:
         settings.update(_record_scope_settings(check.id, run_cfg))
     elif run_binding.stages_for(check) != (2,):
         raise ValueError('METADATA_COLLECTION_STATUS_PROFILE_UNAVAILABLE')
@@ -347,19 +357,26 @@ def _prebound_record_binding(check, env, values, *, policy, side, target_pointer
     if check.id == 'LIF-12':
         executor.prepared_retry_records(check, env, effective, expected_target_sha256=target_sha256)
         digests.update({key: effective[key] for key in ('retry_scope_sha256', 'retry_record_source_sha256')})
+    elif check.id == 'PLT-12':
+        copy_digests = {key: effective[key] for key in _COPY_RECORD_FILE_DIGESTS}
+        if expected_copy_digests is not None and copy_digests != expected_copy_digests:
+            raise ValueError('METADATA_COPY_RECORD_INPUT_SHA256_MISMATCH')
+        executor.prepared_copy_record_snapshot(check, env, effective, expected_target_sha256=target_sha256)
+        digests.update(copy_digests)
     else:
         executor.prepared_collection_status(check, env, effective, expected_target_sha256=target_sha256)
     return digests
 
 
-def _check_reason(check, env, target, transport, values, *, policy, side, target_pointer, record_inputs, record_pins):
+def _check_reason(check, env, target, transport, values, *, policy, side, target_pointer, record_inputs, record_pins,
+                  prebound_copy_records=False):
     if not _in_scope(check.id, policy):
         return 'MVP_POLICY_SCOPE_MISMATCH'
     if any(key.required and key.key not in values for key in check.policy_params):
         return 'MVP_POLICY_VALUE_MISSING'
     if check.executor != CHECK_EXECUTORS[check.id]:
         return 'METADATA_EXECUTOR_UNAVAILABLE'
-    if check.id in PREBOUND_RECORD_EXECUTORS:
+    if check.id in PREBOUND_RECORD_EXECUTORS or (check.id == 'PLT-12' and prebound_copy_records):
         try:
             record_pins[side] = _prebound_record_binding(check, env, values, policy=policy, side=side,
                 target_pointer=target_pointer, target_sha256=transport.target_sha256, record_inputs=record_inputs)
@@ -493,7 +510,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
              normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False,
              cilium_egress_status=False, normal_startup_load=False, normal_compile_cache=False,
              normal_safetensors_reader=False, normal_graph_capture=False, sup05_normal_preparations=None,
-             retry_record_inputs=None, collection_status_bindings=None):
+             retry_record_inputs=None, collection_status_bindings=None, prebound_copy_records=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -525,7 +542,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config = {'store': str(Path(store).absolute()), 'adapter': {'name': base.engine.name},
               'update': {'mode': 'external'}, 'executors': {}, 'sides': {side: {} for side in sides}}
     candidates = {}
-    records = {check_id: _paired_record_inputs(value, check_id) for check_id, value in
+    records = {check_id: _paired_record_inputs(value, check_id, prebound_copy_records=prebound_copy_records)
+               for check_id, value in
                (('OBS-01', observation_run_bindings), ('PLT-12', copy_record_inputs),
                 ('LIF-12', retry_record_inputs), ('OBS-11', collection_status_bindings)) if value is not None}
     if gateway_record_inputs is not None:
@@ -550,7 +568,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         record_pins = {}
         reasons = {side: _check_reason(check, env, target, transport, values, policy=policy, side=side,
                                        target_pointer=target_pointer, record_inputs=records.get(check_id, {}).get(side),
-                                       record_pins=record_pins)
+                                       record_pins=record_pins, prebound_copy_records=prebound_copy_records)
                    for side, (env, target, transport, _, target_pointer) in sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
         if record_pins.keys() == set(readiness.SIDES):
@@ -584,13 +602,15 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 settings[check.executor] = {'target': target_pointer['path']}
             if check_id in records:
                 run_cfg = dict(records[check_id][side])
+                if check_id == 'PLT-12':
+                    run_cfg.pop('input_sha256', None)
                 if check_id in RECORD_SCOPE_FILES:
                     settings.setdefault('check_config', {})[check_id] = _record_scope_settings(check_id, run_cfg)
                 if check_id == 'OBS-01' and SNAPSHOT_SOURCE in run_cfg:
                     settings.setdefault('check_config', {})[check_id] = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
                 settings.setdefault('run_binding', {})[check_id] = run_cfg
             binding = {'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer}
-            if check_id in PREBOUND_RECORD_EXECUTORS:
+            if 'prepared_record_input_sha256_by_side' in decision:
                 binding['record_inputs'] = dict(decision['prepared_record_input_sha256_by_side'][side])
             bindings.append(binding)
         if check_id == 'SUP-04' and node_image_verification is not None:
@@ -710,7 +730,8 @@ def main():
     parser.add_argument('--normal-graph-capture', action='store_true',
                         help='Read the source-checked ordinary CUDA graph capture completion for REQ-20')
     parser.add_argument('--copy-record-inputs', type=Path,
-                        help='Paired PLT-12 consumer inputs with an existing producer, session and sealed inventory')
+                        help='Paired PLT-12 producer, session and sealed inventory. Prebound sides may both include '
+                             'input_sha256 with copy_inventory_sha256 and copy_record_source_sha256.')
     parser.add_argument('--retry-record-inputs', type=Path,
                         help='Paired LIF-12 inputs with an existing producer, session and sealed retry scope')
     parser.add_argument('--collection-status-bindings', type=Path,
@@ -745,7 +766,8 @@ def main():
                                         normal_safetensors_reader=args.normal_safetensors_reader,
                                         normal_graph_capture=args.normal_graph_capture,
                                         sup05_normal_preparations=sup05_preparations, retry_record_inputs=retries,
-                                        collection_status_bindings=collection_status)
+                                        collection_status_bindings=collection_status,
+                                        prebound_copy_records=args.candidate_target_after_baseline is None)
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]
@@ -767,7 +789,8 @@ def main():
         # Each receipt's directory contains all files emitted by prepare-sup05-normal.
         protected.extend([args.sup05_normal_preparations, *(Path(row['path']).parent for row in sup05_preparations.values())])
     output = reserve_output(args.output, protected=protected)
-    bound_records = {cid for cid in PREBOUND_RECORD_EXECUTORS if checks.get(cid, {}).get('configuration_enabled')}
+    bound_records = {cid for cid, check in checks.items() if check['configuration_enabled']
+                     and 'prepared_record_input_sha256_by_side' in check}
     enabled_preparations = (sup05_preparations if checks.get('SUP-05', {}).get('configuration_enabled') else None)
     if bound_records or enabled_preparations is not None:
         _publish_prebound(output, config=config, bindings=bindings, checks=checks, pack=pack,

@@ -71,6 +71,7 @@ _INPUT_FILES = ('environment', 'policy', 'configuration')
 _INPUT_ROW_FIELDS = {'check_id', 'side', *_INPUT_FILES}
 _COLLECTION_STATUS_DIGESTS = {'target_file_sha256', 'record_session_sha256'}
 _RETRY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'retry_scope_sha256', 'retry_record_source_sha256'}
+_COPY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'copy_inventory_sha256', 'copy_record_source_sha256'}
 STARTUP_OBSERVERS = {
     'LIF-01': ('startup_load_source', normal_startup_load_transport, 'NORMAL_STARTUP_LOAD'),
     'SUP-07': ('compile_cache_source', normal_compile_cache_transport, 'NORMAL_COMPILE_CACHE'),
@@ -329,7 +330,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
                          and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
     if 'record_inputs' in source:
-        if retry_records and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['LIF-12']) is True:
+        if copy_snapshot:
+            digests = _COPY_RECORD_DIGESTS
+        elif retry_records and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['LIF-12']) is True:
             digests = _RETRY_RECORD_DIGESTS
         elif (collection_status and prebound_kubernetes and run_binding.stages_for(check) == (2,)
               and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-11']) is True):
@@ -522,7 +525,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             valid_from=policy.valid_from, valid_until=policy.valid_until,
             run_cfg=run_cfg, policy_ref=policy.ref(), **binding_options)
         if expected_record_inputs is not None:
-            if check.id == 'LIF-12' and retry_records:
+            if copy_snapshot:
+                session_key = 'copy_record_session'
+            elif check.id == 'LIF-12' and retry_records:
                 session_key = 'retry_session'
             elif check.id == 'OBS-11' and collection_status:
                 session_key = 'collection_session'

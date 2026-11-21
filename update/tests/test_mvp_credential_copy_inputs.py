@@ -3,6 +3,11 @@
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+from pathlib import Path
+import socket
+import subprocess
+import sys
+import tomllib
 
 import pytest
 
@@ -10,10 +15,12 @@ from guard.collectors.file import load_policy
 from guard.core.select import select
 from guard.executors import credential_copy_contract as contract, run_binding
 from guard.executors.kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor, load_inventory
-from guard.models import DataOrigin, Gap, canonical_json, load_pack, sha256_hex
+from guard.models import DataOrigin, Environment, Gap, canonical_json, load_pack, sha256_hex
 from guard.store import Store
 from tests.builders import environment, policy
+from tests.test_mvp_metadata_wiring import sources
 from tools import mvp_credential_copy_inputs as inputs
+from tools import mvp_metadata_wiring as wiring
 from tools import mvp_runtime_policy as runtime_policy
 
 
@@ -84,6 +91,91 @@ def test_materialized_files_pass_the_product_binding(tmp_path, monkeypatch):
         decision = inventory['copies'][0]
         assert decision['required_action'] == 'delete' and decision['retention_exception'] is None
         assert contract.stamp(decision['deadline_at']) - contract.stamp(source['started_at']) == timedelta(seconds=30)
+
+
+def test_prebound_publication_rechecks_copy_record_pins_and_preserves_staged_index(tmp_path, monkeypatch, sources):
+    def forbidden(*args, **kwargs):
+        pytest.fail('PLT-12 declaration preparation must not contact a workload or run a producer')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    pack, sides, _ = sources
+    _, base, _, selection = owned_declarations()
+    base = base.model_copy(update={'scope': base.scope.model_copy(update={'include': ['PLT-12']})}).seal()
+    env_paths = {side: files['environment'] for side, files in sides.items()}
+    selection.update(base_policy_ref=base.ref().model_dump(mode='json'), environments={
+        side: Environment.model_validate_json(path.read_bytes()).ref().model_dump(mode='json')
+        for side, path in env_paths.items()})
+    base_path, selection_path = tmp_path / 'base.json', tmp_path / 'selection.json'
+    base_path.write_bytes(canonical_json(base.to_dict()))
+    selection_path.write_bytes(canonical_json(selection))
+    prepared = tmp_path / 'prepared-copy'
+    manifest = inputs.prepare(base_path, env_paths, selection_path, sha256_hex(selection_path.read_bytes()), prepared)
+    policy_path = prepared / 'policy.json'
+
+    declarations, pinned = {}, {}
+    for number, side in enumerate(sides, 1):
+        producer = tmp_path / f'{side}-producer.txt'
+        producer.write_bytes(b'# inert EXAMPLE producer bytes\n')
+        inventory = tmp_path / f'{side}-inventory.json'
+        inventory.write_bytes((prepared / 'copy-inventory.json').read_bytes())
+        declarations[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
+                              'copy_inventory': str(inventory)}
+        pinned[side] = {**declarations[side], 'input_sha256': {
+            'copy_inventory_sha256': manifest['files']['copy-inventory.json'],
+            'copy_record_source_sha256': sha256_hex(producer.read_bytes())}}
+
+    wrong = deepcopy(pinned)
+    wrong['candidate']['input_sha256']['copy_inventory_sha256'] = '0' * 64
+    store = tmp_path / 'store'
+    config, rows, decisions = wiring.assemble(sides, policy_path, pack=pack, store=store,
+                                             copy_record_inputs=wrong, prebound_copy_records=True)
+    assert not config['update']['allowed_checks'] and not rows
+    assert decisions['PLT-12']['sides']['candidate'] == 'METADATA_COPY_RECORD_INPUT_SHA256_MISMATCH'
+
+    pinned_path = tmp_path / 'pinned-inputs.json'
+    pinned_path.write_bytes(canonical_json(pinned))
+    args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store)]
+    for side, files in sides.items():
+        for role, path in files.items():
+            args.extend([f'--{side}-{role}', str(path)])
+    prebound = tmp_path / 'prebound'
+    monkeypatch.setattr(sys, 'argv', [*args, '--output', str(prebound), '--copy-record-inputs', str(pinned_path)])
+    wiring.main()
+    index = prebound / 'input-sources.json'
+    replay = wiring.readiness.audit(index, pack=pack)
+    assert replay['file_binding_valid_sides'] == 2
+    assert replay['actual_results'] is None and not replay['engine_executed']
+    for row in json.loads(index.read_bytes())['inputs']:
+        side = row['side']
+        assert row['record_inputs'] == {
+            **pinned[side]['input_sha256'], 'target_file_sha256': sha256_hex(sides[side]['target'].read_bytes()),
+            'record_session_sha256': sha256_hex(declarations[side]['record_session'].encode('ascii'))}
+        checked = next(item for item in replay['rows'] if (item['check_id'], item['side']) == ('PLT-12', side))
+        assert checked['record_inputs'] == row['record_inputs']
+
+    for role in ('copy_inventory', 'record_producer'):
+        path = Path(declarations['candidate'][role])
+        raw = path.read_bytes()
+        path.write_bytes(raw + b'\n')
+        changed = wiring.readiness.audit(index, pack=pack)
+        path.write_bytes(raw)
+        assert changed['file_binding_valid_sides'] == 1
+        candidate = next(row for row in changed['rows'] if (row['check_id'], row['side']) == ('PLT-12', 'candidate'))
+        assert not candidate['file_binding_valid'] and 'MVP_INPUT_FILE_CHANGED' in candidate['blocking_codes']
+
+    paths_only = tmp_path / 'paths-only.json'
+    paths_only.write_bytes(canonical_json(declarations))
+    staged = tmp_path / 'staged'
+    monkeypatch.setattr(sys, 'argv', [*args, '--output', str(staged), '--copy-record-inputs', str(paths_only),
+        '--candidate-target-after-baseline', str(tmp_path / 'future-target.json')])
+    wiring.main()
+    stage_config = tomllib.loads((staged / 'guard.toml').read_text(encoding='utf-8'))
+    assert stage_config['update'] == {'mode': 'external', 'allowed_checks': ['PLT-12'],
+                                       'kubernetes_candidate_binding': 'after_baseline'}
+    items = json.loads((staged / 'input-sources.json').read_bytes())['inputs']
+    assert len(items) == 2 and all('record_inputs' not in row for row in items)
+    assert all(Path(row['configuration']['path']) == staged / 'preliminary-guard.toml' for row in items)
 
 
 @pytest.mark.parametrize('case,diagnostic', [

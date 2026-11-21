@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 
 CONTRACT = 'guard-model-entry/1'
 PHASES = ('import', 'constructor', 'forward')
@@ -56,9 +57,16 @@ def project(rows):
     """실제 생산자 행 → SUP-09·11 관측. 형식이 틀린 행은 오류로만 세고 위반을 만들지 않는다."""
     specs = {c['case_id']: c for c in fixtures()}
     valid, errors, violations, mode_violations = {}, [], [], []
+    seen_cases, duplicate_cases, reported_controls = set(), set(), {}
+    modeling_source = hashlib.sha256(FIXTURE_FILES['modeling_b2probe.py'].encode()).hexdigest()
     for row in rows:
         key = row.get('case_id') if isinstance(row, dict) else None
-        if type(key) is not str or key not in specs or key in valid or row.get('contract') != CONTRACT:
+        if type(key) is not str or key not in specs or row.get('contract') != CONTRACT:
+            errors.append('unknown_or_duplicate_case'); continue
+        if key in seen_cases:
+            duplicate_cases.add(key)
+        seen_cases.add(key)
+        if key in valid:
             errors.append('unknown_or_duplicate_case'); continue
         case = specs[key]
         optimize = row.get('python_optimize')
@@ -76,6 +84,18 @@ def project(rows):
         elif case['trust'] and (row.get('outcome') != 'accepted' or row.get('selected_source_matches') is not True
                                 or row.get('forward_completed') is not True or not set(PHASES) <= phases):
             errors.append(key)
+        elif case['trust'] and row.get('selected_source_sha256') == modeling_source:
+            class_digest = row.get('selected_class_sha256')
+            if type(class_digest) is str and re.fullmatch('[0-9a-f]{64}', class_digest):
+                reported_controls[key] = {
+                    'case_identity': row['case_identity'],
+                    'mode': case['mode'],
+                    'python_optimize': optimize,
+                    'selected_source_sha256': modeling_source,
+                    'selected_class_sha256': class_digest,
+                    'observed_modeling_phases': [phase for phase in PHASES if phase in phases],
+                    'before_and_after_forward_completed': True,
+                }
         if not case['trust'] and phases:
             violations.append(key)
     for case in fixtures():
@@ -88,6 +108,7 @@ def project(rows):
     complete = set(valid) == set(specs) and not errors
     return {'SUP-09': {'model_entry_confirmed_violations': {'value': violations, 'collected': bool(valid)}},
             'SUP-11': {'model_entry_mode_violations': {'value': mode_violations, 'collected': bool(valid)}},
+            'reported_normal_controls': [reported_controls[key] for key in sorted(reported_controls.keys() - duplicate_cases)],
             'complete': complete, 'errors': sorted(set(errors)),
             'scope': 'transformers model-entry loader in fresh Python children; not a vLLM engine boot or worker forward'}
 

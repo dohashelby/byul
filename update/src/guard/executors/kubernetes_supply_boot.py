@@ -625,6 +625,22 @@ class KubernetesSupplyBootExecutor:
         sessions = [{**part['row'], **({'reported_boot_record': part['packet'],
                     'reported_record_is_native_worker_verification': False}
                     if b3 and part['packet'] is not None else {})} for part in collected.values()]
+        if check.id in {'SUP-09', 'SUP-11'}:
+            from .dynamic_model_entry import CONTRACT as MODEL_ENTRY_CONTRACT, project as project_model_entry
+
+            normal = collected['normal']
+            if (normal['row']['collected'] is True and normal['row']['owner_binding_verified'] is True
+                    and normal['packet'] is not None and normal['packet']['role'] == 'normal'):
+                rows = [row for row in normal['packet']['rows']
+                        if type(row) is dict and row.get('contract') == MODEL_ENTRY_CONTRACT]
+                controls = project_model_entry(rows)['reported_normal_controls']
+                if controls:
+                    normal_session = next(row for row in sessions if row['role'] == 'normal')
+                    normal_session['reported_model_entry_controls'] = {
+                        'scope': 'transformers-model-entry-cpu',
+                        'producer_authenticated': False,
+                        'controls': controls,
+                    }
         cleanup = sorted({part["cleanup"] for part in collected.values() if part.get("cleanup")})
         observed = {"supply_boot_sessions": sessions, "supply_boot_change": change, "supply_boot_violations": violations,
                     "supply_boot_missing": missing, "supply_boot_complete": complete and not missing,

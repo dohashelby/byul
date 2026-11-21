@@ -192,6 +192,32 @@ def _sealed_plan(store, pack, envs, pol, cfg):
     return plan
 
 
+@pytest.mark.parametrize(('side', 'check_id'), [('baseline', 'LIF-07'), ('candidate', 'LIF-09')])
+def test_initialization_rejects_same_content_target_symlink_after_preparation(
+        external, monkeypatch, side, check_id):  # noqa: F811
+    monkeypatch.setattr(subprocess, 'Popen', _forbidden)
+    pack, envs, pol, cfg = _paired_inputs(external, check_id, None)
+    check = pack.checks[check_id]
+    assert run_binding.stages_for(check) == (1, 2)
+    env = envs[side == 'candidate']
+    settings = cfg['sides'][side]['initialization']
+    _, values = run_binding.effective_values(check, settings, env, pol.values[check_id], side=side,
+        attempt_id=None, issued_at=utcnow(), run_cfg=cfg['run_binding'][check_id])
+    executor = KubernetesInitializationExecutor(settings, runner=_forbidden,
+        expected_target_sha256=values['init_target_sha256'])
+    executor.prepared_inputs(check, env, values)
+
+    target = Path(settings['target'])
+    original = target.with_name('original-target.json')
+    target.rename(original)
+    target.symlink_to(original.name)
+    monkeypatch.setattr('guard.executors.kubernetes_initialization.KubernetesInitializationHTTP', _forbidden)
+    with pytest.raises(ValueError, match='^INITIALIZATION_CONFIGURATION_INVALID$'):
+        executor.prepared_inputs(check, env, values)
+    with pytest.raises(ValueError, match='^INITIALIZATION_CONFIGURATION_INVALID$'):
+        executor.run(check, env, values, object(), external / 'not-dispatched')
+
+
 def test_recipe_pins_raw_files_and_preserves_canonical_run_binding(external, tmp_path):  # noqa: F811
     check_id = 'LIF-07'
     pack, envs, pol, cfg = _paired_inputs(external, check_id, None)

@@ -69,11 +69,17 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
         normalize_check_policy(check,values)
 
     def _local_inputs(self, check, env, policy_values):
+        from guard.adapters.vllm_file_read_sensor import dependency
         from guard.collectors.lifecycle import load_initialization_prepared
+        from .run_binding import stages_for
+
         try:
             if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            if stages_for(check) == (1, 2):
+                target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+            else:
+                with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             target_hash = sha256_hex(canonical_json(target))
             prepared = load_initialization_prepared(self.cfg['prepared'], env, expected_sha256=self.expected_prepared)
             start, end = normalize_check_policy(check, policy_values)

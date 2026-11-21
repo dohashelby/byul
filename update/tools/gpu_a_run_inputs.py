@@ -12,6 +12,7 @@ import argparse
 from copy import deepcopy
 import json
 from pathlib import Path
+import re
 
 import yaml
 
@@ -75,8 +76,42 @@ def cases(preset, *, media_text_after=None):
     raise ValueError('RUN_INPUTS_CASE_PRESET_UNKNOWN')
 
 
+def _external_platform(render, launch, platform):
+    from guard.adapters.engine_provider import VllmProvider
+
+    if (type(platform) is not str or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ._+/-]{0,127}', platform)
+            or platform != platform.strip()):
+        raise ValueError('RUN_INPUTS_EXTERNAL_PLATFORM_INVALID')
+    release = VllmProvider().release_profile(render.get('engine_version'))
+    hashes = render.get('outputs_sha256')
+    engine_hash = hashes.get('engine.yaml') if type(hashes) is dict else None
+    if (render.get('schema') != 'byul-gpu-a-aws-render/2' or type(launch) is not dict
+            or launch.get('engine') != 'V1' or release is None or render.get('engine_image') not in release['images']
+            or release['launch']['engine'] != launch['engine'] or launch.get('env') != release['launch']['env']
+            or type(engine_hash) is not str or not re.fullmatch(r'[0-9a-f]{64}', engine_hash)
+            or type(render.get('run_id')) is not str or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', render['run_id'])):
+        raise ValueError('RUN_INPUTS_EXTERNAL_ENV_REVIEWED_V1_REQUIRED')
+    return f'{platform}, external Kubernetes'
+
+
+def _platform(render, launch, *, observed_engine_version, external_platform):
+    fields = [('generation', render['generation'])]
+    if external_platform is None:
+        platform = 'GPU, amd64, AWS g6 kubeadm serving-lab'
+        fields.append(('run', render['run_id']))
+    else:
+        platform = _external_platform(render, launch, external_platform)
+    fields.extend((('profile', render['profile']), ('engine_requested', launch.get('engine')),
+                   ('runner', launch['runner']), ('async_requested', launch['async_requested']),
+                   ('engine_version_observed', observed_engine_version is not None),
+                   ('eager', render['enforce_eager'])))
+    if external_platform is None:
+        fields.append(('render_engine_sha256', render['outputs_sha256']['engine.yaml']))
+    return platform + '; ' + '; '.join(f'{key}={value}' for key, value in fields)
+
+
 def environment(render, *, model_id=None, inventory=None, gpu_model, driver, observed_engine_version=None,
-                data_origin='DECLARED'):
+                data_origin='DECLARED', external_platform=None):
     generation = render['generation']
     legacy = render.get('schema') == 'byul-gpu-a-aws-render/1'
     if not legacy and render.get('schema') != 'byul-gpu-a-aws-render/2':
@@ -94,12 +129,8 @@ def environment(render, *, model_id=None, inventory=None, gpu_model, driver, obs
                                       'async_requested': generation != 'v1-callback-sync',
                                       'prefix_cache': generation != 'v2-default'}
     # facts는 등록된 키만 받는다. 세대 구분은 서술 필드에 남기고 결과를 세대끼리 섞지 않는다.
-    platform = ('GPU, amd64, AWS g6 kubeadm serving-lab; ' + '; '.join(f'{k}={v}' for k, v in (
-        ('generation', generation), ('run', render['run_id']), ('profile', render['profile']),
-        ('engine_requested', launch.get('engine')),
-        ('runner', launch['runner']), ('async_requested', launch['async_requested']),
-        ('engine_version_observed', observed_engine_version is not None),
-        ('eager', render['enforce_eager']), ('render_engine_sha256', render['outputs_sha256']['engine.yaml']))))
+    platform = _platform(render, launch, observed_engine_version=observed_engine_version,
+                         external_platform=external_platform)
     origin = DataOrigin(data_origin)
     env = Environment(id=new_id('ENV'), data_origin=origin,
         engine={'name': 'vllm', 'version': version, 'image_digest': render['engine_image']},
@@ -351,9 +382,11 @@ def http_inputs(check_id, target_value, draft, *, root, prepared=None, prepared_
     return policy, '\n'.join([*lines, ''])
 
 
-def _write(path, data):
+def _write(path, data, *, exclusive=False):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(data if type(data) is str else json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + '\n', encoding='utf-8')
+    contents = data if type(data) is str else json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + '\n'
+    with path.open('x' if exclusive else 'w', encoding='utf-8') as stream:
+        stream.write(contents)
 
 
 def main(argv=None):
@@ -363,6 +396,7 @@ def main(argv=None):
     e.add_argument('--driver', required=True); e.add_argument('--model-inventory'); e.add_argument('--out', type=Path, required=True)
     e.add_argument('--model-id', help='렌더 기록의 모델 ID와 일치해야 한다')
     e.add_argument('--observed-engine-version', help='Pod 안에서 조회한 실제 vLLM 판본(코드 선택 세대 필수)')
+    e.add_argument('--external-platform', help='비교에 쓸 서버 OS·아키텍처 선언(예: Linux x86_64)')
     t = sub.add_parser('target'); t.add_argument('--env', type=Path, required=True); t.add_argument('--render', type=Path, required=True)
     for name in ('namespace', 'engine-pod', 'probe-pod'):
         t.add_argument('--' + name, type=Path, required=True)
@@ -385,13 +419,24 @@ def main(argv=None):
         parser.error('--media-text-after requires --check REQ-16 --cases req16-full')
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'env':
-        env = environment(load(args.render), model_id=args.model_id, gpu_model=args.gpu_model, driver=args.driver,
-            observed_engine_version=args.observed_engine_version,
+        render_ref = {}
+        if args.external_platform is None:
+            render = load(args.render)
+        else:
+            from guard.runtime.bounded import strict_json
+            from tools.mvp_a_input_preflight import _read
+
+            render_path = args.render.absolute()
+            raw, _ = _read(render_path, max_bytes=262144)
+            render = strict_json(raw, limit=262144)
+            render_ref['render'] = {'path': str(render_path), 'sha256': sha256_hex(raw)}
+        env = environment(render, model_id=args.model_id, gpu_model=args.gpu_model, driver=args.driver,
+            observed_engine_version=args.observed_engine_version, external_platform=args.external_platform,
             inventory=args.model_inventory)
-        _write(args.out, env.model_dump(mode='json'))
+        _write(args.out, env.model_dump(mode='json'), exclusive=args.external_platform is not None)
         if load_environment(args.out).ref() != env.ref():
             raise ValueError('RUN_INPUTS_ENV_ROUNDTRIP_MISMATCH')
-        print(json.dumps({'env': str(args.out), 'sha256': env.ref().sha256}))
+        print(json.dumps({'env': str(args.out), 'sha256': env.ref().sha256, **render_ref}))
     elif args.kind == 'target':
         value = target(load_environment(args.env), load(args.render), load(args.namespace), load(args.engine_pod),
             load(args.probe_pod), context=args.context, api_model=args.api_model)

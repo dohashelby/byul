@@ -33,6 +33,15 @@ def load_inventory(path,expected_hash,expected_policy):
     finally:os.close(fd)
 
 
+def _read_snapshot_target(path):
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    target = strict_json(dependency(path, None), limit=65536)
+    if type(target) is not dict:
+        raise ValueError('COPY_CONFIGURATION_INVALID')
+    return target
+
+
 class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
     name='required_event_record';version='0.2.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
@@ -74,7 +83,6 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
 
     def prepared_copy_record_snapshot(self, check, env, values, *, expected_target_sha256=None):
         """Validate the saved copy declaration without opening the owned event file."""
-        from guard.adapters.vllm_file_read_sensor import dependency
         from .run_binding import stages_for
 
         if (self.cfg.get(SNAPSHOT_OPTION) is not True or check.executor != self.name
@@ -84,9 +92,7 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
         try:
             if env.ref().sha256 != values['copy_environment_sha256']:
                 raise ValueError
-            target = strict_json(dependency(self.cfg['target'], None), limit=65536)
-            if type(target) is not dict:
-                raise ValueError
+            target = _read_snapshot_target(self.cfg['target'])
             self._validate_target(target, values, True, expected_target_sha256=expected_target_sha256)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             raise ValueError('COPY_CONFIGURATION_INVALID') from None
@@ -104,7 +110,10 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
             if set(self.cfg)-{'target','copy_inventory','kubectl_binary','max_duration_seconds',SNAPSHOT_OPTION} or adapter is None:raise ValueError
             start,end=contract.normalize_policy(policy_values)
             if env.ref().sha256!=policy_values['copy_environment_sha256'] or not start<=utcnow()<=end:raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            if snapshot_only:
+                target = _read_snapshot_target(self.cfg['target'])
+            else:
+                with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             self._validate_target(target, policy_values, snapshot_only)
             if inventory is None:
                 inventory = self._bound_inventory(policy_values)

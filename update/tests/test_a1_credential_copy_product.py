@@ -364,3 +364,23 @@ def test_copy_snapshot_preparation_checks_bound_declarations_without_collecting(
     else:
         with pytest.raises(ValueError, match=f'^{error}$'):
             executor.prepared_copy_record_snapshot(check, environment, values, expected_target_sha256=digest)
+
+
+def test_copy_snapshot_rejects_same_content_target_symlink_after_preparation(tmp_path, monkeypatch):
+    environment, world, values, pack, cfg, digest = snapshot_inputs(tmp_path)
+    check = pack.checks['PLT-12']
+    executor = KubernetesRequiredEventExecutor(cfg, runner=world.runner, expected_target_sha256=digest)
+    executor.prepared_copy_record_snapshot(check, environment, values, expected_target_sha256=digest)
+
+    target = Path(cfg['target'])
+    original = target.with_name('original-target.json')
+    target.rename(original)
+    target.symlink_to(original.name)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('PLT-12 must reject the replaced target before constructing the transport')
+
+    monkeypatch.setattr(copy_executor.KubernetesCredentialCopyRecordExecutor, '_transport', forbidden)
+    with pytest.raises(ValueError, match='^COPY_CONFIGURATION_INVALID$'):
+        executor.run(check, environment, values, VllmAdapter(), tmp_path / 'snapshot')
+    assert not world.calls and not world.reads and not world.sent

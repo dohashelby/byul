@@ -307,12 +307,17 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     assert result["checks"][0]["verdicts"]["security"] == ("FAIL" if changes.get("duplicate") else "UNKNOWN" if changes else "PASS")
 
 
-@pytest.mark.parametrize("scope", ["matched", "different-image", "different-version", "different-contract", "different-source"])
-def test_saved_obs09_baseline_replay_uses_the_pinned_environment(tmp_path, scope):
+@pytest.mark.parametrize("release,scope", [
+    ("0.30.0", "matched"), ("0.30.0", "different-image"), ("0.30.0", "different-version"),
+    ("0.30.0", "different-contract"), ("0.30.0", "different-source"),
+    ("0.31.0", "matched"), ("0.31.0", "matched-canonical-source"),
+    ("0.31.0", "different-contract"), ("0.31.0", "different-source"),
+])
+def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope):
     from types import SimpleNamespace
 
     from guard.adapters.engine_provider import NATIVE_LOG_REPLAY_BASELINE_IMAGE, get_provider
-    from guard.adapters.vllm import VllmAdapter
+    from guard.adapters.vllm import REQUEST_BINDING_GPU_IMAGE, VllmAdapter
     from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
     from guard.log_evidence import _obs09
     from guard.models import canonical_json, sha256_hex
@@ -320,20 +325,28 @@ def test_saved_obs09_baseline_replay_uses_the_pinned_environment(tmp_path, scope
     from tests.test_log_integrity import VALUES
     from tests.test_native_artifact_privacy import fixture
 
-    image = "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE
+    baseline = release == "0.30.0"
+    image = "docker.io/" + (NATIVE_LOG_REPLAY_BASELINE_IMAGE if baseline else REQUEST_BINDING_GPU_IMAGE)
+    source_image = image if baseline or scope == "matched-canonical-source" else REQUEST_BINDING_GPU_IMAGE
     other_image = "vllm/vllm-openai@sha256:" + "f" * 64
+    foreign_source = not baseline and scope == "different-source"
+    if foreign_source:
+        source_image = "foreign/vllm-openai@" + REQUEST_BINDING_GPU_IMAGE.rsplit("@", 1)[1]
     adapter = VllmAdapter()
-    profile = get_provider("vllm").evidence_contract("native_log_replay_profile", image, "0.30.0")
-    assert profile["request_logger_line"] == 63
-    assert adapter.native_log_contract(image, "0.30.0") is None
+    profile = get_provider("vllm").evidence_contract("native_log_replay_profile", image, release)
+    request_logger_line = 63 if baseline else 65
+    assert profile["request_logger_line"] == request_logger_line
+    assert adapter.native_log_contract(image, release) is None
 
     def record_identity(capture, trials, before, after):
         for identity in [before, after]:
-            identity.update(image=image, image_id=image)
+            identity.update(image=source_image, image_id=source_image)
 
-    _, _, _, sample = fixture(change=record_identity, cases=("before", "after"), request_logger_line=63)
+    _, _, _, sample = fixture(change=record_identity, cases=("before", "after"), request_logger_line=request_logger_line)
     sample["native_contract_sha256"] = sha256_hex(canonical_json(profile["contract"]))
-    collection = replay_native(sample, request_logger_line=63)["collection"]
+    if not baseline:
+        assert sample["native_contract_sha256"] == "97bea97ae6e7984b8d3ce53bcefe9e7665471c228b9dc36eeb7e4a3a3373daf2"
+    collection = replay_native(sample, request_logger_line=request_logger_line)["collection"]
     collection.update(capture_window=sample["capture"]["window"], redaction=PROFILE)
     document = render_projection(collection)
     sample["display_sha256"] = sha256_hex(document.encode())
@@ -345,18 +358,22 @@ def test_saved_obs09_baseline_replay_uses_the_pinned_environment(tmp_path, scope
         artifacts.append(SimpleNamespace(name=name, path=path, bytes=path.stat().st_size))
 
     fixture_evd = SimpleNamespace(artifacts=artifacts, execution=SimpleNamespace(executor=SimpleNamespace(version="0.3.1")))
-    original = environment(engine={"name": "vllm", "version": "0.30.0", "image_digest": image},
-                           model={"id": "EXAMPLE-baseline"})
-    obs, complete = _obs09(tmp_path, fixture_evd, sample, VALUES, original)
+    original = environment(engine={"name": "vllm", "version": release, "image_digest": image},
+                           model={"id": "EXAMPLE-projection"})
+    replay_env = original
+    if foreign_source:
+        # The saved foreign transcript is internally consistent, including its physical image digest.
+        replay_env = environment(engine={"name": "vllm", "version": release, "image_digest": source_image})
+    obs, complete = _obs09(tmp_path, fixture_evd, sample, VALUES, replay_env)
     assert not complete and obs["normal_controls"] and obs["log_trials_reached"] == ["before", "after"]
 
     if scope in {"different-image", "different-version"}:
-        original = environment(engine={"name": "vllm", "version": "0.31.0" if scope == "different-version" else "0.30.0",
+        original = environment(engine={"name": "vllm", "version": "0.31.0" if scope == "different-version" else release,
                                       "image_digest": other_image if scope == "different-image" else image},
-                               model={"id": "EXAMPLE-baseline"})
+                               model={"id": "EXAMPLE-projection"})
     elif scope == "different-contract":
         sample["native_contract_sha256"] = "b" * 64
-    elif scope == "different-source":
+    elif scope == "different-source" and baseline:
         sample["source_identity_after"]["image"] = other_image
 
     samples = tmp_path / "log_integrity_samples.json"
@@ -367,7 +384,7 @@ def test_saved_obs09_baseline_replay_uses_the_pinned_environment(tmp_path, scope
                            observations={key: {"value": value, "collected": True} for key, value in obs.items()})
     store = save_native_integrity_report(tmp_path, draft, original, "0.3.1")
     result = analyze_saved_logs(store)
-    assert result["accepted"] is (scope == "matched"), result
+    assert result["accepted"] is (scope in {"matched", "matched-canonical-source"}), result
     assert result["original_inventory_preserved"] and result["official"] is False
     if result["accepted"]:
         row, = result["checks"]

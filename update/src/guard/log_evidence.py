@@ -81,8 +81,9 @@ def _replay_native_for_environment(sample, environment):
         return replay_native(sample)
     if sample.get("native_contract_sha256") != sha256_hex(canonical_json(profile["contract"])):
         raise ValueError("saved native contract differs from the reviewed environment")
+    reviewed_images = profile.get("image_spellings", (environment.engine.image_digest,))
     for identity in (sample["source_identity_before"], sample["source_identity_after"]):
-        if identity is not None and identity["image"] != environment.engine.image_digest:
+        if identity is not None and identity["image"] not in reviewed_images:
             raise ValueError("saved native identity differs from the pinned environment")
     return replay_native(sample, request_logger_line=profile["request_logger_line"])
 

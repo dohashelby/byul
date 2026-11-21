@@ -6,7 +6,8 @@ import re
 
 from .base import LaunchSpec
 from .model_inventory import inventory
-from .vllm import VllmAdapter, BOUNDED_LAUNCH_KEYS, BOUNDED_LAUNCH_PROFILE, GpuLaunchOptions, CONTAINER_PORT
+from .vllm import (VllmAdapter, BOUNDED_LAUNCH_KEYS, BOUNDED_LAUNCH_PROFILE, GpuLaunchOptions, CONTAINER_PORT,
+                   REQUEST_BINDING_GPU_IMAGE)
 from .openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.runtime import generation_readiness
 
@@ -127,6 +128,10 @@ class VllmProvider(EngineProvider):
 
     def native_log_replay_profile(self, image_digest: str, engine_version: str) -> dict | None:
         """Reviewed additional source mapping for offline saved log evidence."""
+        candidate_images = (REQUEST_BINDING_GPU_IMAGE, "docker.io/" + REQUEST_BINDING_GPU_IMAGE)
+        if engine_version == "0.31.0" and image_digest in candidate_images:
+            contract = self.adapter().native_log_contract(REQUEST_BINDING_GPU_IMAGE, engine_version)
+            return {"contract": contract, "request_logger_line": 65, "image_spellings": candidate_images}
         if (engine_version, image_digest) not in {
                 ("0.30.0", NATIVE_LOG_REPLAY_BASELINE_IMAGE),
                 ("0.30.0", "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE)}:

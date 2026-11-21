@@ -1130,6 +1130,11 @@
       "manifest_sha256": "d4ea1eb5698f88d2052178743dc177ec7c94cd99706c9ebe809a1e3adfce77ee",
       "reviewed_by": "Codex / PLT-12 and OBS-01 passive snapshot target verification / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-21T07:51:08+00:00"
+    },
+    {
+      "manifest_sha256": "37e88749ba8123cdae0a41c795b9acd78988f3f5a3ff6b978f050508e7a0fde4",
+      "reviewed_by": "Codex / LIF-07 and LIF-09 saved initialization input review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-21T11:12:54+00:00"
     }
   ]
 }

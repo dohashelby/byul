@@ -18,7 +18,7 @@ def _read_snapshot_target(path):
 
     target = strict_json(dependency(path, None), limit=65536)
     if type(target) is not dict:
-        raise ValueError('OBSERVATION_CONFIGURATION_INVALID')
+        raise ValueError
     return target
 
 

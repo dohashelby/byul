@@ -9,7 +9,7 @@ from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sh
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_http import KubernetesBindingError,KubernetesHTTP,REQUEST_BINDING_PROFILE,REQUIRED_EVENT_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
-from .kubernetes_observation import RequiredEventReader
+from .kubernetes_observation import RequiredEventReader, _read_snapshot_target
 from .owned_capture import MAX_BYTES
 from . import credential_copy_contract as contract
 
@@ -31,15 +31,6 @@ def load_inventory(path,expected_hash,expected_policy):
                 or sha256_hex(raw)!=expected_hash):raise ValueError('COPY_INVENTORY_FILE_UNAVAILABLE')
         return contract.validate_inventory(strict_json(raw,limit=MAX_BYTES),expected_policy_sha256=expected_policy)
     finally:os.close(fd)
-
-
-def _read_snapshot_target(path):
-    from guard.adapters.vllm_file_read_sensor import dependency
-
-    target = strict_json(dependency(path, None), limit=65536)
-    if type(target) is not dict:
-        raise ValueError('COPY_CONFIGURATION_INVALID')
-    return target
 
 
 class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):

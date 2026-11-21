@@ -201,6 +201,7 @@ def test_canonical_obs01_snapshot_rejects_unsafe_configuration_before_read(tmp_p
     ('binding-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
     ('executor-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
     ('gateway', 'OBSERVATION_RECORD_SNAPSHOT_CONFIGURATION_INVALID'),
+    ('same-content-symlink-after-prepare', None),
 ])
 def test_canonical_obs01_prepares_only_the_bound_engine_snapshot(tmp_path, monkeypatch, damage, reason):
     environment, world, values, _, _ = inputs(tmp_path)
@@ -227,13 +228,21 @@ def test_canonical_obs01_prepares_only_the_bound_engine_snapshot(tmp_path, monke
     monkeypatch.setattr(http.KubernetesHTTP, '__call__', forbidden)
     monkeypatch.setattr(observation.RequiredEventReader, '__init__', forbidden)
     executor = observation.KubernetesRequiredEventExecutor(cfg, runner=forbidden,
-        expected_target_sha256='f' * 64 if damage == 'executor-pin' else None)
+        expected_target_sha256={'executor-pin': 'f' * 64,
+                                'same-content-symlink-after-prepare': digest}.get(damage))
     pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
     check = pack.checks['OBS-01']
     pin = 'e' * 64 if damage == 'binding-pin' else None if damage == 'missing-pin' else digest
     if reason is None:
         executor.prepared_record_snapshot(check, environment, values, expected_target_sha256=pin)
         assert executor.keys() == {}
+        if damage == 'same-content-symlink-after-prepare':
+            original = target_path.with_name('original-target.json')
+            target_path.rename(original)
+            target_path.symlink_to(original.name)
+            monkeypatch.setattr(observation.KubernetesRequiredEventExecutor, '_transport', forbidden)
+            with pytest.raises(ValueError, match='^OBSERVATION_CONFIGURATION_INVALID$'):
+                executor.run(check, environment, values, VllmAdapter(), tmp_path / 'snapshot')
     else:
         with pytest.raises(ValueError, match=f'^{reason}$'):
             executor.prepared_record_snapshot(check, environment, values, expected_target_sha256=pin)

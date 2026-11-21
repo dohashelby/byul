@@ -13,6 +13,15 @@ from .owned_capture import _FILE_READER,MAX_BYTES
 from .observation_contract import PROFILE,POLICY_TYPES,OBSERVATIONS,normalize_policy,validate_record,correlate
 
 
+def _read_snapshot_target(path):
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    target = strict_json(dependency(path, None), limit=65536)
+    if type(target) is not dict:
+        raise ValueError('OBSERVATION_CONFIGURATION_INVALID')
+    return target
+
+
 class RequiredEventReader(KubernetesLifecycleReader):
     def __init__(self,transport,target,session,*,binary,duration,runner=None,snapshot_only=False):
         if target.get('lab') is not (not snapshot_only):raise KubernetesCaptureError()
@@ -103,7 +112,6 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
 
     def prepared_record_snapshot(self, check, env, values, *, expected_target_sha256=None):
         """Validate only the saved engine-owned OBS-01 target, without collecting its record."""
-        from guard.adapters.vllm_file_read_sensor import dependency
         from .run_binding import stages_for
 
         if (check.id != 'OBS-01' or check.executor != self.name or stages_for(check) != (1, 2, 3, 4)
@@ -112,9 +120,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             raise ValueError('OBSERVATION_RECORD_SNAPSHOT_CONFIGURATION_INVALID')
         self.validate_policy(check, values)
         try:
-            target = strict_json(dependency(self.cfg['target'], None), limit=65536)
-            if type(target) is not dict:
-                raise ValueError
+            target = _read_snapshot_target(self.cfg['target'])
             self._validate_target(target, env, values, True, expected_target_sha256=expected_target_sha256)
         except (KeyError, ValueError, TypeError, OSError, RuntimeError):
             raise ValueError('OBSERVATION_CONFIGURATION_INVALID') from None
@@ -148,7 +154,10 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
                     or 'copy_inventory' in self.cfg and (type(self.cfg['copy_inventory']) is not str or not self.cfg['copy_inventory'])
                     or set(self.roles())!={'allowed','denied'}):raise ValueError
             keys={} if snapshot_only else self.keys()
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            if snapshot_only:
+                target = _read_snapshot_target(self.cfg['target'])
+            else:
+                with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             start,end=normalize_policy(policy_values)
             self._validate_target(target,env,policy_values,snapshot_only)
             if not start<=utcnow()<=end:raise ValueError

@@ -11,14 +11,16 @@ import pytest
 
 from guard import application
 from guard.executors import kubernetes_log_integrity, lifecycle_transition as transition
+from guard.executors.kubernetes_sup05_normal_preparation import prepare as prepare_sup05
 from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
 from guard.models import DataOrigin, Environment, canonical_json, sha256_hex
 from tests import test_redeployment_preflight as fixture
 from tests.builders import T0, policy
 from tests.test_a1_retry_record_contract import example as retry_example
 from tests.test_kubernetes_log_integrity import GAP_VALUES
-from tests.test_lifecycle_capture import external
+from tests.test_lifecycle_capture import REPOSITORY, external
 from tests.test_model_mapping import declared_mapping
+from tests.test_sup05_normal_preparation import _case as sup05_case
 from tools import mvp_lifecycle_transition_inputs as materializer, mvp_live_readiness as readiness
 from tools import mvp_metadata_wiring as metadata, mvp_retry_record_inputs as retry_inputs
 from tools.j02_run_config import write_config
@@ -67,6 +69,28 @@ def _retry_pair(directory, sources, pack, policy_path, confirmed, example_scope)
     output = directory / 'prepared-retry'
     retry_inputs.prepare(sources, policy_path, selection, _pointer(selection)['sha256'], output, pack=pack)
     return json.loads((output / 'retry-record-inputs.json').read_bytes())
+
+
+def _sup05_receipt(directory, env, before):
+    directory.mkdir()
+    case = sup05_case(directory, env.engine.version)
+    args = case.args
+    target = json.loads(args['target'].read_bytes())
+    target['environment_ref'] = env.ref().model_dump(mode='json')
+    engine = target['kubernetes']['engine']
+    ordinary = json.loads(Path(before['target']).read_bytes())['kubernetes']['engine']
+    engine.update(image=env.engine.image_digest, image_id=env.engine.image_digest, container_id=ordinary['container_id'])
+    case.snapshot['pod']['spec']['containers'][0]['image'] = env.engine.image_digest
+    case.snapshot['pod']['status']['containerStatuses'][0].update(
+        imageID=engine['image_id'], containerID=engine['container_id'])
+    args['target'].write_bytes(canonical_json(target))
+    args['owner_snapshot'].write_bytes(canonical_json(case.snapshot))
+    args['owner_snapshot_sha256'] = _pointer(args['owner_snapshot'])['sha256']
+    args['environment'] = Path(before['environment'])
+    args['model_manifest'] = args['environment'].with_name('reference.json')
+    args['model_manifest_sha256'] = _pointer(args['model_manifest'])['sha256']
+    prepared = prepare_sup05(case.output, REPOSITORY, **args)
+    return _pointer(case.output / 'preparation.json'), prepared['normal']
 
 
 @pytest.mark.parametrize(('check_id', 'case', 'error'), [
@@ -510,3 +534,111 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
     assert wrong_path['file_binding_valid_sides'] == expected_bound - 1
     stock_row = next(row for row in wrong_path['rows'] if row['check_id'] == 'SUP-04' and row['side'] == 'candidate')
     assert not stock_row['file_binding_valid']
+
+
+@pytest.mark.parametrize('case,error', [
+    ('exact', None),
+    ('target', 'SUP05_PREPARATION_RECEIPT_INVALID'),
+    ('receipt', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('asset-after-audit', 'SUP05_PREPARATION_RECEIPT_INVALID'),
+    ('flat-target-leak', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('output-alias', 'outside source inputs'),
+])
+def test_joins_prebound_sup05_receipts_and_keeps_ordinary_sibling_targets(external, monkeypatch, case, error):
+    _offline_only(monkeypatch)
+    build_environment = fixture.environment
+
+    def reviewable_environment(*, runtime, **kwargs):
+        return build_environment(runtime={**runtime, 'platform': 'Linux x86_64; engine_requested=V1'}, **kwargs)
+
+    monkeypatch.setattr(fixture, 'environment', reviewable_environment)
+    check_id = 'LIF-16'
+    pack, envs, _, cfg = fixture._configuration(external, check_id, mvp_inputs=True, lab=False)
+    confirmed = policy(pack.ref(), scope={'include': ['SUP-05', 'SUP-10', check_id]}, values={},
+                       data_origin=DataOrigin.DECLARED, status='CONFIRMED',
+                       confirmed_by='EXAMPLE operator', confirmed_at=T0)
+    policy_path = external / 'policy.json'
+    policy_path.write_bytes(canonical_json(confirmed.to_dict()))
+
+    sides, sources, receipts, normals = {}, {}, {}, {}
+    for side, env in zip(readiness.SIDES, envs, strict=True):
+        rows = cfg['sides'][side]['check_config'][check_id]['generations']
+        sides[side] = _selected_side(env, rows, cfg['run_binding'][check_id])
+        before = rows[0]
+        sources[side] = {key: Path(before[key]) for key in ('target', 'environment')}
+        receipts[side], normals[side] = _sup05_receipt(external / f'{side}-sup05', env, before)
+
+    stock = external / 'metadata'
+    stock.mkdir()
+    config, bindings, decisions = metadata.assemble(
+        sources, policy_path, pack=pack, store=external / 'metadata-store',
+        installed_plugin_inventory=True, sup05_normal_preparations=receipts)
+    assert config['update']['allowed_checks'] == ['SUP-10', 'SUP-05'], decisions['SUP-05']
+    metadata._publish_prebound(stock, config=config, bindings=bindings, checks=decisions,
+                               pack=pack, preparations=receipts, record_checks=set())
+    source_index = stock / 'input-sources.json'
+    candidate_receipt = Path(receipts['candidate']['path'])
+    candidate_target = Path(normals['candidate']['target'])
+    if case == 'target':
+        candidate_target.write_bytes(candidate_target.read_bytes() + b'\n')
+    elif case == 'receipt':
+        candidate_receipt.write_bytes(candidate_receipt.read_bytes() + b'\n')
+    elif case == 'asset-after-audit':
+        original_audit = readiness.audit
+        asset = Path(normals['candidate']['prepared']).with_name('settings.json')
+
+        def mutate_after_audit(*args, **kwargs):
+            report = original_audit(*args, **kwargs)
+            asset.write_bytes(asset.read_bytes() + b'\n')
+            return report
+
+        monkeypatch.setattr(readiness, 'audit', mutate_after_audit)
+    elif case == 'flat-target-leak':
+        config['sides']['candidate']['supply_boot'] = {'target': str(sources['candidate']['target'])}
+        config_path = stock / 'guard.toml'
+        write_config(config, config_path)
+        index = json.loads(source_index.read_bytes())
+        for row in index['inputs']:
+            row['configuration'] = _pointer(config_path)
+        source_index.write_bytes(canonical_json(index))
+
+    selection = external / 'selection.json'
+    selection.write_bytes(canonical_json({'schema': materializer.SELECTION_SCHEMA, 'check_id': check_id,
+        'policy_ref': confirmed.ref().model_dump(mode='json'), 'sides': sides}))
+    declaration = {'index': _pointer(source_index), 'targets': {side: _pointer(paths['target']) for side, paths in sources.items()}}
+    selections = [(selection, _pointer(selection)['sha256'])]
+    output = (candidate_receipt.parent if case == 'output-alias' else external) / 'joint'
+    if error is not None:
+        with pytest.raises(ValueError, match=error):
+            materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=declaration)
+        assert not output.exists()
+        return
+
+    materialized, index = materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=declaration)
+    joined_index = output / materializer.INDEX_NAME
+    assert materialized['update']['allowed_checks'] == ['SUP-10', 'SUP-05', check_id]
+    for side in readiness.SIDES:
+        assert materialized['sides'][side]['check_config']['SUP-05'] == config['sides'][side]['check_config']['SUP-05']
+        assert materialized['sides'][side]['check_config']['SUP-10'] == {'target': str(sources[side]['target'])}
+        assert 'supply_boot' not in materialized['sides'][side]
+    for row in index['inputs']:
+        if row['check_id'] == 'SUP-05':
+            assert row['target'] == _pointer(normals[row['side']]['target'])
+        elif row['check_id'] == 'SUP-10':
+            assert row['target'] == declaration['targets'][row['side']]
+        else:
+            assert 'target' not in row
+    report = readiness.audit(joined_index, pack=pack)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 6
+    assert report['actual_results'] is None and not report['engine_executed']
+    assert {row['side']: row['sup05_normal_preparation'] for row in report['rows'] if row['check_id'] == 'SUP-05'} == receipts
+    ready = application.update_readiness(pack, envs, confirmed, materialized)
+    assert next(row for row in ready['checks'] if row['check'] == 'inputs')['ok'], ready
+
+    for path in (candidate_target, candidate_receipt):
+        original = path.read_bytes()
+        path.write_bytes(original + b'\n')
+        checked = readiness.audit(joined_index, pack=pack)
+        valid = {(row['check_id'], row['side']) for row in checked['rows'] if row['file_binding_valid']}
+        assert len(valid) == 5 and ('SUP-05', 'candidate') not in valid and ('SUP-10', 'candidate') in valid
+        path.write_bytes(original)

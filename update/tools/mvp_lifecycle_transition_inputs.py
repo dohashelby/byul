@@ -4,10 +4,12 @@ import argparse
 from pathlib import Path
 import tomllib
 
-from guard.configuration import bounded_metadata_scopes, merge_config, update_allowed_checks
+from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES
+from guard.configuration import SUP05_PREPARATION_RECEIPT, bounded_metadata_scopes, merge_config, update_allowed_checks
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.select import _in_scope
 from guard.executors import lifecycle_transition as transition, run_binding
+from guard.executors.kubernetes_sup05_normal_preparation import read_normal_preparation
 from guard.executors.owned_capture import MAX_BYTES as MAX_RETRY_SCOPE_BYTES
 from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
 from guard.models import Environment, Policy, canonical_json, load_pack, sha256_hex, utcnow
@@ -162,6 +164,24 @@ def _snapshot_record_settings(side_settings, records, target_pointer, target_bin
     return expected
 
 
+def _sup05_settings(side_settings, env, ordinary_target, captured):
+    overlays = side_settings.get('check_config') if type(side_settings) is dict else None
+    overlay = overlays.get('SUP-05') if type(overlays) is dict else None
+    if type(overlay) is not dict or overlay.keys() != {'normal', SUP05_PREPARATION_RECEIPT}:
+        raise ValueError(_METADATA_INVALID)
+    receipt = readiness._sup05_preparation_ref(overlay[SUP05_PREPARATION_RECEIPT])
+    path, _ = _pinned_bytes(receipt, MAX_SCOPE_BYTES, captured)
+    prepared = read_normal_preparation(path, env, expected_sha256=receipt['sha256'])
+    normal = prepared['normal']
+    if normal != overlay['normal'] or normal['target'] == ordinary_target:
+        raise ValueError(_METADATA_INVALID)
+    target = {'path': normal['target'], 'sha256': prepared['target_file_sha256']}
+    _pinned_bytes(target, _FILE_LIMITS['target'], captured)
+    for key, digest in prepared['expected_normal_file_sha256'].items():
+        _pinned_bytes({'path': normal[key], 'sha256': digest}, MAX_SCOPE_BYTES, captured)
+    return {'normal': normal, SUP05_PREPARATION_RECEIPT: receipt}, target
+
+
 def _prebound_metadata(source, pack, policy, primary_refs, captured):
     from tools import mvp_metadata_wiring as metadata
 
@@ -174,7 +194,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     index_path, raw = _pinned_bytes(source['index'], 262144, captured)
     index = strict_json(raw, limit=262144)
     ordinary = set(metadata.CHECK_EXECUTORS) - set(metadata.RECORD_SNAPSHOT_OPTIONS) - set(metadata.PREBOUND_RECORD_EXECUTORS)
-    supported = ordinary | _RECORD_CHECKS
+    supported = ordinary | _RECORD_CHECKS | {'SUP-05'}
     if (type(index) is not dict or index.keys() != {'schema', 'pack_ref', 'inputs'}
             or index['schema'] != readiness.SCHEMA or index['pack_ref'] != pack.ref().model_dump(mode='json')
             or type(index['inputs']) is not list or not 2 <= len(index['inputs']) <= 2 * len(supported)):
@@ -206,11 +226,12 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
             or update.get('kubernetes_candidate_binding', 'prebound') != 'prebound'):
         raise ValueError('MVP_TRANSITION_PREBOUND_METADATA_REQUIRED')
     allowed = update_allowed_checks(config, pack)
+    executors = {**metadata.CHECK_EXECUTORS, 'SUP-05': 'supply_boot'}
     if (not allowed or not allowed <= supported or set(entries) != {(check_id, side) for check_id in allowed for side in sides}
             or config.keys() - {'store', 'adapter', 'update', 'executors', 'sides', 'check_config'}
             or update.keys() - {'mode', 'allowed_checks', 'kubernetes_candidate_binding'}
             or type(config.get('sides')) is not dict or config['sides'].keys() != sides
-            or config.get('executors') != {metadata.CHECK_EXECUTORS[check_id]: 'kubernetes' for check_id in allowed}):
+            or config.get('executors') != {executors[check_id]: 'kubernetes' for check_id in allowed}):
         raise ValueError(_METADATA_INVALID)
     overrides = config.get('check_config', {})
     expected = {check_id: {metadata.CHECK_OPTIONS[check_id]: True} for check_id in allowed
@@ -227,7 +248,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     saved_policy = Policy.model_validate(policy_doc)
     if not saved_policy.hash_ok() or saved_policy.ref() != policy.ref():
         raise ValueError('MVP_TRANSITION_METADATA_POLICY_MISMATCH')
-    target_pointers = {}
+    target_pointers, sup05_targets, sup05_receipts = {}, {}, {}
     for side in readiness.SIDES:
         _, env_doc = _selected_file(env_pointers[side], 262144, captured)
         env = Environment.model_validate(env_doc)
@@ -246,6 +267,15 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
             target_binding = {'environment_ref': primary_refs[side], 'target_sha256': transport.target_sha256}
             expected_side.update(_snapshot_record_settings(
                 side_settings, records, target_pointers[side], target_binding, captured))
+        if 'SUP-05' in allowed:
+            sup05, sup05_targets[side] = _sup05_settings(side_settings, env, path, captured)
+            sup05_receipts[side] = (sup05[SUP05_PREPARATION_RECEIPT], env)
+            del expected_side['supply_boot']
+            overlays = expected_side.setdefault('check_config', {})
+            overlays['SUP-05'] = sup05
+            for check_id in sorted(allowed - {'SUP-05'}):
+                if executors[check_id] == 'supply_boot':
+                    overlays[check_id] = {'target': path}
         if side_settings != expected_side:
             raise ValueError(_METADATA_INVALID)
 
@@ -255,13 +285,17 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         if len(retry_target_presence) != 1:
             raise ValueError(_METADATA_INVALID)
 
-    report = readiness.audit(index_path, pack=pack)
+    sup05_refs = {side: receipt for side, (receipt, _) in sup05_receipts.items()}
+    report = readiness.audit(index_path, pack=pack, sup05_normal_preparations=sup05_refs or None)
     admitted = {(row['check_id'], row['side']): row for row in report['rows'] if row['file_binding_valid']}
     if admitted.keys() != entries.keys() or any(admitted[key].get('record_inputs') != entry.get('record_inputs')
                                                for key, entry in entries.items()):
         raise ValueError('MVP_TRANSITION_METADATA_READINESS_UNVERIFIED')
-    pinned_entries = [{**row, 'target': target_pointers[row['side']]} for row in entries.values()]
-    return config, pinned_entries, index_path.parent
+    if any(admitted['SUP-05', side].get('sup05_normal_preparation') != receipt for side, receipt in sup05_refs.items()):
+        raise ValueError('MVP_TRANSITION_METADATA_READINESS_UNVERIFIED')
+    pinned_entries = [{**row, 'target': (sup05_targets if check == 'SUP-05' else target_pointers)[side]}
+                      for (check, side), row in entries.items()]
+    return config, pinned_entries, index_path.parent, sup05_receipts
 
 
 def prepare(policy_path, selection_path, expected_selection_sha256, output, *, pack, store=None):
@@ -275,6 +309,7 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
     A prebound metadata input provides its standard source index pointer under
     ``index`` and one independently pinned target per side under ``targets``.
     OBS-11 and LIF-12 rows must also carry their verified snapshot input digests.
+    SUP-05 uses the preparation receipt and separate target held by the pinned configuration.
     A pinned file pointer to that declaration is also accepted.
     """
     if (not isinstance(selections, (list, tuple)) or not 1 <= len(selections) <= len(transition.REDEPLOY_CHECKS)
@@ -323,8 +358,10 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
     spec['store'] = str(directory / 'store' if store_path is None else store_path)
     config = j02_run_config.build_config(spec)
     config['update']['allowed_checks'] = sorted(documents)
+    sup05_receipts = {}
     if prebound_metadata is not None:
-        metadata, metadata_inputs, metadata_root = _prebound_metadata(prebound_metadata, pack, policy, primary_refs, captured)
+        metadata, metadata_inputs, metadata_root, sup05_receipts = _prebound_metadata(
+            prebound_metadata, pack, policy, primary_refs, captured)
         config = merge_config(metadata, config)
         config['update']['allowed_checks'] = [*metadata['update']['allowed_checks'], *sorted(documents)]
         allowed = update_allowed_checks(config, pack)
@@ -334,6 +371,9 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
     for path, original, identity, minimum, limit in captured:
         if _read(path, min_bytes=minimum, max_bytes=limit) != (original, identity):
             raise ValueError(_FILE_CHANGED)
+    for receipt, env in sup05_receipts.values():
+        read_normal_preparation(receipt['path'], env, expected_sha256=receipt['sha256'])
+        prepared_roots.append(Path(receipt['path']).parent)
 
     protected = [readiness.ROOT, *(entry[0] for entry in captured), *prepared_roots]
     if pack.path is not None:

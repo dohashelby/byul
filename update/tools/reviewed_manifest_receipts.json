@@ -1165,6 +1165,11 @@
       "manifest_sha256": "a90f839cffa34b5d7f41ab01953828298ab2a7b1f18e92222001a0b7c5fb8b09",
       "reviewed_by": "Codex / SUP-05 bounded owned read gap diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T06:32:37.735Z"
+    },
+    {
+      "manifest_sha256": "6f75c52ea6b0b0b522a4b5294fe0ddae864bae9a6044ebc20a84980cfd5fdc9a",
+      "reviewed_by": "Codex / OBS-11 scoped file capture receipt / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T07:28:44.018Z"
     }
   ]
 }

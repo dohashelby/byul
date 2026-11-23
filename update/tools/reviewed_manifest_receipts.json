@@ -1160,6 +1160,11 @@
       "manifest_sha256": "5f614e55bcfb660e327e97386d03a191709b8cf63d3417b36117d72c7a1d396f",
       "reviewed_by": "Codex / OBS-09 retained source receipt and projection / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T06:01:33.448Z"
+    },
+    {
+      "manifest_sha256": "a90f839cffa34b5d7f41ab01953828298ab2a7b1f18e92222001a0b7c5fb8b09",
+      "reviewed_by": "Codex / SUP-05 bounded owned read gap diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T06:32:37.735Z"
     }
   ]
 }

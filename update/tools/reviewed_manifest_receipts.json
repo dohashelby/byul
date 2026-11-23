@@ -1185,6 +1185,11 @@
       "manifest_sha256": "f79d54d7e48c467e13d82ce8433b14cf711122ef130b2c94cffa2102364fbafd",
       "reviewed_by": "Codex / initialization receipts and supply artifacts / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T12:30:09.042Z"
+    },
+    {
+      "manifest_sha256": "c6e7609cf42128e250240ac65ecd9e43c1db8b813e648cb19ed71177adcadb44",
+      "reviewed_by": "Codex / LIF-11 and OBS-06 evidence review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T13:00:33.607Z"
     }
   ]
 }

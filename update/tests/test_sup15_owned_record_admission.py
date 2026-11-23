@@ -1,5 +1,6 @@
 """SUP-15 owned-record admission through the real read-only executor."""
 
+from contextlib import contextmanager
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -499,10 +500,26 @@ def test_sup15_rejects_only_role_aliases_at_the_same_owned_record_location(
         assert not draft.observations['supply_boot_complete'].value
 
 
-@pytest.mark.parametrize("late_owner_change", [False, True], ids=["stable-owner", "late-owner-change"])
-def test_sup15_requires_owner_after_record_read_and_keeps_earlier_role(tmp_path, external, late_owner_change):
+@pytest.mark.parametrize("condition", ["stable-owner", "late-owner-change", "short-normal-write"])
+def test_sup15_requires_owner_after_record_read_and_keeps_earlier_role(tmp_path, external, monkeypatch, condition):
+    late_owner_change = condition == "late-owner-change"
+    short_normal_write = condition == "short-normal-write"
     env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE})
     settings, pins, worlds, records = _prepare_roles(external, env, late_owner_change)
+    workdir = tmp_path / "evidence"
+    normal_file = "supply_boot_normal_record.json"
+    if short_normal_write:
+        original_open = Path.open
+
+        @contextmanager
+        def short_write(path, mode="r", *args, **kwargs):
+            with original_open(path, mode, *args, **kwargs) as stream:
+                if path.name == normal_file and mode == "xb":
+                    yield SimpleNamespace(write=lambda data: stream.write(data[:1]))
+                else:
+                    yield stream
+
+        monkeypatch.setattr(Path, "open", short_write)
 
     def runner(argv, **kwargs):
         namespace = argv[5] if argv[3:5] == ["get", "namespace"] else argv[3].removeprefix("--namespace=")
@@ -512,7 +529,7 @@ def test_sup15_requires_owner_after_record_read_and_keeps_earlier_role(tmp_path,
     executor.runner = runner
     check = PACK.checks["SUP-15"]
     values = base_values(env, check.id, pins)
-    draft = executor.run(check, env, values, None, tmp_path / "evidence")
+    draft = executor.run(check, env, values, None, workdir)
     normal, challenge = draft.observations["supply_boot_sessions"].value
     artifacts = {artifact.name: artifact.path for artifact in draft.artifacts}
     assert draft.data_origin is DataOrigin.EXAMPLE
@@ -520,7 +537,17 @@ def test_sup15_requires_owner_after_record_read_and_keeps_earlier_role(tmp_path,
     assert worlds["guard-challenge"].bad_owner is late_owner_change
     assert normal["collected"] and normal["owner_binding_verified"]
     assert normal["record_sha256"] == sha256_hex(records["normal"])
-    assert artifacts["supply_boot_normal_record.json"].read_bytes() == records["normal"]
+    assert normal["reported_boot_record"] == json.loads(records["normal"])
+    if short_normal_write:
+        code = "SUPPLY_BOOT_RECORD_ARTIFACT_UNAVAILABLE:normal"
+        assert normal_file not in artifacts and not (workdir / normal_file).exists()
+        assert set(path.name for path in workdir.iterdir()) == set(artifacts)
+        assert draft.abort_reason == code and code in draft.cleanup_errors
+        assert code in draft.observations["supply_boot_missing"].value
+        assert not draft.observations["supply_boot_complete"].value
+        assert json.loads(artifacts["supply_boot_summary.json"].read_bytes())["artifact_errors"] == [code]
+    else:
+        assert artifacts[normal_file].read_bytes() == records["normal"]
     assert draft.observations["supply_boot_record_authenticated"].value is False
     projected = _normalize(check, draft)
     evd = evidence(check_id=check.id, status=draft.status, data_origin=draft.data_origin,
@@ -536,7 +563,7 @@ def test_sup15_requires_owner_after_record_read_and_keeps_earlier_role(tmp_path,
         assert draft.observations["supply_boot_violations"].value == []
         assert verdict is Verdict.UNKNOWN
     else:
-        assert draft.status is ExecStatus.COMPLETED
+        assert draft.status is (ExecStatus.ABORTED if short_normal_write else ExecStatus.COMPLETED)
         assert challenge["collected"] and challenge["owner_binding_verified"]
         assert artifacts["supply_boot_challenge_record.json"].read_bytes() == records["challenge"]
         assert verdict is Verdict.FAIL

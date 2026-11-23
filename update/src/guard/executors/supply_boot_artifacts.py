@@ -10,6 +10,18 @@ from .base import DraftArtifact
 from .owned_capture import MAX_BYTES
 
 
+def _publish_complete_bytes(path, raw, *, staging_prefix):
+    with TemporaryDirectory(dir=path.parent, prefix=staging_prefix) as staging:
+        temporary = Path(staging) / path.name
+        with temporary.open('xb') as stream:
+            if stream.write(raw) != len(raw):
+                raise OSError('SUPPLY_BOOT_ARTIFACT_SHORT_WRITE')
+            stream.flush()
+            os.fsync(stream.fileno())
+        # Link the complete file into the evidence directory without replacing an existing file.
+        os.link(temporary, path)
+
+
 def persist(workdir, summary, collected, collector):
     artifacts, errors = [], []
     workdir = Path(workdir)
@@ -26,8 +38,7 @@ def persist(workdir, summary, collected, collector):
             if type(raw) is not bytes or len(raw) > MAX_BYTES:
                 raise ValueError('SUPPLY_BOOT_RECORD_ARTIFACT_BOUND')
             path = workdir / name
-            with path.open('xb') as stream:
-                stream.write(raw)
+            _publish_complete_bytes(path, raw, staging_prefix='.supply-boot-record-')
             artifacts.append(DraftArtifact(name=name, path=path, collector=collector))
         except (OSError, ValueError):
             errors.append('SUPPLY_BOOT_RECORD_ARTIFACT_UNAVAILABLE:' + role)
@@ -67,15 +78,7 @@ def persist_normal_file_read_sources(workdir, captured, selected, collector):
         path = workdir / name
         try:
             workdir.mkdir(parents=True, exist_ok=True)
-            with TemporaryDirectory(dir=workdir, prefix=".sup05-source-") as staging:
-                temporary = Path(staging) / name
-                with temporary.open("xb") as stream:
-                    if stream.write(raw) != len(raw):
-                        raise OSError("SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_SHORT_WRITE")
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                # Publish the completed file atomically without replacing another file.
-                os.link(temporary, path)
+            _publish_complete_bytes(path, raw, staging_prefix=".sup05-source-")
         except OSError:
             errors.append("SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_UNAVAILABLE")
             continue

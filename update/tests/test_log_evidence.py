@@ -372,7 +372,7 @@ def save_native_integrity_report(tmp_path, draft, env, version):
     for item in draft.artifacts:
         saved = store.put_artifact(item.path.read_bytes())
         artifacts.append({"name": item.name, "path": saved.path, "sha256": saved.sha256, "bytes": saved.bytes,
-                          "collected_at": env.created_at, "collector": "EXAMPLE-persisted-draft"})
+                          "collected_at": env.created_at, "collector": getattr(item, "collector", "EXAMPLE-persisted-draft")})
     evd = Evidence(id="EVD-EXAMPLE-NATIVE", data_origin="EXAMPLE", refs=[plan.ref(), env.ref()],
         plan=plan.ref(), environment=env.ref(), check_id="OBS-09", side="single",
         execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": version, "config_sha256": "0" * 64}},
@@ -487,12 +487,17 @@ def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope
         assert row["coverage_complete"] is False and row["raw_source_replayed"] is False
 
 
-@pytest.mark.parametrize("version,accepted", [("0.3.1+k8s.1", True), ("0.3.1+k8s.2", True), ("0.3.1+k8s.99", False)])
-def test_native_kubernetes_transcript_replays_partial_cri_evidence(tmp_path, monkeypatch, version, accepted):
+@pytest.mark.parametrize("version,source_available,accepted", [
+    ("0.3.1+k8s.1", True, True), ("0.3.1+k8s.2", True, True), ("0.3.1+k8s.2", False, True),
+    ("0.3.1+k8s.99", True, False),
+])
+def test_native_kubernetes_transcript_replays_partial_cri_evidence(tmp_path, monkeypatch, version, source_available, accepted):
     from tests.test_kubernetes_log_integrity import run
 
-    draft, _, env = run(tmp_path, monkeypatch, attach=None)
-    assert draft.observations["log_trials_reached"].value == ["before", "cr", "reserved", "html", "after"]
+    identity = None if source_available else {"env": {"VLLM_LOGGING_LEVEL": "DEBUG"}}
+    draft, _, env = run(tmp_path, monkeypatch, attach=None, identity=identity)
+    expected = ["before", "cr", "reserved", "html", "after"] if source_available else []
+    assert draft.observations["log_trials_reached"].value == expected
     sample_artifact = next(item for item in draft.artifacts if item.name == "log_integrity_samples.json")
     assert sample_artifact.collector == "log_integrity/0.3.1+k8s.2"
     source = save_native_integrity_report(tmp_path, draft, env, version)
@@ -508,7 +513,65 @@ def test_native_kubernetes_transcript_replays_partial_cri_evidence(tmp_path, mon
         assert detail["verdicts"]["security"] == "UNKNOWN"
         assert detail["raw_source_replayed"] is False
         assert detail["original_native_parser_replayed"] is False
+    if version == "0.3.1+k8s.2" and source_available:
+        assert set(detail["native_source_pins"]["attachments"]) == {
+            "probe_log.jsonl", "log_integrity_samples.json", "log_integrity_events.json", "log_integrity_display.html"}
+    else:
+        assert "native_source_pins" not in detail
     assert result["original_inventory_preserved"] and inventory_tree(source) == before
+
+
+@pytest.mark.parametrize("aligned", [True, False], ids=["attach", "cri-only"])
+def test_native_kubernetes_writer_joins_sealed_receipt_without_recovering_stdout(tmp_path, aligned):
+    from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
+    from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
+    from guard.log_evidence import _kubernetes_obs09_source_pins
+    from guard.models import sha256_hex
+    from tests.test_native_artifact_privacy import CANARY, fixture
+
+    executor = KubernetesLogIntegrityExecutor({"target": "EXAMPLE: no command or connection"})
+
+    def collect_ordinary(capture, _trials, _before, _after):
+        native_lines = capture["text"].splitlines(keepends=True)
+        cri = ("2026-10-23T02:59:59Z prior ordinary line\n" + "".join(native_lines)).encode()
+        attach = "".join(line.split(" ", 1)[1] for line in native_lines).encode()
+        retained = {"stdout_bytes": len(attach), "stdout_sha256": sha256_hex(attach)}
+        executor._stop_attach = lambda: ({"returncode": 0, "stdout_bytes": attach, "stderr_bytes": b"",
+            "capture": {"schema": "guard-attach-capture/1", "complete": True, **retained}} if aligned else None)
+        ctx = SimpleNamespace(cprobe=SimpleNamespace(engine_logs=lambda *_: {"stdout_bytes": cri,
+            "stderr_bytes": b"", "returncode": 0, "capture": {"complete": True}}))
+        capture.update(executor._read(ctx, capture["window"]["since"], capture["window"]["until"], float("inf")))
+
+    _, _, _, sample = fixture(change=collect_ordinary, cases=("before", "after"))
+    assert executor._source["alignment"]["aligned"] is aligned
+    assert sample["source_transport"]["raw_retained_sha256"] != sample["source_transport"]["decoded_stdout_sha256"]
+    collection = replay_native(sample)["collection"]
+    collection.update(capture_window=sample["capture"]["window"], redaction=PROFILE)
+    display = render_projection(collection)
+    sample["display_sha256"] = sha256_hex(display.encode())
+    files = {"probe_log.jsonl": json.dumps({"summary": True, "kubernetes_source": executor._source}) + "\n",
+             "log_integrity_samples.json": json.dumps(envelope(sample)),
+             "log_integrity_events.json": json.dumps(envelope(collection)), "log_integrity_display.html": display}
+    store = Store(tmp_path / "native-pins")
+    artifacts = []
+    for name, body in files.items():
+        item = store.put_artifact(body.encode())
+        artifacts.append(SimpleNamespace(name=name, path=item.path, sha256=item.sha256, bytes=item.bytes,
+                                         collector=f"{executor.name}/{executor.version}"))
+    evd = SimpleNamespace(artifacts=artifacts)
+    before = inventory_tree(store.root)
+    pins = _kubernetes_obs09_source_pins(store.root, evd, sample)
+    assert pins["attachments"] == {item.name: {"sha256": item.sha256, "bytes": item.bytes} for item in artifacts}
+    transport = sample["source_transport"]
+    for output, prefix in (("recorded_raw_retained", "raw_retained"), ("recorded_decoded_stdout", "decoded_stdout")):
+        assert pins[output] == {"sha256": transport[f"{prefix}_sha256"], "bytes": transport[f"{prefix}_bytes"]}
+    assert CANARY not in json.dumps(pins)
+
+    for field, message in (("decoded_stdout_sha256", "decoded stdout"), ("raw_retained_sha256", "retained source")):
+        changed = {**sample, "source_transport": {**transport, field: "f" * 64}}
+        with pytest.raises(ValueError, match=message):
+            _kubernetes_obs09_source_pins(store.root, evd, changed)
+    assert inventory_tree(store.root) == before
 
 
 @pytest.mark.parametrize("kind,leak,expected", [(None, False, "PASS"), ("request", False, "UNKNOWN"),

@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 from guard.core.judge import pass_gate
 from guard.executors import kubernetes_log_analysis, passive_api_hop, run_binding
+from guard.executors.kubernetes_log_integrity import SOURCE_PROFILE as K8S_NATIVE_SOURCE_PROFILE
 from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, analyze_log_captures, strict_json_loads
 from guard.executors.log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
 from guard.executors.log_integrity_parser import PROFILE, TRUSTED_FIELDS
@@ -32,6 +33,9 @@ from guard.validation_evidence import _ARTIFACT, _DIGEST, _directory, _unlinked,
 SCHEMA = "guard-log-evidence-audit/1"
 CHECKS = {"OBS-03": "log_analysis", "OBS-09": "log_integrity"}
 _NATIVE_PROJECTION_VERSIONS = frozenset({"0.3.0", "0.3.1", "0.3.1+k8s.1", "0.3.1+k8s.2"})
+_K8S_NATIVE_RECEIPT_VERSION = "0.3.1+k8s.2"
+_K8S_NATIVE_RECEIPT_FILES = frozenset({"probe_log.jsonl", "log_integrity_samples.json", "log_integrity_events.json",
+                                      "log_integrity_display.html"})
 MAX_JSON_BYTES = 16 * 1024**2
 
 
@@ -197,6 +201,57 @@ def _replay_native_for_environment(sample, environment):
         if identity is not None and identity["image"] not in reviewed_images:
             raise ValueError("saved native identity differs from the pinned environment")
     return replay_native(sample, request_logger_line=profile["request_logger_line"])
+
+
+def _kubernetes_obs09_source_pins(store, evd, sample):
+    """Join the saved Kubernetes writer's retained-source receipt to its projection."""
+    artifacts = {item.name: item for item in evd.artifacts}
+    collector = f"log_integrity/{_K8S_NATIVE_RECEIPT_VERSION}"
+    if (len(evd.artifacts) != len(artifacts) or set(artifacts) != _K8S_NATIVE_RECEIPT_FILES
+            or any(item.collector != collector for item in artifacts.values())):
+        raise ValueError("saved Kubernetes log attachments differ from their writer")
+    parts = _artifact(store, evd, "probe_log.jsonl").split(b"\n", 32)
+    if not 1 < len(parts) <= 32 or parts[-1] != b"":
+        raise ValueError("saved Kubernetes log source receipt framing differs")
+    try:
+        rows = [strict_json_loads(line.decode("utf-8")) for line in parts[:-1]]
+    except (ValueError, RecursionError):
+        raise ValueError("saved Kubernetes log source receipt is invalid") from None
+    if (any(type(row) is not dict or row.get("summary") is True for row in rows[:-1])
+            or type(rows[-1]) is not dict or rows[-1].get("summary") is not True):
+        raise ValueError("saved Kubernetes log source receipt framing differs")
+    source = rows[-1].get("kubernetes_source")
+    alignment = source.get("alignment") if type(source) is dict else None
+    if (type(alignment) is not dict or alignment.get("profile") != K8S_NATIVE_SOURCE_PROFILE
+            or type(alignment.get("aligned")) is not bool):
+        raise ValueError("saved Kubernetes log source alignment is invalid")
+
+    transport = sample["source_transport"]
+    if all(value is None for value in transport.values()):
+        if alignment["aligned"] or "cri_raw_bytes" in source or "cri_raw_sha256" in source:
+            raise ValueError("saved Kubernetes log source receipt differs from projection transport")
+        return None  # A saved capture with no source bytes to pin can still replay its partial observations.
+
+    decoded = transport["decoded_stdout_bytes"], transport["decoded_stdout_sha256"]
+    stdout = sample["source_summary"]["stdout"]
+    if decoded != (stdout["decoded_bytes"], stdout["decoded_sha256"]):
+        raise ValueError("saved Kubernetes log decoded stdout differs from projection source")
+    raw = transport["raw_retained_bytes"], transport["raw_retained_sha256"]
+    if alignment["aligned"]:
+        attach = source.get("attach_capture")
+        if (type(attach) is not dict or attach.get("schema") != "guard-attach-capture/1"
+                or attach.get("complete") is not True):
+            raise ValueError("saved Kubernetes log attach receipt is invalid")
+        expected_raw = attach.get("stdout_bytes"), attach.get("stdout_sha256")
+    else:
+        if sample["capture"]["source_complete"]:
+            raise ValueError("saved Kubernetes log CRI-only source cannot have complete native boundaries")
+        expected_raw = source.get("cri_raw_bytes"), source.get("cri_raw_sha256")
+    if (type(expected_raw[0]) is not int or type(expected_raw[1]) is not str or raw != expected_raw):
+        raise ValueError("saved Kubernetes log retained source differs from projection transport")
+    return {"attachments": {name: {"sha256": item.sha256, "bytes": item.bytes} for name, item in artifacts.items()},
+            "recorded_raw_retained": {"bytes": raw[0], "sha256": raw[1]},
+            "recorded_decoded_stdout": {"bytes": decoded[0], "sha256": decoded[1]}}
 
 
 def _obs09(store, evd, sample, values, environment):
@@ -505,6 +560,7 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 continue
             if sample.get("policy_values") != values:
                 raise ValueError("saved capture policy differs from pinned policy")
+            native_source_pins = None
             if check.id == "OBS-03":
                 obs, complete, profile = _obs03(evd, sample, values)
                 row["analysis_profile"] = profile
@@ -518,6 +574,8 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
             else:
                 obs, complete = _obs09(store, evd, sample, values, resolve(expected_env))
                 if sample.get("schema") == NATIVE_SCHEMA:
+                    if executor.version == _K8S_NATIVE_RECEIPT_VERSION:
+                        native_source_pins = _kubernetes_obs09_source_pins(store, evd, sample)
                     row["replay_basis"] = "stored_native_predicate_transcript"
                     row["raw_source_replayed"] = False
                     row["original_native_parser_replayed"] = False
@@ -550,6 +608,8 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
             row.update(status="PROJECTION_REPLAY_MATCH" if row.get("replay_basis") else "REPLAY_MATCH",
                        replayed=True, coverage_complete=complete,
                        result=res.ref().model_dump(mode="json"), verdicts=res.verdicts.model_dump(mode="json"))
+            if native_source_pins is not None:
+                row["native_source_pins"] = native_source_pins
             if not complete:
                 limitations.append(f"{check.id}/{evd.side.value}: capture remains incomplete; saved UNKNOWN/independent FAIL is preserved")
         except (ValueError, KeyError, IndexError, TypeError) as exc:

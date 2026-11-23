@@ -328,6 +328,8 @@ def test_sup05_normal_bundle_reaches_offline_input_audit(tmp_path, external, mon
     ('LIF-09', 'wrong-model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('LIF-07', 'scenario-changed', 'RUN_BINDING_INITIALIZATION_SCENARIO_CHANGED'),
     ('LIF-09', 'prepared-rewritten', 'INITIALIZATION_CONFIGURATION_INVALID'),
+    ('LIF-07', 'prepared-pin', None),
+    ('LIF-09', 'prepared-pin-replaced', 'MVP_INPUT_HASH_MISMATCH'),
 ])
 def test_initialization_readiness_uses_the_declared_startup_inputs(
         tmp_path, external, monkeypatch, check_id, candidate_input, gap):
@@ -393,6 +395,15 @@ def test_initialization_readiness_uses_the_declared_startup_inputs(
         role: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
         for role, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()
     }} for side, env in entries]
+    prepared_refs = {}
+    if candidate_input in {'prepared-pin', 'prepared-pin-replaced'}:
+        for row in index['inputs']:
+            side = row['side']
+            prepared = Path(config['sides'][side]['initialization']['prepared'])
+            raw = prepared.read_bytes()
+            prepared_refs[side] = row['initialization_prepared'] = {'path': str(prepared), 'sha256': sha256_hex(raw)}
+            if side == 'candidate' and candidate_input == 'prepared-pin-replaced':
+                prepared.write_bytes(raw + b'\n')
     report = run(tmp_path, index)
     assert report['sides'] == 138 and report['active_checks'] == 69
     assert report['file_binding_valid_sides'] == (2 if gap is None else 1)
@@ -405,6 +416,8 @@ def test_initialization_readiness_uses_the_declared_startup_inputs(
         else:
             assert row['binding_schema'] == 'guard-run-binding/2'
             assert set(row['blocking_codes']) == {'EXAMPLE_ENV_NOT_ACTUAL', 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'}
+            if row['side'] in prepared_refs:
+                assert row['files']['initialization_prepared'] == prepared_refs[row['side']]
 
 
 @pytest.mark.parametrize('candidate_wrong_owner', [False, True])

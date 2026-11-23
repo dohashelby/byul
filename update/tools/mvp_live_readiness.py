@@ -15,8 +15,10 @@ import tomllib
 
 import yaml
 
+from guard.adapters import vllm_initialization_release_sensor, vllm_initialization_sensor
 from guard.adapters import vllm_native_input_profiles, vllm_native_input_rejection
 from guard.adapters.engine_provider import get_provider
+from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES
 from guard.application import _scoped_target_sha256
 from guard.collectors import native_input, native_input_qualification
 from guard.collectors import native_input_rejection_qualification, reused_input_qualification
@@ -70,6 +72,11 @@ SCHEMA = 'guard-mvp-live-input-sources/1'
 SIDES = ('baseline', 'candidate')
 _INPUT_FILES = ('environment', 'policy', 'configuration')
 _INPUT_ROW_FIELDS = {'check_id', 'side', *_INPUT_FILES}
+_INPUT_FILE_LIMITS = {'route_target': _RESPONSE_TARGET_BYTE_LIMIT, 'initialization_prepared': MAX_SCOPE_BYTES}
+_INITIALIZATION_PREPARED_PROFILES = {
+    ('vllm', '0.30.0'): vllm_initialization_release_sensor.PROFILE,
+    ('vllm', '0.31.0'): vllm_initialization_sensor.PROFILE,
+}
 _COLLECTION_STATUS_DIGESTS = {'target_file_sha256', 'record_session_sha256'}
 OBSERVATION_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | set(run_binding.KEYS_BY_CHECK_3['OBS-01'])
 _RETRY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'retry_scope_sha256', 'retry_record_source_sha256'}
@@ -329,6 +336,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     initialization = (check.executor == 'initialization' and implementation == 'kubernetes'
                       and check.id in run_binding.INITIALIZATION_CHECKS
                       and {1, 2}.issubset(run_binding.stages_for(check)))
+    pinned_initialization = 'initialization_prepared' in source
+    if pinned_initialization and (
+            not initialization or not prebound_kubernetes or run_binding.stages_for(check) != (1, 2)
+            or values.get('init_phase') != 'normal' or config.get('lab_activation') or config.get('record_attestation')
+            or type(cfg.get('prepared')) is not str or not cfg['prepared']):
+        raise ValueError('MVP_INITIALIZATION_PREPARED_REFERENCE_SCOPE_INVALID')
     collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
                          and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
     if 'record_inputs' in source:
@@ -529,12 +542,24 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             producer = run_binding.producer_sha256(run_cfg['record_producer'])
             binding_options['expected_supply_record_digests'] = {**prepared_raw_digests, 'record_producer': producer}
             config = {**config, '_supply_prepared_sha256_by_role': prepared_raw_digests}
+        if pinned_initialization and (type(run_cfg) is not dict or run_cfg.keys() != run_binding.config_keys(check)):
+            raise ValueError('MVP_INITIALIZATION_PREPARED_REFERENCE_SCOPE_INVALID')
         if initialization and type(run_cfg) is dict and 'scenario' in run_cfg and 'prepared' in cfg:
             initialization_digests = {}
             for key, path in (('prepared', cfg['prepared']), ('scenario', run_cfg['scenario'])):
-                raw, identity = _read(path)
-                bound_files.append((path, raw, identity))
-                initialization_digests[key] = sha256_hex(raw)
+                if pinned_initialization and key == 'prepared':
+                    pointer = source['initialization_prepared']
+                    raw, identity = _read_input(pointer, configured_target=path, max_bytes=MAX_SCOPE_BYTES)
+                    manifest = strict_json(raw, limit=MAX_SCOPE_BYTES)
+                    profile = _INITIALIZATION_PREPARED_PROFILES.get((env.engine.name, env.engine.version))
+                    if profile is None or type(manifest) is not dict or manifest.get('profile') != profile:
+                        raise ValueError('MVP_INITIALIZATION_PREPARED_REFERENCE_SCOPE_INVALID')
+                    files['initialization_prepared'], identities['initialization_prepared'] = raw, identity
+                    initialization_digests[key] = pointer['sha256']
+                else:
+                    raw, identity = _read(path)
+                    bound_files.append((path, raw, identity))
+                    initialization_digests[key] = sha256_hex(raw)
             binding_options['expected_initialization_digests'] = initialization_digests
             config = {**config, '_initialization_prepared_sha256': initialization_digests['prepared']}
         binding, effective = run_binding.effective_values(check, cfg, env, values,
@@ -646,7 +671,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
         path = source[role]['path']
-        after, current = (_read(path, max_bytes=_RESPONSE_TARGET_BYTE_LIMIT) if role == 'route_target' else _read(path))
+        limit = _INPUT_FILE_LIMITS.get(role)
+        after, current = _read(path, max_bytes=limit) if limit is not None else _read(path)
         if current != identity or after != files[role]:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
     for path, before, identity in bound_files:
@@ -703,7 +729,8 @@ def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_prep
         raise ValueError('MVP_SOURCE_INDEX_INVALID')
     sources = {}
     for item in index['inputs']:
-        if (type(item) is not dict or set(item) - {'target', 'route_target', 'record_inputs'} != _INPUT_ROW_FIELDS
+        if (type(item) is not dict
+                or set(item) - {'target', 'route_target', 'record_inputs', 'initialization_prepared'} != _INPUT_ROW_FIELDS
                 or item['check_id'] not in active or item['side'] not in SIDES):
             raise ValueError('MVP_SOURCE_INDEX_INVALID')
         if item['side'] not in selected_sides:

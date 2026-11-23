@@ -13,8 +13,10 @@ import os
 from pathlib import Path
 import stat
 import sqlite3
+from types import SimpleNamespace
 
 from guard.core.judge import pass_gate
+from guard.executors import kubernetes_log_analysis, passive_api_hop, run_binding
 from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, analyze_log_captures, strict_json_loads
 from guard.executors.log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
 from guard.executors.log_integrity_parser import PROFILE, TRUSTED_FIELDS
@@ -22,10 +24,10 @@ from guard.executors.log_projection import PROFILE as LOG_PROJECTION_PROFILE, va
 from guard.executors.native_projection import (SCHEMA as NATIVE_SCHEMA, PROFILE as NATIVE_PROJECTION_PROFILE,
     ENCODING as NATIVE_ENCODING, replay_native, render_projection)
 from guard.judges.rule_table import RuleTableJudge
-from guard.models import canonical_json, sha256_hex, weakest_origin
+from guard.models import Ref, canonical_json, sha256_hex, weakest_origin
 from guard.models.objects import object_from_dict
 from guard.report.log_integrity import render_log_integrity, verify_log_display
-from guard.validation_evidence import _ARTIFACT, _directory, _unlinked, inventory_tree, read_objects, verify_store_files
+from guard.validation_evidence import _ARTIFACT, _DIGEST, _directory, _unlinked, inventory_tree, read_objects, verify_store_files
 
 SCHEMA = "guard-log-evidence-audit/1"
 CHECKS = {"OBS-03": "log_analysis", "OBS-09": "log_integrity"}
@@ -63,6 +65,97 @@ def _artifact(store, evd, name):
             != (after.st_size, after.st_mtime_ns, after.st_ctime_ns)):
         raise ValueError("log replay artifact bytes differ from pinned evidence")
     return data
+
+
+def _normal_obs03_metadata(store, evd, values):
+    producer = kubernetes_log_analysis
+    artifacts = evd.artifacts
+    if len(artifacts) != 1 or artifacts[0].collector != f"log_analysis/{producer.KubernetesLogAnalysisExecutor.version}":
+        raise ValueError("saved ordinary log attachment differs from its writer")
+    try:
+        summary = strict_json_loads(_artifact(store, evd, "probe_log.jsonl").decode("utf-8"))
+    except (ValueError, RecursionError):
+        raise ValueError("saved ordinary log summary is invalid") from None
+    fixture = {"profile": producer.PROFILE, "target_source": "owned-engine-pod-stdout",
+               "logical_request": producer.LOGICAL_ID, "policy_sha256": sha256_hex(canonical_json(values))}
+    if (type(summary) is not dict or set(summary) != {
+            "summary", "topology", "lab", "profile", "source", "fixture", "collection_status", "gaps", "violations"}
+            or summary["summary"] is not True or summary["topology"] != "kubernetes-owned-direct"
+            or summary["lab"] is not False or summary["profile"] != producer.PROFILE or summary["fixture"] != fixture
+            or evd.comparability.fixture_sha256 != sha256_hex(canonical_json(fixture))):
+        raise ValueError("saved ordinary log summary differs from its pinned fixture")
+    source = summary["source"]
+    if (type(source) is not dict or set(source) != {"available", "payload_retained", "byte_count", "sha256"}
+            or source["available"] is not True or source["payload_retained"] is not False
+            or type(source["byte_count"]) is not int or not 0 <= source["byte_count"] <= producer.LIMIT_BYTES
+            or type(source["sha256"]) is not str or _DIGEST.fullmatch(source["sha256"]) is None):
+        raise ValueError("saved ordinary log source metadata differs from its writer")
+    observations = evd.observations
+    gaps, coverage = observations.get("log_coverage_gaps"), observations.get("log_coverage_complete")
+    if (gaps is None or not gaps.collected or type(summary["gaps"]) is not list or summary["gaps"] != gaps.value
+            or coverage is None or not coverage.collected or coverage.value is not False
+            or type(summary["violations"]) is not list or not evd.normal_control.attempted
+            or any(step.attempted for step in evd.challenges)):
+        raise ValueError("saved ordinary log scope differs from its pinned observations")
+    status = summary["collection_status"]
+    if type(status) is not dict or set(status) != {"normal_control", "engine_stdout"}:
+        raise ValueError("saved ordinary log collection status is invalid")
+    control, engine = status["normal_control"], status["engine_stdout"]
+    if type(control) is not dict or type(engine) is not dict:
+        raise ValueError("saved ordinary log collection status is invalid")
+    if control == {"stage": "binding_or_capture_unavailable"}:
+        if evd.normal_control.succeeded is not False:
+            raise ValueError("saved ordinary log control differs from pinned evidence")
+    elif (set(control) != {"stage", "binding_verified_before_after", "capture_complete", "http_status"}
+            or control["stage"] not in ("response_received", "response_id_observed")
+            or control["binding_verified_before_after"] is not True
+            or type(control["capture_complete"]) not in (bool, type(None))
+            or (control["http_status"] is not None and (type(control["http_status"]) is not int
+                                                        or not 100 <= control["http_status"] <= 599))
+            or (control["stage"] == "response_id_observed" and evd.normal_control.succeeded is not True)):
+        raise ValueError("saved ordinary log control differs from its writer")
+    flags = (*producer._PIPE_FLAGS, "child_reap_unverified")
+    if (set(engine) != {"stage", "returncode", *flags} or type(engine["returncode"]) is not int
+            or engine["returncode"] != 0 or engine["bounded_at_source"] is not True
+            or any(type(engine[key]) not in (bool, type(None)) for key in flags)):
+        raise ValueError("saved ordinary log pipe status differs from its writer")
+    complete = (engine["complete"] is True and engine["timed_out"] is False and engine["truncated"] is not True
+                and source["byte_count"] < producer.LIMIT_BYTES)
+    if engine["stage"] != ("bounded_capture_complete" if complete else "bounded_capture_partial"):
+        raise ValueError("saved ordinary log pipe status differs from its writer")
+    return {"artifact_sha256": artifacts[0].sha256, "source": source, "collection_status": status}
+
+
+def _passive_hop_source_ref(evd, plan, evidence_refs, resolve):
+    """Accept the one extra reference emitted by the same-attempt PLT-08 projection."""
+    execution = evd.execution
+    binding = execution.run_binding
+    if (evd.check_id != passive_api_hop.CHECK or execution.status.value != "COMPLETED"
+            or execution.executor is None or execution.executor.name != passive_api_hop.EXECUTOR
+            or execution.executor.version != passive_api_hop.VERSION or evd.artifacts or not isinstance(binding, dict)):
+        raise ValueError("saved evidence refs differ from exact PLAN/environment")
+    values = binding.get("values")
+    if (type(values) is not dict or set(values) != {"profile", "source_evidence", "source_artifact_sha256", "target_sha256"}
+            or values["profile"] != passive_api_hop.PROFILE or binding.get("schema") != run_binding.SCHEMA_2
+            or run_binding.verify(binding, evd)):
+        raise ValueError("saved passive API hop binding differs from exact evidence scope")
+    files = {key: values[key] for key in ("source_artifact_sha256", "target_sha256")}
+    if binding.get("files") != files or any(type(digest) is not str or _DIGEST.fullmatch(digest) is None
+                                            for digest in files.values()):
+        raise ValueError("saved passive API hop binding differs from exact evidence files")
+    ref = Ref.model_validate(values["source_evidence"])
+    if _key(ref) not in evidence_refs:
+        raise ValueError("saved passive API hop source is absent from the original report")
+    source, environment, _ = passive_api_hop._source(
+        SimpleNamespace(resolve=resolve), plan.ref(), evd.side, execution.attempt_id, ref)
+    if (environment.ref() != evd.environment or source.data_origin != evd.data_origin
+            or source.comparability != evd.comparability
+            or source.execution.finished_at is None or execution.started_at is None
+            or source.execution.finished_at > execution.started_at
+            or [artifact.sha256 for artifact in source.artifacts if artifact.name == "probe_log.jsonl"]
+            != [files["source_artifact_sha256"]]):
+        raise ValueError("saved passive API hop source differs from exact evidence scope")
+    return ref
 
 
 def _persisted_text(capture):
@@ -323,9 +416,15 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
     official = policy.status.value == "CONFIRMED" and pack.reviewed and all(value.value != "EXAMPLE" for value in origins)
     if report.official != official or report.data_origin != weakest_origin(origins):
         raise ValueError("report official/origin differs from its pinned original sources")
+    evidence_refs = {_key(evd.ref()) for evd in evidence}
     for evd in evidence:
+        expected_refs = [plan.ref(), evd.environment]
+        executor = evd.execution.executor
+        if len(evd.refs) == 3 or (evd.check_id == passive_api_hop.CHECK and executor is not None
+                                  and executor.version == passive_api_hop.VERSION):
+            expected_refs.append(_passive_hop_source_ref(evd, plan, evidence_refs, resolve))
         if (evd.plan != plan.ref() or evd.environment not in plan.inputs.environments
-                or len(evd.refs) != 2 or {_key(ref) for ref in evd.refs} != {_key(plan.ref()), _key(evd.environment)}):
+                or len(evd.refs) != len(expected_refs) or {_key(ref) for ref in evd.refs} != {_key(ref) for ref in expected_refs}):
             raise ValueError("saved evidence refs differ from exact PLAN/environment")
     for res in results:
         evd = resolve(res.evidence)
@@ -375,6 +474,13 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
             if any(getattr(side_row, axis) != getattr(res.verdicts, axis)
                    for axis in ("security", "functional", "performance")):
                 raise ValueError("report verdicts differ from the pinned result")
+            values = policy.values.get(check.id, {})
+            if check.id == "OBS-03" and executor.version == kubernetes_log_analysis.KubernetesLogAnalysisExecutor.version:
+                row.update(status="NORMAL_METADATA_VALIDATED", replay_basis="stored_normal_capture_metadata",
+                           raw_source_replayed=False, normal_capture=_normal_obs03_metadata(store, evd, values),
+                           result=res.ref().model_dump(mode="json"))
+                limitations.append(f"{check.id}/{evd.side.value}: the sealed ordinary capture summary omits original stdout and response bytes. Metadata was checked without replay or re-judgment.")
+                continue
             name = "log_samples.json" if check.id == "OBS-03" else "log_integrity_samples.json"
             raw = _artifact(store, evd, name)
             envelope = json.loads(raw)
@@ -397,7 +503,6 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 row["status"] = "LEGACY_UNVERIFIABLE"
                 limitations.append(f"{check.id}/{evd.side.value}: legacy capture retained; new pipe/nofollow/correlation guarantees cannot be reconstructed")
                 continue
-            values = policy.values.get(check.id, {})
             if sample.get("policy_values") != values:
                 raise ValueError("saved capture policy differs from pinned policy")
             if check.id == "OBS-03":

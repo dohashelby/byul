@@ -18,6 +18,7 @@ from guard.store import Store
 from guard.validation_evidence import inventory_tree
 from tests.builders import PACK_DIR, baseline_pack
 from tests.prepared_fixtures import manual_setup_seed
+from tests.test_passive_api_hop import paired_original, passive_update
 
 
 _spec = importlib.util.spec_from_file_location("wheel_log_fixture", Path(__file__).resolve().parents[1] / "tools/wheel_log_fixture.py")
@@ -91,6 +92,86 @@ def test_replay_consumes_only_the_named_artifacts_pinned_bytes(tmp_path, replace
     (store.root / saved.path).write_bytes(replacement)
     with pytest.raises(ValueError, match="^log replay artifact bytes differ from pinned evidence$"):
         _artifact(store.root, evidence, item.name)
+
+
+def test_ordinary_log_metadata_is_readable_in_a_paired_report_with_passive_hops(tmp_path, monkeypatch, passive_update,
+                                                                          paired_original):
+    from guard import application
+    from guard.executors import registry
+    from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
+    from guard.models import Side
+    from tests.builders import T0
+    from tests.test_kubernetes_passive_log_analysis import LogWorld, PRIVATE, REQUEST_ID, STDERR, VALUES
+
+    store, pack, envs, policy, config, _ = passive_update
+    policy = policy.model_copy(update={
+        "scope": policy.scope.model_copy(update={"include": [*policy.scope.include, "OBS-03", "OBS-09"]}),
+        "values": {**policy.values, "OBS-03": VALUES}}).seal()
+    config["update"]["allowed_checks"].append("OBS-03")
+    config["executors"]["log_analysis"] = "kubernetes"
+    worlds = {}
+    for side, (_, _, _, prior_world) in paired_original.items():
+        target_path = config["sides"][side.value]["container_config"]["target"]
+        config["sides"][side.value]["log_analysis"] = {"target": target_path}
+        worlds[target_path] = LogWorld(prior_world.target, "plain")
+
+    def ordinary_logs(cfg):
+        options = cfg["log_analysis"]
+        executor = KubernetesLogAnalysisExecutor(options, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
+        executor._kubectl_runner = worlds[options["target"]].runner
+        return executor
+
+    monkeypatch.setitem(registry.EXECUTORS, "log_analysis:kubernetes", ordinary_logs)
+    report, _ = application.execute_update(store, pack, envs, policy, config, tmp_path / "update", T0)
+    original = f"{report.id}@{report.revision}"
+    pinned = [store.resolve(ref) for ref in report.inputs_manifest if ref.kind == "EVD"]
+    logs = {evd.side.value: evd for evd in pinned if evd.check_id == "OBS-03"}
+    hops = {evd.side: evd for evd in pinned if evd.check_id == "PLT-08"}
+    assert all(len(evd.refs) == 3 for evd in hops.values()) and set(hops) == {Side.baseline, Side.candidate}
+    assert all(len(world.packets) == world.log_reads == 1 for world in worlds.values())
+
+    before = inventory_tree(store.root)
+    audit = analyze_saved_logs(store.root, original)
+    assert audit["original_inventory_preserved"] and inventory_tree(store.root) == before
+    assert audit["report"] == report.ref().model_dump(mode="json") and not audit["accepted"] and not audit["official"]
+    rows = {(row["check_id"], row["side"]): row for row in audit["checks"]}
+    for side in ("baseline", "candidate"):
+        row = rows["OBS-03", side]
+        assert row["status"] == "NORMAL_METADATA_VALIDATED" and row["data_origin"] == "EXAMPLE"
+        assert not row["replayed"] and not row["raw_source_replayed"] and not row["coverage_complete"]
+        assert "verdicts" not in row and row["normal_capture"]["artifact_sha256"] == logs[side].artifacts[0].sha256
+        assert row["normal_capture"]["source"]["payload_retained"] is False
+        assert row["normal_capture"]["collection_status"]["engine_stdout"]["stage"] == "bounded_capture_complete"
+        assert rows["OBS-09", side]["replayed"] is False
+    assert all(marker not in json.dumps(audit) for marker in (PRIVATE, REQUEST_ID, STDERR))
+
+    plan = store.resolve(hops[Side.baseline].plan)
+
+    def publish_revised(evd, **updates):
+        store.put(evd.model_copy(update={"revision": evd.revision + 1, **updates}).seal())
+        judge_plan(store, pack, plan, T0)
+        revised = build_report(store, pack, plan, T0)
+        store.put(revised)
+        return f"{revised.id}@{revised.revision}"
+
+    evd = logs["baseline"]
+    original_item, = evd.artifacts
+    summary = json.loads((store.root / original_item.path).read_bytes())
+    summary["fixture"]["policy_sha256"] = "0" * 64
+    replacement = store.put_artifact(json.dumps(summary).encode() + b"\n")
+    changed = original_item.model_copy(update={"path": replacement.path, "sha256": replacement.sha256, "bytes": replacement.bytes})
+    bad_summary = publish_revised(evd, artifacts=[changed])
+    assert "OBS-03/baseline: saved ordinary log summary differs from its pinned fixture" in analyze_saved_logs(
+        store.root, bad_summary)["problems"]
+
+    hop = hops[Side.baseline]
+    wrong_attempt = "ATTEMPT-EXAMPLE-OTHER"
+    execution = hop.execution.model_copy(update={"attempt_id": wrong_attempt,
+        "run_binding": {**hop.execution.run_binding, "attempt_id": wrong_attempt}})
+    bad_link = publish_revised(hop, execution=execution)
+    with pytest.raises(ValueError, match="PASSIVE_API_HOP_SOURCE_SCOPE_UNVERIFIED"):
+        analyze_saved_logs(store.root, bad_link)
+    assert analyze_saved_logs(store.root, original)["checks"] == audit["checks"]
 
 
 def test_cli_new_output_and_no_input_overwrite(tmp_path, capsys):

@@ -1,3 +1,9 @@
+## 2026-11-23 — Linux 핀·프로파일 사전 검사
+
+- 한 일: 기존 전체 CI와 병렬로 `update-preflight`를 추가했다. 소스 목록과 검토 영수증, observer ABI 소스 핀, lifecycle 의존 핀과 프로파일·스키마·관측 지점 충돌을 한 번에 보고한다. 새 작업은 진단이며 기존 필수 `update-ci-ok`와 검토 절차를 유지한다.
+- 검증: 워크플로 YAML·경로 필터를 파싱해 기존 작업과 필수 게이트가 그대로임을 대조했다. 셸로 원본 목록의 577개 파일 해시, observer ABI 소스 핀과 일치하는 검토 영수증을 확인했다. 여러 오류의 일괄 출력 회귀를 추가했다.
+- 다음 단계: Linux PR CI에서 사전 검사 실행과 회귀 결과를 확인한다. 로컬 Python·pytest 실행과 원격 CI 실행은 하지 않았다.
+
 ## 2026-11-17 — 메인 세션 LIF11 호스트 GPU PID·장치 참조 수집과 원 증거 연결
 
 - 한 일: 기존 containerd 이미지/task/커널 루트 마운트 증거를 재사용해 host PID1 anchor와 worker PID/NSpid/시작 시각/UID/namespace를 연결했다. NVML의 UUID/minor/사용 PID와 모든 host PID의 장치 FD를 제한 범위에서 대조한다. pidfd 생존 검사, 전후 NVML 조회, 고정 바이너리 bytes/소유권/불변성, PID·FD·출력/시간·시계 검사를 포함했다. 빈 compute 조회의 상속 FD·다른 GPU 작업·PID 재사용·부분 관측을 구분한다. GPU/요청/비밀 내용은 읽지 않는다.

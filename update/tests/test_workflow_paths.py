@@ -53,10 +53,12 @@ def test_pull_request_runs_always_and_job_filter_matches_push_filter():
     assert "paths" not in (workflow[True]["pull_request"] or {})
     assert RELEVANCE.patterns() == workflow[True]["push"]["paths"]
     jobs = workflow["jobs"]
-    gated = [name for name in jobs if name not in ("changes", "update-ci-ok")]
-    assert gated and all(jobs[name]["needs"] == "changes" for name in gated)
-    assert all(jobs[name]["if"] == "needs.changes.outputs.relevant == 'true'" for name in gated)
-    assert jobs["update-ci-ok"]["if"] == "always()" and set(jobs["update-ci-ok"]["needs"]) == {"changes", *gated}
+    filtered = set(jobs) - {"changes", "update-ci-ok"}
+    assert "update-preflight" in filtered
+    assert all(jobs[name]["needs"] == "changes" for name in filtered)
+    assert all(jobs[name]["if"] == "needs.changes.outputs.relevant == 'true'" for name in filtered)
+    assert jobs["update-ci-ok"]["if"] == "always()"
+    assert set(jobs["update-ci-ok"]["needs"]) == {"changes", *filtered} - {"update-preflight"}
 
 
 @pytest.mark.parametrize("files,expected", [

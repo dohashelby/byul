@@ -51,6 +51,7 @@ from guard.executors.kubernetes_normal_serving_readiness import normal_serving_r
 from guard.executors.kubernetes_normal_startup_load import normal_startup_load_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_passive_egress_policy import passive_egress_policy_transport
+from guard.executors.kubernetes_response_content import _TARGET_BYTE_LIMIT as _RESPONSE_TARGET_BYTE_LIMIT
 from guard.executors.lifecycle_transition import (REDEPLOY_CHECKS, REDEPLOY_SIDE_REUSE, _manifest_row,
                                                    endpoint_sensor, generation_identity, generation_sensor,
                                                    redeployment_side_reuse)
@@ -204,7 +205,7 @@ def _is_sha256(value):
     return type(value) is str and len(value) == 64 and all(c in '0123456789abcdef' for c in value)
 
 
-def _read_input(pointer, *, configured_target=None):
+def _read_input(pointer, *, configured_target=None, **bounds):
     if (type(pointer) is not dict or set(pointer) != {'path', 'sha256'}
             or type(pointer['path']) is not str or not pointer['path']
             or not _is_sha256(pointer['sha256'])):
@@ -214,7 +215,7 @@ def _read_input(pointer, *, configured_target=None):
         if _plain_path(Path(path)) != _plain_path(Path(configured_target)):
             raise ValueError('MVP_TARGET_REFERENCE_PATH_MISMATCH')
         path = configured_target
-    raw, identity = _read(path)
+    raw, identity = _read(path, **bounds)
     if sha256(raw).hexdigest() != pointer['sha256']:
         raise ValueError('MVP_INPUT_HASH_MISMATCH')
     return raw, identity
@@ -358,6 +359,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     gateway_response = (check.id == 'REQ-13' and check.executor == 'response_content'
                         and implementation == 'kubernetes' and 'gateway' in values['required_targets']
                         and config.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
+    pinned_route = 'route_target' in source
+    if pinned_route and (not prebound_kubernetes or not gateway_response
+                         or type(cfg.get('route_target')) is not str or not cfg['route_target']):
+        raise ValueError('MVP_ROUTE_TARGET_REFERENCE_SCOPE_INVALID')
     normal_graph_capture = check.id == 'REQ-20' and cfg.get(NORMAL_GRAPH_CAPTURE_OPTION) is True
     normal_safetensors_reader = check.id == 'SUP-12' and cfg.get(NORMAL_SAFETENSORS_READER_OPTION) is True
     normal_compile_cache = check.id == 'SUP-07' and cfg.get(NORMAL_COMPILE_CACHE_OPTION) is True
@@ -450,9 +455,16 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         binding_options['expected_normal_file_sha256'] = normal_hashes
     if gateway_response and 'route_target' in cfg:
         path = cfg['route_target']
-        raw, identity = _read(path)
-        bound_files.append((path, raw, identity))
-        config = {**config, '_response_route_target_sha256': sha256_hex(raw)}
+        if pinned_route:
+            pointer = source['route_target']
+            raw, identity = _read_input(pointer, configured_target=path, max_bytes=_RESPONSE_TARGET_BYTE_LIMIT)
+            files['route_target'], identities['route_target'] = raw, identity
+            digest = pointer['sha256']
+        else:
+            raw, identity = _read(path)
+            bound_files.append((path, raw, identity))
+            digest = sha256_hex(raw)
+        config = {**config, '_response_route_target_sha256': digest}
     if cilium_egress_status:
         try:
             passive_egress_policy_transport(target_data, env, duration=1)
@@ -633,7 +645,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     if requires_native_matrix and not normal_token_input:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
-        after, current = _read(source[role]['path'])
+        path = source[role]['path']
+        after, current = (_read(path, max_bytes=_RESPONSE_TARGET_BYTE_LIMIT) if role == 'route_target' else _read(path))
         if current != identity or after != files[role]:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
     for path, before, identity in bound_files:
@@ -690,7 +703,7 @@ def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_prep
         raise ValueError('MVP_SOURCE_INDEX_INVALID')
     sources = {}
     for item in index['inputs']:
-        if (type(item) is not dict or set(item) - {'target', 'record_inputs'} != _INPUT_ROW_FIELDS
+        if (type(item) is not dict or set(item) - {'target', 'route_target', 'record_inputs'} != _INPUT_ROW_FIELDS
                 or item['check_id'] not in active or item['side'] not in SIDES):
             raise ValueError('MVP_SOURCE_INDEX_INVALID')
         if item['side'] not in selected_sides:

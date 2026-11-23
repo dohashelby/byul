@@ -248,6 +248,62 @@ def test_paired_gateway_inputs_are_checked_offline(tmp_path, monkeypatch, candid
             assert row['blocking_codes'] == [gap]
 
 
+def test_prebound_gateway_audit_keeps_the_independent_route_file_pin(tmp_path, monkeypatch):
+    monkeypatch.setattr(subprocess, 'Popen', _no_kubectl)
+    monkeypatch.setattr(socket, 'socket', _no_kubectl)
+    monkeypatch.setattr(module.KubernetesResponseContentExecutor, 'keys', _no_kubectl)
+    pack, _, pol, cfg = _paired_gateway_inputs(tmp_path)
+    policy_path, config_path = tmp_path / 'policy.json', tmp_path / 'guard.toml'
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    write_config(cfg, config_path)
+
+    def reference(path):
+        return {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+
+    index = mvp_live_readiness.template(pack)
+    index['inputs'] = [{'check_id': 'REQ-13', 'side': side,
+                        'environment': reference(tmp_path / side / 'env.json'),
+                        'policy': reference(policy_path), 'configuration': reference(config_path)}
+                       for side in cfg['sides']]
+    candidate = next(row for row in index['inputs'] if row['side'] == 'candidate')
+    route_path = Path(cfg['sides']['candidate']['response_content']['route_target'])
+    pointer = reference(route_path)
+    candidate['route_target'] = pointer
+    index_path = tmp_path / 'index.json'
+
+    def audit():
+        index_path.write_bytes(canonical_json(index))
+        result = mvp_live_readiness.audit(index_path, pack=pack)
+        return {row['side']: row for row in result['rows'] if row['check_id'] == 'REQ-13'}
+
+    rows = audit()
+    assert all(row['file_binding_valid'] and not row['live_target_verified'] for row in rows.values())
+    assert rows['candidate']['files']['route_target'] == pointer
+    assert 'route_target' not in rows['baseline']['files']
+
+    original = route_path.read_bytes()
+    route_path.write_bytes(original + b'\n')
+    rows = audit()
+    assert rows['baseline']['file_binding_valid']
+    assert not rows['candidate']['file_binding_valid']
+    assert rows['candidate']['blocking_codes'] == ['MVP_INPUT_HASH_MISMATCH']
+
+    route_path.write_bytes(original)
+    alternative = tmp_path / 'same-route-bytes.json'
+    alternative.write_bytes(original)
+    candidate['route_target'] = reference(alternative)
+    rows = audit()
+    assert rows['baseline']['file_binding_valid']
+    assert rows['candidate']['blocking_codes'] == ['MVP_TARGET_REFERENCE_PATH_MISMATCH']
+
+    cfg['update']['kubernetes_candidate_binding'] = 'after_baseline'
+    write_config(cfg, config_path)
+    for row in index['inputs']:
+        row['configuration'] = reference(config_path)
+    candidate['route_target'] = pointer
+    assert audit()['candidate']['blocking_codes'] == ['MVP_ROUTE_TARGET_REFERENCE_SCOPE_INVALID']
+
+
 @pytest.mark.parametrize('late', [False, True])
 def test_prebound_gateway_bytes_cannot_change_after_selection(tmp_path, monkeypatch, late):
     from guard.core import run as core_run

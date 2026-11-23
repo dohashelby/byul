@@ -192,14 +192,17 @@ def _replay_native_for_environment(sample, environment):
         provider = None
     profile = (provider.evidence_contract("native_log_replay_profile", environment.engine.image_digest,
                                          environment.engine.version) if provider is not None else None)
+    reviewed_images = (environment.engine.image_digest,)
+    if profile is not None:
+        if sample.get("native_contract_sha256") != sha256_hex(canonical_json(profile["contract"])):
+            raise ValueError("saved native contract differs from the reviewed environment")
+        reviewed_images = profile.get("image_spellings", reviewed_images)
+    for field in ("source_identity_before", "source_identity_after"):
+        identity = sample.get(field)
+        if identity is not None and (type(identity) is not dict or identity.get("image") not in reviewed_images):
+            raise ValueError("saved native identity differs from the pinned environment")
     if profile is None:
         return replay_native(sample)
-    if sample.get("native_contract_sha256") != sha256_hex(canonical_json(profile["contract"])):
-        raise ValueError("saved native contract differs from the reviewed environment")
-    reviewed_images = profile.get("image_spellings", (environment.engine.image_digest,))
-    for identity in (sample["source_identity_before"], sample["source_identity_after"]):
-        if identity is not None and identity["image"] not in reviewed_images:
-            raise ValueError("saved native identity differs from the pinned environment")
     return replay_native(sample, request_logger_line=profile["request_logger_line"])
 
 

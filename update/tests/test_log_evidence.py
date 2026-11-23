@@ -407,7 +407,7 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     ("0.30.0", "matched"), ("0.30.0", "different-image"), ("0.30.0", "different-version"),
     ("0.30.0", "different-contract"), ("0.30.0", "different-source"),
     ("0.31.0", "matched"), ("0.31.0", "matched-canonical-source"),
-    ("0.31.0", "different-contract"), ("0.31.0", "different-source"),
+    ("0.31.0", "different-image"), ("0.31.0", "different-contract"), ("0.31.0", "different-source"),
 ])
 def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope):
     from guard.adapters.engine_provider import NATIVE_LOG_REPLAY_BASELINE_IMAGE, get_provider
@@ -481,6 +481,8 @@ def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope
     result = analyze_saved_logs(store)
     assert result["accepted"] is (scope in {"matched", "matched-canonical-source"}), result
     assert result["original_inventory_preserved"] and result["official"] is False
+    if scope == "different-image":
+        assert result["problems"] == ["OBS-09/single: saved native identity differs from the pinned environment"]
     if result["accepted"]:
         row, = result["checks"]
         assert row["status"] == "PROJECTION_REPLAY_MATCH" and row["verdicts"]["security"] == "UNKNOWN"

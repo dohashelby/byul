@@ -317,7 +317,7 @@ GONE = {"tcp": False, "tls": False, "reason": "unreachable"}
 
 @pytest.mark.parametrize("reply,security", [
     (handshake(OK, REFUSED_PEER), "UNKNOWN"), (handshake(PLAIN, PLAIN), "FAIL"),
-    (handshake(OK, OK), "FAIL"), (handshake(GONE, GONE), "UNKNOWN"),
+    (handshake(OK, OK), "FAIL"), (handshake(GONE, GONE), "UNKNOWN"), (handshake(OK, GONE), "UNKNOWN"),
 ])
 def test_plt09_handshake_results(tmp_path, reply, security):
     evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=HelperDocker([reply])), TRANSPORT,
@@ -325,7 +325,12 @@ def test_plt09_handshake_results(tmp_path, reply, security):
     assert result.verdicts.security.value == security
     assert evd.execution.status.value == "COMPLETED"
     assert evd.observations["record_transport_segments_tested"].value == (
-        [SEGMENT["name"]] if reply["expected"]["tcp"] else [])
+        [SEGMENT["name"]] if reply["expected"]["tcp"] and reply["wrong"]["tcp"] else [])
+    assert evd.observations["record_transport_unreachable"].value == (
+        [] if reply["expected"]["tcp"] and reply["wrong"]["tcp"] else [SEGMENT["name"]])
+    if reply == handshake(OK, GONE):
+        trial, = evd.observations["record_transport_trials"].value
+        assert trial["state"] == "protected" and trial["wrong_peer_state"] == "unreachable"
     assert evd.observations["record_transport_sender_verified"].value is False
 
 

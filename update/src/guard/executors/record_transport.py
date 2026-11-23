@@ -100,7 +100,7 @@ def project(rows):
     # A TLS peer rejection verifies refusal. The helper sends no record data.
     unprotected = [r["name"] for r in rows if r["tls_required"] and r["state"] == "no_tls"]
     wrong = [r["name"] for r in rows if r["tls_required"] and r["wrong_peer_state"] == "accepted"]
-    unknown = [r["name"] for r in rows if r["state"] == "unreachable"]
+    unknown = [r["name"] for r in rows if "unreachable" in (r["state"], r["wrong_peer_state"])]
     return unprotected, wrong, unknown
 
 
@@ -129,7 +129,7 @@ def run(check, env, values, cfg, *, docker=None):
             diagnostics.append("RECORD_TRANSPORT_SEGMENT_UNAVAILABLE")
     unprotected, wrong, unknown = project(rows)
     tested = [r["name"] for r in rows
-              if r["state"] not in (None, "unreachable") and r["wrong_peer_state"] is not None]
+              if r["state"] not in (None, "unreachable") and r["wrong_peer_state"] not in (None, "unreachable")]
     observations = {
         "record_transport_trials": {"value": rows, "collected": True},
         "record_transport_segments_planned": {"value": names, "collected": True},

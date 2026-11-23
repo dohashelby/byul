@@ -1190,6 +1190,11 @@
       "manifest_sha256": "c6e7609cf42128e250240ac65ecd9e43c1db8b813e648cb19ed71177adcadb44",
       "reviewed_by": "Codex / LIF-11 and OBS-06 evidence review / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T13:00:33.607Z"
+    },
+    {
+      "manifest_sha256": "0cc62cae23a276a35c06d0787cbd0f8faf70c2aa0d865cb6101e598d098bb8ee",
+      "reviewed_by": "Codex / LIF-11 and LIF-13 evidence retention review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T13:31:55.655Z"
     }
   ]
 }

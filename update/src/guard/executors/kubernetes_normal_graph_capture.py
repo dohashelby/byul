@@ -36,6 +36,10 @@ _RETURN = re.compile(
 )
 
 
+class _CaptureReportGap(ValueError):
+    """Closed parser diagnostics safe to include in the capture summary."""
+
+
 def _capture_callsite(adapter, env):
     method = getattr(adapter, "graph_capture_source", None)
     profile = (method(env) if callable(method) else
@@ -66,14 +70,17 @@ def _capture_observation(raw, window, callsite):
         if not any(marker in row for marker in (_PROGRESS_TITLE, _RETURN_TITLE, _SKIP_TITLE)):
             continue
         timestamp, _, message = row.partition(b" ")
-        at = _stamp(timestamp.decode("ascii"))
+        try:
+            at = _stamp(timestamp.decode("ascii"))
+        except ValueError:
+            raise _CaptureReportGap("REQ20_CAPTURE_LOG_TIMESTAMP_UNVERIFIED") from None
         if not started <= at <= ready or returned or _SKIP_TITLE in message:
-            raise ValueError("REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED")
+            raise _CaptureReportGap("REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED")
         if _RETURN_TITLE in message:
             match = _RETURN.fullmatch(message)
             if (not match or int(match["line"]) != callsite or last_progress is None
                     or at < last_progress or previous != expected_total):
-                raise ValueError("REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED")
+                raise _CaptureReportGap("REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED")
             returned = True
             continue
         for frame in message.split(b"\r"):
@@ -81,20 +88,20 @@ def _capture_observation(raw, window, callsite):
                 continue
             progress = _PROGRESS.fullmatch(frame)
             if not progress:
-                raise ValueError("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
+                raise _CaptureReportGap("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
             completed, total, percent = (int(progress[key]) for key in ("completed", "total", "percent"))
             if not (0 <= completed <= total and total > 0 and 0 <= percent <= 100
                     and (percent == 100) == (completed == total)):
-                raise ValueError("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
+                raise _CaptureReportGap("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
             if previous is None:
                 if completed != 0 or percent != 0:
-                    raise ValueError("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
+                    raise _CaptureReportGap("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
                 expected_total = total
             elif total != expected_total or completed == 0 or completed < previous or at < last_progress:
-                raise ValueError("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
+                raise _CaptureReportGap("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
             previous, last_progress = completed, at
     if not returned:
-        raise ValueError("REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED")
+        raise _CaptureReportGap("REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED")
     return {"mode": "decode_full", "reported_completed_descriptor_iterations": expected_total,
             "native_capture_return_report_observed": True}
 
@@ -166,6 +173,7 @@ class KubernetesNormalGraphCaptureExecutor:
 
         prefix = target["startup_log_prefix"]
         observed = None
+        report_diagnostic = None
         failure = "REQ20_CAPTURE_OWNER_BEFORE_UNVERIFIED"
         try:
             window, container = _ready_window(logs)
@@ -179,14 +187,19 @@ class KubernetesNormalGraphCaptureExecutor:
             if len(raw) != prefix["byte_count"] or sha256_hex(raw) != prefix["sha256"]:
                 raise ValueError
             failure = "REQ20_CAPTURE_NATIVE_REPORT_UNVERIFIED"
-            capture = _capture_observation(raw, window, callsite)
-            failure = "REQ20_CAPTURE_OWNER_AFTER_UNVERIFIED"
+            capture = diagnostic = None
+            try:
+                capture = _capture_observation(raw, window, callsite)
+                failure = "REQ20_CAPTURE_OWNER_AFTER_UNVERIFIED"
+            except _CaptureReportGap as exc:
+                diagnostic = str(exc)
             after, container = _ready_window(logs)
             _verify_graph_launch(target, container, source)
             _verify_source(source_reader, source)
             if after == window and not any(t.report()["cleanup_errors"] or t.report()["collection_gap"]
                                            for t in (logs, source_reader)):
                 observed = capture
+                report_diagnostic = diagnostic
         except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
             pass
 
@@ -202,6 +215,8 @@ class KubernetesNormalGraphCaptureExecutor:
                    "observation": observed, "conditions_sha256": conditions, "gap": error,
                    "missing": ["actual_graph_handle_and_descriptor_contents", "current_input_refresh_and_replay",
                                "output_consumption_and_buffer_lifetime", "replay_functional_control"]}
+        if report_diagnostic is not None:
+            summary["native_report_diagnostic"] = report_diagnostic
         artifacts = []
         try:
             path = Path(workdir) / "normal_graph_capture.json"

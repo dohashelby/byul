@@ -52,8 +52,10 @@ def _run(tmp_path, version, fault=None, graph_option=None):
             "100%|██████████| 3/3 [00:00<00:00, 48.40it/s]", progress, completion]
     if fault == "no-decode":
         rows.remove(progress)
-    if fault == "zero":
+    if fault in {"zero", "progress-owner-changed", "progress-source-changed"}:
         rows[2] = progress.replace("0/2", "0/0").replace("2/2", "0/0")
+    if fault == "invalid-timestamp":
+        rows[2] = progress.replace("2026-10-26T00:00:05.323Z", "EXAMPLE-INVALID-TIME")
     if fault == "unfinished":
         rows[2] = progress.replace(_DONE, "")
     if fault == "starts-after-zero":
@@ -71,7 +73,20 @@ def _run(tmp_path, version, fault=None, graph_option=None):
     target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=world.runner)
     assert not world.hash_calls and world.log_calls == [65536]
     world.log_calls.clear()
-    world.fault = fault
+    world.fault = "source-changed" if fault == "progress-source-changed" else fault
+    if fault == "progress-owner-changed":
+        engine_reads_after_logs = 0
+
+        def pod_readback(role, document, after):
+            nonlocal engine_reads_after_logs
+            world.pod_readback(role, document, after)
+            if role == "engine" and world.log_calls:
+                engine_reads_after_logs += 1
+                # The logs transport's own owner check succeeded before the parser.
+                if engine_reads_after_logs > 1:
+                    document["metadata"]["uid"] = "other-generation"
+
+        world.mutate = pod_readback
     path.write_bytes(canonical_json(target))
 
     def runner(argv, **kwargs):
@@ -91,7 +106,8 @@ def _run(tmp_path, version, fault=None, graph_option=None):
         return
     draft = executor.run(check, env, {}, adapter, tmp_path / "work")
     summary = draft.artifacts[0].path.read_text()
-    assert all(value not in summary for value in (UNRELATED, "pid=96", ROOT, "/models/fixture", "0.03 GiB", "1 secs"))
+    assert all(value not in summary for value in
+               (UNRELATED, "pid=96", ROOT, "/models/fixture", "0.03 GiB", "1 secs", "EXAMPLE-INVALID-TIME"))
     assert not world.execs and not draft.normal_control.attempted
     return draft, json.loads(summary), check, world
 
@@ -101,6 +117,7 @@ def test_req20_observes_nonempty_native_capture_baseline_only(tmp_path, version,
     draft, summary, check, world = _run(tmp_path, version, layout)
     assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
     assert summary["gap"] is None and len(summary["conditions_sha256"]) == 64
+    assert "native_report_diagnostic" not in summary
     assert summary["observation"] == {"mode": "decode_full", "reported_completed_descriptor_iterations": 2,
                                       "native_capture_return_report_observed": True}
     assert [step.attempted for step in draft.challenges] == [True, False, False]
@@ -123,6 +140,28 @@ def test_req20_rejects_without_a_complete_unambiguous_owned_capture_sequence(tmp
     assert summary["observation"] is None and summary["gap"] == draft.abort_reason
     assert not any(step.attempted for step in draft.challenges)
     assert bool(world.log_calls) is (fault != "wrong-source")
+
+
+@pytest.mark.parametrize(("fault", "suffix", "source_reads"), [
+    ("zero", "PROGRESS_UNVERIFIED", 2),
+    ("no-decode", "LOG_SEQUENCE_UNVERIFIED", 2),
+    ("invalid-timestamp", "LOG_TIMESTAMP_UNVERIFIED", 2),
+    ("progress-owner-changed", None, 1),
+    ("progress-source-changed", None, 2),
+])
+def test_req20_retains_parser_diagnostic_only_after_owner_and_source_recheck(tmp_path, fault, suffix, source_reads):
+    draft, summary, check, world = _run(tmp_path, "0.30.0", fault)
+    assert len(world.hash_calls) == source_reads and world.log_calls == [len(world.raw)]
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.abort_reason == summary["gap"] == "REQ20_CAPTURE_NATIVE_REPORT_UNVERIFIED"
+    assert summary["observation"] is None and not any(step.attempted for step in draft.challenges)
+    if suffix is None:
+        assert "native_report_diagnostic" not in summary
+    else:
+        assert summary["native_report_diagnostic"] == "REQ20_CAPTURE_" + suffix
+    observations = _normalize(check, draft)["observations"]
+    result = RuleTableJudge().judge(check, evidence(check_id=check.id, observations=observations), check.judge.params, {})
+    assert result.verdicts["security"] == Verdict.UNKNOWN
 
 
 @pytest.mark.parametrize("fault", ["disabled", "wrong-target"])

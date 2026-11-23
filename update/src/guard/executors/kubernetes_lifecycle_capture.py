@@ -7,6 +7,7 @@ import hashlib
 import math
 import re
 import time
+from enum import StrEnum
 from types import SimpleNamespace
 
 from guard.models import canonical_json, sha256_hex
@@ -47,9 +48,39 @@ def validate_target(target,env,*,require_lab=True):
     return validate_capture_target(target,env,require_lab=require_lab)
 
 
+class KubernetesCaptureFailureKind(StrEnum):
+    BUDGET = "budget"
+    RUNNER = "runner"
+    MALFORMED_CAPTURE = "malformed_capture"
+    TIMEOUT = "timeout"
+    CAP = "cap"
+    PARENT_CLEANUP = "parent_cleanup"
+    NONZERO_PROCESS = "nonzero_process"
+    UTF8_DECODE = "utf8_decode"
+    UNAVAILABLE = "unavailable"
+
+
 class KubernetesCaptureError(ValueError):
-    def __init__(self):
+    def __init__(self, *, failure_kind: KubernetesCaptureFailureKind | None = None):
         super().__init__("KUBERNETES_CAPTURE_BINDING_UNAVAILABLE")
+        self.failure_kind = failure_kind
+
+
+def _pipe_failure_kind(returncode, pipe, raw, cap, parent_cleanup):
+    """Classify a rejected runner result using its bounded capture flags."""
+    if parent_cleanup:
+        return KubernetesCaptureFailureKind.PARENT_CLEANUP
+    if (type(returncode) is not int or type(raw) is not bytes or any(
+            type(pipe.get(key)) is not bool for key in ("complete", "bounded_at_source", "timed_out", "truncated"))):
+        return KubernetesCaptureFailureKind.MALFORMED_CAPTURE
+    if pipe["bounded_at_source"]:
+        if pipe["timed_out"]:
+            return KubernetesCaptureFailureKind.TIMEOUT
+        if pipe["truncated"] or len(raw) > cap:
+            return KubernetesCaptureFailureKind.CAP
+        if pipe["complete"] and returncode != 0:
+            return KubernetesCaptureFailureKind.NONZERO_PROCESS
+    return KubernetesCaptureFailureKind.UNAVAILABLE
 
 
 def supervised_source(source):
@@ -106,7 +137,8 @@ class KubernetesLifecycleReader:
 
     def _remaining(self,deadline):
         value=min(self.deadline,deadline)-time.monotonic()
-        if value<=0:raise KubernetesCaptureError()
+        if value <= 0:
+            raise KubernetesCaptureError(failure_kind=KubernetesCaptureFailureKind.BUDGET)
         return value
 
     def _request(self,args,*,deadline,cap):
@@ -114,18 +146,26 @@ class KubernetesLifecycleReader:
         argv=[self.binary,f"--context={self.binding['context']}",f"--request-timeout={remaining:.3f}s",*args]
         try:
             result=self.runner(argv,timeout=remaining,env_extra={},max_stdout_bytes=cap,max_stderr_bytes=4096)
-            pipe=result["capture"];raw=result["stdout_bytes"]
-            if pipe.get("pipes_closed") is False or "child_reap" in pipe.get("read_errors",[]):
-                self.gap=True
-                self._parent_cleanup_failures+=1
-            if (result["returncode"]!=0 or pipe.get("complete") is not True
-                    or pipe.get("bounded_at_source") is not True or pipe.get("timed_out") is not False
-                    or pipe.get("truncated") is not False or type(raw) is not bytes or len(raw)>cap):
-                raise KubernetesCaptureError()
-            return raw
         except Exception:
             self.gap=True
-            raise KubernetesCaptureError() from None
+            raise KubernetesCaptureError(failure_kind=KubernetesCaptureFailureKind.RUNNER) from None
+        try:
+            pipe=result["capture"];raw=result["stdout_bytes"]
+            parent_cleanup = pipe.get("pipes_closed") is False or "child_reap" in pipe.get("read_errors",[])
+            if parent_cleanup:
+                self.gap=True
+                self._parent_cleanup_failures+=1
+            returncode = result["returncode"]
+            if (returncode!=0 or pipe.get("complete") is not True
+                    or pipe.get("bounded_at_source") is not True or pipe.get("timed_out") is not False
+                    or pipe.get("truncated") is not False or type(raw) is not bytes or len(raw)>cap):
+                failure_kind = _pipe_failure_kind(returncode, pipe, raw, cap, parent_cleanup)
+            else:
+                return raw
+        except Exception:
+            failure_kind = KubernetesCaptureFailureKind.MALFORMED_CAPTURE
+        self.gap=True
+        raise KubernetesCaptureError(failure_kind=failure_kind) from None
 
     def snapshot(self,timeout=5):
         """Transient verified identity/mount projection; never a raw API object."""
@@ -197,17 +237,23 @@ class KubernetesLifecycleReader:
             raw=self._request([f"--namespace={role['namespace']}","exec",role["pod"],f"--container={role['container']}",
                 "--","python3","-I","-S","-B","-c",self.wrapped[key],repr(budget),*argv[3:]],
                 deadline=deadline,cap=max_bytes)
-            text=raw.decode("utf-8","strict")
+            try:
+                text=raw.decode("utf-8","strict")
+            except UnicodeDecodeError:
+                raise KubernetesCaptureError(failure_kind=KubernetesCaptureFailureKind.UTF8_DECODE) from None
             row["transport_complete"]=True
             if key=="context":
                 try:schema=strict_json(raw,limit=4096).get("schema")
                 except Exception:schema=None
                 row["result"]={"guard-lifecycle-process-context/1":"context","guard-lifecycle-process-absent/1":"process_absent"}.get(schema,"unrecognized")
-        except Exception:
+        except Exception as error:
             row["diagnostic_codes"].append("KUBERNETES_READ_TRANSPORT_UNAVAILABLE")
             self.gap=True
             self.rows.append(row)
-            raise KubernetesCaptureError() from None
+            failure_kind = KubernetesCaptureFailureKind.UNAVAILABLE
+            if type(error) is KubernetesCaptureError and type(error.failure_kind) is KubernetesCaptureFailureKind:
+                failure_kind = error.failure_kind
+            raise KubernetesCaptureError(failure_kind=failure_kind) from None
         try:row["owner_before_after_verified"]=self._owner(self._remaining(deadline))==before
         except Exception:row["diagnostic_codes"].append("KUBERNETES_READ_OWNER_RECHECK_UNAVAILABLE")
         if not row["owner_before_after_verified"]:self.gap=True

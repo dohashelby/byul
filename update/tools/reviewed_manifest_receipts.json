@@ -1175,6 +1175,11 @@
       "manifest_sha256": "1c6fff930efab4452783d94b3eff1afe3ed16b3616e711620cfc52cd9ebd8fdb",
       "reviewed_by": "Codex / LIF-02 and PLT-09 evidence review / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T07:58:18.972Z"
+    },
+    {
+      "manifest_sha256": "b6fb013f98d291c6f8b6f0ac842e3a1a545523fe6bdd2253f52651df03453424",
+      "reviewed_by": "Codex / OBS-09 replay and REQ-20 boot receipt / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T12:04:05.389Z"
     }
   ]
 }

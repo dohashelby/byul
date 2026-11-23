@@ -44,7 +44,10 @@ from tools.mvp_versions import versions
 
 PREBOUND_RECORD_EXECUTORS = {'LIF-12': 'request_termination', 'OBS-11': 'log_integrity'}
 RECORD_SCOPE_FILES = {'PLT-12': 'copy_inventory', 'LIF-12': 'retry_scope'}
-_COPY_RECORD_FILE_DIGESTS = ('copy_inventory_sha256', 'copy_record_source_sha256')
+_RECORD_FILE_DIGESTS = {
+    'PLT-12': ('copy_inventory_sha256', 'copy_record_source_sha256'),
+    'LIF-12': ('retry_scope_sha256', 'retry_record_source_sha256'),
+}
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
                    'SUP-03': 'template_validation', 'SUP-07': 'supply_boot', 'SUP-10': 'supply_boot', 'SUP-12': 'supply_boot',
                    'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
@@ -94,8 +97,8 @@ def _paired_record_inputs(value, check_id, *, prebound_copy_records=False, prebo
         fields.add('test_actors')
     if check_id == 'LIF-12' and any(type(entry) is dict and RETRY_TARGET_BINDING in entry for entry in value.values()):
         fields.add(RETRY_TARGET_BINDING)
-    if (check_id == 'PLT-12' and prebound_copy_records
-            and any(type(entry) is dict and 'input_sha256' in entry for entry in value.values())):
+    accepts_file_pins = check_id == 'LIF-12' or (check_id == 'PLT-12' and prebound_copy_records)
+    if accepts_file_pins and any(type(entry) is dict and 'input_sha256' in entry for entry in value.values()):
         fields.add('input_sha256')
     bindings = {}
     for side, entry in value.items():
@@ -103,7 +106,7 @@ def _paired_record_inputs(value, check_id, *, prebound_copy_records=False, prebo
             raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
         if 'input_sha256' in entry:
             expected = entry['input_sha256']
-            if (type(expected) is not dict or expected.keys() != set(_COPY_RECORD_FILE_DIGESTS)
+            if (type(expected) is not dict or expected.keys() != set(_RECORD_FILE_DIGESTS[check_id])
                     or not all(readiness._is_sha256(digest) for digest in expected.values())):
                 raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
         bindings[side] = dict(entry)
@@ -345,7 +348,7 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=Fals
 def _prebound_record_binding(check, env, values, *, policy, side, target_pointer, target_sha256, record_inputs):
     settings = {'target': target_pointer['path'], CHECK_OPTIONS[check.id]: True}
     run_cfg = dict(record_inputs)
-    expected_copy_digests = run_cfg.pop('input_sha256', None) if check.id == 'PLT-12' else None
+    expected_file_digests = run_cfg.pop('input_sha256', None)
     if check.id in RECORD_SCOPE_FILES:
         settings.update(_record_scope_settings(check.id, run_cfg))
     elif check.id == 'OBS-11' and run_binding.stages_for(check) != (2,):
@@ -361,11 +364,14 @@ def _prebound_record_binding(check, env, values, *, policy, side, target_pointer
         executor.prepared_record_snapshot(check, env, effective, expected_target_sha256=target_sha256)
         digests.update({key: effective[key] for key in run_binding.KEYS_BY_CHECK_3['OBS-01']})
     elif check.id == 'LIF-12':
+        retry_digests = {key: effective[key] for key in _RECORD_FILE_DIGESTS[check.id]}
+        if expected_file_digests is not None and retry_digests != expected_file_digests:
+            raise ValueError('METADATA_RETRY_RECORD_INPUT_SHA256_MISMATCH')
         executor.prepared_retry_records(check, env, effective, expected_target_sha256=target_sha256)
-        digests.update({key: effective[key] for key in ('retry_scope_sha256', 'retry_record_source_sha256')})
+        digests.update(retry_digests)
     elif check.id == 'PLT-12':
-        copy_digests = {key: effective[key] for key in _COPY_RECORD_FILE_DIGESTS}
-        if expected_copy_digests is not None and copy_digests != expected_copy_digests:
+        copy_digests = {key: effective[key] for key in _RECORD_FILE_DIGESTS[check.id]}
+        if expected_file_digests is not None and copy_digests != expected_file_digests:
             raise ValueError('METADATA_COPY_RECORD_INPUT_SHA256_MISMATCH')
         executor.prepared_copy_record_snapshot(check, env, effective, expected_target_sha256=target_sha256)
         digests.update(copy_digests)
@@ -619,9 +625,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 settings[check.executor] = {'target': target_pointer['path']}
             if check_id in records:
                 run_cfg = dict(records[check_id][side])
-                if check_id == 'PLT-12':
-                    run_cfg.pop('input_sha256', None)
                 if check_id in RECORD_SCOPE_FILES:
+                    run_cfg.pop('input_sha256', None)
                     settings.setdefault('check_config', {})[check_id] = _record_scope_settings(check_id, run_cfg)
                 if check_id == 'OBS-01' and SNAPSHOT_SOURCE in run_cfg:
                     settings.setdefault('check_config', {})[check_id] = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
@@ -752,7 +757,8 @@ def main():
                         help='Paired PLT-12 producer, session and sealed inventory. Prebound sides may both include '
                              'input_sha256 with copy_inventory_sha256 and copy_record_source_sha256.')
     parser.add_argument('--retry-record-inputs', type=Path,
-                        help='Paired LIF-12 inputs with an existing producer, session and sealed retry scope')
+                        help='Paired LIF-12 producer, session and sealed retry scope. Both sides may include '
+                             'input_sha256 with retry_scope_sha256 and retry_record_source_sha256.')
     parser.add_argument('--collection-status-bindings', type=Path,
                         help='Paired OBS-11 session declarations for existing owned collection status records')
     parser.add_argument('--candidate-target-after-baseline', type=Path,

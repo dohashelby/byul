@@ -2156,6 +2156,10 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
                          'retry_scope': str(_write(tmp_path / f'{side}-retry-scope.json', scope))}
         status[side] = {'record_session': f'{10 + number:032x}'}
 
+    pinned_retries = {side: {**entry, 'input_sha256': {
+        'retry_scope_sha256': sha256_hex(Path(entry['retry_scope']).read_bytes()),
+        'retry_record_source_sha256': sha256_hex(Path(entry['record_producer']).read_bytes()),
+    }} for side, entry in retries.items()}
     options = {'pack': pack, 'store': tmp_path / 'store'}
     default, _, decisions = tool.assemble(sides, policy_path, **options)
     assert not {'LIF-12', 'OBS-11'}.intersection(decisions)
@@ -2163,6 +2167,11 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
     for option, pair in (('retry_record_inputs', retries), ('collection_status_bindings', status)):
         with pytest.raises(ValueError, match='^OBSERVATION_PAIRED_RUN_BINDINGS_REQUIRED$'):
             tool.assemble(sides, policy_path, **options, **{option: {'baseline': pair['baseline']}})
+    incomplete_candidate = {**pinned_retries['candidate'], 'input_sha256': {'retry_scope_sha256': '0' * 64}}
+    for candidate in (retries['candidate'], incomplete_candidate):
+        with pytest.raises(ValueError, match='^OBSERVATION_RUN_BINDING_INVALID$'):
+            tool.assemble(sides, policy_path, **options,
+                          retry_record_inputs={**pinned_retries, 'candidate': candidate})
 
     invalid = {**status, 'candidate': {'record_session': 'invalid'}}
     only_retry, _, decisions = tool.assemble(sides, policy_path, **options,
@@ -2173,7 +2182,7 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
 
     output = tmp_path / 'assembled-status'
     argv = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(options['store']),
-            '--retry-record-inputs', str(_write(tmp_path / 'retry-inputs.json', retries)),
+            '--retry-record-inputs', str(_write(tmp_path / 'retry-inputs.json', pinned_retries)),
             '--collection-status-bindings', str(_write(tmp_path / 'status-bindings.json', status))]
     for side, paths in sides.items():
         for role, path in paths.items():
@@ -2261,8 +2270,14 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
         path = Path(retries['candidate'][role])
         original = path.read_bytes()
         path.write_bytes(original + b'\n')
+        remaining_config, remaining_bindings, decisions = tool.assemble(sides, policy_path, **options,
+            retry_record_inputs=pinned_retries, collection_status_bindings=status)
         changed = tool.readiness.audit(index_path, pack=pack)
         path.write_bytes(original)
+        assert remaining_config['update']['allowed_checks'] == ['OBS-11']
+        assert [row['check_id'] for row in remaining_bindings] == ['OBS-11', 'OBS-11']
+        assert decisions['LIF-12'] == {'configuration_enabled': False,
+            'sides': {'baseline': None, 'candidate': 'METADATA_RETRY_RECORD_INPUT_SHA256_MISMATCH'}}
         assert_candidate_unverified(changed, 'MVP_INPUT_FILE_CHANGED', ('LIF-12',))
 
     candidate_scope = Path(retries['candidate']['retry_scope'])

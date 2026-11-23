@@ -1180,6 +1180,11 @@
       "manifest_sha256": "b6fb013f98d291c6f8b6f0ac842e3a1a545523fe6bdd2253f52651df03453424",
       "reviewed_by": "Codex / OBS-09 replay and REQ-20 boot receipt / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T12:04:05.389Z"
+    },
+    {
+      "manifest_sha256": "f79d54d7e48c467e13d82ce8433b14cf711122ef130b2c94cffa2102364fbafd",
+      "reviewed_by": "Codex / initialization receipts and supply artifacts / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T12:30:09.042Z"
     }
   ]
 }

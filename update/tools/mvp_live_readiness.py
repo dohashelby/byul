@@ -63,7 +63,9 @@ from guard.input_matrix_policy import PROFILE as INPUT_MATRIX
 from guard.models import Environment, canonical_json, load_pack, sha256_hex
 from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX
 from guard.runtime.bounded import strict_json
-from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
+from guard.runtime.kubernetes_http import (
+    REQUEST_BINDING_PROFILE, KubernetesBindingError, _validate as validate_target_binding,
+)
 from guard.update_validation import _plain_path
 from tools.mvp_a_input_preflight import _code, _pairs, _read
 from tools.mvp_versions import versions
@@ -437,7 +439,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         if record_snapshot and expected_record_inputs is not None and target_data.get('synthetic', False) is not False:
             raise ValueError('MVP_RECORD_INPUT_SCOPE_INVALID')
         if gateway_snapshot:
-            _scoped_target_sha256(raw_target, env, gateway_snapshot=True, scoped_check=check.id)
+            gateway_target_sha256 = _scoped_target_sha256(
+                raw_target, env, gateway_snapshot=True, scoped_check=check.id)
         if 'target' not in source or source['target']['path'] != target:
             bound_files.append((target, raw_target, identity))
     if record_access or copy_snapshot or retry_records:
@@ -592,6 +595,14 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             executor.validate_policy(check, effective)
         except (ValueError, TypeError, KeyError):
             raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
+        if gateway_snapshot and prebound_record_stages and check.executor == 'required_event_record':
+            if effective['observation_target_sha256'] != gateway_target_sha256:
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            engine_target = {key: value for key, value in target_data.items() if key != 'kubernetes_gateway'}
+            try:
+                executor._transport(engine_target, env, REQUEST_BINDING_PROFILE)
+            except (KubernetesBindingError, OverflowError):
+                raise ValueError('GATEWAY_AUDIT_TARGET_UNVERIFIED') from None
         if normal_file_reads:
             executor.normal_file_read_inputs(env, effective)
         if supply_record_roles:

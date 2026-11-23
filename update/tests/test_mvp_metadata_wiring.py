@@ -1196,12 +1196,12 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
     monkeypatch.setattr(socket, 'socket', forbid_io)
     monkeypatch.setattr(subprocess, 'Popen', forbid_io)
     configuration = tmp_path / 'guard.toml'
-    tool.write_config(cfg, configuration)
-    config_ref = {'path': str(configuration), 'sha256': sha256_hex(configuration.read_bytes())}
-    index = _write(tmp_path / 'inputs.json', {**tool.readiness.template(pack),
-        'inputs': [{**binding, 'configuration': config_ref} for binding in bindings]})
 
-    def gateway_rows():
+    def gateway_rows(selected_config=cfg):
+        tool.write_config(selected_config, configuration)
+        config_ref = {'path': str(configuration), 'sha256': sha256_hex(configuration.read_bytes())}
+        index = _write(tmp_path / 'inputs.json', {**tool.readiness.template(pack),
+            'inputs': [{**binding, 'configuration': config_ref} for binding in bindings]})
         return {row['side']: row for row in tool.readiness.audit(index, pack=pack)['rows']
                 if row['check_id'] == 'OBS-01'}
 
@@ -1231,6 +1231,22 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
         application._pin_prebound_kubernetes_targets(raw, envs[0], paths, {baseline: baseline.read_bytes()})
         assert raw['_kubernetes_target_sha256_by_check'] == {'OBS-01': None}
     baseline.write_bytes(original)
+
+    wrong_model = json.loads(original)
+    wrong_model['model_mapping']['revision'] = '1' * 40
+    _write(baseline, wrong_model)
+    wrong_model_rows = gateway_rows()
+    baseline.write_bytes(original)
+
+    bad_budget = deepcopy(cfg)
+    baseline_checks = bad_budget['sides']['baseline'].setdefault('check_config', {})
+    baseline_checks.setdefault('OBS-01', {})['max_duration_seconds'] = 0
+    for rejected in (wrong_model_rows, gateway_rows(bad_budget)):
+        assert rejected['baseline']['file_binding_valid'] is False
+        assert rejected['baseline']['blocking_codes'] == ['GATEWAY_AUDIT_TARGET_UNVERIFIED']
+        assert rejected['candidate']['file_binding_valid'] is True
+        assert all(not row['engine_executed'] and not row['ready_for_execution'] for row in rejected.values())
+
     with pytest.raises(ValueError, match='GATEWAY_RECORDS_REQUIRE_PREBOUND_PAIR'):
         tool.staged_config(cfg, tmp_path / 'unbound-candidate.json')
     bad_mode = deepcopy(cfg)

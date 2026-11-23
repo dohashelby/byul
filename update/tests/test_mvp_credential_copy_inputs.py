@@ -178,6 +178,34 @@ def test_prebound_publication_rechecks_copy_record_pins_and_preserves_staged_ind
     assert all(Path(row['configuration']['path']) == staged / 'preliminary-guard.toml' for row in items)
 
 
+def test_prebound_copy_producer_uses_the_existing_binding_size_limit(tmp_path):
+    pack, policy, environments, selection = owned_declarations()
+    _, inventory = inputs.materialize(policy, pack, environments, selection)
+    inventory_path = tmp_path / 'copy-inventory.json'
+    inventory_bytes = canonical_json(inventory)
+    inventory_path.write_bytes(inventory_bytes)
+    producer = tmp_path / 'EXAMPLE-producer.bytes'
+    with producer.open('xb') as stream:
+        stream.truncate(8 * 1024**2 + 1)
+    producer_sha256 = run_binding.producer_sha256(str(producer))
+    declarations = {side: {'record_session': f'{number:032x}', 'copy_inventory': str(inventory_path),
+                           'record_producer': str(producer)} for number, side in enumerate(environments, 1)}
+    pinned = {side: {**row, 'input_sha256': {'copy_inventory_sha256': sha256_hex(inventory_bytes),
+                                             'copy_record_source_sha256': producer_sha256}}
+              for side, row in declarations.items()}
+
+    assert wiring._paired_record_inputs(pinned, 'PLT-12', prebound_copy_records=True) == pinned
+    with pytest.raises(ValueError, match='MA7_INPUT_FILE_INVALID'):
+        wiring._paired_record_inputs(declarations, 'PLT-12')
+
+    with producer.open('r+b') as stream:
+        stream.truncate(run_binding._MAX_PRODUCER_BYTES + 1)
+    with pytest.raises(ValueError, match='MA7_INPUT_FILE_INVALID'):
+        wiring._paired_record_inputs(pinned, 'PLT-12', prebound_copy_records=True)
+    with pytest.raises(run_binding.RunBindingUnavailable, match='RUN_BINDING_FILE_UNAVAILABLE'):
+        run_binding.producer_sha256(str(producer))
+
+
 @pytest.mark.parametrize('case,diagnostic', [
     ('wrong-policy', 'MVP_APPROVED_POLICY_REQUIRED'),
     ('scope', 'MVP_APPROVED_POLICY_REQUIRED'),

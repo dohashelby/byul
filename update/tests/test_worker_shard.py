@@ -370,14 +370,17 @@ def test_points_avoid_the_traced_decorators_and_assets_carry_the_flag(tmp_path):
     assert engine_callbacks.prepare_assets(tmp_path / 'b')['worker_shards'] is False
 
 
-@pytest.mark.parametrize('wrong_scope', (None, 'session', 'pid'))
-def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypatch, wrong_scope):
+@pytest.mark.parametrize(('side', 'wrong_scope'), (
+    ('baseline', None), ('candidate', None), ('candidate', 'session'), ('candidate', 'pid'),
+))
+def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypatch, side, wrong_scope):
     from typer.testing import CliRunner
 
     from guard.cli import app
     from guard.models import canonical_json, sha256_hex
     from tests.test_kubernetes_sampling import normal_sampling_inputs
     from tools import gpu_a_producers_collect as collector
+    from tools.mvp_versions import versions
 
     assets = tmp_path / 'assets'
     prepared_result = CliRunner().invoke(app, ['prepare-engine-callbacks', '--output', str(assets), '--worker-shards'])
@@ -386,7 +389,12 @@ def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypat
     assert prepared['worker_shards'] is True
     session = prepared['session']
     session_hash = sha256_hex(session.encode())
-    env, target, _, target_path = normal_sampling_inputs(tmp_path, '0.31.0')
+    release = versions()[side]
+    env, target, _, target_path = normal_sampling_inputs(tmp_path, release['version'])
+    env = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': release['image']})}).seal()
+    target['environment_ref'] = env.ref().model_dump(mode='json')
+    target['engine']['image_digest'] = release['image']
+    target['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])
     env_path = tmp_path / 'env.json'
     env_path.write_bytes(canonical_json(env.to_dict()))
     target_path.write_bytes(canonical_json(target))
@@ -428,3 +436,85 @@ def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypat
     checked = common_consumption.worker_shards(record, scope, {})
     for validation in (captured['validation'], checked):
         assert validation['supported'] is validation['complete'] is False
+    if wrong_scope is None:
+        _assert_saved_capture_handoff(tmp_path, monkeypatch, side, env, env_path, target, target_path, assets, result)
+
+
+def _assert_saved_capture_handoff(root, monkeypatch, side, env, env_path, target, target_path, assets, capture):
+    import socket
+    import subprocess
+
+    from guard.collectors import lifecycle
+    from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+    from guard.models import canonical_json, sha256_hex
+    from tools import mvp_sup06_worker_shard_inputs as handoff
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Saved worker shard materialization must not contact an owner or execute a process')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    owner = target['kubernetes']
+    lifecycle_target = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': True, 'run_id': owner['run_id'],
+                        'environment_ref': env.ref().model_dump(mode='json'),
+                        'kubernetes': {key: deepcopy(owner[key]) for key in ('context', 'engine')}}
+    lifecycle_path, capture_path = root / 'lifecycle-target.json', root / 'producers.json'
+    lifecycle_path.write_bytes(canonical_json(lifecycle_target))
+    capture_raw = (json.dumps(capture, ensure_ascii=False, indent=1, sort_keys=True) + '\n').encode()
+    capture_path.write_bytes(capture_raw)
+    paths = {'environment': env_path, 'lifecycle_target': lifecycle_path, 'callback_target': target_path,
+             'callback_prepared': assets / 'manifest.json', 'capture': capture_path}
+    selection_path = root / 'selection.json'
+
+    def write_selection():
+        files = {key: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())} for key, path in paths.items()}
+        raw = canonical_json({'schema': handoff.SELECTION_SCHEMA, 'side': side, 'files': files})
+        selection_path.write_bytes(raw)
+        return sha256_hex(raw)
+
+    selection_sha = write_selection()
+    output = root / 'handoff'
+    receipt = handoff.prepare(selection_path, selection_sha, output)
+    assert json.loads((output / handoff.OUTPUT_NAME).read_bytes()) == receipt
+    assert receipt['side'] == side and receipt['role'] == 'normal'
+    assert receipt['source_file_sha256']['capture'] == sha256_hex(capture_raw)
+    assert receipt['source_ended'] is receipt['owner_binding_verified'] is receipt['producer_authenticated'] is False
+    assert not receipt['ready_for_execution']
+    fragment = receipt['worker_shard_input']
+    saved_record = Path(fragment['path']).read_bytes()
+    assert saved_record == canonical_json(capture['records']['worker-shard-load']['record'])
+    assert fragment['sha256'] == sha256_hex(saved_record) and fragment['data_origin'] == 'EXAMPLE'
+    assert capture_path.read_bytes() == capture_raw
+
+    base_prepared = lifecycle.prepare_assets(root / 'lifecycle-assets', Path(__file__).resolve().parents[2])
+    executor = KubernetesSupplyBootExecutor({'normal': {'worker_shard_input': fragment}}, runner=forbidden)
+    bound = {'supply_normal_prepared_sha256': sha256_hex(canonical_json(base_prepared))}
+    record, scope, result = executor._worker_shard_input(
+        env, bound, 'normal', lifecycle_target, sha256_hex(lifecycle_path.read_bytes()))
+    assert canonical_json(record) == saved_record and scope == fragment['scope']
+    assert result['complete'] is False and result['violations'] == []
+
+    capture_path.write_bytes(capture_raw + b'\n')
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_SOURCE_CHANGED$'):
+        handoff.prepare(selection_path, selection_sha, root / 'changed')
+    assert not (root / 'changed').exists()
+    capture_path.write_bytes(capture_raw)
+
+    validate = handoff.common_consumption.validate_record
+
+    def replace_after_validation(*args, **kwargs):
+        result = validate(*args, **kwargs)
+        capture_path.write_bytes(capture_raw + b'\n')
+        return result
+
+    with monkeypatch.context() as edit:
+        edit.setattr(handoff.common_consumption, 'validate_record', replace_after_validation)
+        with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_SOURCE_CHANGED$'):
+            handoff.prepare(selection_path, selection_sha, root / 'late-change')
+    assert not (root / 'late-change').exists()
+    capture_path.write_bytes(capture_raw)
+    lifecycle_target['kubernetes']['engine']['restart_count'] += 1
+    lifecycle_path.write_bytes(canonical_json(lifecycle_target))
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_OWNER_MISMATCH$'):
+        handoff.prepare(selection_path, write_selection(), root / 'other-owner')
+    assert not (root / 'other-owner').exists()

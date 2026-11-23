@@ -223,9 +223,12 @@ class LocalUsageWorld(FullWorld):
             assert module.supervised_source(module._LOCAL_READER) in argv
             assert 'VLLM_USAGE_STATS_SERVER' not in module._LOCAL_READER
             self.snapshots += 1
-            if self.mode == 'local-transport-failed':
+            if (self.mode in ('local-transport-failed', 'local-transport-timed-out')
+                    or (self.mode == 'local-after-transport-timed-out' and self.snapshots == 2)):
+                timed_out = self.mode.endswith('-timed-out')
                 return {'returncode': 1, 'stdout_bytes': b'', 'stderr_bytes': PRIVATE.encode(),
-                        'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
+                        'capture': {'complete': not timed_out, 'bounded_at_source': True,
+                                    'timed_out': timed_out, 'truncated': False}}
             cache = self.mode.startswith('cache')
             paths = [*LOCAL_PATHS, CACHE_PATH] if cache else LOCAL_PATHS
             files = [{'path': path, 'exists': False, 'readable': True,
@@ -346,6 +349,7 @@ def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path
     ('cache-source-change-legacy-new', False, True, 'FAIL'),
     ('cache-launch-override', False, False, 'UNKNOWN'), ('cache-launch-mount-after', False, False, 'UNKNOWN'),
     ('cache-unqualified', False, False, 'UNKNOWN'),
+    ('local-transport-timed-out', False, False, 'UNKNOWN'), ('local-after-transport-timed-out', False, False, 'UNKNOWN'),
     ('local-transport-failed', False, False, 'UNKNOWN'), ('local-owner-changed', False, False, 'UNKNOWN'),
     ('local-projection-invalid', False, False, 'UNKNOWN'),
 ])
@@ -374,12 +378,14 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monk
     pre_control_failures = {
         'shared-pid': 'USAGE_LOCAL_PRE_READ_UNVERIFIED',
         'host-pid': 'USAGE_LOCAL_PRE_READ_UNVERIFIED',
+        'local-transport-timed-out': 'USAGE_LOCAL_TRANSPORT_UNAVAILABLE',
         'local-transport-failed': 'USAGE_LOCAL_TRANSPORT_UNAVAILABLE',
         'local-owner-changed': 'USAGE_LOCAL_OWNER_AFTER_UNVERIFIED',
         'local-projection-invalid': 'USAGE_LOCAL_PROJECTION_INVALID',
     }
     assert world.snapshots == {'optout-missing': 1, 'shared-pid': 0, 'host-pid': 0,
                                'all-unreadable': 1, 'cache-unqualified': 1, 'cache-launch-override': 1,
+                               'local-transport-timed-out': 1,
                                'local-transport-failed': 1, 'local-owner-changed': 1,
                                'local-projection-invalid': 1}.get(mode, 2)
     assert world.controls == (0 if mode in ({'optout-missing', 'all-unreadable', 'cache-unqualified',
@@ -403,8 +409,23 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monk
     if mode in pre_control_failures:
         assert summary['local_snapshot_status'] == {'before': pre_control_failures[mode]}
         assert summary['local_snapshot_presence'] == {}
+        assert draft.normal_control.attempted is False
     elif mode == 'absent':
         assert summary['local_snapshot_status'] == dict.fromkeys(('before', 'after'), 'USAGE_LOCAL_SNAPSHOT_VERIFIED')
+    elif mode == 'local-after-transport-timed-out':
+        assert summary['local_snapshot_status'] == {
+            'before': 'USAGE_LOCAL_SNAPSHOT_VERIFIED', 'after': 'USAGE_LOCAL_TRANSPORT_UNAVAILABLE',
+        }
+        assert set(summary['local_snapshot_presence']) == {'before'}
+    failure_kinds = {
+        'local-transport-failed': {'before': 'nonzero_process'},
+        'local-transport-timed-out': {'before': 'timeout'},
+        'local-after-transport-timed-out': {'after': 'timeout'},
+    }
+    if mode in failure_kinds:
+        assert summary['local_snapshot_failure_kind'] == failure_kinds[mode]
+    else:
+        assert 'local_snapshot_failure_kind' not in summary
     if mode == 'cache-new':
         reports = draft.observations['usage_new_local_reports'].value
         assert [report['path_sha256'] for report in reports] == [sha256_hex(CACHE_PATH.encode())]

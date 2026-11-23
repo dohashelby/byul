@@ -296,6 +296,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     prebound_kubernetes = (external_kubernetes
                            and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
     prebound_record_stages = prebound_kubernetes and run_binding.stages_for(check) == (1, 2, 3, 4)
+    prebound_gateway_snapshot = (gateway_snapshot and prebound_record_stages
+                                 and check.executor == 'required_event_record')
     normal_sampling = (prebound_kubernetes and check.id == 'REQ-10' and check.executor == 'sampling_validation'
                        and getattr(check, 'collection_profile', None) is None
                        and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['REQ-10']) is True)
@@ -311,8 +313,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
                      and not config.get('lab_activation'))
     if gateway_snapshot or record_snapshot or copy_snapshot:
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
+    observation_record_binding = record_snapshot or (
+        prebound_gateway_snapshot and ('record_inputs' in source or expected_record_inputs is not None))
     record_source_key = None
-    if record_access or record_snapshot or copy_snapshot or retry_records:
+    if record_access or observation_record_binding or copy_snapshot or retry_records:
         record_source_key = {
             'OBS-01': 'observation_expected_source_sha256',
             'OBS-06': 'record_inventory_source_sha256',
@@ -348,7 +352,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
                          and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
     if 'record_inputs' in source:
-        if record_snapshot:
+        if observation_record_binding:
             digests = OBSERVATION_RECORD_DIGESTS
         elif copy_snapshot:
             digests = _COPY_RECORD_DIGESTS
@@ -571,7 +575,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             valid_from=policy.valid_from, valid_until=policy.valid_until,
             run_cfg=run_cfg, policy_ref=policy.ref(), **binding_options)
         if expected_record_inputs is not None:
-            if record_snapshot:
+            if observation_record_binding:
                 session_key = 'observation_session'
                 record_digests.update({key: effective[key] for key in run_binding.KEYS_BY_CHECK_3['OBS-01']
                                        if key != record_source_key})
@@ -588,6 +592,11 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
                                     **record_digests}
             if actual_record_inputs != expected_record_inputs:
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
+            if prebound_gateway_snapshot:
+                from tools.mvp_gateway_preparation import PRODUCER_SHA256
+
+                if effective['observation_expected_source_sha256'] != PRODUCER_SHA256:
+                    raise ValueError('GATEWAY_REVIEWED_PRODUCER_REQUIRED')
         # Use the same executor configuration and policy validation as runtime.
         try:
             executor = registry.build_executor(check.executor, implementation, config,
@@ -595,7 +604,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             executor.validate_policy(check, effective)
         except (ValueError, TypeError, KeyError):
             raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
-        if gateway_snapshot and prebound_record_stages and check.executor == 'required_event_record':
+        if prebound_gateway_snapshot:
             if effective['observation_target_sha256'] != gateway_target_sha256:
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             engine_target = {key: value for key, value in target_data.items() if key != 'kubernetes_gateway'}
@@ -675,7 +684,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
                 executor.prepared_copy_record_snapshot(check, env, effective, expected_target_sha256=expected)
             elif record_snapshot:
                 executor.prepared_record_snapshot(check, env, effective, expected_target_sha256=expected)
-            else:
+            elif retry_records:
                 executor.prepared_retry_records(check, env, effective, expected_target_sha256=expected)
         if local_metadata:
             expected = sha256_hex(canonical_json(target_data))

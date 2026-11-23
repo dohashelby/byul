@@ -404,6 +404,8 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         except passive_api_hop.PassiveApiHopUnavailable as exc:
             return str(exc)
         return None
+    gateway_snapshot = check.id == 'OBS-01' and record_inputs is not None and SNAPSHOT_SOURCE in record_inputs
+    pinned_gateway_snapshot = gateway_snapshot and run_binding.stages_for(check) == (1, 2, 3, 4)
     try:
         target_path = target_pointer['path']
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
@@ -475,8 +477,8 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
             run_cfg = dict(record_inputs) if record_inputs is not None else None
             if check.id == 'PLT-12':
                 config[check.executor]['copy_inventory'] = run_cfg.pop('copy_inventory')
-            if check.id == 'OBS-01' and SNAPSHOT_SOURCE in run_cfg:
-                from tools.mvp_gateway_preparation import GATEWAY_IMAGE, IMAGE_CONFIG_SHA256
+            if gateway_snapshot:
+                from tools.mvp_gateway_preparation import GATEWAY_IMAGE, IMAGE_CONFIG_SHA256, PRODUCER_SHA256
 
                 gateway = snapshot_owner(target, transport.binding)
                 if (gateway['image'] != GATEWAY_IMAGE
@@ -488,6 +490,11 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
             _, values = run_binding.effective_values(check, config[check.executor], env, values, side=side,
                 attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
                 run_cfg=run_cfg, policy_ref=policy.ref())
+            if pinned_gateway_snapshot:
+                if values['observation_target_sha256'] != transport.target_sha256:
+                    return 'MVP_INPUT_FILE_CHANGED'
+                if values['observation_expected_source_sha256'] != PRODUCER_SHA256:
+                    return 'GATEWAY_REVIEWED_PRODUCER_REQUIRED'
         executor = registry.build_executor(check.executor, 'kubernetes', config,
                                            engine=env.engine.name, version=env.engine.version)
         executor.validate_policy(check, values)
@@ -497,6 +504,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         return 'NORMAL_LOG_EXECUTOR_UNAVAILABLE'
     if check.id in RECORD_SNAPSHOT_OPTIONS and type(executor) is not KubernetesRequiredEventExecutor:
         return 'OBSERVATION_RECORD_SNAPSHOT_EXECUTOR_UNAVAILABLE'
+    if pinned_gateway_snapshot:
+        record_pins[side] = {
+            'target_file_sha256': target_pointer['sha256'],
+            'record_session_sha256': sha256(values['observation_session'].encode('ascii')).hexdigest(),
+            **{key: values[key] for key in run_binding.KEYS_BY_CHECK_3['OBS-01']},
+        }
     if check.id == 'OBS-04' and registry.resolve_executor(check.executor, 'kubernetes', engine=env.engine.name,
             version=env.engine.version) is not registry.EXECUTORS.get('boundary_egress:kubernetes'):
         return 'LOCAL_USAGE_EXECUTOR_UNAVAILABLE'

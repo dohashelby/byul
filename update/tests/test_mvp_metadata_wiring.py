@@ -1165,11 +1165,12 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
     pol = original.model_copy(update={'values': values,
         'scope': original.scope.model_copy(update={'include': ['OBS-01', 'PLT-12']})}).seal()
     _write(policy_path, pol.to_dict())
-    producer = tmp_path / 'selected-producer.py'
-    producer.write_bytes(b'# fixture producer\n')
-    monkeypatch.setattr(preparation, 'PRODUCER_SHA256', sha256_hex(producer.read_bytes()))
+    producer_bytes = b'# fixture producer\n'
+    monkeypatch.setattr(preparation, 'PRODUCER_SHA256', sha256_hex(producer_bytes))
     gateway_inputs = {}
     for number, (side, paths) in enumerate(sides.items(), 1):
+        producer = tmp_path / f'{side}-selected-producer.py'
+        producer.write_bytes(producer_bytes)
         target_doc = json.loads(paths['target'].read_bytes())
         roles = target_doc['kubernetes']
         roles['probe'].update(namespace=roles['engine']['namespace'], namespace_uid=roles['engine']['namespace_uid'])
@@ -1197,18 +1198,67 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
     monkeypatch.setattr(subprocess, 'Popen', forbid_io)
     configuration = tmp_path / 'guard.toml'
 
-    def gateway_rows(selected_config=cfg):
+    def gateway_rows(selected_config=cfg, *, pinned=True, index_bindings=bindings):
         tool.write_config(selected_config, configuration)
         config_ref = {'path': str(configuration), 'sha256': sha256_hex(configuration.read_bytes())}
-        index = _write(tmp_path / 'inputs.json', {**tool.readiness.template(pack),
-            'inputs': [{**binding, 'configuration': config_ref} for binding in bindings]})
+        index_rows = [{**binding, 'configuration': config_ref} for binding in index_bindings]
+        if not pinned:
+            for entry in index_rows:
+                entry.pop('record_inputs')
+        index = _write(tmp_path / 'inputs.json', {**tool.readiness.template(pack), 'inputs': index_rows})
         return {row['side']: row for row in tool.readiness.audit(index, pack=pack)['rows']
                 if row['check_id'] == 'OBS-01'}
 
-    rows = gateway_rows()
-    assert all(row['file_binding_valid'] and row['executor_policy_valid']
-               and not row['ready_for_execution'] and not row['engine_executed']
-               and row['actual_results'] is None for row in rows.values())
+    for pinned in (True, False):
+        rows = gateway_rows(pinned=pinned)
+        assert all(row['file_binding_valid'] and row['executor_policy_valid']
+                   and not row['ready_for_execution'] and not row['engine_executed']
+                   and row['actual_results'] is None for row in rows.values())
+        if not pinned:
+            assert all('record_inputs' not in row for row in rows.values())
+    for binding in bindings:
+        side = binding['side']
+        assert binding['record_inputs'] == {
+            'target_file_sha256': sha256_hex(sides[side]['target'].read_bytes()),
+            'record_session_sha256': sha256_hex(gateway_inputs[side]['record_session'].encode('ascii')),
+            'observation_expected_source_sha256': preparation.PRODUCER_SHA256,
+            'observation_allowed_actor_sha256': 'a' * 64,
+            'observation_denied_actor_sha256': 'b' * 64,
+        }
+
+    def publish(output):
+        output.mkdir()
+        tool._publish_prebound(output, config=cfg, bindings=bindings, checks=decisions, pack=pack,
+                               preparations=None, record_checks={'OBS-01'})
+
+    output = tmp_path / 'gateway-published'
+    publish(output)
+    published_rows = {row['side']: row for row in tool.readiness.audit(output / 'input-sources.json', pack=pack)['rows']
+                      if row['check_id'] == 'OBS-01'}
+    assert all(published_rows[row['side']]['file_binding_valid']
+               and published_rows[row['side']]['record_inputs'] == row['record_inputs'] for row in bindings)
+
+    for side, changed in (('baseline', sides['baseline']['target']),
+                          ('candidate', Path(gateway_inputs['candidate']['record_producer']))):
+        before = changed.read_bytes()
+        changed.write_bytes(before + b'\n')
+        rows = gateway_rows()
+        assert rows[side]['blocking_codes'] == ['MVP_INPUT_FILE_CHANGED']
+        assert sum(row['file_binding_valid'] for row in rows.values()) == 1
+        blocked_output = tmp_path / f'{side}-gateway-blocked'
+        with pytest.raises(ValueError, match='^METADATA_RECORD_INPUT_PUBLICATION_UNVERIFIED$'):
+            publish(blocked_output)
+        assert list(blocked_output.iterdir()) == []
+        if side == 'candidate':
+            unreviewed = deepcopy(bindings)
+            entry = next(binding for binding in unreviewed if binding['side'] == side)
+            entry['record_inputs']['observation_expected_source_sha256'] = sha256_hex(changed.read_bytes())
+            rejected = gateway_rows(index_bindings=unreviewed)
+            assert not rejected[side]['file_binding_valid']
+            assert rejected[side]['blocking_codes'] == ['GATEWAY_REVIEWED_PRODUCER_REQUIRED']
+            assert rejected['baseline']['file_binding_valid']
+        changed.write_bytes(before)
+
     baseline = sides['baseline']['target']
     original = baseline.read_bytes()
     raw = merge_config(cfg, cfg['sides']['baseline'])
@@ -1224,7 +1274,7 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
         else:
             malformed['kubernetes_gateway']['namespace_uid'] = '00000000-0000-0000-0002-000000000001'
         _write(baseline, malformed)
-        rows = gateway_rows()
+        rows = gateway_rows(pinned=False)
         assert not rows['baseline']['file_binding_valid']
         assert 'KUBERNETES_SCOPED_TARGET_INVALID' in rows['baseline']['blocking_codes']
         assert rows['candidate']['file_binding_valid'] and not rows['candidate']['engine_executed']
@@ -1235,7 +1285,7 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
     wrong_model = json.loads(original)
     wrong_model['model_mapping']['revision'] = '1' * 40
     _write(baseline, wrong_model)
-    wrong_model_rows = gateway_rows()
+    wrong_model_rows = gateway_rows(pinned=False)
     baseline.write_bytes(original)
 
     bad_budget = deepcopy(cfg)

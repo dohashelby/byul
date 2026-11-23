@@ -22,6 +22,7 @@ from tools import mvp_retry_record_inputs as retry_inputs
     ("changed-target", "MVP_RETRY_TARGET_MISMATCH"),
     ("wrong-run", "MVP_RETRY_TARGET_MISMATCH"),
     ("changed-source", "MVP_RETRY_PRODUCER_SOURCE_CHANGED"),
+    ("late-source", "MVP_RETRY_INPUT_SOURCE_CHANGED"),
 ])
 def test_materialized_retry_scopes_join_both_sides_without_collection(tmp_path, monkeypatch, sources, damage, reason):
     def forbidden(*args, **kwargs):
@@ -65,6 +66,18 @@ def test_materialized_retry_scopes_join_both_sides_without_collection(tmp_path, 
         candidate["run_id"] = "different-example-run"
     elif damage == "changed-source":
         Path(candidate["record_producer"]["path"]).write_bytes(b"# different inert file bytes\n")
+    elif damage == "late-source":
+        original_validate = retry_inputs.retry.validate_scope
+        baseline_image = wiring.versions()["baseline"]["image"].rsplit("@", 1)[1]
+        producer = Path(declarations["baseline"]["record_producer"]["path"])
+
+        def replace_after_validating(scope, **binding):
+            checked = original_validate(scope, **binding)
+            if checked["image_digest"] == baseline_image:
+                producer.write_bytes(b"# changed after scope validation\n")
+            return checked
+
+        monkeypatch.setattr(retry_inputs.retry, "validate_scope", replace_after_validating)
 
     selection = tmp_path / "selection.json"
     selection.write_bytes(canonical_json({"schema": retry_inputs.SELECTION_SCHEMA,
@@ -89,7 +102,11 @@ def test_materialized_retry_scopes_join_both_sides_without_collection(tmp_path, 
         binding = {key: declarations[side][key] for key in ("environment_ref", "target_sha256")}
         assert item[TARGET_BINDING_KEY] == binding
         assert config["sides"][side]["check_config"]["LIF-12"][TARGET_BINDING_KEY] == binding
-        emitted = json.loads(Path(item["retry_scope"]).read_bytes())
+        scope_raw = Path(item["retry_scope"]).read_bytes()
+        emitted = json.loads(scope_raw)
+        assert item["input_sha256"] == {"retry_scope_sha256": sha256_hex(scope_raw),
+                                         "retry_record_source_sha256": declarations[side]["record_producer"]["sha256"]}
+        assert "input_sha256" not in config["sides"][side]["run_binding"]["LIF-12"]
         assert emitted["subjects"] == declarations[side]["subjects"]
         assert emitted["producer_source_sha256"] == declarations[side]["record_producer"]["sha256"]
         assert emitted["policy_sha256"] == sha256_hex(canonical_json(values))

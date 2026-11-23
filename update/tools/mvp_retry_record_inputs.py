@@ -1,6 +1,7 @@
 """Materialize paired LIF-12 declarations from pinned, already selected local inputs."""
 
 import argparse
+import json
 from pathlib import Path
 
 from guard.core.execution_recipe import validate_policy_time
@@ -10,8 +11,8 @@ from guard.executors.owned_capture import MAX_BYTES
 from guard.models import Environment, Policy, canonical_json, load_pack, sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.update_validation import _plain_path, reserve_output
-from tools.mvp_a_input_preflight import _read
-from tools.mvp_metadata_wiring import _source, _transport, readiness, versions
+from tools.mvp_a_input_preflight import _pairs, _read
+from tools.mvp_metadata_wiring import _transport, readiness, versions
 
 CHECK = "LIF-12"
 SELECTION_SCHEMA = "guard-mvp-retry-record-selection/1"
@@ -23,7 +24,16 @@ _OUTPUT = "retry-record-inputs.json"
 
 def prepare(inputs, policy_path, selection_path, expected_selection_sha256, output, *, pack):
     """Write two validated scope declarations and the existing assembler's input map."""
-    policy = Policy.model_validate(_source(_plain_path(Path(policy_path)))[0])
+    captured = []
+
+    def capture(path, **bounds):
+        raw, identity = _read(path, **bounds)
+        digest = sha256_hex(raw)
+        captured.append((path, bounds, digest, identity))
+        return raw, digest
+
+    policy_raw, _ = capture(_plain_path(Path(policy_path)))
+    policy = Policy.model_validate(json.loads(policy_raw, object_pairs_hook=_pairs))
     check = pack.checks[CHECK]
     values = policy.values.get(CHECK)
     if (not policy.hash_ok() or policy.pack != pack.ref() or policy.status != "CONFIRMED"
@@ -38,8 +48,8 @@ def prepare(inputs, policy_path, selection_path, expected_selection_sha256, outp
     limits = retry.validate_limits(values[retry.DECISION_KEY])
     policy_hash = run_binding.policy_document_sha256(CHECK, "retry_policy_sha256", values)
 
-    raw, _ = _read(_plain_path(Path(selection_path)), max_bytes=2 * MAX_BYTES)
-    if not retry.fingerprint(expected_selection_sha256) or sha256_hex(raw) != expected_selection_sha256:
+    raw, selection_sha256 = capture(_plain_path(Path(selection_path)), max_bytes=2 * MAX_BYTES)
+    if not retry.fingerprint(expected_selection_sha256) or selection_sha256 != expected_selection_sha256:
         raise ValueError("MVP_RETRY_SELECTION_CHANGED")
     selected = strict_json(raw, limit=2 * MAX_BYTES)
     sides = set(readiness.SIDES)
@@ -59,14 +69,16 @@ def prepare(inputs, policy_path, selection_path, expected_selection_sha256, outp
                 or type(paths) is not dict or paths.keys() != {"environment", "target"}):
             raise ValueError("MVP_RETRY_SELECTION_INVALID")
         env_path, target_path = (_plain_path(Path(paths[key])) for key in ("environment", "target"))
-        env = Environment.model_validate(_source(env_path)[0])
+        env_raw, _ = capture(env_path)
+        env = Environment.model_validate(json.loads(env_raw, object_pairs_hook=_pairs))
         engine = releases[side]
         if (not env.hash_ok() or env.data_origin == "EXAMPLE"
                 or declaration["environment_ref"] != env.ref().model_dump(mode="json")
                 or (env.engine.name, env.engine.version, env.engine.image_digest)
                 != (engine["engine"], engine["version"], engine["image"])):
             raise ValueError("MVP_RETRY_ENVIRONMENT_MISMATCH")
-        target = strict_json(_read(target_path, max_bytes=65536)[0], limit=65536)
+        target_raw, _ = capture(target_path, max_bytes=65536)
+        target = strict_json(target_raw, limit=65536)
         transport = _transport(target, env)
         if (declaration["target_sha256"] != transport.target_sha256
                 or declaration["run_id"] != transport.binding["run_id"]):
@@ -77,8 +89,8 @@ def prepare(inputs, policy_path, selection_path, expected_selection_sha256, outp
                 or type(producer["path"]) is not str or not producer["path"] or not retry.fingerprint(producer["sha256"])):
             raise ValueError("MVP_RETRY_PRODUCER_PIN_INVALID")
         producer_path = _plain_path(Path(producer["path"]))
-        producer_raw, _ = _read(producer_path, max_bytes=run_binding._MAX_PRODUCER_BYTES)
-        if sha256_hex(producer_raw) != producer["sha256"]:
+        _, producer_sha256 = capture(producer_path, max_bytes=run_binding._MAX_PRODUCER_BYTES)
+        if producer_sha256 != producer["sha256"]:
             raise ValueError("MVP_RETRY_PRODUCER_SOURCE_CHANGED")
         scope_fields = {
             "policy_sha256": policy_hash, "producer_source_sha256": producer["sha256"],
@@ -94,10 +106,20 @@ def prepare(inputs, policy_path, selection_path, expected_selection_sha256, outp
         if len(scopes[side]) > MAX_BYTES:
             raise ValueError("MVP_RETRY_SCOPE_TOO_LARGE")
         bindings[side] = {"record_session": declaration["record_session"], "record_producer": str(producer_path),
+                          "input_sha256": {"retry_scope_sha256": sha256_hex(scopes[side]),
+                                           "retry_record_source_sha256": producer_sha256},
                           retry.TARGET_BINDING_KEY: {
                               "environment_ref": env.ref().model_dump(mode="json"),
                               "target_sha256": transport.target_sha256}}
         protected.extend((env_path, target_path, producer_path))
+
+    for path, bounds, digest, identity in captured:
+        try:
+            raw, current = _read(_plain_path(path), **bounds)
+        except (OSError, ValueError):
+            raise ValueError("MVP_RETRY_INPUT_SOURCE_CHANGED") from None
+        if current != identity or sha256_hex(raw) != digest:
+            raise ValueError("MVP_RETRY_INPUT_SOURCE_CHANGED")
 
     directory = reserve_output(Path(output), protected=protected)
     directory.chmod(0o700)

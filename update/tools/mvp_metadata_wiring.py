@@ -526,7 +526,7 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
              cilium_egress_status=False, normal_startup_load=False, normal_compile_cache=False,
              normal_safetensors_reader=False, normal_graph_capture=False, sup05_normal_preparations=None,
              retry_record_inputs=None, collection_status_bindings=None, prebound_copy_records=False,
-             prebound_observation_records=False):
+             prebound_observation_records=False, prebound_target_pins=True):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
@@ -632,6 +632,9 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                     settings.setdefault('check_config', {})[check_id] = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
                 settings.setdefault('run_binding', {})[check_id] = run_cfg
             binding = {'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer}
+            if (prebound_target_pins and check_id not in RECORD_SNAPSHOT_OPTIONS
+                    and check_id not in PREBOUND_RECORD_EXECUTORS and check_id != 'SUP-05'):
+                binding['target'] = dict(target_pointer)
             if 'prepared_record_input_sha256_by_side' in decision:
                 binding['record_inputs'] = dict(decision['prepared_record_input_sha256_by_side'][side])
             bindings.append(binding)
@@ -693,6 +696,13 @@ def _publish_prebound(output, *, config, bindings, checks, pack, preparations, r
                               and row['file_binding_valid'] and row.get('sup05_normal_preparation') == preparations[row['side']]}
             if verified_sup05 != set(readiness.SIDES):
                 raise ValueError('SUP05_NORMAL_PREPARATION_PUBLICATION_UNVERIFIED')
+        # Verify each saved target directly so partial readiness diagnostics remain publishable.
+        target_pins = {(row['target']['path'], row['target']['sha256']) for row in bindings if 'target' in row}
+        for path, digest in target_pins:
+            try:
+                readiness._read_input({'path': path, 'sha256': digest}, configured_target=path)
+            except (OSError, ValueError):
+                raise ValueError('METADATA_TARGET_PUBLICATION_UNVERIFIED') from None
         if sha256(config_path.read_bytes()).hexdigest() != config_sha256:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
 
@@ -795,7 +805,8 @@ def main():
                                         sup05_normal_preparations=sup05_preparations, retry_record_inputs=retries,
                                         collection_status_bindings=collection_status,
                                         prebound_copy_records=args.candidate_target_after_baseline is None,
-                                        prebound_observation_records=args.prebound_observation_records)
+                                        prebound_observation_records=args.prebound_observation_records,
+                                        prebound_target_pins=args.candidate_target_after_baseline is None)
     if args.prebound_observation_records and not checks['OBS-01']['configuration_enabled']:
         raise ValueError('OBSERVATION_PREBOUND_RECORD_INPUTS_UNVERIFIED')
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
@@ -819,25 +830,24 @@ def main():
         # Each receipt's directory contains all files emitted by prepare-sup05-normal.
         protected.extend([args.sup05_normal_preparations, *(Path(row['path']).parent for row in sup05_preparations.values())])
     output = reserve_output(args.output, protected=protected)
-    bound_records = {cid for cid, check in checks.items() if check['configuration_enabled']
-                     and 'prepared_record_input_sha256_by_side' in check}
-    enabled_preparations = (sup05_preparations if checks.get('SUP-05', {}).get('configuration_enabled') else None)
-    if bound_records or enabled_preparations is not None:
+    if staged is None:
+        bound_records = {cid for cid, check in checks.items() if check['configuration_enabled']
+                         and 'prepared_record_input_sha256_by_side' in check}
+        enabled_preparations = (sup05_preparations if checks.get('SUP-05', {}).get('configuration_enabled') else None)
         _publish_prebound(output, config=config, bindings=bindings, checks=checks, pack=pack,
                           preparations=enabled_preparations, record_checks=bound_records)
         return
-    config_path = output / ('preliminary-guard.toml' if staged is not None else 'guard.toml')
+    config_path = output / 'preliminary-guard.toml'
     write_config(config, config_path)
     cfg_ref = {'path': str(config_path), 'sha256': sha256(config_path.read_bytes()).hexdigest()}
     index = output / 'input-sources.json'
     _write_input_sources(index, pack, bindings, cfg_ref)
     result = readiness.audit(index, pack=pack)
     result['metadata_wiring'] = checks
-    if staged is not None:
-        write_config(staged, output / 'guard.toml')
-        result['candidate_handoff'] = {'preliminary_target': preliminary,
-            'candidate_target_after_baseline': str(_plain_path(args.candidate_target_after_baseline)),
-            'fresh_generation_verified': False, 'revalidation_required': True}
+    write_config(staged, output / 'guard.toml')
+    result['candidate_handoff'] = {'preliminary_target': preliminary,
+        'candidate_target_after_baseline': str(_plain_path(args.candidate_target_after_baseline)),
+        'fresh_generation_verified': False, 'revalidation_required': True}
     (output / 'readiness.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
 
 

@@ -222,7 +222,8 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         fields = {'check_id', 'side', 'environment', 'policy', 'configuration'}
         if item['check_id'] in _RECORD_CHECKS:
             fields.add('record_inputs')
-        if item.keys() != fields or type(item['side']) is not str or item['side'] not in sides:
+        optional = {'target'} if item['check_id'] in ordinary else set()
+        if item.keys() - optional != fields or type(item['side']) is not str or item['side'] not in sides:
             raise ValueError(_METADATA_INVALID)
         key = item['check_id'], item['side']
         if key in entries:
@@ -293,6 +294,16 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
                     overlays[check_id] = {'target': path}
         if side_settings != expected_side:
             raise ValueError(_METADATA_INVALID)
+        for check_id in allowed & ordinary:
+            entry = entries[check_id, side]
+            if 'target' not in entry:
+                continue
+            pointer = entry['target']
+            if (type(pointer) is not dict or pointer.keys() != {'path', 'sha256'}
+                    or type(pointer['path']) is not str or not pointer['path']
+                    or pointer['sha256'] != target_pointers[side]['sha256']
+                    or _plain_path(Path(pointer['path'])) != Path(path)):
+                raise ValueError('MVP_TRANSITION_METADATA_TARGET_REFERENCE_MISMATCH')
 
     if 'LIF-12' in allowed:
         retry_target_presence = {RETRY_TARGET_BINDING in settings['check_config']['LIF-12']

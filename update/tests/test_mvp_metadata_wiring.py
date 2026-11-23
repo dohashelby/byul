@@ -104,11 +104,31 @@ def test_offline_cli_emits_product_config_and_all_138_rows(tmp_path, monkeypatch
     readiness = json.loads((output / 'readiness.json').read_bytes())
     assert readiness['sides'] == 138 and readiness['active_checks'] == 69
     assert readiness['file_binding_valid_sides'] == (6 if missing_template else 10)
+    index = json.loads((output / 'input-sources.json').read_bytes())
+    for row in index['inputs']:
+        target = sides[row['side']]['target']
+        assert row['target'] == {'path': str(target), 'sha256': sha256_hex(target.read_bytes())}
     assert readiness['ready_for_execution'] is False and readiness['actual_results'] is None
     assert all(not row['engine_executed'] and row['actual_results'] is None for row in readiness['rows'])
     assert readiness['metadata_wiring']['SUP-03']['sides']['candidate'] == (
         'CONFIGURED_TEMPLATE_TARGET_REQUIRED' if missing_template else None)
     assert config['check_config'].get('REQ-07') == (None if missing_template else {'req07_normal_only': True})
+
+
+def test_prebound_publication_rejects_target_replacement_after_assembly(tmp_path, sources):
+    pack, sides, policy_path = sources
+    config, bindings, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+    target = sides['candidate']['target']
+    raw = target.read_bytes()
+    assert any(row['side'] == 'candidate' and row['target']['sha256'] == sha256_hex(raw) for row in bindings)
+    target.write_bytes(raw + b'\n')
+
+    output = tmp_path / 'prebound'
+    output.mkdir()
+    with pytest.raises(ValueError, match='^METADATA_TARGET_PUBLICATION_UNVERIFIED$'):
+        tool._publish_prebound(output, config=config, bindings=bindings, checks=decisions, pack=pack,
+                               preparations=None, record_checks=set())
+    assert not any(output.iterdir())
 
 
 def test_a_target_from_the_other_release_cannot_be_reused(tmp_path, sources):
@@ -1522,7 +1542,9 @@ def test_startup_tools_check_exact_declared_provider_source(tmp_path, sources, m
     tool.write_config(cfg, configuration)
     config_ref = {'path': str(configuration), 'sha256': sha256_hex(configuration.read_bytes())}
     for binding in bindings:
+        # Independently select the changed declarations to exercise the source checks.
         _, binding['environment'] = tool._source(sides[binding['side']]['environment'])
+        _, binding['target'] = tool._source(sides[binding['side']]['target'])
     index = _write(tmp_path / 'sources.json', {**tool.readiness.template(pack),
         'inputs': [{**binding, 'configuration': config_ref} for binding in bindings]})
     report = tool.readiness.audit(index, pack=pack)

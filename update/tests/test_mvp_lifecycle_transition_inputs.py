@@ -300,6 +300,8 @@ def test_both_redeployment_checks_share_one_configuration(external, monkeypatch,
 
 @pytest.mark.parametrize('case,error', [
     ('prebound', None),
+    ('legacy-prebound', None),
+    ('rebound-source-target', 'MVP_TRANSITION_METADATA_TARGET_REFERENCE_MISMATCH'),
     ('obs01', None),
     ('obs01-actor', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
     ('obs01-changed-producer', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
@@ -440,6 +442,9 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         prebound_copy_records=include_copy, observation_run_bindings=observation_bindings,
         prebound_observation_records=include_observation)
     assert stock_config['update']['allowed_checks'] == stock_checks
+    if case == 'legacy-prebound':
+        for row in stock_rows:
+            del row['target']
     if case == 'staged':
         stock_config = metadata.staged_config(stock_config, stock / 'later-target.json')
     if case == 'duplicate':
@@ -499,10 +504,10 @@ def test_explicit_prebound_metadata_pair_keeps_its_own_pins_and_scope(external, 
         index_path.write_bytes(canonical_json(index))
     sources = {'index': _pointer(index_path), 'targets': {side: _pointer(paths['target'])
                                                         for side, paths in stock_sources.items()}}
-    if case in {'changed-target', 'lif12-raw-target'}:
+    if case in {'changed-target', 'lif12-raw-target', 'rebound-source-target'}:
         target = stock_sources['candidate']['target']
         target.write_bytes(target.read_bytes() + b'\n')
-        if case == 'lif12-raw-target':
+        if case in {'lif12-raw-target', 'rebound-source-target'}:
             sources['targets']['candidate'] = _pointer(target)
     if case == 'obs01-changed-producer':
         path = Path(observation_bindings['candidate']['record_producer'])

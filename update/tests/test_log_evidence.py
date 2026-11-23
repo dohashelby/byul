@@ -6,12 +6,13 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 
 import pytest
 
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.log_evidence import analyze_saved_logs, main
+from guard.log_evidence import _artifact, analyze_saved_logs, main
 from guard.models import DataOrigin, PolicyStatus, ReviewStatus
 from guard.store import Store
 from guard.validation_evidence import inventory_tree
@@ -76,6 +77,20 @@ def test_positive_exact_pinned_log_replay_is_read_only_and_example_not_official(
     assert result["checks"][0]["data_origin"] == "EXAMPLE"
     assert result["official"] is False and result["policy_status"] == "DRAFT"
     assert result["original_inventory_preserved"] and before == inventory_tree(source)
+
+
+@pytest.mark.parametrize("replacement", [b'{"sample":2}', b'{"sample":10}'], ids=["same-size", "longer"])
+def test_replay_consumes_only_the_named_artifacts_pinned_bytes(tmp_path, replacement):
+    store = Store(tmp_path / "store")
+    raw = b'{"sample":1}'
+    saved = store.put_artifact(raw)
+    item = SimpleNamespace(name="log_integrity_events.json", path=saved.path, sha256=saved.sha256, bytes=saved.bytes)
+    evidence = SimpleNamespace(artifacts=[item])
+    assert _artifact(store.root, evidence, item.name) == raw
+
+    (store.root / saved.path).write_bytes(replacement)
+    with pytest.raises(ValueError, match="^log replay artifact bytes differ from pinned evidence$"):
+        _artifact(store.root, evidence, item.name)
 
 
 def test_cli_new_output_and_no_input_overwrite(tmp_path, capsys):
@@ -314,8 +329,6 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     ("0.31.0", "different-contract"), ("0.31.0", "different-source"),
 ])
 def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope):
-    from types import SimpleNamespace
-
     from guard.adapters.engine_provider import NATIVE_LOG_REPLAY_BASELINE_IMAGE, get_provider
     from guard.adapters.vllm import REQUEST_BINDING_GPU_IMAGE, VllmAdapter
     from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
@@ -350,21 +363,22 @@ def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope
     collection.update(capture_window=sample["capture"]["window"], redaction=PROFILE)
     document = render_projection(collection)
     sample["display_sha256"] = sha256_hex(document.encode())
-    artifacts = []
+    artifacts, artifact_refs = [], []
+    fixture_store = Store(tmp_path / "fixture-store")
     for name, content in (("log_integrity_events.json", json.dumps(envelope(collection))),
                           ("log_integrity_display.html", document)):
-        path = tmp_path / name
-        path.write_text(content, encoding="utf-8")
-        artifacts.append(SimpleNamespace(name=name, path=path, bytes=path.stat().st_size))
+        saved = fixture_store.put_artifact(content.encode("utf-8"))
+        artifacts.append(SimpleNamespace(name=name, path=fixture_store.root / saved.path))
+        artifact_refs.append(SimpleNamespace(name=name, path=saved.path, sha256=saved.sha256, bytes=saved.bytes))
 
-    fixture_evd = SimpleNamespace(artifacts=artifacts, execution=SimpleNamespace(executor=SimpleNamespace(version="0.3.1")))
+    fixture_evd = SimpleNamespace(artifacts=artifact_refs, execution=SimpleNamespace(executor=SimpleNamespace(version="0.3.1")))
     original = environment(engine={"name": "vllm", "version": release, "image_digest": image},
                            model={"id": "EXAMPLE-projection"})
     replay_env = original
     if foreign_source:
         # The saved foreign transcript is internally consistent, including its physical image digest.
         replay_env = environment(engine={"name": "vllm", "version": release, "image_digest": source_image})
-    obs, complete = _obs09(tmp_path, fixture_evd, sample, VALUES, replay_env)
+    obs, complete = _obs09(fixture_store.root, fixture_evd, sample, VALUES, replay_env)
     assert not complete and obs["normal_controls"] and obs["log_trials_reached"] == ["before", "after"]
 
     if scope in {"different-image", "different-version"}:

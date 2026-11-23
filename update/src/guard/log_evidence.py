@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import stat
 import sqlite3
@@ -24,7 +25,7 @@ from guard.judges.rule_table import RuleTableJudge
 from guard.models import canonical_json, sha256_hex, weakest_origin
 from guard.models.objects import object_from_dict
 from guard.report.log_integrity import render_log_integrity, verify_log_display
-from guard.validation_evidence import inventory_tree, read_objects, verify_store_files
+from guard.validation_evidence import _ARTIFACT, _directory, _unlinked, inventory_tree, read_objects, verify_store_files
 
 SCHEMA = "guard-log-evidence-audit/1"
 CHECKS = {"OBS-03": "log_analysis", "OBS-09": "log_integrity"}
@@ -36,15 +37,32 @@ def _key(ref):
     return ref.kind, ref.id, ref.revision, ref.sha256
 
 
-def _artifact(store, evd, name, *, json_value=True):
+def _artifact(store, evd, name):
+    """Return the exact sealed attachment bytes for replay."""
     matches = [item for item in evd.artifacts if item.name == name]
     if len(matches) != 1:
         raise ValueError("one pinned named log artifact is required")
     item = matches[0]
-    if item.bytes > MAX_JSON_BYTES:
+    if type(item.bytes) is not int or not 0 <= item.bytes <= MAX_JSON_BYTES:
         raise ValueError("log replay artifact exceeds its read budget")
-    data = (store / item.path).read_bytes()
-    return json.loads(data) if json_value else data.decode("utf-8")
+    if _ARTIFACT.fullmatch(item.path) is None or item.path != f"artifacts/{item.sha256}":
+        raise ValueError("log replay artifact reference differs")
+    path = store / item.path
+    _directory(path.parent)
+    _unlinked(path)
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(before.st_mode) or before.st_size != item.bytes
+                or getattr(before, "st_file_attributes", 0) & 0x400):
+            raise ValueError("log replay artifact bytes differ from pinned evidence")
+        data = stream.read(item.bytes + 1)
+        after = os.fstat(stream.fileno())
+    if (len(data) != item.bytes or sha256_hex(data) != item.sha256
+            or (before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+            != (after.st_size, after.st_mtime_ns, after.st_ctime_ns)):
+        raise ValueError("log replay artifact bytes differ from pinned evidence")
+    return data
 
 
 def _persisted_text(capture):
@@ -120,17 +138,19 @@ def _obs09(store, evd, sample, values, environment):
     collection["capture_window"] = capture.get("window")
     collection["redaction"] = (NATIVE_PROJECTION_PROFILE if projected else
         "configured authorization secrets and labelled credential values; source digests precede redaction")
-    events_envelope = _artifact(store, evd, "log_integrity_events.json")
+    events_raw = _artifact(store, evd, "log_integrity_events.json")
     if projected:
-        events_envelope = strict_json_loads(_artifact(store, evd, "log_integrity_events.json", json_value=False))
+        events_envelope = strict_json_loads(events_raw.decode("utf-8"))
         if (set(events_envelope) != {"capture", "redaction", "encoding"}
                 or events_envelope["redaction"] != NATIVE_PROJECTION_PROFILE
                 or events_envelope["encoding"] != NATIVE_ENCODING):
             raise ValueError("saved native events envelope differs")
+    else:
+        events_envelope = json.loads(events_raw)
     saved_collection = events_envelope["capture"]
     if saved_collection != collection:
         raise ValueError("saved native events differ from capture replay (redaction may limit reconstruction)")
-    document = _artifact(store, evd, "log_integrity_display.html", json_value=False)
+    document = _artifact(store, evd, "log_integrity_display.html").decode("utf-8")
     displayed = verify_log_display(document, collection)
     if (hashlib.sha256(document.encode()).hexdigest() != sample.get("display_sha256")
             or document != (render_projection(collection) if projected else render_log_integrity(collection)) or not displayed):
@@ -356,13 +376,14 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                    for axis in ("security", "functional", "performance")):
                 raise ValueError("report verdicts differ from the pinned result")
             name = "log_samples.json" if check.id == "OBS-03" else "log_integrity_samples.json"
-            envelope = _artifact(store, evd, name)
+            raw = _artifact(store, evd, name)
+            envelope = json.loads(raw)
             if not isinstance(envelope, dict) or not isinstance(envelope.get("capture"), dict):
                 raise ValueError("saved log capture envelope differs")
             sample = envelope.get("capture", {})
             if sample.get("schema") in {"guard-log-analysis-capture/4", NATIVE_SCHEMA}:
                 try:
-                    exact = strict_json_loads(_artifact(store, evd, name, json_value=False))
+                    exact = strict_json_loads(raw.decode("utf-8"))
                 except (ValueError, RecursionError):
                     raise ValueError("saved projection envelope JSON is ambiguous") from None
                 native = sample.get("schema") == NATIVE_SCHEMA

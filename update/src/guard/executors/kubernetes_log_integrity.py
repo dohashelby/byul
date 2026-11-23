@@ -74,7 +74,8 @@ def _read_collection_status(ctx, session):
                                      path=reader.path, max_bytes=_STATUS_CAP)
         if proof.get("owner_binding_verified") is not True or reader.gap:
             raise KubernetesCaptureError()
-        return strict_json(raw, limit=_STATUS_CAP), proof["capture_sha256"]
+        return strict_json(raw, limit=_STATUS_CAP), {"file_sha256": proof["capture_sha256"],
+            "file_bytes": proof["bytes"], "owner_binding_verified": True}
     finally:
         if reader.report().get("parent_cleanup_unverified"):
             ctx._collection_status_cleanup.append("COLLECTION_STATUS_PARENT_CLEANUP_UNVERIFIED")
@@ -338,9 +339,9 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         # OBS-11: 원 log_collection_gap의 기록 검증·판정을 그대로 쓰고 읽기만 probe Pod로 바꾼다.
         self.version = log_collection_gap.VERSION + "+k8s.2"
         values = ctx.policy_values
-        packet, file_sha256, diagnostics, result = None, None, [], None
+        packet, capture_receipt, diagnostics, result = None, None, [], None
         try:
-            document, file_sha256 = _read_collection_status(ctx, values["collection_session"])
+            document, capture_receipt = _read_collection_status(ctx, values["collection_session"])
             packet = log_collection_gap.validate_record(document, environment_ref=ctx.env.ref().model_dump(mode="json"),
                                                         session=values["collection_session"])
             result = log_collection_gap.evaluate(packet, values)
@@ -354,9 +355,12 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
                "collection_normal_arrivals": {"value": result and result["normal"], "collected": collected},
                "collection_producer_authenticated": {"value": False, "collected": True},
                "collection_independent_event_verified": {"value": False, "collected": True}}
+        # Issue the capture receipt only after validating the environment and session in the packet.
         summary = {"profile": log_collection_gap.PROFILE, "diagnostic_codes": diagnostics,
                    "record_sha256": sha256_hex(canonical_json(packet)) if packet is not None else None,
-                   "file_sha256": file_sha256, "source": "owned probe Pod /guard-collection/data/<session>/collection-status.json",
+                   "file_sha256": capture_receipt["file_sha256"] if capture_receipt is not None else None,
+                   "capture_receipt": capture_receipt if collected else None,
+                   "source": "owned probe Pod /guard-collection/data/<session>/collection-status.json",
                    "selected_record_timeline": log_collection_gap.selected_record_timeline(
                        packet, values["required_records"]) if collected else None,
                    "producer_authenticated": False, "independent_event_verified": False,

@@ -113,7 +113,7 @@ def run(tmp_path, monkeypatch, *, changes=None, identity=None, definition=None, 
         assert ctx.cprobe is fake
         if status is None:
             raise KubernetesBindingError()
-        return status['document'], status['sha256']
+        return status, _status_capture(canonical_json(status))
     monkeypatch.setattr(module, '_read_collection_status', read_status)
     executor = module.KubernetesLogIntegrityExecutor({'target': str(path), 'request_timeout': 1})
     env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE}, model={'id': 'fixture-model'})
@@ -211,9 +211,12 @@ GAP_VALUES = {'required_records': ['request'], 'collection_session': 'a' * 32, '
 
 
 def status(env, rows):
-    return {'schema': 'guard-owned-file/1', 'sha256': 'a' * 64,
-            'document': {'schema': 'guard-collection-status/1', 'session': 'a' * 32,
-                         'environment_ref': env.ref().model_dump(mode='json'), 'events': rows}}
+    return {'schema': 'guard-collection-status/1', 'session': 'a' * 32,
+            'environment_ref': env.ref().model_dump(mode='json'), 'events': rows}
+
+
+def _status_capture(raw):
+    return {'file_sha256': sha256_hex(raw), 'file_bytes': len(raw), 'owner_binding_verified': True}
 
 
 def _saved_status_target(side):
@@ -326,7 +329,7 @@ def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, 
 
     row = {'record': 'request', 'event_at_ms': 10, 'arrived_at_ms': 11, 'gap_marked_at_ms': None,
            'alert_at_ms': None, 'dependent_result': None, 'clock_uncertainty_ms': 1}
-    document = status(env, [row])['document']
+    document = status(env, [row])
     record_bytes = canonical_json(document) + b'\n'
     read_sessions = []
 
@@ -334,7 +337,7 @@ def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, 
         assert ctx._collection_target == declaration and ctx.cprobe.target_sha256 == digest
         assert ctx.env.ref() == env.ref()
         read_sessions.append(session)
-        return document, sha256_hex(record_bytes)
+        return document, _status_capture(record_bytes)
 
     monkeypatch.setattr(module, '_read_collection_status', read_status)
     draft = executor.run(definition, env, GAP_VALUES, VllmAdapter(), tmp_path / 'work')
@@ -343,6 +346,7 @@ def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, 
     assert draft.observations['collection_normal_arrivals'].value == ['request']
     summary = json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
     assert summary['file_sha256'] == sha256_hex(record_bytes)
+    assert summary['capture_receipt'] == _status_capture(record_bytes)
     assert summary['record_sha256'] == sha256_hex(canonical_json(document))
     assert summary['selected_record_timeline'] == [row] and not summary['producer_authenticated']
 
@@ -413,8 +417,8 @@ def test_obs11_unreadable_record_stays_uncollected(tmp_path, monkeypatch):
     assert draft.data_origin.value=='EXAMPLE' and not observer.validated and observer.attached==0
 
 
-@pytest.mark.parametrize('fault', [None, 'duplicate', 'symlink', 'owner-changed', 'file-changed'])
-def test_obs11_bound_reader_parses_only_stable_original_bytes(tmp_path, monkeypatch, fault):
+@pytest.mark.parametrize('fault', [None, 'wrong-env', 'wrong-session', 'duplicate', 'symlink', 'owner-changed', 'file-changed'])
+def test_obs11_bound_reader_retains_only_stable_scope_validated_receipts(tmp_path, monkeypatch, fault):
     session = 'a' * 32
     selected = tmp_path / 'guard-collection/data'
     selected.mkdir(parents=True)
@@ -425,9 +429,15 @@ def test_obs11_bound_reader_parses_only_stable_original_bytes(tmp_path, monkeypa
         directory.symlink_to(alternate, target_is_directory=True)
     else:
         directory.mkdir()
-    document = {'schema': 'guard-collection-status/1', 'session': session, 'environment_ref': {},
-                'events': [{'record': 'request', 'event_at_ms': 50, 'arrived_at_ms': 60}]}
-    raw = canonical_json(document)
+    env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE})
+    normal = {'record': 'request', 'event_at_ms': 50, 'arrived_at_ms': 60, 'gap_marked_at_ms': None,
+              'alert_at_ms': None, 'dependent_result': None, 'clock_uncertainty_ms': 1}
+    document = status(env, [normal])
+    if fault == 'wrong-env':
+        document['environment_ref']['sha256'] = '0' * 64
+    elif fault == 'wrong-session':
+        document['session'] = 'b' * 32
+    raw = canonical_json(document) + b'\n'
     if fault == 'duplicate':
         raw = raw.replace(b'"arrived_at_ms":60', b'"arrived_at_ms":60,"arrived_at_ms":2000')
     receipt = directory / 'collection-status.json'
@@ -476,12 +486,23 @@ def test_obs11_bound_reader_parses_only_stable_original_bytes(tmp_path, monkeypa
     transport = BoundTransport(profile=module.LOG_INTEGRITY_PROFILE, target_sha256=sha256_hex(canonical_json(topology)),
         binding={'context': 'fixture', 'run_id': 'fixture-run', 'probe': probe}, binary='kubectl',
         runner=runner, clock=monotonic, deadline=monotonic() + 30)
-    ctx = SimpleNamespace(cprobe=transport, _collection_target=topology, _collection_status_cleanup=[])
+    ctx = SimpleNamespace(cprobe=transport, _collection_target=topology, _collection_status_cleanup=[],
+                          env=env, check=gap_check(), policy_values=GAP_VALUES)
+    executor = module.KubernetesLogIntegrityExecutor({'target': 'EXAMPLE'})
+    observations, _, _, summary = executor.collect(ctx)
+    assert not summary['producer_authenticated'] and not summary['independent_event_verified']
     if fault:
-        with pytest.raises((ValueError, module.KubernetesCaptureError)):
-            module._read_collection_status(ctx, session)
+        assert summary['diagnostic_codes'] == ['COLLECTION_STATUS_UNAVAILABLE']
+        assert summary['capture_receipt'] is None and summary['record_sha256'] is None
+        assert summary['file_sha256'] == (sha256_hex(raw) if fault in {'wrong-env', 'wrong-session'} else None)
+        assert not observations['collection_normal_arrivals']['collected']
     else:
-        assert module._read_collection_status(ctx, session) == (document, sha256_hex(raw))
+        assert not summary['diagnostic_codes']
+        assert summary['capture_receipt'] == _status_capture(raw)
+        assert summary['file_sha256'] == sha256_hex(raw)
+        assert summary['record_sha256'] == sha256_hex(canonical_json(document))
+        assert summary['selected_record_timeline'] == [normal]
+        assert observations['collection_normal_arrivals'] == {'value': ['request'], 'collected': True}
     assert len(calls) == 1 and len(ownership) == 2 and not ctx._collection_status_cleanup
     assert transport.deadline - transport.clock() > 5
 

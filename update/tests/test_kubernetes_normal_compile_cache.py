@@ -80,7 +80,8 @@ class CompileWorld(StartupWorld):
             self.hash_calls.append(request)
             files = [{**row, "sha256": sha256_hex(row["relative"].encode()), "state": "hashed"}
                      for row in request["files"]]
-            if self.fault == "wrong-installed-source":
+            if self.fault == "wrong-installed-source" or (
+                    self.fault == "metadata-unavailable-source-changed" and len(self.hash_calls) == 2):
                 files[0]["sha256"] = "0" * 64
             source = {"files": files}
         else:
@@ -100,6 +101,8 @@ class CompileWorld(StartupWorld):
             elif self.fault == "empty":
                 artifact["size"] = 0
             source = {"reader_uid": 2000, "directory": directory, "artifact": artifact}
+            if self.fault in {"metadata-unavailable", "metadata-unavailable-source-changed"}:
+                source = {}
         return {"returncode": 0, "stdout_bytes": canonical_json(source), "capture": {"complete": True}}
 
 
@@ -170,6 +173,7 @@ def test_normal_compile_with_owned_boot_cache_metadata_is_partial(tmp_path, vers
     assert cache["file_path_sha256"] == sha256_hex(f"{CACHE_PATH}/{ARTIFACT}".encode())
     assert cache["file_bytes"] == 543
     assert artifact["gap"] is None and "file_read_and_consumption" in artifact["missing"]
+    assert artifact["retained_compile_report"] is None
     observations = _normalize(check, draft)["observations"]
     assert observations["supply_boot_complete"] == {"collected": True, "value": False}
     assert observations["supply_boot_violations"] == {"collected": False, "value": None}
@@ -181,13 +185,32 @@ def test_normal_compile_with_owned_boot_cache_metadata_is_partial(tmp_path, vers
     ("wrong-installed-source", False), ("prefix-changed", False), ("wrong-directory", False), ("overlay", False),
     ("compile-override", False),
     ("no-completed-compile", False), ("duplicate-compile", False), ("non-file", True), ("empty", True),
-    ("stale", True), ("changed-after-stat", True),
+    ("stale", True), ("changed-after-stat", True), ("metadata-unavailable-source-changed", True),
 ])
 def test_current_path_and_stable_metadata_are_required(tmp_path, fault, stat_called):
     draft, artifact, _, world = _run(tmp_path, "0.31.0", fault)
     assert bool(world.metadata_reads) is stat_called
     assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
     assert artifact["observation"] is None and artifact["gap"] == draft.abort_reason
+    assert (artifact["retained_compile_report"] is not None) is (fault in {"non-file", "empty", "stale"})
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+def test_retains_verified_native_compile_report_when_file_metadata_is_unavailable(tmp_path, version):
+    draft, artifact, _, world = _run(tmp_path, version, "metadata-unavailable")
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.abort_reason == artifact["gap"] == "SUP07_COMPILE_FILE_METADATA_UNVERIFIED"
+    assert len(world.hash_calls) == 2 and len(world.log_calls) == len(world.metadata_reads) == 1
+    assert artifact["retained_compile_report"] == {
+        "scope": "native_ordinary_compile_monitor",
+        "selected_at": "2026-10-26T00:00:04.517000+00:00",
+        "completed_at": "2026-10-26T00:00:08.534000+00:00",
+        "reported_compile_elapsed_ms": 3270,
+        "reported_directory_sha256": sha256_hex(CACHE_PATH.encode()),
+    }
+    assert set(artifact["installed_source_sha256"]) == set(FILES)
+    assert artifact["observation"] is None and not draft.observations["supply_boot_sessions"].collected
+    assert "ordinary_compile_cache_file_metadata" in artifact["missing"]
 
 
 @pytest.mark.parametrize("leaf_type", ["unreadable", "symbolic-link"])

@@ -275,7 +275,7 @@ class KubernetesNormalCompileCacheExecutor:
             raise ValueError("SUP07_COMPILE_TARGET_OR_SOURCE_UNVERIFIED") from None
 
         prefix = target["startup_log_prefix"]
-        observed = source_hashes = None
+        observed = source_hashes = retained_compile_report = None
         failure = "SUP07_COMPILE_OWNER_BEFORE_UNVERIFIED"
         try:
             window, container = _ready_window(logs)
@@ -291,16 +291,26 @@ class KubernetesNormalCompileCacheExecutor:
                 raise ValueError
             failure = "SUP07_COMPILE_REPORT_UNVERIFIED"
             folder, compilation = _compile_observation(raw, window, compile_profile)
-            failure = "SUP07_COMPILE_FILE_METADATA_UNVERIFIED"
-            metadata = _cache_metadata(metadata_reader, folder, compile_profile, mount, window)
-            failure = "SUP07_COMPILE_OWNER_AFTER_UNVERIFIED"
+            try:
+                metadata = _cache_metadata(metadata_reader, folder, compile_profile, mount, window)
+            except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
+                metadata = None
+            failure = ("SUP07_COMPILE_FILE_METADATA_UNVERIFIED" if metadata is None
+                       else "SUP07_COMPILE_OWNER_AFTER_UNVERIFIED")
             final_window, container = _ready_window(logs)
             _verify_launch(target, container, startup)
             if (final_window == window and _cache_mount(container, compile_profile) == mount
                     and _verify_compiler(source_reader, startup, compile_profile) == source_hashes
                     and not any(t.report()["cleanup_errors"] or t.report()["collection_gap"]
                                 for t in (logs, source_reader, metadata_reader))):
-                observed = {"role": "normal", "profile": PROFILE, "compilation": compilation, "cache_file_metadata": metadata}
+                if metadata is None:
+                    retained_compile_report = {
+                        **compilation,
+                        "reported_directory_sha256": sha256_hex(folder.as_posix().encode()),
+                    }
+                else:
+                    observed = {"role": "normal", "profile": PROFILE, "compilation": compilation,
+                                "cache_file_metadata": metadata}
         except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
             pass
 
@@ -311,7 +321,8 @@ class KubernetesNormalCompileCacheExecutor:
                           if observed and target.get("comparison_config") else None)
         summary = {"profile": PROFILE, "target_sha256": target_sha, "environment_sha256": env.ref().sha256,
                    "binding_sha256": logs.report()["binding_sha256"], "fixed_boot_prefix": prefix,
-                   "installed_source_sha256": source_hashes if observed else None, "observation": observed,
+                   "installed_source_sha256": source_hashes if observed or retained_compile_report else None,
+                   "retained_compile_report": retained_compile_report, "observation": observed,
                    "conditions_sha256": conditions_sha, "missing": missing,
                    "gap": None if observed else failure}
         error = None if observed else failure

@@ -70,6 +70,7 @@ SIDES = ('baseline', 'candidate')
 _INPUT_FILES = ('environment', 'policy', 'configuration')
 _INPUT_ROW_FIELDS = {'check_id', 'side', *_INPUT_FILES}
 _COLLECTION_STATUS_DIGESTS = {'target_file_sha256', 'record_session_sha256'}
+OBSERVATION_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | set(run_binding.KEYS_BY_CHECK_3['OBS-01'])
 _RETRY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'retry_scope_sha256', 'retry_record_source_sha256'}
 _COPY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'copy_inventory_sha256', 'copy_record_source_sha256'}
 STARTUP_OBSERVERS = {
@@ -330,7 +331,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     collection_status = (check.id == 'OBS-11' and check.executor == 'log_integrity' and implementation == 'kubernetes'
                          and requested_update.get('mode', 'external') == 'external' and 2 in run_binding.stages_for(check))
     if 'record_inputs' in source:
-        if copy_snapshot:
+        if record_snapshot:
+            digests = OBSERVATION_RECORD_DIGESTS
+        elif copy_snapshot:
             digests = _COPY_RECORD_DIGESTS
         elif retry_records and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['LIF-12']) is True:
             digests = _RETRY_RECORD_DIGESTS
@@ -412,6 +415,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         target_data = json.loads(raw_target, object_pairs_hook=_pairs)
         if type(target_data) is not dict or target_data.get('environment_ref') != env.ref().model_dump(mode='json'):
             raise ValueError('MVP_TARGET_ENVIRONMENT_MISMATCH')
+        if record_snapshot and expected_record_inputs is not None and target_data.get('synthetic', False) is not False:
+            raise ValueError('MVP_RECORD_INPUT_SCOPE_INVALID')
         if gateway_snapshot:
             _scoped_target_sha256(raw_target, env, gateway_snapshot=True, scoped_check=check.id)
         if 'target' not in source or source['target']['path'] != target:
@@ -525,7 +530,11 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             valid_from=policy.valid_from, valid_until=policy.valid_until,
             run_cfg=run_cfg, policy_ref=policy.ref(), **binding_options)
         if expected_record_inputs is not None:
-            if copy_snapshot:
+            if record_snapshot:
+                session_key = 'observation_session'
+                record_digests.update({key: effective[key] for key in run_binding.KEYS_BY_CHECK_3['OBS-01']
+                                       if key != record_source_key})
+            elif copy_snapshot:
                 session_key = 'copy_record_session'
             elif check.id == 'LIF-12' and retry_records:
                 session_key = 'retry_session'

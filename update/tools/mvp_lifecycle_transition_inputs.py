@@ -31,7 +31,7 @@ _RECORD_FILES = {
     'LIF-12': ('retry_scope', 'retry_scope_sha256', 'retry_record_source_sha256'),
     'PLT-12': ('copy_inventory', 'copy_inventory_sha256', 'copy_record_source_sha256'),
 }
-_RECORD_CHECKS = {'OBS-11', *_RECORD_FILES}
+_RECORD_CHECKS = {'OBS-01', 'OBS-11', *_RECORD_FILES}
 
 
 def _pinned_bytes(pointer, limit, captured, *, min_bytes=1):
@@ -143,15 +143,26 @@ def _snapshot_record_settings(side_settings, records, target_pointer, target_bin
         binding = bindings[check_id]
         files = _RECORD_FILES.get(check_id)
         keys = {'record_session', 'record_producer'} if files else {'record_session'}
+        if check_id == 'OBS-01':
+            keys |= {'record_producer', 'test_actors'}
         if type(binding) is not dict or binding.keys() != keys:
             raise ValueError(_METADATA_INVALID)
         session = run_binding._session(binding['record_session'])
         digests = {'target_file_sha256': target_pointer['sha256'],
                    'record_session_sha256': sha256_hex(session.encode('ascii'))}
         expected_keys = digests.keys() | (set(files[1:]) if files else set())
+        if check_id == 'OBS-01':
+            actors = binding['test_actors']
+            if type(actors) is not dict or actors.keys() != {'allowed', 'denied'}:
+                raise ValueError(_METADATA_INVALID)
+            digests.update({f'observation_{role}_actor_sha256': value for role, value in actors.items()})
+            expected_keys = readiness.OBSERVATION_RECORD_DIGESTS
         if (type(pins) is not dict or pins.keys() != expected_keys
                 or any(pins[key] != digest for key, digest in digests.items())):
             raise ValueError(_RECORD_INPUT_MISMATCH)
+        if check_id == 'OBS-01':
+            _pinned_bytes({'path': binding['record_producer'], 'sha256': pins['observation_expected_source_sha256']},
+                          run_binding._MAX_PRODUCER_BYTES, captured, min_bytes=0)
         if files:
             scope_key, scope_sha256, producer_sha256 = files
             overlays = side_settings.get('check_config')
@@ -312,7 +323,7 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
 
     A prebound metadata input provides its standard source index pointer under
     ``index`` and one independently pinned target per side under ``targets``.
-    OBS-11, LIF-12 and PLT-12 rows must also carry their verified snapshot input digests.
+    OBS-01, OBS-11, LIF-12 and PLT-12 rows must also carry their verified snapshot input digests.
     SUP-05 uses the preparation receipt and separate target held by the pinned configuration.
     A pinned file pointer to that declaration is also accepted.
     """

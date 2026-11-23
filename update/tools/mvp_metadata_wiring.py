@@ -82,7 +82,7 @@ def _transport(target, env):
     return transport
 
 
-def _paired_record_inputs(value, check_id, *, prebound_copy_records=False):
+def _paired_record_inputs(value, check_id, *, prebound_copy_records=False, prebound_observation_records=False):
     if type(value) is not dict or set(value) != set(readiness.SIDES):
         raise ValueError('OBSERVATION_PAIRED_RUN_BINDINGS_REQUIRED')
     scope_file = RECORD_SCOPE_FILES.get(check_id)
@@ -111,7 +111,8 @@ def _paired_record_inputs(value, check_id, *, prebound_copy_records=False):
             if type(entry[field]) is not str or not entry[field]:
                 raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
             source = Path(entry[field]).absolute()
-            if check_id not in PREBOUND_RECORD_EXECUTORS:
+            if check_id not in PREBOUND_RECORD_EXECUTORS and not (
+                    check_id == 'OBS-01' and prebound_observation_records):
                 _read(source)
             bindings[side][field] = str(source)
     return bindings
@@ -345,7 +346,7 @@ def _prebound_record_binding(check, env, values, *, policy, side, target_pointer
     expected_copy_digests = run_cfg.pop('input_sha256', None) if check.id == 'PLT-12' else None
     if check.id in RECORD_SCOPE_FILES:
         settings.update(_record_scope_settings(check.id, run_cfg))
-    elif run_binding.stages_for(check) != (2,):
+    elif check.id == 'OBS-11' and run_binding.stages_for(check) != (2,):
         raise ValueError('METADATA_COLLECTION_STATUS_PROFILE_UNAVAILABLE')
     _, effective = run_binding.effective_values(check, settings, env, values,
         side=side, attempt_id=None, issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
@@ -354,7 +355,10 @@ def _prebound_record_binding(check, env, values, *, policy, side, target_pointer
                                        engine=env.engine.name, version=env.engine.version)
     digests = {'target_file_sha256': target_pointer['sha256'],
                'record_session_sha256': sha256(run_cfg['record_session'].encode('ascii')).hexdigest()}
-    if check.id == 'LIF-12':
+    if check.id == 'OBS-01':
+        executor.prepared_record_snapshot(check, env, effective, expected_target_sha256=target_sha256)
+        digests.update({key: effective[key] for key in run_binding.KEYS_BY_CHECK_3['OBS-01']})
+    elif check.id == 'LIF-12':
         executor.prepared_retry_records(check, env, effective, expected_target_sha256=target_sha256)
         digests.update({key: effective[key] for key in ('retry_scope_sha256', 'retry_record_source_sha256')})
     elif check.id == 'PLT-12':
@@ -369,14 +373,17 @@ def _prebound_record_binding(check, env, values, *, policy, side, target_pointer
 
 
 def _check_reason(check, env, target, transport, values, *, policy, side, target_pointer, record_inputs, record_pins,
-                  prebound_copy_records=False):
+                  prebound_copy_records=False, prebound_observation_records=False):
     if not _in_scope(check.id, policy):
         return 'MVP_POLICY_SCOPE_MISMATCH'
     if any(key.required and key.key not in values for key in check.policy_params):
         return 'MVP_POLICY_VALUE_MISSING'
     if check.executor != CHECK_EXECUTORS[check.id]:
         return 'METADATA_EXECUTOR_UNAVAILABLE'
-    if check.id in PREBOUND_RECORD_EXECUTORS or (check.id == 'PLT-12' and prebound_copy_records):
+    if check.id == 'OBS-01' and prebound_observation_records and target.get('synthetic', False) is not False:
+        return 'OBSERVATION_PREBOUND_ENGINE_TARGET_REQUIRED'
+    if (check.id in PREBOUND_RECORD_EXECUTORS or (check.id == 'PLT-12' and prebound_copy_records)
+            or (check.id == 'OBS-01' and prebound_observation_records)):
         try:
             record_pins[side] = _prebound_record_binding(check, env, values, policy=policy, side=side,
                 target_pointer=target_pointer, target_sha256=transport.target_sha256, record_inputs=record_inputs)
@@ -510,10 +517,16 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
              normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False,
              cilium_egress_status=False, normal_startup_load=False, normal_compile_cache=False,
              normal_safetensors_reader=False, normal_graph_capture=False, sup05_normal_preparations=None,
-             retry_record_inputs=None, collection_status_bindings=None, prebound_copy_records=False):
+             retry_record_inputs=None, collection_status_bindings=None, prebound_copy_records=False,
+             prebound_observation_records=False):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
+    if prebound_observation_records:
+        if gateway_record_inputs is not None:
+            raise ValueError('GATEWAY_RECORD_INPUT_MODE_CONFLICT')
+        if observation_run_bindings is None:
+            raise ValueError('OBSERVATION_PAIRED_RUN_BINDINGS_REQUIRED')
     expected = versions() if expected is None else expected
     document, policy_pointer = _source(policy_path)
     policy = Policy.model_validate(document)
@@ -542,7 +555,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config = {'store': str(Path(store).absolute()), 'adapter': {'name': base.engine.name},
               'update': {'mode': 'external'}, 'executors': {}, 'sides': {side: {} for side in sides}}
     candidates = {}
-    records = {check_id: _paired_record_inputs(value, check_id, prebound_copy_records=prebound_copy_records)
+    records = {check_id: _paired_record_inputs(value, check_id, prebound_copy_records=prebound_copy_records,
+                                             prebound_observation_records=prebound_observation_records)
                for check_id, value in
                (('OBS-01', observation_run_bindings), ('PLT-12', copy_record_inputs),
                 ('LIF-12', retry_record_inputs), ('OBS-11', collection_status_bindings)) if value is not None}
@@ -568,7 +582,8 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
         record_pins = {}
         reasons = {side: _check_reason(check, env, target, transport, values, policy=policy, side=side,
                                        target_pointer=target_pointer, record_inputs=records.get(check_id, {}).get(side),
-                                       record_pins=record_pins, prebound_copy_records=prebound_copy_records)
+                                        record_pins=record_pins, prebound_copy_records=prebound_copy_records,
+                                        prebound_observation_records=prebound_observation_records)
                    for side, (env, target, transport, _, target_pointer) in sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
         if record_pins.keys() == set(readiness.SIDES):
@@ -703,6 +718,8 @@ def main():
                         help='Read only the approved PLT-02 path metadata')
     parser.add_argument('--observation-run-bindings', type=Path,
                         help='Paired existing OBS-01 RunBinding inputs for read-only record collection')
+    parser.add_argument('--prebound-observation-records', action='store_true',
+                        help='Publish the independently pinned pair of existing engine-owned OBS-01 record inputs')
     parser.add_argument('--gateway-record-inputs', type=Path,
                         help='Paired prebound OBS-01 inputs for one selected, already recorded normal Gateway request')
     parser.add_argument('--normal-stream-buffer', action='store_true',
@@ -739,6 +756,8 @@ def main():
     parser.add_argument('--candidate-target-after-baseline', type=Path,
                         help='Unpublished target path for the operator-managed second phase')
     args = parser.parse_args()
+    if args.prebound_observation_records and args.candidate_target_after_baseline is not None:
+        parser.error('--prebound-observation-records requires both targets before baseline execution')
     inputs = {side: {role: getattr(args, f'{side}_{role}') for role in ('environment', 'target')}
               for side in readiness.SIDES}
     pack = load_pack(readiness.ROOT / 'packs/PACK-BASELINE')
@@ -767,7 +786,10 @@ def main():
                                         normal_graph_capture=args.normal_graph_capture,
                                         sup05_normal_preparations=sup05_preparations, retry_record_inputs=retries,
                                         collection_status_bindings=collection_status,
-                                        prebound_copy_records=args.candidate_target_after_baseline is None)
+                                        prebound_copy_records=args.candidate_target_after_baseline is None,
+                                        prebound_observation_records=args.prebound_observation_records)
+    if args.prebound_observation_records and not checks['OBS-01']['configuration_enabled']:
+        raise ValueError('OBSERVATION_PREBOUND_RECORD_INPUTS_UNVERIFIED')
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
     preliminary = _source(inputs['candidate']['target'])[1] if staged is not None else None
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]

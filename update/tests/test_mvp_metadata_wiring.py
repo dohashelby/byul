@@ -1843,7 +1843,7 @@ def test_req20_capture_scope_rejects_native_siblings_before_target_preparation(t
         run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(config))
 
 
-def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources):
+def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources, monkeypatch):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())
     values = {'OBS-01': {'observation_required_events': ['ACCESS_ALLOWED', 'ACCESS_DENIED'],
@@ -1858,9 +1858,10 @@ def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path,
         producer.write_text(f'# producer fixture for {side}\n')
         obs_bindings[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
                               'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64}}
-    cfg, _, decisions = tool.assemble(
+    cfg, legacy_rows, decisions = tool.assemble(
         sides, policy_path, pack=pack, store=tmp_path / 'store', observation_run_bindings=obs_bindings)
     assert cfg['update']['allowed_checks'] == ['OBS-01']
+    assert all('record_inputs' not in row for row in legacy_rows)
     assert cfg['check_config'] == {'OBS-01': {'record_snapshot_only': True}}
     assert cfg['executors'] == {'required_event_record': 'kubernetes'}
     assert decisions['OBS-01']['shared_executor_checks']['PLT-12']['baseline']['expected_if_invoked'] == 'NOT_RUN'
@@ -1874,6 +1875,43 @@ def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path,
     invalid = application.update_readiness(pack, envs, pol, bad_scope)
     assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == (
         'OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID')
+
+    binding_file = _write(tmp_path / 'preserved-obs01-bindings.json', obs_bindings)
+    argv = ['mvp_metadata_wiring', '--prebound-observation-records', '--observation-run-bindings', str(binding_file),
+            '--policy', str(policy_path), '--store', str(tmp_path / 'store')]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            argv.extend([f'--{side}-{role}', str(path)])
+    paired = tmp_path / 'paired-obs01'
+    monkeypatch.setattr(sys, 'argv', [*argv, '--output', str(paired)])
+    tool.main()
+    index = paired / 'input-sources.json'
+    assert {row['side']: row['record_inputs'] for row in json.loads(index.read_bytes())['inputs']} == {
+        side: {'target_file_sha256': sha256_hex(paths['target'].read_bytes()),
+               'record_session_sha256': sha256_hex(obs_bindings[side]['record_session'].encode('ascii')),
+               'observation_expected_source_sha256': sha256_hex(Path(obs_bindings[side]['record_producer']).read_bytes()),
+               'observation_allowed_actor_sha256': obs_bindings[side]['test_actors']['allowed'],
+               'observation_denied_actor_sha256': obs_bindings[side]['test_actors']['denied']}
+        for side, paths in sides.items()}
+    assert tool.readiness.audit(index, pack=pack)['file_binding_valid_sides'] == 2
+
+    rejected = tmp_path / 'rejected-obs01'
+    incompatible = [*argv, '--output', str(rejected)]
+    monkeypatch.setattr(sys, 'argv', [*incompatible, '--candidate-target-after-baseline', str(tmp_path / 'later')])
+    with pytest.raises(SystemExit) as error:
+        tool.main()
+    assert error.value.code == 2 and not rejected.exists()
+    with pytest.raises(ValueError, match='^GATEWAY_RECORD_INPUT_MODE_CONFLICT$'):
+        tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', observation_run_bindings=obs_bindings,
+                      prebound_observation_records=True, gateway_record_inputs={})
+    broken = deepcopy(obs_bindings)
+    broken['candidate']['test_actors']['denied'] = broken['candidate']['test_actors']['allowed']
+    _write(binding_file, broken)
+    monkeypatch.setattr(sys, 'argv', incompatible)
+    with pytest.raises(ValueError, match='^OBSERVATION_PREBOUND_RECORD_INPUTS_UNVERIFIED$'):
+        tool.main()
+    assert not rejected.exists()
+
     fresh = tmp_path / 'fresh-record-target.json'
     staged = tool.staged_config(cfg, fresh)
     assert staged['sides']['candidate']['run_binding'] == cfg['sides']['candidate']['run_binding']

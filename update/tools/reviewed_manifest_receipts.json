@@ -1145,6 +1145,11 @@
       "manifest_sha256": "19922e2641de7cfc221318bd69b4f1831d965e926c04bf1c19ad31a444d8ba3e",
       "reviewed_by": "Codex / OBS-09 exact candidate saved logger source / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-21T16:02:39+00:00"
+    },
+    {
+      "manifest_sha256": "f90467241e16586795d6eff356181f0479d7d495b2bc926f3118fa6d4a5d6ee0",
+      "reviewed_by": "Codex / SUP-12 filesystem report and OBS-09 sealed artifact bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T04:41:15.726Z"
     }
   ]
 }

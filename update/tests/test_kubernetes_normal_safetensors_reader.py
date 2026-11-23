@@ -37,12 +37,14 @@ class ReaderWorld(StartupWorld):
         returned = source["loader_completion_call_linenumber"]
         completion_proc = "(EngineCore pid=98) " if fault == "other-process" else proc
         checkpoint_size = "0.00" if fault == "empty-checkpoint" else "0.47"
-        fs_code = "XFS" if fault == "strategy-filesystem-mismatch" else "EXT4"
+        filesystem = "unknown" if fault in {"filesystem-unreported", "strategy-unreported-mismatch"} else "EXT4"
+        strategy_filesystem = {"strategy-filesystem-mismatch": "XFS",
+                               "strategy-unreported-mismatch": "EXT4"}.get(fault, filesystem)
         rows = [
             f"2026-10-26T00:00:04.517Z {proc}INFO 10-26 00:00:04 [weight_utils.py:{fs}] "
-            f"Filesystem type for checkpoints: EXT4. Checkpoint size: {checkpoint_size} GiB. Available RAM: 50.11 GiB.",
+            f"Filesystem type for checkpoints: {filesystem}. Checkpoint size: {checkpoint_size} GiB. Available RAM: 50.11 GiB.",
             f"2026-10-26T00:00:04.616Z {proc}INFO 10-26 00:00:04 [weight_utils.py:{strategy}] "
-            f"Auto-prefetch is disabled because the filesystem ({fs_code}) is not a recognized network FS "
+            f"Auto-prefetch is disabled because the filesystem ({strategy_filesystem}) is not a recognized network FS "
             "(NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.",
             f"2026-10-26T00:00:06.233Z {completion_proc}INFO 10-26 00:00:06 [default_loader.py:{returned}] "
             "Loading weights took 0.29 seconds",
@@ -158,20 +160,26 @@ def test_sup12_prepares_the_saved_default_reader_without_collecting(tmp_path, mo
 
 
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
-def test_sup12_reports_scoped_actual_default_reader_branch_without_a_full_verdict(tmp_path, version):
-    draft, artifact, check, world = _run(tmp_path, version)
+@pytest.mark.parametrize(("fixture", "filesystem", "branch"), [
+    (None, "EXT4", "automatic_local_no_prefetch"),
+    ("filesystem-unreported", None, "automatic_no_prefetch_filesystem_unreported"),
+])
+def test_sup12_reports_scoped_actual_default_reader_branch_without_a_full_verdict(
+        tmp_path, version, fixture, filesystem, branch):
+    draft, artifact, check, world = _run(tmp_path, version, fixture)
     assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
     assert artifact["gap"] is None and len(world.hash_calls) == 2 and world.log_calls == [len(world.raw)]
     assert not world.execs and not draft.normal_control.attempted
     assert [step.attempted for step in draft.challenges] == [True, False, False]
     reader = artifact["observation"]["reader"]
     assert reader["observed_reader_family"] == "safetensors"
-    assert reader["load_strategy_branch"] == "automatic_local_no_prefetch"
+    assert reader["load_strategy_branch"] == branch
     assert reader["source_indicated_iterator_call"] == "safe_open"
     assert reader["direct_safe_open_call_observed"] is False
-    assert reader["reported_checkpoint_size_centi_gib"] == 47 and reader["filesystem_type"] == "EXT4"
+    assert reader["reported_checkpoint_size_centi_gib"] == 47 and reader["filesystem_type"] == filesystem
     assert reader["same_process_label_observed"] is (version == "0.31.0")
     assert "direct_safe_open_call_and_file_identity" in artifact["missing"]
+    assert ("checkpoint_filesystem_type" in artifact["missing"]) is (filesystem is None)
     observations = _normalize(check, draft)["observations"]
     assert observations["supply_boot_complete"] == {"collected": True, "value": False}
     assert observations["supply_boot_violations"] == {"collected": False, "value": None}
@@ -181,7 +189,7 @@ def test_sup12_reports_scoped_actual_default_reader_branch_without_a_full_verdic
 
 @pytest.mark.parametrize("fault", ["prefix-changed", "wrong-source", "source-changed", "override", "no-branch",
                                    "other-reader", "other-process", "wrong-order", "duplicate", "empty-checkpoint",
-                                   "strategy-filesystem-mismatch", "owner-changed"])
+                                   "strategy-filesystem-mismatch", "strategy-unreported-mismatch", "owner-changed"])
 def test_sup12_requires_exact_source_scope_and_ordered_unambiguous_report(tmp_path, fault):
     draft, artifact, _, world = _run(tmp_path, "0.31.0", fault)
     assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE

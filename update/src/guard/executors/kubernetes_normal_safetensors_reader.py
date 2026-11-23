@@ -25,9 +25,10 @@ _LOG_LINE = re.compile(rb"(?P<time>[0-9T:.Z-]{20,30}) "
                        rb"(?:(?P<process>\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\)) )?"
                        rb"INFO [0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} "
                        rb"\[(?P<module>weight_utils|default_loader)\.py:(?P<line>[0-9]{1,5})\] (?P<message>[^\r\n]+)")
-_FILESYSTEM = re.compile(rb"Filesystem type for checkpoints: ([A-Z][A-Z0-9_-]{0,23})\. "
+_FS_LABEL = rb"(unknown|[A-Z][A-Z0-9_-]{0,23})"
+_FILESYSTEM = re.compile(rb"Filesystem type for checkpoints: " + _FS_LABEL + rb"\. "
                          rb"Checkpoint size: ([0-9]{1,6}\.[0-9]{2}) GiB\. Available RAM: [0-9]{1,6}\.[0-9]{2} GiB\.")
-_READER_DEFAULT = re.compile(rb"Auto-prefetch is disabled because the filesystem \(([A-Z][A-Z0-9_-]{0,23})\) "
+_READER_DEFAULT = re.compile(rb"Auto-prefetch is disabled because the filesystem \(" + _FS_LABEL + rb"\) "
                               rb"is not a recognized network FS \(NFS/Lustre\)\. If you want to force prefetching, "
                               rb"start vLLM with --safetensors-load-strategy=prefetch\.")
 _LOADER_RETURN = re.compile(rb"Loading weights took [0-9]{1,6}\.[0-9]{2} seconds")
@@ -116,10 +117,14 @@ def _reader_observation(raw, window, profile):
     if (not fs_at <= strategy_at <= returned_at or fs_process != strategy_process or fs_process != return_process
             or not size or filesystem != strategy_filesystem or filesystem in {b"NFS", b"NFS4", b"LUSTRE"}):
         raise ValueError("SUP12_READER_BOOT_REPORT_UNVERIFIED")
+    filesystem_reported = filesystem != b"unknown"
     return {"scope": "native_ordinary_safetensors_default_iterator",
-            "observed_reader_family": "safetensors", "load_strategy_branch": "automatic_local_no_prefetch",
+            "observed_reader_family": "safetensors",
+            "load_strategy_branch": ("automatic_local_no_prefetch" if filesystem_reported
+                                     else "automatic_no_prefetch_filesystem_unreported"),
             "source_indicated_iterator_call": "safe_open", "direct_safe_open_call_observed": False,
-            "filesystem_type": filesystem.decode("ascii"), "reported_checkpoint_size_centi_gib": size,
+            "filesystem_type": filesystem.decode("ascii") if filesystem_reported else None,
+            "reported_checkpoint_size_centi_gib": size,
             "iterator_report_at": fs_at.isoformat(), "strategy_report_at": strategy_at.isoformat(),
             "loader_return_report_at": returned_at.isoformat(), "same_process_label_observed": fs_process is not None}
 
@@ -219,6 +224,8 @@ class KubernetesNormalSafetensorsReaderExecutor:
 
         cleanup = sorted({item for t in (logs, source_reader) for item in t.report()["cleanup_errors"]})
         missing = _MISSING + ([] if observed else ["ordinary_boot_reader_selection"])
+        if observed and reader["filesystem_type"] is None:
+            missing.append("checkpoint_filesystem_type")
         settings = {"profile": PROFILE, "max_duration_seconds": duration}
         conditions = (sha256_hex(canonical_json(execution_conditions(target, settings, [])))
                       if observed and target.get("comparison_config") else None)

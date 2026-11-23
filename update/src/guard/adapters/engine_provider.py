@@ -129,13 +129,18 @@ class VllmProvider(EngineProvider):
     def native_log_replay_profile(self, image_digest: str, engine_version: str) -> dict | None:
         """Reviewed additional source mapping for offline saved log evidence."""
         candidate_images = (REQUEST_BINDING_GPU_IMAGE, "docker.io/" + REQUEST_BINDING_GPU_IMAGE)
-        if engine_version == "0.31.0" and image_digest in candidate_images:
+        baseline_images = (NATIVE_LOG_REPLAY_BASELINE_IMAGE, "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE)
+        if image_digest in candidate_images:
+            reviewed_version = "0.31.0"
+        elif image_digest in baseline_images:
+            reviewed_version = "0.30.0"
+        else:
+            return None
+        if engine_version != reviewed_version:
+            raise ValueError("saved native log image differs from the declared release")
+        if reviewed_version == "0.31.0":
             contract = self.adapter().native_log_contract(REQUEST_BINDING_GPU_IMAGE, engine_version)
             return {"contract": contract, "request_logger_line": 65, "image_spellings": candidate_images}
-        if (engine_version, image_digest) not in {
-                ("0.30.0", NATIVE_LOG_REPLAY_BASELINE_IMAGE),
-                ("0.30.0", "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE)}:
-            return None
         # Exact logger, formatter and ordinary INFO entry from the installed
         # linux/amd64 manifest. The existing live profile has separate scope.
         sources = [

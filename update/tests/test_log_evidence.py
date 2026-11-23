@@ -407,7 +407,8 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     ("0.30.0", "matched"), ("0.30.0", "different-image"), ("0.30.0", "different-version"),
     ("0.30.0", "different-contract"), ("0.30.0", "different-source"),
     ("0.31.0", "matched"), ("0.31.0", "matched-canonical-source"),
-    ("0.31.0", "different-image"), ("0.31.0", "different-contract"), ("0.31.0", "different-source"),
+    ("0.31.0", "different-image"), ("0.31.0", "different-version"),
+    ("0.31.0", "different-contract"), ("0.31.0", "different-source"),
 ])
 def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope):
     from guard.adapters.engine_provider import NATIVE_LOG_REPLAY_BASELINE_IMAGE, get_provider
@@ -421,7 +422,7 @@ def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope
 
     baseline = release == "0.30.0"
     image = "docker.io/" + (NATIVE_LOG_REPLAY_BASELINE_IMAGE if baseline else REQUEST_BINDING_GPU_IMAGE)
-    source_image = image if baseline or scope == "matched-canonical-source" else REQUEST_BINDING_GPU_IMAGE
+    source_image = image if baseline or scope in {"matched-canonical-source", "different-version"} else REQUEST_BINDING_GPU_IMAGE
     other_image = "vllm/vllm-openai@sha256:" + "f" * 64
     foreign_source = not baseline and scope == "different-source"
     if foreign_source:
@@ -463,7 +464,8 @@ def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope
     assert not complete and obs["normal_controls"] and obs["log_trials_reached"] == ["before", "after"]
 
     if scope in {"different-image", "different-version"}:
-        original = environment(engine={"name": "vllm", "version": "0.31.0" if scope == "different-version" else release,
+        other_version = "0.31.0" if baseline else "0.30.0"
+        original = environment(engine={"name": "vllm", "version": other_version if scope == "different-version" else release,
                                       "image_digest": other_image if scope == "different-image" else image},
                                model={"id": "EXAMPLE-projection"})
     elif scope == "different-contract":
@@ -483,6 +485,8 @@ def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope
     assert result["original_inventory_preserved"] and result["official"] is False
     if scope == "different-image":
         assert result["problems"] == ["OBS-09/single: saved native identity differs from the pinned environment"]
+    if scope == "different-version":
+        assert result["problems"] == ["OBS-09/single: saved native log image differs from the declared release"]
     if result["accepted"]:
         row, = result["checks"]
         assert row["status"] == "PROJECTION_REPLAY_MATCH" and row["verdicts"]["security"] == "UNKNOWN"

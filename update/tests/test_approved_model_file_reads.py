@@ -55,7 +55,7 @@ def _source_fixture(root, release, name):
 
 
 def produce_normal_file_read_fixture(tmp_path, monkeypatch, release, *, model_path, prepared_path,
-                                     matched_model=True, observed=True):
+                                     matched_model=True, observed=True, missing_file=False):
     """Use installed-source-shaped EXAMPLE files with the real writer and parser."""
     monkeypatch.setenv('VLLM_USE_V2_MODEL_RUNNER', '0')
     prepared_path = Path(prepared_path)
@@ -130,11 +130,19 @@ def produce_normal_file_read_fixture(tmp_path, monkeypatch, release, *, model_pa
                                    revision=None, quantization=None)
     original_open = builtins.open
     try:
-        if observed:
+        if missing_file:
+            # The private EXAMPLE file becomes unavailable before the ordinary eager open.
+            model_path.unlink()
+            with pytest.raises(FileNotFoundError):
+                instance.load_weights(model, model_config)
+            assert not decoded and not applied
+        elif observed:
             assert instance.load_weights(model, model_config) is None
         else:
             applied.extend(eager_weights())
-        assert decoded == [original] and applied == [('weight', 42)] and builtins.open is original_open
+        if not missing_file:
+            assert decoded == [original] and applied == [('weight', 42)]
+        assert builtins.open is original_open
     finally:
         observer.writer.close('PROCESS_EXIT')
     recording, = sink.glob('pid-*.jsonl')

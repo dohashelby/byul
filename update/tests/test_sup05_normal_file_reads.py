@@ -3,7 +3,9 @@ from contextlib import contextmanager
 from copy import deepcopy
 from datetime import timedelta
 import json
+import os
 from pathlib import Path
+import sys
 import threading
 from types import SimpleNamespace
 
@@ -26,7 +28,7 @@ PACK_DIRECTORY = REPOSITORY / "update" / "packs" / "PACK-BASELINE"
 
 
 def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=None, model_root=None, engine_role=None,
-                engine_image=IMAGE, platform=None, release=None):
+                engine_image=IMAGE, platform=None, release=None, missing_file=False):
     profile = sensor.PROFILE
     if release is not None:
         from guard.adapters import vllm_lifecycle_catalog as catalog
@@ -73,7 +75,7 @@ def normal_case(root, patch, *, mismatch=False, env_id="ENV-SUP05-NORMAL", mode=
         from tests.test_approved_model_file_reads import produce_normal_file_read_fixture
 
         _, raw = produce_normal_file_read_fixture(root, patch, release, model_path=file,
-                                                  prepared_path=assets / "manifest.json")
+                                                  prepared_path=assets / "manifest.json", missing_file=missing_file)
     start = json.loads(raw.splitlines()[0])
     pid = start["payload"]["context"]["pid"]
     group = SimpleNamespace(root=root, env=env, prepared=prepared, raw=raw, raw_by_pid={pid: raw})
@@ -224,6 +226,35 @@ def test_scope_and_transport_gaps_cannot_make_a_success(external, monkeypatch, m
         assert not draft.observations["supply_boot_native_consumption"].collected
     if mode in {"writable-model", "nested-shadow"}:
         assert not case.world.execs
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or os.uname().machine != "x86_64"
+    or sys.version_info[:3] != (3, 12, 3) or sys.flags.optimize != 0,
+    reason="the selected GPU observer ABI is Linux x86_64 CPython 3.12.3",
+)
+@pytest.mark.parametrize(("release", "mode"), [
+    ("0.30.0", None), ("0.31.0", None), ("0.31.0", "unsealed"),
+    ("0.31.0", "late-file-owner"), ("0.31.0", "cleanup"),
+])
+def test_only_verified_incomplete_approved_recording_retains_gap_counts(external, monkeypatch, release, mode):
+    case = normal_case(external / "case", monkeypatch, release=release, mode=mode, missing_file=True)
+    draft = run(case, external / "out")
+
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert not draft.observations["supply_boot_native_consumption"].collected
+    assert not draft.observations["supply_boot_violations"].collected
+    summary, = draft.artifacts
+    raw = summary.path.read_bytes()
+    result = json.loads(raw)
+    if mode is None:
+        assert draft.abort_reason == "SUPPLY_BOOT_NORMAL_OWNED_READ_UNAVAILABLE"
+        assert result["normal_read_gap_recordings"] == [
+            {"recording_sha256": sha256_hex(case.raw), "file_read_event_count": 1, "open_raise_count": 1},
+        ]
+    else:
+        assert "normal_read_gap_recordings" not in result
+    assert b"public-example.safetensors" not in raw and b"exception_kind" not in raw
 
 
 @pytest.mark.parametrize("changed", ["false-marker", "other-check", "wrong-reference", "wrong-prepared", "wrong-target",

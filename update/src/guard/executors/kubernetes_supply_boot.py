@@ -62,6 +62,26 @@ def _read_projection(captured, prepared, digest, prepared_sha256, analysis):
     return native
 
 
+def _approved_read_gap_recordings(captured):
+    from guard.adapters.vllm_approved_file_read_composition import EVENT
+
+    diagnostics = []
+    for recording in captured["recordings"]:
+        capture = recording["capture"]
+        provenance = capture["provenance"]
+        if (capture["process_context_verified"] is not True or recording["session_owner_match"] is not True
+                or recording["listed_file_identity_match"] is not True
+                or provenance["owner_binding_verified"] is not True
+                or capture["summary"]["recording_closed"] is not True
+                or capture["summary"]["discarded_tail_bytes"] != 0):
+            continue
+        phases = [row["payload"]["phase"] for row in capture["records"] if row["event"] == EVENT]
+        if phases:
+            diagnostics.append({"recording_sha256": provenance["capture_sha256"],
+                                "file_read_event_count": len(phases), "open_raise_count": phases.count("OPEN_RAISE")})
+    return diagnostics
+
+
 def _normal_validity(values):
     from guard.adapters.vllm_file_read_sensor import fingerprint
     from .rank_failure_contract import stamp
@@ -498,6 +518,7 @@ class KubernetesSupplyBootExecutor:
         reader = self._normal_reader(target, env, prepared)
         engine = reader.binding["engine"]
         native = None
+        diagnostics = []
         cleanup = []
         gap = "SUPPLY_BOOT_NORMAL_SEALED_CAPTURE_UNAVAILABLE"
         try:
@@ -526,6 +547,8 @@ class KubernetesSupplyBootExecutor:
                 gap = None
             else:
                 gap = "SUPPLY_BOOT_NORMAL_OWNED_READ_UNAVAILABLE"
+                if prepared["profile"] != sensor.PROFILE:
+                    diagnostics = _approved_read_gap_recordings(captured)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError, IndexError):
             pass
         try:
@@ -555,6 +578,8 @@ class KubernetesSupplyBootExecutor:
         rows = [{"role": "normal", **native}] if native is not None else []
         summary = {"profile": NORMAL_FILE_READS_PROFILE, "sessions": [session], "native": rows, "gap": gap,
                    "missing": sorted(set(missing + cleanup + source_errors))}
+        if diagnostics and not cleanup:
+            summary["normal_read_gap_recordings"] = diagnostics
         summary_artifacts, errors = persist(workdir, summary, {"normal": {}, "challenge": {}}, collector)
         errors = source_errors + errors
         observed = {"supply_boot_sessions": [session], "supply_boot_missing": sorted(set(missing + cleanup + errors)),

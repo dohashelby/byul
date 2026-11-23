@@ -197,6 +197,23 @@ def test_canonical_initialization_evidence_preserves_bound_positive_steps(tmp_pa
     assert all(row['same_process_interval_observed'] and row['required_rank_ready_return_observed'] for row in native)
     source = (init_release if profile == init_release.PROFILE else sensor).SOURCE_ADDITIONS[sensor.MP]
     assert all(row['source_sha256'] == source for row in native)
+    artifact, = [item for item in draft.artifacts if item.name == 'probe_log.jsonl']
+    summary = json.loads(artifact.path.read_text().splitlines()[-1])
+    assert summary['summary'] is True
+    for row in native:
+        receipt = row['source_recording']
+        assert set(receipt) == {'sha256', 'aggregate_call_and_return_seq', 'ready_call_and_return_seq'}
+        capture, = [recording['capture'] for recording in summary['native']['recordings']
+                    if recording['capture'] and recording['capture']['provenance']['capture_sha256'] == receipt['sha256']]
+        assert capture['process_context_verified'] and capture['provenance']['owner_binding_verified']
+        assert capture['summary']['recording_closed'] and capture['summary']['discarded_tail_bytes'] == 0
+        records = {item['seq']: item for item in capture['records']}
+        for field, call in (('aggregate', 'executor_call_sha256'), ('ready', 'ready_call_sha256')):
+            call_seq, return_seq = receipt[f'{field}_call_and_return_seq']
+            assert call_seq < return_seq
+            assert records[call_seq]['payload']['phase'] == 'CALL'
+            assert records[return_seq]['payload']['phase'] == 'RETURN'
+            assert records[call_seq]['payload']['call_sha256'] == records[return_seq]['payload']['call_sha256'] == row[call]
     assert all(row['normal_shape_verified'] and not row['service_gate_verified'] for row in controls)
     assert not observed['activation_scope_complete'] and not observed['activation_violations']
     assert 'readiness_and_http_shape_are_not_independent_admission_oracle' in observed['activation_missing']

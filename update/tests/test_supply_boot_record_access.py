@@ -452,7 +452,7 @@ def access_run(tmp_path, monkeypatch, capture, inventory):
     def read(self, env, target, values_, digest):
         if inventory is None:
             raise ValueError("gone")
-        return {"copies": deepcopy(inventory)}
+        return {"copies": deepcopy(inventory)}, None
     monkeypatch.setattr(record_product, "capture_record_access", collect)
     monkeypatch.setattr(record_product.KubernetesRecordAccessExecutor, "_inventory", read)
     return pipeline(tmp_path, "OBS-06", values, lambda env, v: record_product.KubernetesRecordAccessExecutor(

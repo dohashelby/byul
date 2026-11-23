@@ -18,6 +18,7 @@ import yaml
 from guard.adapters import vllm_initialization_release_sensor, vllm_initialization_sensor
 from guard.adapters import vllm_native_input_profiles, vllm_native_input_rejection
 from guard.adapters.engine_provider import get_provider
+from guard.adapters.resource_recovery_probe import MAX_INPUT as _RECOVERY_SELECTION_LIMIT
 from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES
 from guard.application import _scoped_target_sha256
 from guard.collectors import native_input, native_input_qualification
@@ -43,7 +44,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNA
                                  normal_startup_load_requested,
                                  normal_token_input_requested, retry_record_snapshot_requested, validate_sup05_preparation_receipt)
 from guard.core.select import _in_scope, check_policy_value
-from guard.executors import passive_api_hop, registry, run_binding
+from guard.executors import passive_api_hop, registry, resource_recovery_contract, run_binding
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
 from guard.executors.kubernetes_normal_compile_cache import normal_compile_cache_transport
 from guard.executors.kubernetes_normal_graph_capture import normal_graph_capture_transport
@@ -607,6 +608,15 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             if effective['init_target_sha256'] != sha256_hex(canonical_json(target_data)):
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
             executor.prepared_inputs(check, env, effective)
+        if (prebound_kubernetes and check.id == 'LIF-11' and check.executor == 'resource_recovery'
+                and run_binding.stages_for(check) == (1, 2, 4)):
+            path = cfg['selection']
+            raw, identity = _read(path, max_bytes=_RECOVERY_SELECTION_LIMIT)
+            selection = strict_json(raw, limit=_RECOVERY_SELECTION_LIMIT)
+            if sha256_hex(canonical_json(selection)) != effective['recovery_selection_sha256']:
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            resource_recovery_contract.validate_selected_policy(selection, effective)
+            bound_files.append((path, raw, identity))
         if collection_status:
             executor.prepared_collection_status(check, env, effective,
                                                 expected_target_sha256=sha256_hex(canonical_json(target_data)))

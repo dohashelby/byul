@@ -420,6 +420,83 @@ def test_initialization_readiness_uses_the_declared_startup_inputs(
                 assert row['files']['initialization_prepared'] == prepared_refs[row['side']]
 
 
+def test_recovery_readiness_uses_the_product_selection_policy(tmp_path, external, monkeypatch):
+    from guard.adapters import vllm_rank_failure_sensor, vllm_release_observation_sensor
+    from guard.collectors.lifecycle import prepare_assets
+    from guard.models import canonical_json
+    from tests.builders import environment, policy
+    from tests.test_a1_resource_recovery import selection, values
+    from tests.test_kubernetes_request_binding import target as owned_target
+    from tests.test_lifecycle_capture import REPOSITORY
+    from tools.j02_run_config import write_config
+
+    def no_runtime(*args, **kwargs):
+        pytest.fail('Resource recovery file readiness must stay offline')
+
+    monkeypatch.setattr(socket, 'socket', no_runtime)
+    monkeypatch.setattr(subprocess, 'Popen', no_runtime)
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    check = pack.checks['LIF-11']
+    selected = selection()
+    fixture_values = values(selected)
+    declared = {field.key: fixture_values[field.key] for field in check.policy_params
+                if field.key != 'recovery_require_absent_kinds'}
+    scenario_path = tmp_path / 'scenario.json'
+    scenario_path.write_bytes(canonical_json({'case': 'EXAMPLE saved resource census'}))
+    config = {'adapter': {'name': 'vllm'}, 'executors': {'resource_recovery': 'kubernetes'},
+              'update': {'allowed_checks': [check.id]},
+              'run_binding': {check.id: {'scenario': str(scenario_path)}}, 'sides': {}}
+    profiles = {'baseline': vllm_release_observation_sensor.RANK_PROFILE,
+                'candidate': vllm_rank_failure_sensor.PROFILE}
+    env_paths = {}
+    for side, engine in tool.versions().items():
+        env = environment(id=f'ENV-RECOVERY-{side.upper()}',
+                          engine={'name': engine['engine'], 'version': engine['version'],
+                                  'image_digest': engine['image']},
+                          model={'id': 'EXAMPLE-model', 'revision': 'EXAMPLE-revision', 'inventory_sha256': 'c' * 64},
+                          runtime={'tp_size': 2, 'gpu_count': 2, 'gpu_model': 'EXAMPLE', 'driver': 'EXAMPLE'})
+        env_path = env_paths[side] = tmp_path / f'{side}-env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        target = owned_target(env)
+        target.update(lab=True, observed_version=engine['version'])
+        target['engine']['image_digest'] = engine['image']
+        target['kubernetes']['engine'].update(image=engine['image'], image_id=engine['image'])
+        target_path = tmp_path / f'{side}-target.json'
+        target_path.write_bytes(canonical_json(target))
+        selection_path = tmp_path / f'{side}-selection.json'
+        selection_path.write_bytes(canonical_json(selected))
+        assets = external / side
+        prepare_assets(assets, REPOSITORY, profile=profiles[side])
+        config['sides'][side] = {'resource_recovery': {
+            'target': str(target_path), 'prepared': str(assets / 'manifest.json'),
+            'selection': str(selection_path),
+        }}
+    policy_path, config_path = tmp_path / 'policy.json', tmp_path / 'guard.toml'
+    write_config(config, config_path)
+
+    for required, valid, reasons in (
+        (['unix-socket', 'posix-shm-fd'], True, {'EXAMPLE_ENV_NOT_ACTUAL', 'LIVE_EXECUTOR_PREFLIGHT_REQUIRED'}),
+        (fixture_values['recovery_required_resource_kinds'], False, {'RESOURCE_SELECTED_REQUIRED_KIND_MISSING'}),
+    ):
+        pol = policy(pack.ref(), scope={'include': [check.id]}, values={
+            check.id: {**declared, 'recovery_require_absent_kinds': required},
+        })
+        policy_path.write_bytes(canonical_json(pol.to_dict()))
+        index = tool.template(pack)
+        index['inputs'] = [{'check_id': check.id, 'side': side, **{
+            role: {'path': str(path), 'sha256': sha256(path.read_bytes()).hexdigest()}
+            for role, path in {'environment': env, 'policy': policy_path, 'configuration': config_path}.items()
+        }} for side, env in env_paths.items()]
+        report = run(tmp_path, index)
+        assert report['active_checks'] == 69 and report['sides'] == 138
+        assert report['file_binding_valid_sides'] == (2 if valid else 0)
+        for row in (row for row in report['rows'] if row['check_id'] == check.id):
+            assert row['file_binding_valid'] is valid
+            assert set(row['blocking_codes']) == reasons
+            assert row['engine_executed'] is row['live_target_verified'] is row['ready_for_execution'] is False
+            assert row['actual_results'] is None
+
+
 @pytest.mark.parametrize('candidate_wrong_owner', [False, True])
 def test_obs11_validates_the_declared_status_probe_in_both_preflights(tmp_path, monkeypatch, candidate_wrong_owner):
     from guard import application

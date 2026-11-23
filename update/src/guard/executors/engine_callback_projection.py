@@ -972,7 +972,8 @@ def project_graph_lifetime(cases, outputs, events, secret, tags, references=None
 
 DAEMON_STATE = 'WeightCacheDaemon._handle_get_state'
 DAEMON_RELEASE = 'WeightCacheDaemon._handle_release'
-WEIGHTS_POINTS = (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load')
+LOADER_STATE = 'IpcModelLoader._request_state'
+WEIGHTS_POINTS = (DAEMON_STATE, DAEMON_RELEASE, LOADER_STATE, 'IpcModelLoader._fallback_load')
 
 
 def _started(event):
@@ -1006,6 +1007,42 @@ def weights_window(events, secret, barrier, container_start_ns):
     scope = {'anchor_ns': anchor, 'container_start_known': type(container_start_ns) is int,
              'rows_outside_container': stale}
     return kept + rows, scope
+
+
+def _loader_state_returns(events):
+    """Summarize qualified loader returns within the existing capture window."""
+    calls = {}
+    for event in events:
+        key = (event.get('process_sha256'), event.get('call_sha256'))
+        if all(type(part) is str and _SHA.fullmatch(part) for part in key):
+            calls.setdefault(key, []).append(event)
+    result = {}
+    for rows in calls.values():
+        if len(rows) != 2:
+            continue
+        entry, terminal = rows
+        if (entry.get('point') != LOADER_STATE or terminal.get('point') != LOADER_STATE
+                or entry.get('phase') != 'CALL' or terminal.get('phase') != 'RETURN'
+                or entry.get('entry_qualified_before') is not True or terminal.get('entry_qualified_before') is not True
+                or terminal.get('entry_qualified_after') is not True
+                or _started(entry) is None or _started(entry) != _started(terminal)):
+            continue
+        pins = ('session_sha256', 'source_file_sha256', 'entry_code_sha256')
+        if any(type(entry.get(key)) is not str or not _SHA.fullmatch(entry[key])
+               or entry[key] != terminal.get(key) for key in pins):
+            continue
+        before, after = entry.get('fields'), terminal.get('fields')
+        if type(before) is not dict or type(after) is not dict:
+            continue
+        mode, count = before.get('mode'), after.get('entries')
+        if (mode not in ('copy', 'zero_copy') or mode != after.get('mode') or after.get('served') is not True
+                or type(count) is not int or not 0 <= count < 2**63):
+            continue
+        stats = result.setdefault(mode, {'returned_calls': 0, 'min_entries': count, 'max_entries': count})
+        stats['returned_calls'] += 1
+        stats['min_entries'] = min(stats['min_entries'], count)
+        stats['max_entries'] = max(stats['max_entries'], count)
+    return result
 
 
 def project_weights_lifetime(cases, outputs, events, switches, scope=None):
@@ -1086,6 +1123,7 @@ def project_weights_lifetime(cases, outputs, events, switches, scope=None):
     # 주체 허용 여부는 정책이 없어 범위만 막는다. 관측한 사실의 위반 여부와는 따로 둔다.
     core = missing - {'release_authorization_policy_unavailable'}
     return {'consumers': len(consumers), 'release_actors': actors, 'post_release': after, 'violations': violations,
+            'loader_state_returns': _loader_state_returns(events),
             **({'scope': dict(scope)} if scope is not None else {}),
             'violation': True if violations else (None if core else False),
             'full_scope': not missing and not violations, 'missing': sorted(missing)}

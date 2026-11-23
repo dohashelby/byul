@@ -1,4 +1,5 @@
 """LIF11 selected resources and explicit absolute deadlines; full recovery lineage separate."""
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import uuid
 from guard.adapters import vllm_initialization_sensor as initialization,vllm_rank_failure_sensor as rank
@@ -79,6 +80,45 @@ def _selected_census_sources(before, after, selection, target_sha256, start, end
     return sources
 
 
+def _owned_gpu_references(censuses, target_sha256, start, end):
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    lower, upper = ((bound - epoch) // timedelta(microseconds=1) * 1000 for bound in (start, end))
+    steps = []
+    for row in censuses:
+        if not all(row[key] is True for key in ('collected', 'owner_binding_verified', 'clock_window_verified')):
+            continue
+        packet, receipt = row['packet'], row['receipt']
+        # validate_packet recomputes completeness, including the host anchor,
+        # observer, query receipts, stable binary and wall/monotonic agreement.
+        if (packet['host_inventory_complete'] is not True
+                or not lower <= packet['started_wall_ns'] <= packet['finished_wall_ns'] <= upper
+                or packet['selection_sha256'] != receipt.get('selection_sha256')):
+            continue
+        devices = {device['uuid']: (device['major'], device['minor']) for device in packet['devices']}
+        processes = {proc['host_pid']: proc for proc in packet['processes']}
+        compute = {(sample['host_pid'], sample['uuid']) for sample in packet['compute']}
+        confirmed = {(sample['host_pid'], sample['uuid']) for sample in packet['compute_confirm']}
+        devices_by_pid = {}
+        for pid, device in compute & confirmed:
+            devices_by_pid.setdefault(pid, []).append(device)
+        references = []
+        for owner in gpu_probe.owner_matches(receipt['selection'], packet['processes']):
+            if len(owner['host_pids']) != 1:
+                continue
+            pid, = owner['host_pids']
+            held = {(handle['major'], handle['minor']) for handle in processes[pid]['handles']}
+            for device in sorted(uuid for uuid in devices_by_pid.get(pid, ()) if devices[uuid] in held):
+                references.append({'owner_id': owner['id'],
+                                   'device_sha256': sha256_hex(canonical_json([target_sha256, device]))})
+        if references:
+            steps.append({'step': 'owned-node-held-gpu-references', 'stage': row['stage'], 'target_sha256': target_sha256,
+                          'selection_sha256': receipt['selection_sha256'], 'program_sha256': receipt['program_sha256'],
+                          'packet_sha256': receipt['packet_sha256'], 'started_wall_ns': packet['started_wall_ns'],
+                          'finished_wall_ns': packet['finished_wall_ns'], 'compute_and_device_handle_references': references,
+                          'producer_authenticated': False, 'gpu_release_verified': False})
+    return steps
+
+
 class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='resource_recovery';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
@@ -127,7 +167,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
                 if (not row.get('collected')or not row.get('owner_binding_verified')or not row.get('clock_window_verified')
                         or (row.get('packet')or{}).get('namespace_scan_complete')is not True):
                     diagnostics.append('RESOURCE_RECOVERY_NAMESPACE_CENSUS_INCOMPLETE')
-        def collect_gpu():
+        def collect_gpu(stage):
             if not self.cfg.get('node_gpu_processes',False):return
             from .node_gpu_process import collect_for_reader
             try:
@@ -146,7 +186,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             except Exception:
                 row={'schema':'guard-owned-node-gpu-process-read/1','collected':False,'owner_binding_verified':False,
                     'clock_window_verified':False,'packet':None,'receipt':None,'diagnostic_codes':['GPU_PROCESS_OWNED_NODE_READ_UNVERIFIED']}
-            gpus.append(row)
+            gpus.append({**row, 'stage': stage})
             if(not row.get('collected')or not row.get('owner_binding_verified')or not row.get('clock_window_verified')
                     or(row.get('packet')or{}).get('host_inventory_complete')is not True):
                 diagnostics.append('RESOURCE_RECOVERY_NODE_GPU_CENSUS_INCOMPLETE')
@@ -158,7 +198,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             before_census = reader.resource_census(ctx._recovery_selection,
                 max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
             collect_group('before')
-            collect_gpu()
+            collect_gpu('before')
             for slot in SLOTS:
                 row={'case_id':'lif11-'+slot,'request_id_sha256':sha256_hex(('byul-lif11-'+token+'-'+slot).encode()),
                     'attempted':False,'started_at':None,'finished_at':None,'policy_window_verified':False,
@@ -183,7 +223,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_CENSUS_UNAVAILABLE')
                 try:collect_group('after')
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_NAMESPACE_CENSUS_UNAVAILABLE')
-                collect_gpu()
+                collect_gpu('after')
                 try:sealed=reader.seal_session().get('sealed') is True
                 except Exception:pass
                 if not sealed:diagnostics.append('RESOURCE_RECOVERY_SESSION_SEAL_UNAVAILABLE')
@@ -257,6 +297,8 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             steps.extend(held)
             if {row['stage'] for row in held} != {'before', 'after'}:
                 missing.append('owned_namespace_held_reference_census_incomplete')
+        if self.cfg.get('node_gpu_processes', False):
+            steps.extend(_owned_gpu_references(gpus, ctx.policy_values['recovery_target_sha256'], start, end))
         observations.update({
             'activation_steps': {'value': steps or None, 'collected': bool(steps)},
             'activation_missing': {'value': missing, 'collected': True},

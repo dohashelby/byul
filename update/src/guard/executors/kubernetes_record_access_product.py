@@ -175,8 +175,13 @@ class KubernetesRecordAccessExecutor:
                                            path=inventory_path(values["record_inventory_session"]))
         if provenance.get("owner_binding_verified") is not True:
             raise ValueError("RECORD_ACCESS_INVENTORY_OWNER_CHANGED")
-        return validate_inventory(strict_json(raw, limit=MAX_BYTES), environment_ref=env.ref().model_dump(mode="json"),
-                                  target_sha256=digest, source_sha256=values["record_inventory_source_sha256"])
+        env_ref = env.ref()
+        packet = validate_inventory(strict_json(raw, limit=MAX_BYTES), environment_ref=env_ref.model_dump(mode="json"),
+                                    target_sha256=digest, source_sha256=values["record_inventory_source_sha256"])
+        # The file reader computes its digest and byte count from these exact retained bytes.
+        return packet, {"file_sha256": provenance["capture_sha256"], "file_bytes": provenance["bytes"],
+                        "environment_sha256": env_ref.sha256, "target_sha256": digest,
+                        "declared_source_sha256": packet["source_sha256"], "owner_binding_verified": True}
 
     def _bound_inputs(self, env, values, *, read=_read_declared_json, expected_target_sha256=None):
         try:
@@ -226,7 +231,8 @@ class KubernetesRecordAccessExecutor:
             raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID")
         workdir = Path(workdir)
         workdir.mkdir(parents=True, exist_ok=True)
-        diagnostics, capture, packet, evaluated = [], None, None, None
+        diagnostics = []
+        capture = packet = inventory_receipt = evaluated = None
         try:
             capture = capture_record_access(env, target, subjects, expected_policy_ref=expected_policy_ref, workdir=workdir,
                 binary=self.cfg.get("kubectl_binary", "kubectl"), duration=self.cfg.get("max_duration_seconds", 60),
@@ -234,14 +240,16 @@ class KubernetesRecordAccessExecutor:
         except Exception:
             diagnostics.append("RECORD_ACCESS_LOG_READ_UNAVAILABLE")
         try:
-            packet = self._inventory(env, target, policy_values, digest)
+            packet, inventory_receipt = self._inventory(env, target, policy_values, digest)
             evaluated = evaluate_inventory(packet)
         except Exception:
             diagnostics.append("RECORD_ACCESS_INVENTORY_UNAVAILABLE")
         ordinary_capture = _ordinary_capture_provenance(capture, env, policy_values, expected_policy_ref, started, end)
-        return self._draft(check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture)
+        return self._draft(check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture,
+                           inventory_receipt=inventory_receipt)
 
-    def _draft(self, check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture):
+    def _draft(self, check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture,
+               *, inventory_receipt=None):
         unauthorized = capture.get("unauthorized_read_verified") if capture else None
         rows = [{key: row[key] for key in ("case_id", "role", "attempted", "identity_verified", "binding_verified",
                                            "read_verified", "returncode", "byte_count", "gaps")} for row in capture["rows"]] if capture else None
@@ -268,6 +276,8 @@ class KubernetesRecordAccessExecutor:
         summary = {"profile": PROFILE, "rows": rows, "diagnostic_codes": diagnostics, "copies": packet and packet["copies"]}
         if ordinary_capture is not None:
             summary["ordinary_capture"] = ordinary_capture
+        if inventory_receipt is not None:
+            summary["inventory_receipt"] = inventory_receipt
         artifact.write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True), encoding="utf-8")
         gap = bool(diagnostics or (capture and capture["gaps"]))
         cleanup = [] if capture is None or capture["cleanup"]["complete"] else ["RECORD_ACCESS_CLEANUP_UNVERIFIED"]

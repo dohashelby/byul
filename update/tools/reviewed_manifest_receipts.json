@@ -1150,6 +1150,11 @@
       "manifest_sha256": "f90467241e16586795d6eff356181f0479d7d495b2bc926f3118fa6d4a5d6ee0",
       "reviewed_by": "Codex / SUP-12 filesystem report and OBS-09 sealed artifact bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T04:41:15.726Z"
+    },
+    {
+      "manifest_sha256": "f24c3da5b34ba7729c6e226164e27b8a2f016c2a0a92a712d09c9db95a9ce49b",
+      "reviewed_by": "Codex / SUP-07 compile report and OBS-03 sealed log metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T05:38:23.367Z"
     }
   ]
 }

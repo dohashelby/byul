@@ -111,7 +111,9 @@ def _paired_record_inputs(value, check_id, *, prebound_copy_records=False, prebo
             if type(entry[field]) is not str or not entry[field]:
                 raise ValueError('OBSERVATION_RUN_BINDING_INVALID')
             source = Path(entry[field]).absolute()
-            if check_id not in PREBOUND_RECORD_EXECUTORS and not (
+            if check_id == 'PLT-12' and prebound_copy_records and field == 'record_producer':
+                _read(source, min_bytes=0, max_bytes=run_binding._MAX_PRODUCER_BYTES)
+            elif check_id not in PREBOUND_RECORD_EXECUTORS and not (
                     check_id == 'OBS-01' and prebound_observation_records):
                 _read(source)
             bindings[side][field] = str(source)

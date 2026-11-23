@@ -10,7 +10,7 @@ from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_recovery_http import KubernetesRecoveryHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
-from guard.runtime.kubernetes_resource_recovery import KubernetesResourceRecoveryReader
+from guard.runtime.kubernetes_resource_recovery import KubernetesResourceRecoveryReader, PROBE_SOURCE_SHA256
 from .lifecycle_session import capture_session
 from .resource_recovery_contract import PROFILE,normalize_policy,stamp,validate_selected_policy,project
 
@@ -57,6 +57,26 @@ def _namespace_observations(censuses, selection, target_sha256, start, end):
                                 for (owner, kind, digest), forms in sorted(references.items())],
             'global_release_verified': False, 'producer_authenticated': False})
     return steps
+
+
+def _selected_census_sources(before, after, selection, target_sha256, start, end):
+    selection_sha256 = sha256_hex(canonical_json(selection))
+    sources = []
+    for stage, row in (('before', before), ('after', after)):
+        if row is None:
+            continue
+        try:
+            if (not all(row[key] is True for key in ('collected', 'owner_binding_verified', 'clock_window_verified'))
+                    or row['selection_sha256'] != selection_sha256 or row['probe_source_sha256'] != PROBE_SOURCE_SHA256
+                    or not start <= stamp(row['started_at']) <= stamp(row['finished_at']) <= end):
+                continue
+            packet = resource_probe.validate_result(row['packet'], selection)
+        except (KeyError, TypeError, ValueError):
+            continue
+        sources.append({'stage': stage, 'selection_sha256': selection_sha256, 'target_sha256': target_sha256,
+                        'probe_source_sha256': PROBE_SOURCE_SHA256, 'packet_sha256': sha256_hex(canonical_json(packet)),
+                        'started_at': row['started_at'], 'finished_at': row['finished_at']})
+    return sources
 
 
 class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
@@ -226,6 +246,11 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         selected = [row for row in projection['rows'] if row['before_status'] == 'match'
                     or row['after_status'] in {'match', 'absent', 'replaced'}]
         steps = [{'step': 'selected-resource-census', 'resources': selected}] if selected else []
+        if steps:
+            sources = _selected_census_sources(before_census, after_census, ctx._recovery_selection,
+                                               ctx.policy_values['recovery_target_sha256'], start, end)
+            if sources:
+                steps[0]['source_censuses'] = sources
         missing = list(projection['missing'])
         if self.cfg.get('namespace_resources', False):
             held = _namespace_observations(groups, group_selection, ctx.policy_values['recovery_target_sha256'], start, end)

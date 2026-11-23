@@ -165,7 +165,8 @@ def test_full_two_branches_and_original_76_definition_bytes_remain(tmp_path):
         if p.is_file() and p.relative_to(seed.path).as_posix() not in {'pack.yaml','checks/LIF-11.yaml'}:assert p.read_bytes()==(pack.path/p.relative_to(seed.path)).read_bytes()
 
 
-@pytest.mark.parametrize('mode', ['released-descriptors', 'retained', 'census-failure', 'initial-binding-failure'])
+@pytest.mark.parametrize('mode', ['released-descriptors', 'retained', 'census-failure', 'initial-binding-failure',
+                                 'clock-skew', 'wrong-census-source'])
 def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp_path, group, native_target, monkeypatch, mode):
     from guard.adapters.engine_provider import PROVIDERS
     from guard.core.run import _normalize
@@ -185,6 +186,16 @@ def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp
             return snapshot(self, *args, **kwargs)
 
         monkeypatch.setattr(KubernetesResourceRecoveryReader, 'snapshot', fail_preflight)
+    if mode == 'wrong-census-source':
+        resource_census = KubernetesResourceRecoveryReader.resource_census
+
+        def wrong_source(self, *args, **kwargs):
+            result = resource_census(self, *args, **kwargs)
+            if world.census_count == 2:
+                result['probe_source_sha256'] = sha256_hex(b'EXAMPLE inconsistent source')
+            return result
+
+        monkeypatch.setattr(KubernetesResourceRecoveryReader, 'resource_census', wrong_source)
     target, selection_path = tmp_path / 'target.json', tmp_path / 'selection.json'
     target.write_bytes(canonical_json(world.target))
     selection_path.write_bytes(canonical_json(selected))
@@ -205,8 +216,25 @@ def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp
     assert set(resources) == selected_ids
     before = None if mode == 'initial-binding-failure' else 'match'
     assert all(row['before_status'] == before for row in resources.values())
-    after = {'released-descriptors': 'absent', 'retained': 'match', 'census-failure': None, 'initial-binding-failure': 'match'}
+    after = {'released-descriptors': 'absent', 'retained': 'match', 'census-failure': None,
+             'initial-binding-failure': 'match', 'clock-skew': None, 'wrong-census-source': 'absent'}
     assert all(resources[row['id']]['after_status'] == after[mode] for row in selected['resources'])
+    expected_stages = (['after'] if mode == 'initial-binding-failure'
+                       else ['before'] if mode in {'census-failure', 'clock-skew', 'wrong-census-source'}
+                       else ['before', 'after'])
+    sources = step['source_censuses']
+    assert [receipt['stage'] for receipt in sources] == expected_stages
+    log, = [artifact for artifact in draft.artifacts if artifact.name == 'probe_log.jsonl']
+    summary = json.loads(log.path.read_text().splitlines()[-1])
+    for receipt in sources:
+        census = summary['censuses'][0 if receipt['stage'] == 'before' or mode == 'initial-binding-failure' else 1]
+        assert receipt == {
+            'stage': receipt['stage'], 'selection_sha256': sha256_hex(canonical_json(selected)),
+            'target_sha256': values_['recovery_target_sha256'],
+            'probe_source_sha256': sha256_hex(census_source().encode()),
+            'packet_sha256': sha256_hex(canonical_json(census['packet'])),
+            'started_at': census['started_at'], 'finished_at': census['finished_at'],
+        }
     if mode == 'initial-binding-failure':
         assert world.census_count == 1 and draft.status.value == 'ABORTED'
         assert not any(row['same_selected_baseline_observed'] for row in resources.values())

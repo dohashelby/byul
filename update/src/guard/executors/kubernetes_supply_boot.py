@@ -395,6 +395,10 @@ class KubernetesSupplyBootExecutor:
             if check.id == "LIF-01":
                 row["reported_stage_costs"] = [stage for stage in packet["rows"]
                                                if stage["stage"] in values["supply_stage_budget_ms"]]
+            if (check.id == "LIF-02" and role == "normal" and provenance["owner_binding_verified"] is True
+                    and packet["rows"]):
+                fields = ("attempt", "at_ms", "bytes", "temporary_left")
+                row["reported_fetch_attempts"] = [{key: attempt[key] for key in fields} for attempt in packet["rows"]]
         except Exception:
             row["diagnostic_codes"].append("SUPPLY_BOOT_RECORD_UNAVAILABLE")
         if check.id in contract.NATIVE_CHECKS:

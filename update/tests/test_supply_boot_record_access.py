@@ -739,3 +739,44 @@ def test_lif01_keeps_only_bound_reported_stage_costs(tmp_path, monkeypatch, cond
     else:
         assert "reported_stage_costs" not in normal and normal["record_sha256"] is None
         assert normal["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"]
+
+
+@pytest.mark.parametrize("condition", ["valid", "bad_type", "wrong_source", "unverified_owner"])
+def test_lif02_preserves_only_bound_normal_fetch_attempt_facts(tmp_path, monkeypatch, condition):
+    env = environment(model={"id": "test"})
+    executor, values, digest = role_inputs(tmp_path, monkeypatch, "LIF-02", env)
+    values.update(supply_max_attempts=2, supply_max_fetch_bytes=10)
+    attempts = [{"attempt": 0, "at_ms": 100, "bytes": 3, "temporary_left": True},
+                {"attempt": 1, "at_ms": 170, "bytes": 5, "temporary_left": False}]
+    packet = good_packet(env.ref().model_dump(mode="json"), digest, "LIF-02")
+    packet["change"] = change(applied=False)
+    packet["rows"] = [{**attempt, "outcome": outcome}
+                      for attempt, outcome in zip(attempts, ("EXAMPLE unretained outcome detail", "complete"), strict=True)]
+    if condition == "bad_type":
+        packet["rows"][0]["bytes"] = True
+    elif condition == "wrong_source":
+        packet["source_sha256"] = sha256_hex(b"another EXAMPLE producer")
+    raw = canonical_json(packet)
+
+    def read_file(self, client, target, *, container, image, path):
+        assert path == boot.record_path("a" * 32)
+        return raw, {"capture_sha256": sha256_hex(raw), "owner_binding_verified": condition != "unverified_owner"}
+
+    monkeypatch.setattr(FakeReader, "read_file", read_file)
+    monkeypatch.setattr(FakeReader, "report", lambda self: {})
+    draft = executor.run(PACK.checks["LIF-02"], env, values, None, tmp_path)
+    summary, = draft.artifacts
+    assert summary.name == "supply_boot_summary.json"
+    saved = summary.path.read_text()
+    normal, missing_challenge = draft.observations["supply_boot_sessions"].value
+    assert json.loads(saved)["sessions"] == [normal, missing_challenge]
+    assert missing_challenge["diagnostic_codes"] == ["SUPPLY_BOOT_INPUT_UNAVAILABLE"]
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.observations["supply_boot_record_authenticated"].value is False
+    assert draft.observations["supply_boot_complete"].value is False
+    assert "EXAMPLE unretained outcome detail" not in saved and '"outcome"' not in saved
+    if condition == "valid":
+        assert normal["reported_fetch_attempts"] == attempts
+        assert normal["record_sha256"] == sha256_hex(raw)
+    else:
+        assert "reported_fetch_attempts" not in normal

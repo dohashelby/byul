@@ -139,18 +139,25 @@ def _switch_mode(
         context, tetragon_namespace, "tp", "set-mode", "--namespace", policy_namespace, policy_name, target_mode
     )
     changed = _try_run(run, command)
+    # Only identity-bound callers consume attempt tracking. Legacy receipts are
+    # serialized verbatim by the existing trial and transition-history writers.
+    mutation = {"mutation_attempted": True} if expected_policy is not None else {}
     after = _read_policy(run, context, tetragon_namespace, policy_name, policy_namespace)
     if not same_policy(after):
+        reason = "mode switch and rollback unverified"
+        if expected_policy is not None:
+            reason = "mode switch unverified; rollback requires the original policy"
         return {
             "ok": False,
-            "reason": "mode switch unverified; rollback requires the original policy",
+            "reason": reason,
             "before": before,
             "after": after,
-            "mutation_attempted": True,
+            **mutation,
+            "rollback": None,
             "rollback_ok": False,
         }
     if changed is not None and changed.returncode == 0 and after["mode"] == target_mode:
-        return {"ok": True, "reason": "mode verified", "before": before, "after": after, "mutation_attempted": True}
+        return {"ok": True, "reason": "mode verified", "before": before, "after": after, **mutation}
     rollback = _try_run(
         run,
         _tetra(
@@ -169,7 +176,7 @@ def _switch_mode(
         "reason": "mode switch failed; rollback verified" if rollback_ok else "mode switch and rollback unverified",
         "before": before,
         "after": after,
-        "mutation_attempted": True,
+        **mutation,
         "rollback": restored,
         "rollback_ok": rollback_ok,
     }

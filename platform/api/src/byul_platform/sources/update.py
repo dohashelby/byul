@@ -132,9 +132,10 @@ class ReportEntry:
     candidate: Any  # verification-result 후보(검증 전)
     raw_checks: dict[str, Any] | None
     path: str | None
+    object_store: Path | None = None
 
 
-def _read_rpt_dir(directory: Path) -> list[ReportEntry]:
+def _read_rpt_dir(directory: Path, object_store: Path | None = None) -> list[ReportEntry]:
     """폴더(하위 포함)의 RPT JSON을 읽는다. RPT가 아닌 JSON은 건너뛴다."""
     out: list[ReportEntry] = []
     for path in sorted(directory.rglob("*.json")):
@@ -147,7 +148,7 @@ def _read_rpt_dir(directory: Path) -> list[ReportEntry]:
         if not isinstance(data, dict) or data.get("kind") != "RPT":
             continue
         raw = {str(r.get("check_id")): r for r in data.get("by_check", []) if isinstance(r, dict)}
-        out.append(ReportEntry(rpt_to_verification_result(data), raw, str(path)))
+        out.append(ReportEntry(rpt_to_verification_result(data), raw, str(path), object_store or directory / "objects" / "store.sqlite"))
     return out
 
 
@@ -180,12 +181,13 @@ class ReportDirUpdateSource:
 
     mode = "live"
 
-    def __init__(self, reports_dir: Path) -> None:
+    def __init__(self, reports_dir: Path, object_store: Path | None = None) -> None:
         self.dir = reports_dir
+        self.object_store = object_store
         self.detail = str(reports_dir)
 
     def reports(self) -> list[ReportEntry]:
-        return _read_rpt_dir(self.dir) if self.dir.is_dir() else []
+        return _read_rpt_dir(self.dir, self.object_store) if self.dir.is_dir() else []
 
 
 # --- 보고서 화면용 투영 -----------------------------------------------------------
@@ -296,6 +298,7 @@ def report_view(vr: dict[str, Any]) -> dict[str, Any]:
         "not_selected": list(vr["not_selected"]),
         "approval": vr["approval"],
         "inputs_manifest": list(vr["inputs_manifest"]),
+        "targets": {},
         "checks": [
             {
                 "check_id": c["check_id"],

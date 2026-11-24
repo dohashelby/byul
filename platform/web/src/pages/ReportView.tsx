@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 // 모양은 runtime에서 가져온 platform 디자인을 따른다. 판정·집계 값은 서버가 RPT에서 꺼낸 그대로 쓴다.
 import type { ReactNode } from "react";
 import type { ReportCheck, ReportMark, ReportSide, ReportView as Report } from "../api/types";
-import { Badge, EnumBadge, VerdictBadge } from "../components/Badges";
+import { Badge, EnumBadge, OriginBadge, VerdictBadge } from "../components/Badges";
 import { DataTable, type Column } from "../components/DataTable";
 import { Pagination, usePagination } from "../components/Pagination";
 import { DetailPanel, KeyValue } from "../components/DetailPanel";
@@ -25,6 +25,7 @@ import {
   VERDICT,
   label,
 } from "../lib/labels";
+import { OBSERVATION_NAMES } from "./reportObservationNames";
 import p from "./pages.module.css";
 
 const AXES = [
@@ -140,10 +141,180 @@ function FindingGroup({ title, note, ids, byId, update, onOpen, pageParam }: { t
   );
 }
 
+const SIDE_LABEL = { single: "검증 대상", baseline: "기준", candidate: "후보" } as const;
+type SideKey = keyof typeof SIDE_LABEL;
+
+function targetLabel(report: Report, side: SideKey) {
+  const target = report.targets?.[side];
+  if (!target) return "엔진 판본 기록 없음";
+  return `${target.name === "vllm" ? "vLLM" : target.name} ${target.version}`;
+}
+
+function comparisonText(check: ReportCheck) {
+  const changes = AXES.flatMap(([axis, name]) => {
+    const before = check.baseline?.[axis];
+    const after = check.candidate?.[axis];
+    return before && after && before !== after
+      ? [`${name} ${VERDICT[before]?.label ?? before} → ${VERDICT[after]?.label ?? after}`]
+      : [];
+  });
+  if (check.comparison === "NOT_COMPARABLE") {
+    return changes.length ? `비교 조건을 충족하지 못했으며 기록된 판정은 ${changes.join(", ")}입니다.` : "비교 조건을 충족하지 못했습니다.";
+  }
+  if (check.comparison === "UNKNOWN" || !check.baseline || !check.candidate) return "변화 여부를 확정할 기록이 부족합니다.";
+  if (changes.length) return `기준과 후보에 기록된 판정이 달라졌습니다 (${changes.join(", ")}).`;
+  return "기록된 판정에 변화가 없습니다.";
+}
+
+const FINDING_TEXT = {
+  forbidden_code_revision_imported: {
+    title: "요청에 지정한 코드가 실제로 로드됨",
+    body: "정책은 요청으로 서버에서 사용할 코드 버전을 지정하는 것을 금지합니다. 시험 요청에 지정된 버전의 코드가 실제로 로드됐습니다.",
+    proof: "요청 직후 생긴 로드 기록과 저장된 모듈의 해시가 일치했습니다.",
+  },
+  forbidden_ipc_connection: {
+    title: "허용되지 않은 프로세스가 내부 통신 접점에 연결됨",
+    body: "정책이 허용한 사용자만 보호된 내부 통신 접점에 연결할 수 있어야 합니다. 시험에서 허용 목록 밖 사용자로 연결이 성공한 기록이 확인됐습니다.",
+  },
+  forbidden_egress_succeeded: {
+    title: "정책으로 금지한 외부 송신이 성공함",
+    body: "정책은 지정된 외부 송신을 차단하도록 요구합니다. 시험에서 금지된 송신이 성공한 기록이 확인됐습니다.",
+  },
+  forbidden_plaintext_succeeded: {
+    title: "평문 연결이 금지된 구간에서 API 요청이 성공함",
+    body: "정책은 대상 API 구간에서 암호화되지 않은 통신을 금지합니다. 시험에서 해당 구간에 평문 HTTP 요청을 보냈고, API가 정상 응답했습니다.",
+  },
+  forbidden_template_reference: {
+    title: "템플릿이 금지된 속성을 참조함",
+    body: "정책은 지정된 속성 참조를 금지합니다. 시험에서 공급 템플릿을 렌더링했을 때, 해당 참조가 실행됐음을 보여주는 결과가 관측됐습니다.",
+  },
+  unapproved_running_image: {
+    title: "승인 목록에 없는 실행 이미지가 확인됨",
+    body: "정책은 승인된 이미지만 실행하도록 요구합니다. 실제 실행 중인 이미지의 식별값을 승인 목록과 대조한 결과, 일치하는 항목이 없었습니다.",
+  },
+  untrusted_input_changed_log: {
+    title: "요청 입력으로 신뢰해야 할 로그 기록이 바뀜",
+    body: "사용자가 보낸 값이 시스템이 남기는 신뢰 기록에 영향을 주면 안 됩니다. 시험에서 입력값이 로그의 신뢰 필드를 바꾸거나 별도 사건으로 기록된 결과가 확인됐습니다.",
+  },
+  normal_probes_passed: {
+    title: "계획된 정상 동작 시험이 모두 성공함",
+    body: "계획 목록에 있는 모든 정상 동작 시험에서 성공 결과가 기록됐습니다. 이 근거는 시험한 요청의 범위에 해당합니다.",
+  },
+  normal_probe_failed: {
+    title: "정상 동작 시험에서 실패가 기록됨",
+    body: "계획된 정상 동작 시험 중 하나 이상에서 실패가 기록됐습니다.",
+  },
+} satisfies Record<NonNullable<ReportSide["finding"]>["code"], { title: string; body: string; proof?: string }>;
+
+function isFunctionalFinding(finding: ReportSide["finding"]) {
+  return finding?.code === "normal_probes_passed" || finding?.code === "normal_probe_failed";
+}
+
+function measuredFinding(side: ReportSide | null | undefined) {
+  return side?.data_origin === "MEASURED" ? side.finding : null;
+}
+
+function needsEvidenceNote(side: ReportSide) {
+  const finding = measuredFinding(side);
+  return (!finding && !side.decisions?.length)
+    || (isFunctionalFinding(finding) && !!side.security && side.security !== "NOT_APPLICABLE"
+      && !side.decisions?.some((decision) => decision.axis === "security"));
+}
+
+
+
+const DECISION_LIMITS: Record<string, string> = {
+  no_rule: "이 축에 적용할 판정 규칙이 없습니다.",
+  no_pass_rule: "이 축의 충족을 확인할 판정 규칙이 없습니다.",
+  policy_context_unverified: "시험에 적용된 정책과 관측의 관계를 확인하지 못했습니다.",
+  execution_incomplete: "시험 실행이 완료되지 않았습니다.",
+  normal_control_unverified: "정상 조건에서의 시험 성공을 확인하지 못했습니다.",
+  challenge_incomplete: "계획한 경계 시험 중 실행 기록이 빠진 항목이 있습니다.",
+  cpu_performance_unverified: "이 CPU 비교에서는 성능을 검증하지 않았습니다.",
+};
+
+const OPERATOR_DESCRIPTIONS: Record<string, string> = {
+  eq: "기준값과 일치", ne: "기준값과 다름",
+  in: "기준 목록에 포함", not_in: "기준 목록 밖의 값",
+  lt: "기준값 미만", le: "기준값 이하", gt: "기준값 초과", ge: "기준값 이상",
+  nonempty: "항목이 기록됨", empty: "기록된 항목이 없음",
+  all_in: "모든 결과가 기준 목록에 포함", any_in: "기준 목록에 포함된 결과가 있음",
+  none_in: "기준 목록에 포함된 결과가 없음",
+  any_between: "지정 범위에 들어가는 결과가 있음", all_between: "모든 결과가 지정 범위 안에 있음",
+  superset_of: "확인 대상이 모두 관측됨", subset_of: "기준 목록 안에서 관측됨",
+  not_subset_of: "기준 목록 밖의 항목이 관측됨",
+};
+
+function decisionAxis(decision: NonNullable<ReportSide["decisions"]>[number]) {
+  return AXES.find(([axis]) => axis === decision.axis)?.[1] ?? decision.axis;
+}
+
+function describeDecisionKeys(keys: string[]) {
+  return keys.flatMap((key) => Object.hasOwn(OBSERVATION_NAMES, key) ? [OBSERVATION_NAMES[key]] : []).join(", ");
+}
+
+function RecordedDecisions({ side, target }: { side: ReportSide; target: string }) {
+  const finding = measuredFinding(side);
+  const explainedAxis = finding && (isFunctionalFinding(finding) ? "functional" : "security");
+  const decisions = (side.decisions ?? []).filter((decision) => decision.axis !== explainedAxis && decision.verdict !== "UNKNOWN");
+  return decisions.map((decision) => {
+    const axis = decisionAxis(decision);
+    return (
+      <section key={decision.axis}>
+        <h4>{target} · {axis} {decision.verdict === "PASS" ? "충족 근거" : "미충족 근거"}</h4>
+        {decision.criterion && <p>점검 기준 — {decision.criterion}</p>}
+        <p>{decision.verdict === "PASS" ? "기록에서 충족 조건을 뒷받침하는 항목입니다." : "기록에서 미충족 조건에 해당하는 항목입니다."}</p>
+        <ul>
+          {decision.observations.map(({ key, kind, value, operators }) => (
+            <li key={key}>
+              {describeDecisionKeys([key]) || "판정에 사용된 관측값"} · {kind === "boolean" ? (value ? "참으로 기록" : "거짓으로 기록")
+                : kind === "count" ? `${value}건 기록` : kind === "number" ? `${value}로 기록` : "수집값 확인"}
+              {operators?.flatMap((operator) => Object.hasOwn(OPERATOR_DESCRIPTIONS, operator)
+                ? [` · ${OPERATOR_DESCRIPTIONS[operator]}`] : []).join("")}
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  });
+}
+
+function unconfirmedReasons(side: ReportSide) {
+  const unknown = side.decisions?.filter((decision) => decision.verdict === "UNKNOWN") ?? [];
+  const reasons = new Map<string, string[]>();
+  for (const decision of unknown) {
+    for (const code of new Set(decision.limits)) {
+      if (!Object.hasOwn(DECISION_LIMITS, code)) continue;
+      reasons.set(code, [...(reasons.get(code) ?? []), decisionAxis(decision)]);
+    }
+  }
+  const missing = [...new Set([...(side.missing_observations ?? []), ...unknown.flatMap((decision) => decision.missing)])];
+  const unverified = [...new Set([...(side.unverified_observations ?? []), ...unknown.flatMap((decision) => decision.unmet)])]
+    .filter((key) => !missing.includes(key));
+  const policy = new Set(unknown.flatMap((decision) => decision.policy_missing));
+  const messages = [...reasons].map(([code, axes]) => `${axes.join("·")} — ${DECISION_LIMITS[code]}`);
+  for (const [keys, description] of [[missing, "수집 기록이 빠진 관측"], [unverified, "추가 확인이 필요한 관측"]] as const) {
+    const names = describeDecisionKeys(keys);
+    if (names) messages.push(`${description}은 ${names}입니다.`);
+    const unnamed = keys.filter((key) => !Object.hasOwn(OBSERVATION_NAMES, key)).length;
+    if (unnamed) messages.push(`${description} ${unnamed}개를 상세 근거에서 확인할 수 있습니다.`);
+  }
+  if (policy.size) messages.push(`판정에 필요한 정책 설정값 ${policy.size}개가 기록되지 않았습니다.`);
+  if (unknown.length && !messages.length) messages.push("확인하지 못한 조건을 특정할 기록이 없습니다.");
+  return messages;
+}
+
 function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Report; raw: unknown; onClose: () => void }) {
   const update = report.mode === "update";
-  const rawRow = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
-  const sides = (update ? (["baseline", "candidate"] as const) : (["single"] as const)).filter((k) => c[k]);
+  const sides: SideKey[] = update ? ["baseline", "candidate"] : ["single"];
+  const present = sides.filter((key) => c[key]);
+  const candidateFinding = measuredFinding(c.candidate);
+  const candidateSecurityFinding = update && c.candidate?.security === "FAIL"
+    && !!candidateFinding && !isFunctionalFinding(candidateFinding);
+  const baselinePass = c.baseline?.security === "PASS";
+  const summarizesComparison = candidateSecurityFinding && baselinePass && c.comparison === "REGRESSED"
+    && c.baseline?.functional === c.candidate?.functional
+    && c.baseline?.performance === c.candidate?.performance;
   return (
     <DetailPanel
       title={<span className="mono">{c.check_id}</span>}
@@ -155,64 +326,109 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
           label: "판정 근거",
           content: (
             <div className="stack">
-              <p style={{ margin: 0, fontWeight: 600 }}>{c.question}</p>
-              <KeyValue
-                items={[
-                  ["영역", `${c.area ?? "–"} ${c.area ? (AREA[c.area] ?? "") : ""}`],
-                  ["적용 여부", <EnumBadge table={APPLICABILITY} value={c.applicability} />],
-                  ["선정", <Value v={c.selected} />],
-                  ["대표 판정", <VerdictBadge verdict={c.headline} />],
-                  ["검토 순서", <Value v={c.review_order} mono />],
-                  ["영향", <Value v={c.impact} />],
-                  ["증거 출처", <Value v={c.evidence_source ? label(EVIDENCE_SOURCE, c.evidence_source) : null} />],
-                  ...(update
-                    ? ([
-                        ["보안 비교", <EnumBadge table={COMPARISON} value={c.comparison} />],
-                        ["기능 비교", <EnumBadge table={COMPARISON} value={c.functional_comparison} />],
-                        ["비교 사유", c.comparison_reasons.length ? c.comparison_reasons.join(", ") : <Value v={null} />],
-                      ] as [string, ReactNode][])
-                    : []),
-                ]}
-              />
-              <p><Link to={`/runtime/observe/checks?check=${encodeURIComponent(c.check_id)}`}>현재 운영 점검 범위·연결 증거</Link></p>
-              {rawRow?.carried_over != null && <section><h4>이월 근거</h4><JsonView value={rawRow.carried_over} /></section>}
-              {rawRow?.previous_result != null && <section><h4>이전 판정</h4><JsonView value={rawRow.previous_result} /></section>}
-              {sides.map((k) => {
-                const s = c[k]!;
-                return (
-                  <div key={k} className="stack" style={{ gap: 6 }}>
-                    <h4 className="small muted" style={{ margin: "8px 0 0", fontWeight: 500 }}>
-                      {k === "single" ? "결과" : k === "baseline" ? "기준" : "후보"}
-                    </h4>
-                    <KeyValue
-                      items={[
-                        ["보안", <VerdictBadge verdict={s.security} />],
-                        ["기능", <VerdictBadge verdict={s.functional} />],
-                        ["성능", <VerdictBadge verdict={s.performance} />],
-                        ["판정(RES)", s.result_id ? <span className="mono">{`${s.result_id}@${s.result_revision}`}</span> : <Value v={null} />],
-                      ]}
-                    />
-                    {s.reasons.length > 0 && (
-                      <div>
-                        <span className="small muted">판정 이유(미충족·미확인 축)</span>
-                        <ul className="small mono" style={{ margin: "4px 0 0", paddingLeft: 18, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                          {s.reasons.map((reason, i) => (
-                            <li key={i}>{reason}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {c.marks.length > 0 && (
-                <div>
-                  <h4 className="small muted" style={{ margin: "8px 0 4px", fontWeight: 500 }}>
-                    표시
-                  </h4>
-                  <Marks marks={c.marks} />
+              {c.question && <p style={{ margin: 0, fontWeight: 600 }}>{c.question}</p>}
+              <section className="stack">
+                <h4>판정 요약</h4>
+                <div className={p.reportSides}>
+                  {sides.map((key) => {
+                    const side = c[key];
+                    return <div key={key} className="card stack">
+                      <strong>{SIDE_LABEL[key]} · {targetLabel(report, key)}</strong>
+                      {side ? <>
+                        <SideChips side={side} />
+                        <span className="row small">증거 등급 {side.data_origin ? <OriginBadge origin={side.data_origin} /> : "확인 기록 없음"}</span>
+                      </> : <span className="muted">판정 기록 없음</span>}
+                    </div>;
+                  })}
                 </div>
+                {update && !summarizesComparison && <p>{comparisonText(c)}</p>}
+              </section>
+              {present.some((key) => measuredFinding(c[key])) && (
+                <section>
+                  {present.map((key) => {
+                    const finding = measuredFinding(c[key]);
+                    if (!finding) return null;
+                    const narrative = FINDING_TEXT[finding.code];
+                    const combined = summarizesComparison && key === "candidate";
+                    const event = finding.code === "forbidden_code_revision_imported"
+                      ? "요청에 지정한 코드가 로드됨"
+                      : narrative.title;
+                    const title = combined
+                      ? `기준 판정은 보안 충족, 후보 실측에서 ${event}`
+                      : narrative.title;
+                    const target = report.targets?.[key] ? `${SIDE_LABEL[key]} ${targetLabel(report, key)}` : SIDE_LABEL[key];
+                    return (
+                      <div key={key}>
+                        <h4>{update && !combined ? `${target} · ${title}` : title}</h4>
+                        <p>{narrative.body}</p>
+                        {"proof" in narrative && <p>{narrative.proof}</p>}
+                      </div>
+                    );
+                  })}
+                </section>
               )}
+              {present.map((key) => (
+                <RecordedDecisions key={key} side={c[key]!} target={SIDE_LABEL[key]} />
+              ))}
+              {present.some((key) => needsEvidenceNote(c[key]!) || unconfirmedReasons(c[key]!).length) && (
+                <section>
+                  <h4>미확인 범위</h4>
+                  {present.map((key) => {
+                    const side = c[key]!;
+                    const messages = unconfirmedReasons(side);
+                    if (messages.length) {
+                      return (
+                        <div key={key}>
+                          <strong>{SIDE_LABEL[key]}</strong>
+                          <ul>{messages.map((message) => <li key={message}>{message}</li>)}</ul>
+                        </div>
+                      );
+                    }
+                    if (key === "baseline" && candidateSecurityFinding && baselinePass && !measuredFinding(side) && !side.decisions?.some((decision) => decision.axis === "security")) {
+                      return <p key={key}>기준 {report.targets?.baseline ? `${targetLabel(report, "baseline")}은` : "판본은"} 보안 충족으로 기록됐습니다. 이 보고서에는 그 판정의 세부 관측 기록이 없습니다.</p>;
+                    }
+                    if (needsEvidenceNote(side)) return <p key={key}>{SIDE_LABEL[key]}의 {measuredFinding(side) ? "보안 " : ""}세부 판정 근거를 설명할 수 있는 관측 기록이 없습니다.</p>;
+                    return null;
+                  })}
+                </section>
+              )}
+              {c.marks.length > 0 && <Marks marks={c.marks} />}
+              <details>
+                <summary>상세 근거</summary>
+                <KeyValue items={[
+                  ...(c.area ? [["영역", AREA[c.area] ?? c.area] as [string, ReactNode]] : []),
+                  ...(c.review_order ? [["검토 순서", <Value v={c.review_order} mono />] as [string, ReactNode]] : []),
+                  ...(c.impact ? [["영향", c.impact] as [string, ReactNode]] : []),
+                  ["적용 여부", <EnumBadge table={APPLICABILITY} value={c.applicability} />],
+                  ["증거 출처", <Value v={c.evidence_source ? label(EVIDENCE_SOURCE, c.evidence_source) : null} />],
+                  ...(update ? [
+                    ["보안 비교", <EnumBadge table={COMPARISON} value={c.comparison} />],
+                    ["기능 비교", <EnumBadge table={COMPARISON} value={c.functional_comparison} />],
+                  ] as [string, ReactNode][] : []),
+                ]} />
+                {c.comparison_reasons.length > 0 && <JsonView value={c.comparison_reasons} />}
+                {present.map((key) => {
+                  const side = c[key]!;
+                  return (
+                    <div key={key} className="stack">
+                      <h4>{SIDE_LABEL[key]}</h4>
+                      {side.result_id && <p className="mono">RES · {side.result_id}@{side.result_revision}</p>}
+                      {side.evidence_ref && <p className="mono">EVD · {side.evidence_ref.id}@{side.evidence_ref.revision}</p>}
+                      {measuredFinding(side)?.code === "forbidden_code_revision_imported" && (
+                        <KeyValue items={[
+                          ["요청 필드", <code>{side.finding?.field}</code>],
+                          ["요청에 지정된 코드 판본", <code>{side.finding?.revision}</code>],
+                        ]} />
+                      )}
+                      {side.reasons.length > 0 && <JsonView value={side.reasons} />}
+                      {!!side.missing_observations?.length && <JsonView value={side.missing_observations} />}
+                      {!!side.unverified_observations?.length && <JsonView value={side.unverified_observations} />}
+                      {!!side.decisions?.length && <JsonView value={side.decisions} />}
+                    </div>
+                  );
+                })}
+                <p><Link to={`/runtime/observe/checks?check=${encodeURIComponent(c.check_id)}`}>현재 운영 점검 범위·연결 증거</Link></p>
+              </details>
             </div>
           ),
         },
@@ -227,7 +443,9 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
   const byId = new Map(report.checks.map((c) => [c.check_id, c]));
   const selectedRows = report.checks.filter((c) => c.selected);
   const n = report.counts;
-  const limitations = report.limitations.filter((text) => !/예시|example|런타임|runtime|에비던스|evidence|비공식|공식.*(?:아님|아닙|제외|불가)/i.test(text));
+  const pairedRows = update ? selectedRows.filter((row) => row.baseline?.security && row.candidate?.security) : [];
+  const changed = pairedRows.filter((row) => row.baseline?.security !== row.candidate?.security).length;
+  const limitations = report.limitations;
   const total = Math.max(1, n.fail + n.unknown + n.pass + n.not_applicable);
   const current = selected ? byId.get(selected) : undefined;
 
@@ -268,6 +486,33 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
       <span className="muted mono">
         {report.report_id}@{report.revision} · {report.created_at} · {label(MODE_LONG, report.mode)}
       </span>
+      <div className="row wrap" aria-label="보고서 자료 등급과 공식 상태">
+        <OriginBadge origin={report.data_origin} />
+        <Badge tone={report.official ? "neutral" : "caution"}>{report.official ? "공식 보고서" : "비공식 보고서"}</Badge>
+      </div>
+
+      <section className="stack" aria-label="검증 대상 엔진 판본">
+        <div className={p.reportSides}>
+          {(update ? ["baseline", "candidate"] as const : ["single"] as const).map((side) => {
+            const verdicts = update ? selectedRows.flatMap((row) => row[side]?.security ?? []) : [];
+            return (
+              <div key={side} className="card stack">
+                <strong>{SIDE_LABEL[side]}</strong>
+                <span>{targetLabel(report, side)}</span>
+                {verdicts.length > 0 && (
+                  <span className="small muted">
+                    보안 {["PASS", "FAIL", "UNKNOWN", "NOT_APPLICABLE"].map((value) =>
+                      `${VERDICT[value].label} ${verdicts.filter((verdict) => verdict === value).length}`,
+                    ).join(" · ")}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {pairedRows.length > 0 && <p className="small">두 판본에 모두 기록된 보안 판정 중 {changed}건이 달라졌습니다.</p>}
+        <p className="small muted">PASS 충족 · FAIL 미충족 · UNKNOWN 근거 부족으로 판정 미확정</p>
+      </section>
 
       <div className={ui.cards}>
         <MetricCard title="종합 보안 판정" dot={report.overall === "FAIL" ? "bad" : report.overall === "PASS" ? "ok" : "none"} value={VERDICT[report.overall]?.label ?? report.overall} caption={`선정 ${n.selected}건`}>
@@ -317,14 +562,15 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
           </table>
         </MetricCard>
 
-        <MetricCard title="증거 출처" value={sum("manual") + sum("automated")} caption={`수동 입력 ${sum("manual")} · 자동 측정 ${sum("automated")} · 미실행 ${sum("not_run")}`}>
+        <MetricCard title={update ? "후보 환경 증거 출처" : "증거 출처"} value={sum("manual") + sum("automated")}
+          caption={`수동 입력 ${sum("manual")} · 자동 실행 ${sum("automated")} · 완료 기록 없음 ${sum("not_run")}`}>
           <table className={ui.miniTable}>
             <thead>
               <tr>
                 <th>영역</th>
                 <th className={ui.num}>수동</th>
                 <th className={ui.num}>자동</th>
-                <th className={ui.num}>미실행</th>
+                <th className={ui.num}>완료 기록 없음</th>
               </tr>
             </thead>
             <tbody>
@@ -494,7 +740,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
         </div>
       </details>
 
-      {current && <CheckDrawer c={current} report={report} raw={rawChecks?.[current.check_id]} onClose={() => onSelect(null)} />}
+      {current && <CheckDrawer key={current.check_id} c={current} report={report} raw={rawChecks?.[current.check_id]} onClose={() => onSelect(null)} />}
     </>
   );
 }

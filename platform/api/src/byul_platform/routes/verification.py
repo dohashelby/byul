@@ -7,22 +7,18 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..models import RevalidationList, VerificationDetail, VerificationList
-from ..sources.update import report_view
+from ..sources.report_evidence import enrich_report
+from ..sources.update import ReportEntry, report_view
 from ..state import AppState, get_state, partition
 
 router = APIRouter(prefix="/api/update", tags=["update"])
 
 
-def _results(state: AppState) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+def _results(state: AppState) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[ReportEntry]]:
     entries = state.update.reports()
     valid, invalid = partition(state.contracts, "verification-result", [e.candidate for e in entries])
-    by_id = {
-        e.candidate["report_ref"]["id"]: e
-        for e in entries
-        if isinstance(e.candidate, dict) and isinstance(e.candidate.get("report_ref"), dict)
-    }
-    valid.sort(key=lambda r: r["created_at"], reverse=True)
-    return valid, invalid, by_id
+    valid.sort(key=lambda r: (r["created_at"], r["report_ref"]["revision"]), reverse=True)
+    return valid, invalid, entries
 
 
 def latest_result(state: AppState) -> dict[str, Any] | None:
@@ -38,16 +34,18 @@ def results(state: AppState = Depends(get_state)) -> dict[str, Any]:
 
 @router.get("/results/{report_id}", response_model=VerificationDetail)
 def result(report_id: str, state: AppState = Depends(get_state)) -> dict[str, Any]:
-    valid, _, by_id = _results(state)
+    valid, _, entries = _results(state)
     item = next((r for r in valid if r["report_ref"]["id"] == report_id), None)
     if item is None:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "보고서가 없거나 형식 오류입니다"})
-    entry = by_id.get(report_id)
+    entry = next(e for e in entries if e.candidate is item)
+    report = report_view(item)
+    enrich_report(report, item, entry.object_store)
     return {
         "item": item,
-        "raw_checks": entry.raw_checks if entry else None,
-        "raw_path": entry.path if entry else None,
-        "report": report_view(item),
+        "raw_checks": entry.raw_checks,
+        "raw_path": entry.path,
+        "report": report,
         "source": state.source("update"),
     }
 

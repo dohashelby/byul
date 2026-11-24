@@ -9,8 +9,12 @@ import { matchesTarget, useEnvTarget } from "../../lib/filters";
 import { useGlobalFilters, useParams } from "../../lib/url";
 import { ObservationOriginBadge, ScopeBadges, TableCard, formatTime, rt } from "./parts";
 
-const pod = (namespace: string | null, name: string | null) => name ? namespace ? `${namespace}/${name}` : name : "확인 안 됨";
-const verdictLabel = (value: string | null) => value?.toLowerCase() === "dropped" ? "차단" : value?.toLowerCase() === "forwarded" ? "통과" : value ?? "확인 안 됨";
+const pod = (namespace: string | null, name: string | null, ip?: string | null) =>
+  name ? (namespace ? `${namespace}/${name}` : name) : ip ?? "확인 안 됨";
+const DROPPED_LABEL = "흐름 드롭 관측";
+const FORWARDED_LABEL = "흐름 전달 관측";
+const verdictLabel = (value: string | null) => value?.toLowerCase() === "dropped"
+  ? DROPPED_LABEL : value?.toLowerCase() === "forwarded" ? FORWARDED_LABEL : value ?? "확인 안 됨";
 
 export function HubbleEvents() {
   const events = useRuntimeEvents();
@@ -37,7 +41,7 @@ export function HubbleEvents() {
         placeholder="Pod·포트·사유 또는 이벤트 ID 검색" value={search}
         onChange={(event) => patch({ q: event.target.value || null, sel: null })} />
       <FilterSelect label="결과" value={verdict} onChange={(value) => patch({ verdict: value, sel: null })}
-        options={[{ value: "dropped", label: "차단" }, { value: "forwarded", label: "통과" }]} />
+        options={[{ value: "dropped", label: DROPPED_LABEL }, { value: "forwarded", label: FORWARDED_LABEL }]} />
       {(search || verdict) && <button className="btn btn-small btn-ghost" onClick={() => patch({ q: null, verdict: null, sel: null })}>필터 지우기</button>}
     </FilterBar>
     <Query q={events}>{() => <TableCard>
@@ -50,7 +54,7 @@ export function HubbleEvents() {
             <td>{formatTime(event.occurred_at)}</td>
             <td>{event.scope.environment ?? "확인 안 됨"}</td>
             <td>{pod(o.src_namespace, o.src_pod)}</td>
-            <td>{pod(o.dst_namespace, o.dst_pod)}<br /><span className="mono small">{o.dst_port ?? "–"}/{o.protocol ?? "–"}</span></td>
+            <td>{pod(o.dst_namespace, o.dst_pod, o.dst_ip)}<br /><span className="mono small">{o.dst_port ?? "–"}/{o.protocol ?? "–"}</span></td>
             <td><Badge tone={dropped ? "warn" : "neutral"} title={o.verdict ?? undefined}>{verdictLabel(o.verdict)}</Badge>{o.verdict && <div className="small mono muted">{o.verdict}</div>}</td>
             <td className="mono">{o.reason ?? "기록 없음"}</td>
             <td><button className="btn btn-small" onClick={() => patch({ sel: event.event_id })}>기록 보기</button>
@@ -69,7 +73,7 @@ export function HubbleEvents() {
             ["결과", `${verdictLabel(selected.observation.verdict)} · ${selected.observation.verdict ?? "–"}`],
             ["사유", selected.observation.reason ?? "확인 안 됨"],
             ["출발", pod(selected.observation.src_namespace, selected.observation.src_pod)],
-            ["도착", pod(selected.observation.dst_namespace, selected.observation.dst_pod)],
+            ["도착", pod(selected.observation.dst_namespace, selected.observation.dst_pod, selected.observation.dst_ip)],
             ["포트", `${selected.observation.dst_port ?? "–"}/${selected.observation.protocol ?? "–"}`],
           ]} />
           <ScopeBadges environment={selected.scope.environment} runId={selected.scope.run_id} />

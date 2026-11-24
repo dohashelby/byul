@@ -69,7 +69,7 @@ export function DashboardPage() {
         <div className={p.statusPanelHead}><h2 id="control-observation-heading">통제·관측 현황</h2></div>
         <div className={p.fiveCards}>
         <MetricCard title="요청 통제" value={blockedRequests} dot={blockedRequests ? "bad" : "ok"} onClick={() => go("/runtime/blocked", { section: "requests" })} label="차단 내역의 엔진 미전달 요청 보기" />
-        <MetricCard title="네트워크 차단" value={dropped} dot="none" onClick={() => go("/runtime/blocked", { section: "network" })} label="차단 내역의 네트워크 차단 보기" />
+        <MetricCard title="네트워크 드롭 관측" value={dropped} caption="Hubble DROPPED · 정보" dot="none" onClick={() => go("/runtime/blocked", { section: "network" })} label="Hubble 드롭 관측 내역 보기" />
         <MetricCard title="프로세스 이벤트" value={process} caption={processDetected ? `탐지 ${processDetected}건` : undefined} dot={processDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="프로세스 이벤트 보기" />
         <MetricCard title="파일 이벤트" value={files} caption={fileDetected ? `탐지 ${fileDetected}건` : undefined} dot={fileDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="파일 이벤트 보기" />
         <MetricCard title="수집 상태" value={`${connected}/${total}`} caption={total && connected === total ? undefined : "확인 필요"} dot={total && connected === total ? "ok" : "warn"} onClick={() => go("/runtime/observe/collectors")} label="수집 상태 보기" />

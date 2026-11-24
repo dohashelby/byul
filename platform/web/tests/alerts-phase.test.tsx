@@ -116,7 +116,7 @@ describe("통합 개요", () => {
       "/api/runtime/events": { items: [], invalid: [], source: SOURCE, truncated: false },
     });
     function Destination() { const location = useLocation(); return <span>{location.pathname}{location.search}</span>; }
-    for (const [button, section] of [["차단 내역의 엔진 미전달 요청 보기", "requests"], ["차단 내역의 네트워크 차단 보기", "network"]]) {
+    for (const [button, section] of [["차단 내역의 엔진 미전달 요청 보기", "requests"], ["Hubble 드롭 관측 내역 보기", "network"]]) {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/runtime/overview"]}><Routes>
         <Route path="/runtime/overview" element={<DashboardPage />} />

@@ -55,6 +55,7 @@ it("네트워크 검색은 Pod·포트를 함께 대조하고 같은 이벤트�
   const other = structuredClone(event);
   other.event_id = "synthetic-network-2";
   other.observation!.src_pod = "other-client";
+  Object.assign(event.observation!, { dst_pod: null, dst_ip: "192.0.2.10" });
   mockApi({ "/api/runtime/events": { items: [other, event], invalid: [], source: SOURCE } });
   renderAt("/hubble", "/hubble", <HubbleEvents />);
   await screen.findAllByText("POLICY_DENIED");
@@ -62,10 +63,13 @@ it("네트워크 검색은 Pod·포트를 함께 대조하고 같은 이벤트�
   const table = screen.getByRole("table");
   expect(table.querySelectorAll("tbody tr")).toHaveLength(1);
   expect(table.textContent).toContain("DROPPED");
+  expect(table.textContent).toContain("흐름 드롭 관측");
+  expect(table.textContent).toContain("192.0.2.10");
   expect(table.textContent).toContain("POLICY_DENIED");
   expect(table.textContent).not.toContain("other-client");
   fireEvent.click(screen.getByRole("button", { name: "기록 보기" }));
   expect(screen.getByText(event.event_id)).toBeTruthy();
+  expect(screen.getByRole("tabpanel").textContent).toContain("192.0.2.10");
   fireEvent.click(screen.getByRole("tab", { name: "원본 기록" }));
   expect(screen.getByRole("tabpanel").textContent).toContain(event.event_id);
   expect(screen.getByRole("tabpanel").textContent).toContain("POLICY_DENIED");

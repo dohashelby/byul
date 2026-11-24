@@ -195,6 +195,9 @@ describe("요청 내역", () => {
     });
     renderAt("/runtime/requests", "/runtime/requests", <RequestsPage />);
     const table = await screen.findByRole("table");
+    fireEvent.click(screen.getByRole("button", { name: /^열 / }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "max_tokens" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "환경·실행" }));
     const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.replace(/[▲▼ ]/g, ""));
     const cells = within(table).getAllByRole("row")[1].querySelectorAll("td");
     const cellOf = (name: string) => cells[headers.indexOf(name)].textContent;

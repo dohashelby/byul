@@ -28,6 +28,8 @@ it("구판 응답에 새 window 필드가 없으면 하한을 만들어 표시�
   data["/api/overview"].requests = {} as typeof data["/api/overview"]["requests"];
   mockApi(data);
   renderAt("/runtime/overview", "/runtime/overview", <DashboardPage />);
-  expect((await screen.findByLabelText("대시보드 집계 범위")).textContent).not.toContain("최소 건수");
+  await screen.findByRole("heading", { name: "통제·관측 현황" });
+  expect(screen.queryByLabelText("대시보드 집계 범위")).toBeNull();
+  expect(screen.queryByText(/확인된 최소 건수/)).toBeNull();
   expect(screen.queryByLabelText("사건 조회 범위")).toBeNull();
 });

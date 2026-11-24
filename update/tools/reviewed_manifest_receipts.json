@@ -1200,6 +1200,11 @@
       "manifest_sha256": "5fd3376aa85a00379a92c68df5fba7fea4b2f81d32cb6678d26e472390a841fb",
       "reviewed_by": "Codex / OBS-04 bounded capture and failure-kind review / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-23T14:53:48.404Z"
+    },
+    {
+      "manifest_sha256": "393dc2a4e785bce540dc86bedb5a98de07ff4dbc76f235441a7ef4db6768eb8b",
+      "reviewed_by": "Codex / bound OBS03/04 and SUP07/REQ20 evidence review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T06:02:40.128Z"
     }
   ]
 }

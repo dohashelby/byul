@@ -266,7 +266,7 @@ def test_report_shows_check_limitation(tmp_path):
     store, evd, res = _run(tmp_path, FakeDocker("hardened"))
     pack = baseline_pack()
     plan = store.resolve(evd.plan)
-    rpt = build_report(store, pack, plan, as_of=res.created_at)
+    rpt = build_report(store, pack, plan, as_of=res.as_of)
     assert any(l.startswith("PLT-01: 이 점검은 컨테이너 설정") and "Docker Desktop의 리눅스 VM 기준" in l for l in rpt.limitations)
     assert any(l.startswith('PLT-01: 실행 가능한 쓰기 경로 1개가 정책으로 허용됨 ["/guard-cache"]') for l in rpt.limitations)
 

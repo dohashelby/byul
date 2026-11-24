@@ -160,7 +160,7 @@ def test_engine_extension_runs_actual_common_select_run_judge_report_without_cor
                 challenges=[{'step': s, 'attempted': True} for s in check.challenge_steps], observations=req01_obs(), config={'EXAMPLE': True})
     profile = engine_profiles.EngineProfile('EXAMPLE-' + engine, engine, ('EXAMPLE-next',), frozenset({'direct_route'}))
     monkeypatch.setattr(engine_profiles, 'PROFILES', (*engine_profiles.PROFILES, profile))
-    provider.bind_executor('direct_route', 'example-chain', lambda cfg: ExampleExecutor(), profile=profile.id)
+    provider.bind_executor('direct_route', 'kubernetes', lambda cfg: ExampleExecutor(), profile=profile.id)
     monkeypatch.setitem(engine_provider.PROVIDERS, engine, provider)
     assert registry.resolve_executor('direct_route', 'kubernetes', engine=engine, version='EXAMPLE-next') is not None
     # No fallback to a frozen vendor implementation for another release.
@@ -199,7 +199,7 @@ def test_continuous_example_releases_preserve_prior_evidence_and_results(tmp_pat
                 observations=req01_obs(direct={'GET /v1/models': 200} if env.engine.version == versions[1] else None),
                 comparability=Comparability(model_inventory_sha256='a' * 64, fixture_sha256='b' * 64,
                     config_sha256='c' * 64, gpu='EXAMPLE', driver='EXAMPLE'))
-    provider.bind_executor('direct_route', 'kubernetes', lambda cfg: ExampleExecutor(), profile=profile.id)
+    provider.bind_executor('direct_route', 'example-chain', lambda cfg: ExampleExecutor(), profile=profile.id)
     monkeypatch.setitem(engine_provider.PROVIDERS, 'sglang', provider)
     envs = [environment({'gateway': {'value': True, 'origin': 'EXAMPLE', 'source': 'EXAMPLE'}},
         id='ENV-EXAMPLE-' + v.replace('.', '-'), engine={'name': 'sglang', 'version': v}) for v in versions]

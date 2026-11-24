@@ -58,8 +58,9 @@ def test_current394_real_gate_HTTP_main_and_exact_saved_pack(case, monkeypatch, 
     assert len(objects) == 6 and store.verify() == restored.verify() == []
     assert all(restored.resolve(o.ref()).to_dict() == o.to_dict() for o in objects)
     plan, = store.iter_kind('PLAN'); report, = store.iter_kind('RPT'); result, = store.iter_kind('RES')
+    assert report.as_of == result.as_of
     cli = CliRunner()
-    checked = cli.invoke(app, ['judge', '--plan', plan.id, '--as-of', report.created_at.isoformat(),
+    checked = cli.invoke(app, ['judge', '--plan', plan.id, '--as-of', report.as_of.isoformat(),
                               '--store', str(restored.root)])
     assert checked.exit_code == 0, checked.output
     checked = cli.invoke(app, ['verify', '--store', str(restored.root)])

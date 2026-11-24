@@ -671,3 +671,13 @@ section.attentionPanel {
   color: var(--surface);
   font-size: 16px;
 }
+
+.reportSides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 12px;
+}
+
+.reportSides > :global(.card) {
+  padding: 12px;
+}

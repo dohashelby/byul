@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..models import RevalidationList, VerificationDetail, VerificationList
+from ..sources.report_evidence import enrich_report
 from ..sources.update import ReportEntry, report_view
 from ..state import AppState, get_state, partition
 
@@ -59,11 +60,13 @@ def result(
                    == (revision, sha256))), None)
     if entry is None:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "보고서가 없거나 형식 오류입니다"})
+    report = report_view(entry.candidate, entry)
+    enrich_report(report, entry.candidate, entry.object_store)
     return {
         "item": entry.candidate,
         "raw_checks": entry.raw_checks,
         "raw_path": entry.path,
-        "report": report_view(entry.candidate, entry),
+        "report": report,
         "source": source,
     }
 

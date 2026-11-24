@@ -136,6 +136,7 @@ class ReportEntry:
     path: str | None
     execution_attempt_id: str | None = None
     as_of: str | None = None
+    object_store: Path | None = None
 
 
 def report_content_sha256(rpt: dict[str, Any]) -> str:
@@ -143,7 +144,7 @@ def report_content_sha256(rpt: dict[str, Any]) -> str:
     return canonical_sha256({key: value for key, value in rpt.items() if key != "content_sha256"})
 
 
-def _read_rpt_dir(directory: Path) -> Iterator[ReportEntry]:
+def _read_rpt_dir(directory: Path, object_store: Path | None = None) -> Iterator[ReportEntry]:
     """폴더(하위 포함)의 RPT JSON을 읽는다. RPT가 아닌 JSON은 건너뛴다."""
     for path in sorted(directory.rglob("*.json")):
         try:
@@ -172,8 +173,9 @@ def _read_rpt_dir(directory: Path) -> Iterator[ReportEntry]:
             continue
         attempt_id, as_of = data.get("execution_attempt_id"), data.get("as_of")
         yield ReportEntry(projected, raw, str(path),
-                          attempt_id if isinstance(attempt_id, str) else None,
-                          as_of if isinstance(as_of, str) else None)
+                          execution_attempt_id=attempt_id if isinstance(attempt_id, str) else None,
+                          as_of=as_of if isinstance(as_of, str) else None,
+                          object_store=object_store or directory / "objects" / "store.sqlite")
 
 
 class UpdateSource(Protocol):
@@ -205,8 +207,9 @@ class ReportDirUpdateSource:
 
     mode = "live"
 
-    def __init__(self, reports_dir: Path) -> None:
+    def __init__(self, reports_dir: Path, object_store: Path | None = None) -> None:
         self.dir = reports_dir
+        self.object_store = object_store
         self.detail = str(reports_dir)
 
     def reports(self) -> list[ReportEntry]:
@@ -214,7 +217,7 @@ class ReportDirUpdateSource:
 
     def iter_reports(self) -> Iterator[ReportEntry]:
         if self.dir.is_dir():
-            yield from _read_rpt_dir(self.dir)
+            yield from _read_rpt_dir(self.dir, self.object_store)
 
 
 # --- 보고서 화면용 투영 -----------------------------------------------------------
@@ -338,6 +341,7 @@ def report_view(vr: dict[str, Any], entry: ReportEntry | None = None) -> dict[st
         "not_selected": list(vr["not_selected"]),
         "approval": vr["approval"],
         "inputs_manifest": list(vr["inputs_manifest"]),
+        "targets": {},
         "checks": [
             {
                 "check_id": c["check_id"],

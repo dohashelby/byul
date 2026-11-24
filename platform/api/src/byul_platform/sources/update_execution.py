@@ -103,7 +103,7 @@ class ExecutionUpdateSource:
 
     def __init__(self, base: UpdateSource, root: Path, contracts: Contracts):
         self.base = base
-        self.generated = ReportDirUpdateSource(root)
+        self.generated = ReportDirUpdateSource(root, root.parent / "objects" / "store.sqlite")
         self.contracts = contracts
 
     def _has_reports(self) -> bool:

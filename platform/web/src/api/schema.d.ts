@@ -1483,6 +1483,57 @@ export interface components {
             /** Regressed */
             regressed: number;
         };
+        /** ReportDecision */
+        ReportDecision: {
+            /**
+             * Axis
+             * @enum {string}
+             */
+            axis: "security" | "functional" | "performance";
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "PASS" | "FAIL" | "UNKNOWN";
+            /** Criterion */
+            criterion?: string | null;
+            /** Observations */
+            observations: components["schemas"]["ReportDecisionObservation"][];
+            /** Missing */
+            missing: string[];
+            /** Unmet */
+            unmet: string[];
+            /** Policy Missing */
+            policy_missing: string[];
+            /** Limits */
+            limits: string[];
+        };
+        /** ReportDecisionObservation */
+        ReportDecisionObservation: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "boolean" | "count" | "number" | "recorded";
+            /** Value */
+            value?: boolean | number | null;
+            /** Operators */
+            operators?: string[];
+        };
+        /** ReportFinding */
+        ReportFinding: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "forbidden_code_revision_imported" | "forbidden_ipc_connection" | "forbidden_egress_succeeded" | "forbidden_plaintext_succeeded" | "forbidden_template_reference" | "unapproved_running_image" | "untrusted_input_changed_log" | "normal_probes_passed" | "normal_probe_failed";
+            /** Field */
+            field?: string | null;
+            /** Revision */
+            revision?: string | null;
+        };
         /** ReportFocus */
         ReportFocus: {
             /** Regressed */
@@ -1543,6 +1594,20 @@ export interface components {
             /** Data Origin */
             data_origin?: ("MEASURED" | "DECLARED" | "EXAMPLE") | null;
             evidence_ref?: components["schemas"]["ManifestRef"] | null;
+            /** Missing Observations */
+            missing_observations?: string[];
+            /** Unverified Observations */
+            unverified_observations?: string[];
+            finding?: components["schemas"]["ReportFinding"] | null;
+            /** Decisions */
+            decisions?: components["schemas"]["ReportDecision"][];
+        };
+        /** ReportTarget */
+        ReportTarget: {
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
         };
         /**
          * ReportView
@@ -1595,6 +1660,10 @@ export interface components {
             approval?: unknown;
             /** Inputs Manifest */
             inputs_manifest: components["schemas"]["ManifestRef"][];
+            /** Targets */
+            targets?: {
+                [key: string]: components["schemas"]["ReportTarget"];
+            };
             /** Checks */
             checks: components["schemas"]["ReportCheck"][];
             /** Execution Attempt Id */

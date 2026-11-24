@@ -161,6 +161,7 @@ class ModeTests(unittest.TestCase):
         outcome = switch_mode("ctx", "serving-lab", "runtime-tg-secret-01", "enforce", run=run)
         self.assertTrue(outcome["ok"])
         self.assertEqual(outcome["before"]["id"], outcome["after"]["id"])
+        self.assertEqual(set(outcome), {"ok", "reason", "before", "after"})
         self.assertFalse(any("delete" in command for command in calls))
 
     def test_failed_switch_verifies_rollback(self):
@@ -191,6 +192,8 @@ class ModeTests(unittest.TestCase):
         outcome = switch_mode("ctx", "serving-lab", "runtime-tg-secret-01", "enforce", run=run)
         self.assertFalse(outcome["ok"])
         self.assertFalse(outcome["rollback_ok"])
+        self.assertIsNone(outcome["rollback"])
+        self.assertNotIn("mutation_attempted", outcome)
         self.assertEqual(changes, ["enforce"])
 
     def test_timeout_after_switch_still_attempts_and_verifies_rollback(self):

@@ -40,7 +40,13 @@ curl -i -H 'Content-Type: application/json' \
   http://127.0.0.1:8080/v1/chat/completions
 ```
 
-운영 화면까지 함께 띄우려면 저장소 루트에서 `platform/scripts/run-with-runtime.sh`를 실행하고 `http://127.0.0.1:8700`을 엽니다.
+운영 화면과 함께 실행하려면 위에서 시작한 Gateway를 먼저 종료하고, 저장소 루트에서 아래 통합 스크립트를 실행합니다. `uv`가 필요하며 화면 빌드 파일이 없으면 Node.js와 npm도 필요합니다.
+
+```bash
+platform/scripts/run-with-runtime.sh
+```
+
+`http://127.0.0.1:8700`을 열면 기본적으로 로그인 화면이 표시됩니다. [플랫폼 실행 안내](../platform/README.md)와 [로그인과 계정 관리](../platform/docs/로그인_계정관리.md)를 참고하세요.
 
 ## 4. 파일 구조
 

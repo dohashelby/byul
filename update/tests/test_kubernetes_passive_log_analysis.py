@@ -39,6 +39,15 @@ class LogWorld(ProcessWorld):
                 event.update(prompt=PRIVATE, **{PRIVATE: PRIVATE})
             stamp = utcnow().isoformat()
             text = f'{stamp} {json.dumps(event)}\n' if self.log_mode != 'plain' else f'{stamp} {PRIVATE}\n'
+            raw = text.encode()
+            if self.log_mode == 'invalid-utf8':
+                raw = raw.replace(PRIVATE.encode(), b'\xff', 1)
+            elif self.log_mode == 'unterminated':
+                raw = raw.removesuffix(b'\n')
+            elif self.log_mode == 'split-timestamp':
+                raw = raw.replace(b' {', b'\r{', 1)
+            elif self.log_mode == 'mixed-invalid':
+                raw = raw.replace(PRIVATE.encode(), b'\xff', 1) + raw
             if self.log_mode == 'replaced':
                 self.replaced = True
             pipes = {'schema': 'guard-pipe-capture/1', 'complete': True, 'bounded_at_source': True,
@@ -46,7 +55,7 @@ class LogWorld(ProcessWorld):
             returncode = {'nonzero': 1, 'unreaped': -1}.get(self.log_mode, 0)
             if self.log_mode == 'unreaped':
                 pipes.update(complete=False, timed_out=True, pipes_closed=False, read_errors=['child_reap'])
-            return {'returncode': returncode, 'stdout_bytes': text.encode(), 'stderr_bytes': STDERR.encode(),
+            return {'returncode': returncode, 'stdout_bytes': raw, 'stderr_bytes': STDERR.encode(),
                     'capture': {**pipes, 'streams': {'stderr': {'retained_sha256': sha256_hex(STDERR.encode())}}}}
         result = super().runner(argv, **kwargs)
         if 'exec' in argv and 'input_bytes' in kwargs:
@@ -63,7 +72,9 @@ class LogWorld(ProcessWorld):
 
 @pytest.mark.parametrize('mode,security', [('clean', 'UNKNOWN'), ('forbidden', 'FAIL'), ('unlinked', 'UNKNOWN'),
                                             ('plain', 'UNKNOWN'), ('replaced', 'UNKNOWN'), ('nonzero', 'UNKNOWN'),
-                                            ('unreaped', 'UNKNOWN'), ('normal-unavailable', 'UNKNOWN')])
+                                            ('unreaped', 'UNKNOWN'), ('normal-unavailable', 'UNKNOWN'),
+                                            ('invalid-utf8', 'UNKNOWN'), ('unterminated', 'UNKNOWN'),
+                                            ('split-timestamp', 'UNKNOWN'), ('mixed-invalid', 'FAIL')])
 def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, mode, security):
     env, target = full_inputs()
     world = LogWorld(target, mode)
@@ -83,7 +94,7 @@ def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, m
     assert draft.abort_reason == ('OWNED_ENGINE_LOG_CAPTURE_INCOMPLETE' if log_unavailable else None)
     assert draft.cleanup_errors == []
     assert draft.observations['log_coverage_complete'].value is False
-    assert draft.observations['log_fields_seen'].collected is (mode in {'clean', 'forbidden'})
+    assert draft.observations['log_fields_seen'].collected is (mode in {'clean', 'forbidden', 'mixed-invalid'})
     assert draft.observations['log_marker_contexts_seen'].collected is False
     evd = Evidence(id='EVD-OBS03-EXAMPLE', data_origin=draft.data_origin, check_id=check.id, side='single',
                    environment=env.ref(), plan=dummy_ref('PLAN'), execution={'status': draft.status},
@@ -116,5 +127,7 @@ def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, m
             'truncated': False, 'pipes_closed': not unreaped, 'child_reap_unverified': unreaped,
         }
     assert summary['source']['available'] == (not log_unavailable)
+    if mode in {'invalid-utf8', 'unterminated', 'split-timestamp', 'mixed-invalid'}:
+        assert 'ENGINE_LOG_FORMAT_PARTIAL' in summary['gaps']
     if log_unavailable:
         assert summary['source'] == {'available': False, 'byte_count': None, 'sha256': None, 'payload_retained': False}

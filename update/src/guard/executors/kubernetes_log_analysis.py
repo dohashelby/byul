@@ -92,15 +92,24 @@ class KubernetesLogAnalysisExecutor(KubernetesContainerConfigExecutor):
                 raise KubernetesBindingError()
             truncated = len(raw) == LIMIT_BYTES or pipes.get('truncated') is True
             complete = pipes.get('complete') is True and pipes.get('timed_out') is False and not truncated
-            text = raw.decode('utf-8', errors='replace')
             # The transport requested CRI timestamps. Do not treat a raw JSON
             # line with a missing timestamp as a scoped observation.
-            lines = text.splitlines()
-            if any(line.strip() and not TIMESTAMPED_JSON.match(line) for line in lines):
+            *frames, tail = raw.split(b'\n')
+            lines, format_gap = [], bool(tail)
+            for frame in frames:
+                try:
+                    line = frame.removesuffix(b'\r').decode('utf-8', errors='strict')
+                except UnicodeDecodeError:
+                    format_gap = True
+                    continue
+                if TIMESTAMPED_JSON.match(line) and line.splitlines() == [line]:
+                    lines.append(line)
+                elif line.strip():
+                    format_gap = True
+            if format_gap:
                 gaps.append('ENGINE_LOG_FORMAT_PARTIAL')
-                text = '\n'.join(line for line in lines if TIMESTAMPED_JSON.match(line))
             captures.append({'source': {'id': 'engine', 'kind': 'kubernetes_pod_logs', 'role': 'engine'},
-                             'text': text, 'window': {'since': started, 'until': utcnow().isoformat()},
+                             'text': '\n'.join(lines), 'window': {'since': started, 'until': utcnow().isoformat()},
                              'returncode': 0, 'identity_stable': True, 'source_complete': complete,
                              'timed_out': pipes.get('timed_out'), 'truncated': truncated})
             ctx._normal_log_source = {'byte_count': len(raw), 'sha256': sha256(raw).hexdigest(),

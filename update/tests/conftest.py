@@ -9,6 +9,13 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest.register_assert_rewrite("tests.lifecycle_fixtures")
+from tests.lifecycle_fixtures import (  # noqa: E402,F401 (registered pytest fixtures)
+    lifecycle_capture_case,
+    lifecycle_external,
+    lifecycle_writer_factory,
+)
+
 
 @pytest.fixture(autouse=True)
 def _isolated_resource_lease_root(tmp_path_factory, monkeypatch):

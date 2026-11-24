@@ -140,31 +140,7 @@ function Sidebar({ areaKey }: { areaKey: AreaKey }) {
         ))}
       </nav>
       {areaKey === "runtime" && <div className={l.footer}>
-        <div className={l.footItem}>
-          <Dot state={conn === "connected" ? "ok" : conn === "example" ? "warn" : conn ? "bad" : "none"} />
-          <span className={l.footText}>
-            <span>runtime</span>
-            <span className={l.navSub}>{conn ? connText[conn] : "확인 중"}</span>
-          </span>
-        </div>
-        <div className={l.footItem}>
-          <Dot state={meta.data?.example_mode ? "warn" : "none"} />
-          <span className={l.footText}>
-            <Link className={l.link} to={`/runtime/settings${keep}#system-info`}>시스템 정보</Link>
-            <span className={l.navSub}>
-              {meta.data
-                ? meta.data.sources.map((x) => `${x.name === "store" ? "저장소" : x.name === "evidence" ? "증거" : x.name} ${label(SOURCE_MODE, x.mode)}`).join(" · ")
-                : "–"}
-            </span>
-          </span>
-        </div>
-        <div className={l.footItem}>
-          <Dot state="none" />
-          <span className={l.footText}>
-            <span>계약</span>
-            <span className={l.navSub}>{meta.data ? `contracts ${meta.data.contracts_version}` : "–"}</span>
-          </span>
-        </div>
+        <Link className={l.link} to={`/runtime/settings${keep}#system-info`}>시스템 정보</Link>
       </div>}
     </aside>
   );
@@ -174,7 +150,7 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function Pagebar({ areaKey }: { areaKey: AreaKey }) {
+function Pagebar() {
   const { pathname } = useLocation();
   const { period, from, to, env } = useGlobalFilters();
   const [, patch] = useParams();
@@ -233,13 +209,6 @@ function Pagebar({ areaKey }: { areaKey: AreaKey }) {
             ))}
           </select>
         </label>
-        {areaKey === "runtime" && meta.data && (
-          <span className={`${l.chip}`} style={{ padding: "0 8px", color: meta.data.example_mode ? "var(--warn)" : "var(--text-2)" }}>
-            {meta.data.example_mode
-              ? meta.data.sources.some((s) => s.mode !== "example") ? "일부 예시 포함" : "예시 데이터"
-              : "실제 연결"}
-          </span>
-        )}
       </div>
       <div className={l.right}>
         <span className={l.refreshState} role="status" title={refreshedAt.toISOString()}>
@@ -314,7 +283,7 @@ export function Layout() {
     <div className={l.shell}>
       <Sidebar areaKey={areaKey} />
       <div className={l.main}>
-        <Pagebar areaKey={areaKey} />
+        <Pagebar />
         {auth.status === "signed_in" && auth.user.default_password && (
           <Banner kind="unofficial">기본 비밀번호(admin) 사용 중 · 상단 [비밀번호 변경]에서 바꾸세요</Banner>
         )}

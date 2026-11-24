@@ -5,9 +5,10 @@ Collection is separate from actual copy membership, treatment and enforcement.
 """
 import os,stat
 from guard.collectors.file import load_bounded_json
-from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
+from guard.models import canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP,REQUIRED_EVENT_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_observation import RequiredEventReader
 from .owned_capture import MAX_BYTES
@@ -110,10 +111,7 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
         challenges=[{'step':step,'attempted':False,'observations':{'copy_scope_complete':False}} for step in ctx.check.challenge_steps]
         return {key:{'value':value,'collected':True} for key,value in observations.items()},normal,challenges,summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx)
-        ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin=min(draft.data_origin,ceiling,key=lambda value:ORIGIN_STRENGTH[value])
-        if ctx._copy_gap or ctx._copy_cleanup:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._copy_cleanup)
-        return draft
+    def _finish(self, ctx):
+        draft = super()._finish(ctx)
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self.runner is not None or ctx.target['lab'])
+        return draft.finish_collection(ceiling, bool(ctx._copy_gap or ctx._copy_cleanup), ctx._copy_cleanup)

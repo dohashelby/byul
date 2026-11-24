@@ -3,9 +3,10 @@ import re
 import time
 import uuid
 from guard.collectors.file import load_bounded_json
-from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
+from guard.models import canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP,REQUIRED_EVENT_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
 from .kubernetes_lifecycle_capture import KubernetesCaptureError
@@ -27,13 +28,8 @@ class RequiredEventReader(FixedRecordReader):
 
 
 def finish_required_event(draft, ctx, *, injected_runner):
-    ceiling = (DataOrigin.EXAMPLE if injected_runner or ctx.target["lab"] or ctx.env.data_origin == DataOrigin.EXAMPLE
-               else DataOrigin.DECLARED)
-    draft.data_origin = min(draft.data_origin, ceiling, key=lambda origin: ORIGIN_STRENGTH[origin])
-    if ctx._obs_gap or ctx._obs_cleanup:
-        draft.status = ExecStatus.ABORTED
-    draft.cleanup_errors.extend(ctx._obs_cleanup)
-    return draft
+    ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=injected_runner or ctx.target["lab"])
+    return draft.finish_collection(ceiling, bool(ctx._obs_gap or ctx._obs_cleanup), ctx._obs_cleanup)
 
 
 class KubernetesRequiredEventExecutor(HttpCheckExecutor):

@@ -1,6 +1,6 @@
 """REQ06 same public CLI, isolated owned Responses and declared HTTP effects."""
 from guard.collectors.file import load_bounded_json
-from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
+from guard.models import DataOrigin,canonical_json,sha256_hex,utcnow
 from guard.runtime.kubernetes_stored_responses import KubernetesStoredResponsesHTTP,HTTP_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from .stored_response_contract import PROFILE,normalize_policy,stamp
@@ -154,8 +154,5 @@ class KubernetesStoredResponsesExecutor(HttpCheckExecutor):
         return {k:{'value':v,'collected':True} for k,v in data.items()}, {'attempted':any(r['attempted'] for r in trials),
             'succeeded':None,'detail':'Owned HTTP response shapes and declared stored/cancel/chain effects; actual principal/store/worker source unverified.'},[],summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
-        if ctx._stored_gap:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._stored_cleanup)
-        return draft
+    def _finish(self, ctx):
+        return super()._finish(ctx).finish_collection(DataOrigin.EXAMPLE, ctx._stored_gap, ctx._stored_cleanup)

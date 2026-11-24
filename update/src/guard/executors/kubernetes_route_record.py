@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 import re
 
-from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
 from guard.models.objects import Observation
 from guard.runtime.bounded import capture_pipes
 from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
@@ -209,10 +209,4 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
             "detail": "Recorded claims only; independent normal/denied route probes unavailable."}, [], summary
 
     def _finish(self, ctx):
-        draft = super()._finish(ctx)
-        draft.data_origin = min(draft.data_origin, ctx._route_origin,
-                                key=lambda origin: ORIGIN_STRENGTH[origin])
-        if ctx._route_gap:
-            draft.status = ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._route_cleanup)
-        return draft
+        return super()._finish(ctx).finish_collection(ctx._route_origin, ctx._route_gap, ctx._route_cleanup)

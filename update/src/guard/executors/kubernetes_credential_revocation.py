@@ -4,7 +4,7 @@ from datetime import datetime,timezone
 from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_lifecycle_release_sensor as release_sensor
-from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
+from guard.models import DataOrigin,canonical_json,sha256_hex,utcnow
 from guard.runtime.kubernetes_credential_revocation import KubernetesCredentialRevocationHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
@@ -98,7 +98,5 @@ class KubernetesCredentialRevocationExecutor(HttpCheckExecutor):
         return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Closed selected credential samples and native auth/handler facts; declared issuer event/provider propagation/pre-event normal/connection receipt/principal unverified.'},[],summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
-        if ctx._revocation_gap:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._revocation_cleanup);return draft
+    def _finish(self, ctx):
+        return super()._finish(ctx).finish_collection(DataOrigin.EXAMPLE, ctx._revocation_gap, ctx._revocation_cleanup)

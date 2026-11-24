@@ -3,8 +3,9 @@
 from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
 import math
-from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
+from guard.models import canonical_json,sha256_hex,utcnow
 from guard.runtime.engine_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_boundary_egress import collect_kubernetes_boundary_egress,validate_inputs,VERSION
 
@@ -49,10 +50,7 @@ class KubernetesEgressProductExecutor(HttpCheckExecutor):
             or record is None or not record['requested_observations_complete'] or record['diagnostic_codes'])
         return observations,normal,challenges,summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx)
-        ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin=min(draft.data_origin,ceiling,key=lambda value:ORIGIN_STRENGTH[value])
-        if ctx._egress_product_gap:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._egress_product_cleanup)
-        return draft
+    def _finish(self, ctx):
+        draft = super()._finish(ctx)
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self.runner is not None or ctx.target['lab'])
+        return draft.finish_collection(ceiling, ctx._egress_product_gap, ctx._egress_product_cleanup)

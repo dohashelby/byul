@@ -12,9 +12,10 @@ import re
 import uuid
 
 from guard.adapters.vllm_model_authorization import project_native
-from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.models import canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP, MODEL_AUTHORIZATION_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
@@ -227,8 +228,5 @@ class KubernetesModelAuthorizationExecutor(HttpCheckExecutor):
 
     def _finish(self, ctx):
         draft = super()._finish(ctx)
-        ceiling = DataOrigin.EXAMPLE if self._kubectl_runner is not None or ctx.env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin = min(draft.data_origin, ceiling, key=lambda x: ORIGIN_STRENGTH[x])
-        if ctx._model_gap: draft.status = ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._model_cleanup)
-        return draft
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self._kubectl_runner is not None)
+        return draft.finish_collection(ceiling, ctx._model_gap, ctx._model_cleanup)

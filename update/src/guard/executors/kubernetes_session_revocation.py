@@ -4,7 +4,7 @@ from datetime import datetime,timezone
 from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_lifecycle_release_sensor as release_sensor
-from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
+from guard.models import DataOrigin,canonical_json,sha256_hex,utcnow
 from guard.runtime.kubernetes_session_revocation import KubernetesSessionRevocationHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
@@ -88,7 +88,5 @@ class KubernetesSessionRevocationExecutor(HttpCheckExecutor):
         return {key:{'value':value,'collected':True} for key,value in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Selected probe HTTP keep-alive and native auth facts only; actual issuer/principal/application session/handle/serving receipt unverified.'},[],summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
-        if ctx._session_gap:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._session_cleanup);return draft
+    def _finish(self, ctx):
+        return super()._finish(ctx).finish_collection(DataOrigin.EXAMPLE, ctx._session_gap, ctx._session_cleanup)

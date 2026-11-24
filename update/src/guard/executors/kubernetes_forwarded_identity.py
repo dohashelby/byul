@@ -2,7 +2,7 @@
 from copy import deepcopy
 import uuid
 from guard.collectors.file import load_bounded_json
-from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
+from guard.models import DataOrigin,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_forwarded_identity import normalize_header_contract
 from guard.runtime.kubernetes_forwarded_identity_http import KubernetesForwardedIdentityHTTP,HTTP_PROFILE,header_value,SLOTS
@@ -135,8 +135,5 @@ class KubernetesForwardedIdentityExecutor(HttpCheckExecutor):
         return {k:{'value':v,'collected':True} for k,v in data.items()}, {'attempted':bool(replies.get('normal-before',{}).get('attempted')),
             'succeeded':None,'detail':'HTTP normal shape and declared normalization/consumption claims; actual trusted principal/authorization unverified.'},[],summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
-        if ctx._forwarded_gap:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._forwarded_cleanup)
-        return draft
+    def _finish(self, ctx):
+        return super()._finish(ctx).finish_collection(DataOrigin.EXAMPLE, ctx._forwarded_gap, ctx._forwarded_cleanup)

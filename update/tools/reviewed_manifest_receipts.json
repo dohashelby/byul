@@ -790,6 +790,11 @@
       "manifest_sha256": "692f3084a38367f2685f73898e9a7c62209edc949132824e4bd87dec3ea5fda8",
       "reviewed_by": "Codex / CI import resolution / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T14:36:51.652Z"
+    },
+    {
+      "manifest_sha256": "88731956412f0721a7c53420bd6808f3cc5a5724389e1d3d14ebeb7f8c93af61",
+      "reviewed_by": "Codex / evidence collection completion / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:40:29.430Z"
     }
   ]
 }

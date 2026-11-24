@@ -3,8 +3,9 @@
 from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
 import math
-from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
+from guard.models import canonical_json,sha256_hex,utcnow
 from guard.runtime.engine_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_unix_ipc import collect_kubernetes_unix_ipc,validate_inputs,VERSION
 
@@ -54,10 +55,7 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
         ctx._ipc_product_gap=bool(summary['collection_errors'] or cleanup or report is None or report['collection_gap'])
         return observations,normal,challenges,summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx)
-        ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin=min(draft.data_origin,ceiling,key=lambda value:ORIGIN_STRENGTH[value])
-        if ctx._ipc_product_gap:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._ipc_product_cleanup)
-        return draft
+    def _finish(self, ctx):
+        draft = super()._finish(ctx)
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self.runner is not None or ctx.target['lab'])
+        return draft.finish_collection(ceiling, ctx._ipc_product_gap, ctx._ipc_product_cleanup)

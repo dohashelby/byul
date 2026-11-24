@@ -24,6 +24,7 @@ PROFILES = {'dev': ('2', '4', '8Gi', '16Gi'), 'reference': ('4', '8', '12Gi', '2
 CALLBACKS, DATA = '/guard-lifecycle/engine-callbacks', '/guard-lifecycle/data'
 MP = ('--distributed-executor-backend', 'mp')
 GPU_RESOURCE = 'nvidia.com/gpu'
+NORMAL_TP2_GENERATIONS = frozenset({'v2-default', 'v2-template'})
 NORMAL_TP2 = {'gpu_count': 2, 'tp_size': 2, 'pp_size': 1, 'dp_size': 1}
 NORMAL_TP2_ARGS = ('--tensor-parallel-size', '2', '--pipeline-parallel-size', '1',
                    '--data-parallel-size', '1', *MP)
@@ -148,7 +149,7 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     if type(release_launch) is not bool or release_launch and (release is None or engine_image not in release['images']):
         raise ValueError('AWS_RELEASE_LAUNCH_PROFILE_UNAVAILABLE')
     if type(normal_tp2) is not bool or normal_tp2 and (
-            generation != 'v2-default' or not release_launch or release['launch']['engine'] != 'V1'
+            generation not in NORMAL_TP2_GENERATIONS or not release_launch or release['launch']['engine'] != 'V1'
             or not normal_tp2_release(engine_version, engine_image)
             or check_id is not None or code_revision is not None or enforce_eager
             or tuple(extra_engine_args) not in ((), ('--safetensors-load-strategy=eager',))):

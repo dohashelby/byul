@@ -121,10 +121,11 @@ def test_external_envs_keep_reviewed_v1_with_comparable_runtime(tmp_path, capsys
 
 
 @pytest.mark.parametrize('side', ('baseline', 'candidate'))
-def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, side):
+@pytest.mark.parametrize('generation', ('v2-default', 'v2-template'))
+def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, side, generation):
     release = versions()[side]
-    pods, render = deployed(tmp_path, 'v2-default', engine_version=release['version'], engine_image=release['image'],
-                             release_launch=True, normal_tp2=True)
+    pods, render = deployed(tmp_path, generation, engine_version=release['version'], engine_image=release['image'],
+                            release_launch=True, normal_tp2=True)
     pod = pods['engine']
     pod['kind'] = 'Pod'
     engine = pod['spec']['containers'][0]
@@ -158,8 +159,22 @@ def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, sid
     saved = json.loads(target_path.read_bytes())
     assert saved['observed_version'] == release['version']
     assert saved['environment_ref'] == env.ref().model_dump(mode='json')
-    assert 'chat_template' not in render and saved['lab'] is False
-    assert saved['comparison_config']['launch'] == {'argv': engine['args'], 'max_model_len': render['max_model_len']}
+    assert saved['lab'] is False
+    launch = {'argv': engine['args'], 'max_model_len': render['max_model_len']}
+    if generation == 'v2-template':
+        assert engine['args'].count('--chat-template') == 1
+        launch['chat_template'] = {'profile': inputs.CHAT_TEMPLATE_PROFILE, 'version': '1',
+                                   'sha256': lab.CHAT_TEMPLATE_SHA256, 'container_path': lab.CHAT_TEMPLATE_PATH,
+                                   'content_format': 'string', 'request_overrides': False}
+        mount, = (item for item in engine['volumeMounts'] if item['name'] == 'guard-chat-template')
+        mount['readOnly'] = False
+        with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+            inputs.target(env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
+                          observed_engine_version=release['version'])
+        mount['readOnly'] = True
+    else:
+        assert 'chat_template' not in render
+    assert saved['comparison_config']['launch'] == launch
     with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
         inputs.target(env, {**render, 'max_model_len': 1024}, namespace, pod, pods['probe'],
                       context='byul-aws-lab', observed_engine_version=release['version'])

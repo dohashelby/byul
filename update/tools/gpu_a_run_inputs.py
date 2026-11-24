@@ -168,7 +168,7 @@ def _binding(pod, namespace, container, role_label=None):
 
 
 def _normal_tp2_topology(render, namespace, pod):
-    from tools.gpu_a_aws_lab import GPU_RESOURCE, NORMAL_TP2, NORMAL_TP2_ARGS, normal_tp2_release
+    from tools.gpu_a_aws_lab import GPU_RESOURCE, NORMAL_TP2, NORMAL_TP2_ARGS, NORMAL_TP2_GENERATIONS, normal_tp2_release
 
     try:
         layout = render['normal_tp2']
@@ -182,7 +182,7 @@ def _normal_tp2_topology(render, namespace, pod):
         model_lengths = [value for option, value in zip(argv, argv[1:]) if option == '--max-model-len']
         quantities = [engine['resources'][key][GPU_RESOURCE] for key in ('requests', 'limits')]
         if (type(layout) is not dict or layout != NORMAL_TP2 or any(type(value) is not int for value in layout.values())
-                or render['schema'] != 'byul-gpu-a-aws-render/2' or render['generation'] != 'v2-default'
+                or render['schema'] != 'byul-gpu-a-aws-render/2' or render['generation'] not in NORMAL_TP2_GENERATIONS
                 or render['lab_namespace_owner_label_required'] is not False
                 or not normal_tp2_release(render['engine_version'], render['engine_image'])
                 or launch['engine'] != 'V1' or namespace['kind'] != 'Namespace'
@@ -194,6 +194,24 @@ def _normal_tp2_topology(render, namespace, pod):
                 or type(max_model_len) is not int or not 256 <= max_model_len <= 131072
                 or model_lengths != [str(max_model_len)]
                 or any(type(quantity) not in (int, str) or str(quantity) != '2' for quantity in quantities)):
+            raise ValueError
+        if render['generation'] == 'v2-template':
+            template = render['chat_template']
+            host_file = Path(template['host_file'])
+            template_args = [value for option, value in zip(argv, argv[1:]) if option == '--chat-template']
+            mount, = (item for item in engine['volumeMounts'] if item['name'] == 'guard-chat-template')
+            volume, = (item for item in pod['spec']['volumes'] if item['name'] == 'guard-chat-template')
+            if (set(template) != {'host_file', 'container_path', 'sha256'}
+                    or template['sha256'] != CHAT_TEMPLATE_SHA256 or template['container_path'] != CHAT_TEMPLATE_CONTAINER_PATH
+                    or not host_file.is_absolute() or host_file.parent.name != render['run_id']
+                    or host_file.name != Path(CHAT_TEMPLATE_CONTAINER_PATH).name
+                    or selectors.count('--chat-template') != 1 or template_args != [CHAT_TEMPLATE_CONTAINER_PATH]
+                    or mount.get('mountPath') != CHAT_TEMPLATE_CONTAINER_PATH or mount.get('readOnly') is not True
+                    or mount.get('subPath') or mount.get('subPathExpr')
+                    or mount.get('mountPropagation') not in (None, 'None')
+                    or volume.get('hostPath') != {'path': str(host_file), 'type': 'File'}):
+                raise ValueError
+        elif 'chat_template' in render or '--chat-template' in selectors:
             raise ValueError
         verify_owned_pod(pod, namespace['metadata'], binding, render['run_id'], require_ready=False)
     except (AttributeError, KeyError, TypeError, ValueError):
@@ -285,7 +303,8 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
             'max_model_len': int(container['args'][container['args'].index('--max-model-len') + 1])}}
     if 'normal_tp2' in render:
         value['engine']['command'] = list(render['launch']['command'])
-        value['comparison_config'] = {'launch': {'argv': list(argv), 'max_model_len': render['max_model_len']}}
+        value.setdefault('comparison_config', {}).setdefault('launch', {}).update(
+            argv=list(argv), max_model_len=render['max_model_len'])
     if observed_engine_version is not None:
         value['observed_version'] = observed_engine_version
     if (render.get('launch') or {}).get('engine') is not None:

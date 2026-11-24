@@ -304,6 +304,33 @@ def test_prebound_gateway_audit_keeps_the_independent_route_file_pin(tmp_path, m
     assert audit()['candidate']['blocking_codes'] == ['MVP_ROUTE_TARGET_REFERENCE_SCOPE_INVALID']
 
 
+def test_prepared_gateway_checks_each_supplied_base_target_pin(tmp_path, monkeypatch):
+    monkeypatch.setattr(subprocess, 'Popen', _no_kubectl)
+    monkeypatch.setattr(socket, 'socket', _no_kubectl)
+    monkeypatch.setattr(KubernetesHTTP, '__call__', _no_kubectl)
+    monkeypatch.setattr(module.KubernetesRoutesHTTP, '__call__', _no_kubectl)
+    monkeypatch.setattr(module.KubernetesResponseContentExecutor, 'keys', _no_kubectl)
+    _, envs, _, cfg = _paired_gateway_inputs(tmp_path)
+    settings = cfg['sides']['baseline']['response_content']
+    expected = sha256_hex(canonical_json(json.loads(Path(settings['target']).read_bytes())))
+    other = '0' * 64
+
+    class NoCallerKeys(dict):
+        get = staticmethod(_no_kubectl)
+
+    def prepare(constructor_pin, caller_pin):
+        executor = module.KubernetesResponseContentExecutor(settings, runner=_no_kubectl, environ=NoCallerKeys(),
+            expected_target_sha256=constructor_pin)
+        executor.prepared_gateway(envs[0], expected_target_sha256=caller_pin)
+
+    for constructor_pin, caller_pin in ((None, None), (expected, None), (None, expected), (expected, expected)):
+        prepare(constructor_pin, caller_pin)
+
+    for constructor_pin, caller_pin in ((other, None), (None, other), (other, expected), (expected, other)):
+        with pytest.raises(ValueError, match=f'^{module.ROUTE_TARGET_CHANGED}$'):
+            prepare(constructor_pin, caller_pin)
+
+
 @pytest.mark.parametrize('late', [False, True])
 def test_prebound_gateway_bytes_cannot_change_after_selection(tmp_path, monkeypatch, late):
     from guard.core import run as core_run

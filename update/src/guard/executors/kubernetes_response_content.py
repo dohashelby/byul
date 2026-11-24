@@ -116,7 +116,9 @@ class KubernetesResponseContentExecutor(ResponseContentExecutor):
             raise ValueError(CONFIGURATION_INVALID)
         try:
             target = strict_json(route_target_bytes(self.cfg['target']), limit=_TARGET_BYTE_LIMIT)
-            if expected_target_sha256 is not None and sha256_hex(canonical_json(target)) != expected_target_sha256:
+            target_sha256 = sha256_hex(canonical_json(target))
+            expected_pins = (self._expected_target_sha256, expected_target_sha256)
+            if any(pin is not None and pin != target_sha256 for pin in expected_pins):
                 raise ValueError(ROUTE_TARGET_CHANGED)
             KubernetesHTTP(target, env, duration=self.cfg.get('max_duration_seconds', 120),
                 binary=self.cfg.get('kubectl_binary', 'kubectl'), runner=self._kubectl_runner,

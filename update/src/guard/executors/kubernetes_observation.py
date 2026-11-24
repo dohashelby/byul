@@ -1,33 +1,39 @@
 """OBS01 owned public probes and separately collected, untrusted audit records."""
-from pathlib import Path
 import re
 import time
 import uuid
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP,REQUIRED_EVENT_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
-from .kubernetes_lifecycle_capture import KubernetesLifecycleReader,KubernetesCaptureError
-from .owned_capture import _FILE_READER,MAX_BYTES
+from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
+from .kubernetes_lifecycle_capture import KubernetesCaptureError
+from .owned_capture import MAX_BYTES
 from .observation_contract import PROFILE,POLICY_TYPES,OBSERVATIONS,normalize_policy,validate_record,correlate
 
 
-class RequiredEventReader(KubernetesLifecycleReader):
+_RECORD_PROFILE = FixedRecordProfile(
+    "/guard-observation/data/{session}/required-events.json", file_report_profile=PROFILE,
+    unverified_fields=("producer_authenticated", "source_code_verified", "actor_identity_verified"),
+)
+
+
+class RequiredEventReader(FixedRecordReader):
     def __init__(self,transport,target,session,*,binary,duration,runner=None):
         if target.get('lab') is not True:raise KubernetesCaptureError()
-        self._initialize(transport.binding,target,{'session':session},binary=binary,duration=duration,runner=runner)
+        super().__init__(transport.binding, target, session, profile=_RECORD_PROFILE,
+                         binary=binary, duration=duration, runner=runner)
 
-    def _program(self,container,argv,max_bytes):
-        path='/guard-observation/data/'+self.session+'/required-events.json'
-        if (container!=self.binding['engine']['container'] or argv!=['python3','-c',_FILE_READER,path,str(MAX_BYTES)]
-                or max_bytes!=2*MAX_BYTES):raise KubernetesCaptureError()
-        return 'file'
 
-    def report(self):
-        result=super().report();result['profile']=PROFILE
-        result['programs']={'file':result['programs']['file']}
-        result.update(producer_authenticated=False,source_code_verified=False,actor_identity_verified=False)
-        return result
+def finish_required_event(draft, ctx, *, injected_runner):
+    ceiling = (DataOrigin.EXAMPLE if injected_runner or ctx.target["lab"] or ctx.env.data_origin == DataOrigin.EXAMPLE
+               else DataOrigin.DECLARED)
+    draft.data_origin = min(draft.data_origin, ceiling, key=lambda origin: ORIGIN_STRENGTH[origin])
+    if ctx._obs_gap or ctx._obs_cleanup:
+        draft.status = ExecStatus.ABORTED
+    draft.cleanup_errors.extend(ctx._obs_cleanup)
+    return draft
 
 
 class KubernetesRequiredEventExecutor(HttpCheckExecutor):
@@ -66,7 +72,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
                     or set(self.roles())!={'allowed','denied'}
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
             keys=self.keys()
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target = load_bounded_json(self.cfg['target'])
             digest=sha256_hex(canonical_json(target));start,end=normalize_policy(policy_values)
             if (target.get('lab') is not True or digest!=policy_values['observation_target_sha256']
                     or env.ref().sha256!=policy_values['observation_environment_sha256']
@@ -89,9 +95,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
                 'collected_monotonic_ns':time.monotonic_ns()}
             try:
                 if not start<=utcnow()<=end:raise ValueError
-                role=reader.binding['engine']
-                raw,provenance=reader.read_file(reader,ctx.target,container=role['container'],image=role['image'],
-                    path='/guard-observation/data/'+values['observation_session']+'/required-events.json')
+                raw,provenance=reader.read_record(ctx.target)
                 packet=validate_record(strict_json(raw,limit=MAX_BYTES),environment_ref=ctx.env.ref().model_dump(mode='json'),
                     target_sha256=values['observation_target_sha256'],session=values['observation_session'],
                     expected_source_sha256=values['observation_expected_source_sha256'],forbidden_values=ctx.secrets)
@@ -163,9 +167,4 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         return {k:{'value':v,'collected':True} for k,v in observations.items()},normal,challenges,summary
 
     def _finish(self,ctx):
-        draft=super()._finish(ctx)
-        ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin=min(draft.data_origin,ceiling,key=lambda origin:ORIGIN_STRENGTH[origin])
-        if ctx._obs_gap or ctx._obs_cleanup:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._obs_cleanup)
-        return draft
+        return finish_required_event(super()._finish(ctx), ctx, injected_runner=self.runner is not None)

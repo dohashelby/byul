@@ -3,8 +3,8 @@
 No credential contents, copy mutation, issuer call or reuse request is made.
 Collection is separate from actual copy membership, treatment and enforcement.
 """
-from pathlib import Path
 import os,stat
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP,REQUIRED_EVENT_PROFILE
@@ -46,7 +46,7 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
             if set(self.cfg)-{'target','copy_inventory','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
             start,end=contract.normalize_policy(policy_values)
             if env.ref().sha256!=policy_values['copy_environment_sha256'] or not start<=utcnow()<=end:raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg['target'])
             target_hash=sha256_hex(canonical_json(target))
             if (target.get('lab') is not True or target_hash!=policy_values['copy_target_sha256']
                     or self.expected_target is not None and target_hash!=self.expected_target):raise ValueError

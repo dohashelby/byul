@@ -1,10 +1,9 @@
 """A1 registration boundary for A2's immutable PLT07 Kubernetes consumer."""
 
+from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
-from pathlib import Path
 import math
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_boundary_egress import collect_kubernetes_boundary_egress,validate_inputs,VERSION
@@ -29,7 +28,7 @@ class KubernetesEgressProductExecutor(HttpCheckExecutor):
                     or not self.cfg['total_timeout']+1<duration<=300 or not supports(env.engine.name, env.engine.version)
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
             def load(name):
-                with Path(self.cfg[name]).open('rb') as stream:return strict_json(stream.read(65537),limit=65536)
+                return load_bounded_json(self.cfg[name])
             target,receiver=load('target'),load('receiver_target')
             if (type(target) is not dict or type(receiver) is not dict or target.get('lab') is not True or receiver.get('lab') is not True
                     or self.expected_target is not None and sha256_hex(canonical_json(target))!=self.expected_target):raise ValueError

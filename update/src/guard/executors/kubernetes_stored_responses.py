@@ -1,7 +1,6 @@
 """REQ06 same public CLI, isolated owned Responses and declared HTTP effects."""
-from pathlib import Path
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_stored_responses import KubernetesStoredResponsesHTTP,HTTP_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from .stored_response_contract import PROFILE,normalize_policy,stamp
@@ -23,7 +22,7 @@ class KubernetesStoredResponsesExecutor(HttpCheckExecutor):
             if (set(self.cfg)-{'target','roles','kubectl_binary','max_duration_seconds'} or adapter is None
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
             start,end,scope=normalize_policy(policy_values,self.roles());keys=self.keys()
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg['target'])
             digest=sha256_hex(canonical_json(target))
             if (digest!=policy_values['stored_target_sha256'] or env.ref().sha256!=policy_values['stored_environment_sha256']
                     or self.expected_target is not None and digest!=self.expected_target or not start<=utcnow()<=end):raise ValueError

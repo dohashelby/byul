@@ -7,14 +7,14 @@ worker identity, model approval, tensor application or endpoint readiness.
 from pathlib import Path
 from guard.adapters import vllm_generation_file_metadata as common
 from guard.collectors import native_worker_model_files as legacy
-from guard.models import sha256_hex
+from .source_pins import verify_adapter_source_pins
 
 VERSION='0.1.0'
 SCHEMA='guard-native-generation-scoped-file-candidates/1'
 PROFILES=frozenset('vllm-native-lifecycle-metadata/'+str(v) for v in (20,21,22))
 SOURCE_PINS={
     'vllm_generation_file_metadata.py':'82391549d2767f76b1e550d2a8fd467e82a253795b9dc34ef6eab906e39b3b1f',
-    'vllm_worker_startup_metadata.py':'b5d0be2de94fe9453a5f68b58e019b62a2f454bd59718fb43512a321755e651a',
+    'vllm_worker_startup_metadata.py':'067851561d48c2dc98f855fb1bee2fc5acd2673f6ddb348e86c2e1cf708aaa91',
     'vllm_worker_startup_sensor.py':'7515a6d023db8056524220ee61fbfbb82fd9cc92520f605d511bfdc04283aae5',
     'vllm_worker_startup_contract.py':'6788df2f4c6f04f46e681eb5eab48631e2ba037754d26166bb02341e4b592950',
     'vllm_worker_initialization_metadata.py':'7070261a91e4ff0754a4612b2253af89ebe896dd2b9aa47c0e98d086a07680d2',
@@ -25,9 +25,9 @@ SOURCE_PINS={
     'vllm_ready_endpoint_metadata.py':'c722aec3fa4a5eafee9ed478d970f5b82e26335b2788ec4cbb2d714128007c8e',
     'vllm_ready_endpoint_sensor.py':'55753bfcaa3838cb3fdcd20429dbfbf50f037f3fee6d00466223870b854f4fe0',
     'vllm_ready_endpoint_contract.py':'ddae1078d9807910c9f79a815f2abeab6b1c340e8122eb4c3bca9a7b71ef3d7d',
-    'vllm_weight_iteration_metadata.py':'f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0',
+    'vllm_weight_iteration_metadata.py':'fb80e45de5355b038896a2aa66e60548e94649948762b7107b2d64eae5cb1489',
     'vllm_weight_iteration_sensor.py':'74d0b65aaf4b45185c3d53b520d0881ebe711950e89b17dd48b0a1ca10e1a87a',
-    'vllm_safe_open_mapping_metadata.py':'833030d5d24aad97bc7ec0050ef105488daeb0f2023987d75bb1d8ffdbc0be29',
+    'vllm_safe_open_mapping_metadata.py':'6bd4661be066a128405dfca7a48bd4a8919830aeb7a40d9a01b889696b42527c',
     'vllm_safe_open_mapping_sensor.py':'8753a0d6cb06229ab0661e1e7548c6213c368a76243543851baf385cc207f3da',
     'vllm_file_read_sensor.py':'5542067206f0d92a68575f6fd9cfbaf1c85fa97c35a707f50d9cb1ee260a0b64',
 }
@@ -40,13 +40,6 @@ CODES=frozenset((common.ERROR,'GENERATION_FILE_CONTEXT_BINDING_UNAVAILABLE','gen
 
 def _require(value):
     if not value:raise ValueError('NATIVE_GENERATION_FILE_INPUT_INVALID')
-
-
-def _source_gate():
-    root=Path(__file__).resolve().parents[1]/'adapters'
-    try:matched=all(sha256_hex((root/name).read_bytes())==expected for name,expected in SOURCE_PINS.items())
-    except OSError:matched=False
-    if not matched:raise ValueError('NATIVE_GENERATION_FILE_COMMON_SOURCE_MISMATCH')
 
 
 def _analyze(packet,prepared):
@@ -107,7 +100,7 @@ def _analyze(packet,prepared):
 
 def analyze(packet,prepared):
     """Consume the exact admitted projection; no collection or approval occurs."""
-    _source_gate()
+    verify_adapter_source_pins(Path(__file__), SOURCE_PINS, 'NATIVE_GENERATION_FILE_COMMON_SOURCE_MISMATCH')
     try:return _analyze(packet,prepared)
     except (ValueError,KeyError,TypeError,UnicodeError,RecursionError,IndexError,AttributeError,OSError,RuntimeError,OverflowError):
         raise ValueError('NATIVE_GENERATION_FILE_INPUT_INVALID') from None

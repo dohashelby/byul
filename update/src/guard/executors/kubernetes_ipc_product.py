@@ -1,10 +1,9 @@
 """A1 registration boundary for A2's immutable Kubernetes Unix IPC consumer."""
 
+from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
-from pathlib import Path
 import math
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_unix_ipc import collect_kubernetes_unix_ipc,validate_inputs,VERSION
@@ -36,7 +35,7 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
                     or not self.cfg['total_timeout']+2+NORMAL_TIMEOUT<duration<=300
                     or not supports(env.engine.name, env.engine.version, 'unix_ipc')
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg['target'])
             if (target.get('lab') is not True or self.expected_target is not None
                     and sha256_hex(canonical_json(target))!=self.expected_target):raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None

@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 
 from guard.models import canonical_json, sha256_hex
+from .response_evidence import complete_body
 from .bounded import strict_json
 from .engine_http import KubernetesHTTP, KubernetesBindingError, REQUEST_BINDING_PROFILE
 from . import profiler_owned_trace as trace_fixture
@@ -105,17 +106,13 @@ class KubernetesProfilerControlHTTP(KubernetesHTTP):
             if (value.get('id'), value.get('method'), value.get('mode')) != (slot, 'POST', 'json'): raise ValueError
             if not (type(status) is int and 100 <= status <= 599 or type(status) is str and status in {
                     'refused', 'timeout', 'unreachable', 'dns_error', 'error', 'probe_error'}): raise ValueError
-            text = value.get('body')
-            complete = bool(type(text) is str and len(text.encode()) <= 131072
-                and value.get('capture_complete') is True and value.get('eof') is True
-                and value.get('utf8_valid') is True and value.get('body_truncated') is False
-                and type(value.get('body_bytes')) is int and value['body_bytes'] == len(text.encode())
-                and value.get('body_sha256') == sha256_hex(text.encode()))
+            body_bytes = complete_body(value)
+            complete = body_bytes is not None
             row.update(outcome=status, binding_verified_before_after=True, capture_complete=complete)
             if slot in CONTROL_PATHS:
                 row['profiler_control_response_success'] = bool(complete and type(status) is int and status == 200)
             elif complete and type(status) is int and status == 200:
-                decoded = strict_json(text.encode(), limit=131072)
+                decoded = strict_json(body_bytes, limit=131072)
                 choices = decoded.get('choices') if type(decoded) is dict else None
                 row['normal_shape_verified'] = bool(type(decoded) is dict and decoded.get('model') == self.api_model
                     and type(choices) is list and 1 <= len(choices) <= 8

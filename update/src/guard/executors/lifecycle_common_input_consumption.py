@@ -10,6 +10,7 @@ from copy import deepcopy
 from pathlib import Path
 import stat
 
+from guard.collectors import check_observations
 from guard.collectors import gpu_common_inputs as contract
 from guard.collectors.gpu_common_input_v4 import event_count
 from guard.collectors import ipc_ownership_producer, group_resource_producer
@@ -23,23 +24,38 @@ LEGACY_KINDS = frozenset({"request-attempt", "generation-transition", "health-wo
 KINDS = LEGACY_KINDS | {'rank-fault'}
 CHECK_IDS = frozenset({"LIF-03", "LIF-05", "LIF-06", "LIF-07", "LIF-09", "LIF-10", "LIF-11",
                        "LIF-08", "LIF-12", "LIF-14", "REQ-12", "OBS-02", "OBS-03", "PLT-01", "PLT-02", "PLT-04"})
-MAX_BYTES = 8 * 1024**2
+MAX_BYTES = check_observations.MAX_RECORD_BYTES
 
 
-def _read(path):
+def _read(path, *, reads=None):
     path = Path(path)
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError("B_COMMON_INPUT_SYMLINK")
     before = path.stat()
     if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= MAX_BYTES:
         raise ValueError("B_COMMON_INPUT_FILE_BOUND")
+    if reads is not None and path in reads:
+        identity, record = reads[path]
+        if check_observations.identity(before) == identity and check_observations.path_identity(path) == identity:
+            return record
+    recipe_record = check_observations.recipe_record(path)
+    if recipe_record is not None:
+        verified = check_observations.load_verified(path, before, recipe_record)
+        if verified is not None:
+            return verified
     with path.open("rb") as stream:
         raw = stream.read(MAX_BYTES + 1)
     after = path.stat()
     if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
         raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
-    return strict_json(raw, limit=MAX_BYTES), sha256_hex(raw)
+    file_sha = sha256_hex(raw)
+    if recipe_record is not None and file_sha != recipe_record.sha256:
+        raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
+    record = strict_json(raw, limit=MAX_BYTES), file_sha
+    if reads is not None and check_observations.identity(before) == check_observations.identity(after):
+        reads[path] = (check_observations.identity(after), record)
+    return record
 
 
 def consume_record(check_id, record, *, environment_ref, target_sha256, prepared_sha256, session, owner=None):
@@ -116,7 +132,8 @@ def _list(draft, key):
     return list(row.value) if row is not None and row.collected and type(row.value) is list else []
 
 
-def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=None, owner=None, generation=None):
+def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=None, owner=None, generation=None,
+                  prepared_reads=None):
     """Add domain facts to existing judge inputs and an exact, bounded evidence artifact."""
     if descriptor is None:
         return draft
@@ -131,7 +148,7 @@ def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=No
                 or descriptor.get("data_origin", "EXAMPLE") not in {"EXAMPLE", "DECLARED"}
                 or descriptor.get("generation") != generation):
             raise ValueError("B_COMMON_INPUT_CONFIGURATION_INVALID")
-        declared, _ = _read(descriptor["prepared"])
+        declared, _ = _read(descriptor["prepared"], reads=prepared_reads)
         if type(declared) is not dict:
             raise ValueError("B_COMMON_INPUT_PREPARED_INVALID")
         if prepared is not None and canonical_json(declared) != canonical_json(prepared):

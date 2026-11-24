@@ -9,7 +9,13 @@ from guard.collectors.lifecycle import prepare_assets,load_prepared
 from guard.collectors.model_read_scope import build_scope,validate_binding
 from guard.executors.kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from guard.models import canonical_json,sha256_hex
-from guard.adapters import vllm_file_read_sensor as sensor
+from guard.adapters import (
+    vllm_file_read_sensor as sensor,
+    vllm_ready_endpoint_sensor as endpoint,
+    vllm_worker_generation_sensor as generation,
+    vllm_worker_initialization_sensor as initialization,
+    vllm_worker_startup_sensor as startup,
+)
 from tests.test_lifecycle_sensor import writer_factory
 from tests.test_lifecycle_capture import case,external
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -84,3 +90,26 @@ def test_prepared_asset_bytes_cannot_be_silently_reapproved(tmp_path,changed):
     filename={'scope':'model-read-scope.json','dependency':'guard_weight_iteration.py','sensor':'guard_lifecycle_sensor.py'}[changed]
     with (destination/filename).open('ab') as stream:stream.write(b' ')
     with pytest.raises(ValueError,match='ASSET_BYTES'):load_prepared(destination/'manifest.json')
+
+
+@pytest.mark.parametrize("profile,filename,diagnostic", [
+    (startup.PROFILE, "guard_worker_startup_contract.py", "WORKER_STARTUP_DEPENDENCY_UNAVAILABLE"),
+    (initialization.PROFILE, "guard_initialization.py", "WORKER_INITIALIZATION_DEPENDENCY_UNAVAILABLE"),
+    (generation.PROFILE, "guard_worker_generation_contract.py", "WORKER_GENERATION_DEPENDENCY_UNAVAILABLE"),
+    (endpoint.PROFILE, "guard_ready_endpoint_contract.py", "READY_ENDPOINT_DEPENDENCY_UNAVAILABLE"),
+])
+def test_worker_dependency_pin_cannot_be_replaced_with_manifest_digest(tmp_path, profile, filename, diagnostic):
+    scope = tmp_path / "scope.json"
+    scope.write_bytes(canonical_json(scope_value(tmp_path / "public.safetensors")))
+    destination = tmp_path / "assets"
+    manifest = prepare_assets(destination, REPO, profile=profile, model_read_scope=scope)
+    manifest_path = destination / "manifest.json"
+    assert load_prepared(manifest_path) == manifest
+
+    dependency = destination / filename
+    modified = dependency.read_bytes() + b" "
+    dependency.write_bytes(modified)
+    manifest["assets"][filename] = {"sha256": sha256_hex(modified), "bytes": len(modified)}
+    manifest_path.write_bytes(canonical_json(manifest))
+    with pytest.raises(ValueError, match=diagnostic):
+        load_prepared(manifest_path)

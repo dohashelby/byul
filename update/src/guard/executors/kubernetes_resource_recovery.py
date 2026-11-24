@@ -1,6 +1,7 @@
 """LIF11 selected resources and explicit absolute deadlines; full recovery lineage separate."""
 from pathlib import Path
 import uuid
+from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_initialization_sensor as initialization,vllm_rank_failure_sensor as rank
 from guard.adapters import vllm_initialization_release_sensor as initialization_release,vllm_release_observation_sensor as release_observation
 from guard.adapters import resource_recovery_probe as resource_probe
@@ -39,7 +40,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             if 'node_gpu_containerd_address'in self.cfg and(self.cfg.get('node_gpu_processes')is not True
                     or self.cfg['node_gpu_containerd_address']not in('/run/containerd/containerd.sock','/run/k3s/containerd/containerd.sock')):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg['target'])
             target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end,deadline=normalize_policy(policy_values)
             with Path(self.cfg['selection']).open('rb') as stream:selection=strict_json(stream.read(resource_probe.MAX_INPUT+1),limit=resource_probe.MAX_INPUT)
             validate_selected_policy(selection,policy_values)

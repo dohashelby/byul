@@ -3,7 +3,7 @@
 OBS01 requires independently observed events and their actual audit records.
 Source/HTTP/collector agreement alone cannot prove actor or approval identity.
 """
-from datetime import datetime
+from guard.executors.record_time import parse_record_time as _time
 import re
 from guard.models import canonical_json,sha256_hex
 
@@ -30,13 +30,6 @@ OBSERVATIONS={'required_event_trials':'list','required_event_records':'list','re
 
 def fingerprint(value):
     return type(value) is str and re.fullmatch(r'[0-9a-f]{64}',value) is not None
-
-
-def _time(value):
-    if type(value) is not str or len(value)>40:raise ValueError
-    stamp=datetime.fromisoformat(value.replace('Z','+00:00'))
-    if stamp.tzinfo is None or stamp.utcoffset() is None:raise ValueError
-    return stamp
 
 
 def _closed_list(value,allowed):

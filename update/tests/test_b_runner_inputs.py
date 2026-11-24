@@ -10,7 +10,7 @@ import pytest
 
 from guard.adapters.vllm import VllmAdapter
 from guard.collectors.engine_callbacks import prepare_assets
-from guard.executors import common_consumption as bridge, registry
+from guard.executors import common_consumption as bridge, pinned_input, registry
 from guard.executors.http_common import Ctx
 from guard.models import canonical_json, sha256_hex, utcnow
 from tests.builders import completion_response, environment
@@ -73,6 +73,8 @@ def test_current_unregistered_source_cannot_be_upgraded_by_preparation(tmp_path,
     assert not result['supported'] and not result['complete']
     assert 'GPU_INPUT_PRODUCER_UNSUPPORTED' in result['gaps']
     assert not receipt['gpu_ready'] and not result['producer_authenticated']
+    reader_source = Path(pinned_input.__file__).read_bytes()
+    assert receipt['source_files']['src/guard/executors/pinned_input.py'] == sha256_hex(reader_source)
 
 
 @pytest.mark.usefixtures("example_registered_callback_producers")

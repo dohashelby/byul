@@ -7,11 +7,11 @@ bytes, individual KV reads, reload atomicity, admission, or live rollback.
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from guard.adapters import vllm_transition_dispatch_callback as callback
 from guard.adapters import vllm_worker_shard_callback as worker
 from . import gpu_common_inputs as contract
+from .source_pins import producer_source_sha256
 
 NAME = 'guard-engine-callback-transition-dispatch'
 VERSION = '1'
@@ -20,10 +20,8 @@ LIMITATIONS = ('TRANSITION_WEIGHTS_CONTENT_UNOBSERVED', 'TRANSITION_KV_KERNEL_RE
 
 
 def producer():
-    digest = hashlib.sha256()
-    for path in (Path(callback.__file__), Path(worker.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': NAME, 'version': VERSION, 'source_sha256': digest.hexdigest()}
+    source_sha256 = producer_source_sha256(callback.__file__, worker.__file__, __file__)
+    return {'name': NAME, 'version': VERSION, 'source_sha256': source_sha256}
 
 
 def record(rows, *, pod, environment_ref, target_sha256, prepared_sha256, session, source_ended=True):

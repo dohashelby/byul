@@ -7,14 +7,20 @@ import json
 from pathlib import Path
 import socket
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
 
 from guard.cli import app
 from guard.executors import kubernetes_route_record as route
+from guard.executors.kubernetes_fixed_record import FixedRecordReader
+from guard.executors.kubernetes_forwarded_identity import ForwardedIdentityReader
+from guard.executors.kubernetes_gateway_observation import GatewayRecordReader
 from guard.executors.kubernetes_lifecycle_capture import supervised_source, KubernetesCaptureError
-from guard.executors.owned_capture import _FILE_READER
+from guard.executors.kubernetes_observation import RequiredEventReader
+from guard.executors.kubernetes_record_access_product import InventoryReader
+from guard.executors.owned_capture import MAX_BYTES, _FILE_READER
 from guard.models import canonical_json, load_pack, utcnow
 from guard.store import Store
 from tests.builders import baseline_pack, policy, T0
@@ -205,3 +211,52 @@ def test_policy_and_fixed_program_are_closed_before_io(tmp_path, damage):
         with pytest.raises(KubernetesCaptureError):
             reader.exec_bounded("engine", ["python3", "-c", _FILE_READER, path, "65536"], timeout=5, max_bytes=131072)
     assert not world.calls and not world.reads
+
+
+def test_fixed_record_readers_keep_profile_paths_separate():
+    environment = env()
+    request_target = {**target(environment), "lab": False}
+
+    def unexpected_io(*args, **kwargs):
+        pytest.fail("The fixed-program check must complete before any transport call")
+
+    reader_options = {"binary": "kubectl", "duration": 30, "runner": unexpected_io}
+    route_reader = route.KubernetesRouteReader(request_target, environment, SESSION, **reader_options)
+    binding = route_reader.binding
+    transport = SimpleNamespace(binding={**binding, "gateway": binding["engine"]}, base=route_reader)
+    lab_target = {**request_target, "lab": True}
+    inventory_target = {
+        "schema": "guard-kubernetes-lifecycle-target/1",
+        "run_id": binding["run_id"],
+        "environment_ref": lab_target["environment_ref"],
+        "lab": True,
+        "kubernetes": {"context": binding["context"], "engine": binding["engine"]},
+    }
+    readers = [
+        (RequiredEventReader(transport, lab_target, SESSION, **reader_options),
+         f"/guard-observation/data/{SESSION}/required-events.json"),
+        (GatewayRecordReader(transport, lab_target, SESSION, **reader_options),
+         "/srv/serving/runtime/data/gateway_records.jsonl"),
+        (ForwardedIdentityReader(transport, lab_target, SESSION, "engine", **reader_options),
+         f"/guard-identity/data/{SESSION}/forwarded-identity.json"),
+        (InventoryReader(inventory_target, environment, SESSION, **reader_options),
+         f"/guard-record-access/data/{SESSION}/copy-inventory.json"),
+        (route_reader, f"/guard-route/data/{SESSION}/route-observations.json"),
+    ]
+    required_reader = readers[0][0]
+    inventory_reader = readers[3][0]
+    assert type(required_reader) is RequiredEventReader
+    assert all(type(reader) is FixedRecordReader for reader, _ in readers[1:])
+    for reader, own_path in readers:
+        own_command = ["python3", "-c", _FILE_READER, own_path, str(MAX_BYTES)]
+        assert reader._program("engine", own_command, 2 * MAX_BYTES) == "file"
+
+        error = ValueError if reader is inventory_reader else KubernetesCaptureError
+        error_code = ("RECORD_ACCESS_INVENTORY_PROGRAM_INVALID" if reader is inventory_reader
+                      else "KUBERNETES_CAPTURE_BINDING_UNAVAILABLE")
+        for _, other_path in readers:
+            if other_path == own_path:
+                continue
+            other_command = ["python3", "-c", _FILE_READER, other_path, str(MAX_BYTES)]
+            with pytest.raises(error, match=error_code):
+                reader.exec_bounded("engine", other_command, timeout=5, max_bytes=2 * MAX_BYTES)

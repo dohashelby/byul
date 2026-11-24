@@ -1,9 +1,8 @@
 """SUP03 consumes existing Kubernetes HTTP/template reads; no new transport."""
 from copy import deepcopy
-from pathlib import Path
 
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
 from .content_common import append_artifact
 from .http_common import Ctx, HttpCheckExecutor
@@ -42,8 +41,7 @@ class KubernetesTemplateSupplyExecutor(HttpCheckExecutor):
             allowed = {"target", "kubectl_binary", "request_timeout", "endpoint", "tokenize_endpoint", "supply_reads_input", *supply.DEFAULTS}
             if type(self.cfg) is not dict or set(self.cfg) - allowed or adapter is None:
                 raise ValueError
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg["target"])
             if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target)) != self._expected_target_sha256:
                 raise ValueError
         except (KeyError, TypeError, ValueError, OSError):

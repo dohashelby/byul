@@ -5,9 +5,9 @@ runtime 주장이나 mount/API 이름을 최종 모델 승인 증명으로 승�
 """
 from __future__ import annotations
 
-from datetime import datetime
+from guard.collectors.file import load_bounded_json
+from guard.executors.record_time import parse_record_time as _time
 import hashlib
-from pathlib import Path
 import re
 import uuid
 
@@ -35,15 +35,6 @@ OBSERVATIONS = {
 
 def _sha(value):
     return type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) is not None
-
-
-def _time(value):
-    if type(value) is not str or len(value) > 40:
-        raise ValueError
-    stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if stamp.tzinfo is None or stamp.utcoffset() is None:
-        raise ValueError
-    return stamp
 
 
 def normalize_policy(values):
@@ -115,8 +106,7 @@ class KubernetesModelAuthorizationExecutor(HttpCheckExecutor):
             if any(type(v) is not str or not v for v in (env.model.id, env.model.revision)):
                 raise ValueError
             keys = self.keys()
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg["target"])
             target_hash = sha256_hex(canonical_json(target))
             if (target_hash != policy_values["model_target_sha256"]
                     or policy_values["model_environment_sha256"] != env.ref().sha256

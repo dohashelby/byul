@@ -5,7 +5,7 @@ Only the target's explicit run label is used for source ownership checks.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from guard.executors.record_time import is_record_time as _timestamp
 import hashlib
 import json
 import math
@@ -34,15 +34,6 @@ def _integer(value, minimum=0, maximum=2**63 - 1):
 
 def _keys(value, expected):
     return type(value) is dict and set(value) == set(expected)
-
-
-def _timestamp(value):
-    if type(value) is not str or len(value) > 40:
-        return False
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).tzinfo is not None
-    except ValueError:
-        return False
 
 
 def _namespaces(value):

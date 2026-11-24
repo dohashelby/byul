@@ -7,8 +7,7 @@
 """
 from __future__ import annotations
 
-from pathlib import Path
-
+from guard.collectors.file import load_bounded_json
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import validate_capture_target
@@ -79,11 +78,8 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
             if getattr(check, "collection_profile", None) not in PROFILES or adapter is None:
                 raise ValueError
             self.validate_policy(check, policy_values)
-            def load(name):
-                with Path(self.cfg[name]).open("rb") as stream:
-                    return strict_json(stream.read(65537), limit=65536)
-            target = load("target")
-            sink = load("sink_target") if "sink_target" in self.cfg else None
+            target = load_bounded_json(self.cfg["target"])
+            sink = load_bounded_json(self.cfg["sink_target"]) if "sink_target" in self.cfg else None
             if (target.get("lab") is not True or sink is not None and sink.get("run_id") != target["kubernetes"]["run_id"]
                     or self.expected_target is not None and sha256_hex(canonical_json(target)) != self.expected_target):
                 raise ValueError

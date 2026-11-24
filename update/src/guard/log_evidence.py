@@ -24,15 +24,12 @@ from guard.judges.rule_table import RuleTableJudge
 from guard.models import canonical_json, sha256_hex, weakest_origin
 from guard.models.objects import object_from_dict
 from guard.report.log_integrity import render_log_integrity, verify_log_display
+from guard.store.integrity import ref_key as _key
 from guard.validation_evidence import inventory_tree, read_objects, verify_store_files
 
 SCHEMA = "guard-log-evidence-audit/1"
 CHECKS = {"OBS-03": "log_analysis", "OBS-09": "log_integrity"}
 MAX_JSON_BYTES = 16 * 1024**2
-
-
-def _key(ref):
-    return ref.kind, ref.id, ref.revision, ref.sha256
 
 
 def _artifact(store, evd, name, *, json_value=True):

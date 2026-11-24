@@ -157,6 +157,171 @@ def test_file_input_cannot_upgrade_to_measured(tmp_path, origin):
     if origin == 'MEASURED':assert not value.observations['activation_steps'].value[-1]['records']
 
 
+@pytest.mark.parametrize('field', ['runner_input', 'supply_reads_input'])
+@pytest.mark.parametrize('mode', ['stable', 'changed', 'changed_to_match_descriptor', 'appeared'])
+def test_scoped_record_reuses_recipe_bytes_only_while_file_matches(tmp_path, monkeypatch, field, mode):
+    from guard.collectors import check_observations
+    from guard.core.execution_recipe import configuration_sha256
+    from guard.executors.common_consumption import load_input
+
+    path = tmp_path / 'submitted.json'
+    raw, replacement = b'{"count":1}', b'{"count":200}'
+    if mode != 'appeared':
+        path.write_bytes(raw)
+    scope = {'environment_ref': {'id': 'ENV-EXAMPLE'}, 'target_sha256': 'a' * 64,
+             'prepared_sha256': 'b' * 64, 'session': 'e' * 32}
+    source = {'path': str(path), 'sha256': sha256_hex(raw), 'scope': scope}
+    if mode in {'changed_to_match_descriptor', 'appeared'}:
+        source['sha256'] = sha256_hex(replacement)
+    record_reads = {}
+    configuration_sha256({field: source}, record_reads=record_reads)
+    if mode != 'stable':
+        path.write_bytes(replacement)
+
+    reads = []
+    original_open = Path.open
+
+    class CountedFile:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __enter__(self):
+            self.stream.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.stream.__exit__(*args)
+
+        def fileno(self):
+            return self.stream.fileno()
+
+        def read(self, limit):
+            reads.append(limit)
+            return self.stream.read(limit)
+
+    def count_file_reads(candidate, *args, **kwargs):
+        stream = original_open(candidate, *args, **kwargs)
+        return CountedFile(stream) if candidate == path else stream
+
+    monkeypatch.setattr(Path, 'open', count_file_reads)
+    kwargs = {key: scope[key] for key in ('environment_ref', 'target_sha256', 'prepared_sha256')}
+    with check_observations.bind(record_reads, {}):
+        if mode != 'stable':
+            with pytest.raises(ValueError, match='B_COMMON_INPUT_BYTES_MISMATCH'):
+                load_input(source, **kwargs)
+        else:
+            assert load_input(source, **kwargs) == ({'count': 1}, scope)
+    assert len(reads) == int(mode == 'changed')
+
+
+@pytest.mark.parametrize("mode,expected_reads,expected_decodes", [
+    ("separate", 5, 2),
+    ("shared", 3, 1),
+    ("changed_between_checks", 3, 1),
+    ("changed_after_recipe_check", 4, 1),
+])
+def test_submitted_process_record_read_counts_and_per_check_evidence(
+    tmp_path, monkeypatch, mode, expected_reads, expected_decodes,
+):
+    import os
+
+    from guard.collectors import check_observations
+    from guard.core.execution_recipe import bind_recipe
+    from guard.executors import lifecycle_common_input_consumption as consumer
+
+    env, target, prepared, record, _, descriptor = inputs(tmp_path / "input", "process-device-provider")
+    record_path = Path(descriptor["records"]["process-device-provider"])
+    raw = canonical_json(record)
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    checks = ("PLT-01", "PLT-04")
+    policy_values = {
+        "PLT-01": {"allowed_capabilities": [], "allowed_mounts": [], "allowed_devices": [],
+                   "require_non_root": True, "allowed_exec_writable_paths": []},
+        "PLT-04": {"forbidden_env_names": [], "forbidden_mount_paths": []},
+    }
+
+    class FixtureExecutor:
+        name, version = "submitted-record-fixture", "0.0.1"
+
+        def __init__(self, common_inputs):
+            self.common_inputs = common_inputs
+
+        def run(self, check, environment, _values, _adapter, workdir):
+            if mode == "changed_after_recipe_check" and check.id == checks[1]:
+                record_path.write_bytes(raw + b"\n")
+            result = attach_inputs(draft(), check, environment, target, self.common_inputs, workdir,
+                                   prepared=prepared, owner=POD)
+            if mode == "changed_between_checks" and check.id == checks[0]:
+                original = record_path.stat()
+                record_path.write_bytes(b"[" + raw[1:])
+                os.utime(record_path, ns=(original.st_atime_ns, original.st_mtime_ns))
+            return result
+
+    def container_fixture(config):
+        return FixtureExecutor(config["container_config"]["common_inputs"])
+
+    def credential_fixture(config):
+        return FixtureExecutor(config["credential_exposure"]["common_inputs"])
+
+    factories = {"container_config": container_fixture, "credential_exposure": credential_fixture}
+    for name, factory in factories.items():
+        monkeypatch.setitem(registry.EXECUTORS, f"{name}:submitted-record-fixture", factory)
+    config = {
+        "executors": {name: "submitted-record-fixture" for name in factories},
+        **{name: {"common_inputs": descriptor} for name in factories},
+    }
+    pol = policy(pack.ref(), scope={"include": list(checks)}, values=policy_values)
+    store = Store(tmp_path / "store")
+    put_pack(store, pack.path)
+    store.put_many([env, pol])
+    plan = bind_recipe(select(pack, [env], pol), config, [env])
+    assert [item.check_id for item in plan.items if item.selected] == list(checks)
+    store.put(plan)
+
+    reads, decodes = [], []
+    original_open = Path.open
+    original_decode = consumer.strict_json
+
+    def counted_open(path, *args, **kwargs):
+        if path == record_path and kwargs.get("mode", args[0] if args else "r") == "rb":
+            reads.append(path)
+        return original_open(path, *args, **kwargs)
+
+    def counted_decode(data, *, limit):
+        if data == raw:
+            decodes.append(data)
+        return original_decode(data, limit=limit)
+
+    monkeypatch.setattr(Path, "open", counted_open)
+    monkeypatch.setattr(consumer, "strict_json", counted_decode)
+    monkeypatch.setattr(check_observations, "strict_json", counted_decode)
+    if mode == "separate":
+        monkeypatch.setattr(check_observations, "load_verified", lambda *_: None)
+    cfg = RunConfig(executors=config["executors"], raw=config)
+    if mode == "changed_between_checks":
+        with pytest.raises(ValueError, match="EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED"):
+            run_plan(store, pack, plan, cfg)
+        evidence = list(store.iter_kind("EVD"))
+        assert [row.check_id for row in evidence] == [checks[0]]
+    else:
+        evidence = run_plan(store, pack, plan, cfg)
+        assert [row.check_id for row in evidence] == list(checks)
+
+    assert (len(reads), len(decodes)) == (expected_reads, expected_decodes)
+    for row in evidence:
+        assert row.data_origin == DataOrigin.EXAMPLE and row.execution.status == ExecStatus.ABORTED
+        artifact, = [a for a in row.artifacts if a.name == "b-common-inputs.json"]
+        summary = json.loads((store.root / artifact.path).read_bytes())
+        assert summary["check_id"] == row.check_id and not summary["whole_question_complete"]
+        if mode == "changed_after_recipe_check" and row.check_id == checks[1]:
+            assert summary["records"] == []
+            assert "B_COMMON_INPUT_REJECTED:process-device-provider:B_COMMON_INPUT_FILE_CHANGED" in summary["gaps"]
+        else:
+            saved, = summary["records"]
+            assert saved["file_sha256"] == sha256_hex(raw) and saved["record"] == json.loads(raw)
+    assert store.verify() == []
+
+
 def test_req12_declaration_retains_unverified_facts_and_closed_dispatch(tmp_path):
     _, _, _, record, scope, descriptor = inputs(tmp_path)
     result = consume_record('REQ-12', record, owner=POD, **scope)

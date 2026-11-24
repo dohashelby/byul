@@ -1,40 +1,35 @@
 """REQ04 exact owned Gateway probes plus separate declared role records."""
 from copy import deepcopy
-from pathlib import Path
 import uuid
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_forwarded_identity import normalize_header_contract
 from guard.runtime.kubernetes_forwarded_identity_http import KubernetesForwardedIdentityHTTP,HTTP_PROFILE,header_value,SLOTS
 from guard.runtime.kubernetes_routes import EXTERNAL
 from .http_common import Ctx,HttpCheckExecutor
-from .kubernetes_lifecycle_capture import KubernetesLifecycleReader,KubernetesCaptureError
-from .owned_capture import _FILE_READER,MAX_BYTES
+from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
+from .kubernetes_lifecycle_capture import KubernetesCaptureError
+from .owned_capture import MAX_BYTES
 from .forwarded_identity_contract import PROFILE,POLICY_TYPES,OBSERVATIONS,normalize_policy,validate_record,correlate,stamp
 
 
-class ForwardedIdentityReader(KubernetesLifecycleReader):
-    def __init__(self,transport,target,session,role,*,binary,duration,runner):
-        if role not in {'gateway','engine'} or target.get('lab') is not True:raise KubernetesCaptureError()
-        self.role=role
-        # Both role bindings were independently validated by the four-Pod
-        # transport. This is the fixed record reader, not a native worker profile.
-        binding={k:transport.binding[k] for k in ('context','run_id')}
-        binding['engine']=deepcopy(transport.binding[role])
-        self._initialize(binding,target,{'session':session},binary=binary,duration=duration,runner=runner)
-        self.deadline=min(self.deadline,transport.base.deadline)
+_RECORD_PROFILE = FixedRecordProfile(
+    "/guard-identity/data/{session}/forwarded-identity.json", file_report_profile=PROFILE,
+    unverified_fields=("producer_authenticated", "producer_process_binding_verified", "producer_code_verified"),
+)
 
-    def _program(self,container,argv,max_bytes):
-        path='/guard-identity/data/'+self.session+'/forwarded-identity.json'
-        if container!=self.binding['engine']['container'] or argv!=['python3','-c',_FILE_READER,path,str(MAX_BYTES)] or max_bytes!=2*MAX_BYTES:
-            raise KubernetesCaptureError()
-        return 'file'
 
-    def report(self):
-        value=super().report();value['profile']=PROFILE;value['record_role']=self.role
-        value['programs']={'file':value['programs']['file']}
-        value.update(producer_authenticated=False,producer_process_binding_verified=False,producer_code_verified=False)
-        return value
+def ForwardedIdentityReader(transport, target, session, role, *, binary, duration, runner):
+    if role not in {"gateway", "engine"} or target.get("lab") is not True:
+        raise KubernetesCaptureError()
+    # The four-Pod transport has independently validated both role bindings.
+    binding = {key: transport.binding[key] for key in ("context", "run_id")}
+    binding["engine"] = deepcopy(transport.binding[role])
+    reader = FixedRecordReader(binding, target, session, profile=_RECORD_PROFILE,
+                               binary=binary, duration=duration, runner=runner, role=role)
+    reader.deadline = min(reader.deadline, transport.base.deadline)
+    return reader
 
 
 class KubernetesForwardedIdentityExecutor(HttpCheckExecutor):
@@ -55,7 +50,7 @@ class KubernetesForwardedIdentityExecutor(HttpCheckExecutor):
             header=normalize_header_contract(self.cfg['header']);keys=self.keys()
             normal=self._environ.get(header['normal_value_env']);alternate=self._environ.get(header['alternate_value_env'])
             if not header_value(normal) or not header_value(alternate) or normal==alternate or keys['allowed'] in {normal,alternate}:raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target = load_bounded_json(self.cfg['target'])
             digest=sha256_hex(canonical_json(target));start,end=normalize_policy(policy_values)
             if (digest!=policy_values['forwarded_target_sha256'] or env.ref().sha256!=policy_values['forwarded_environment_sha256']
                     or self.expected_target is not None and digest!=self.expected_target or not start<=utcnow()<=end):raise ValueError
@@ -80,9 +75,8 @@ class KubernetesForwardedIdentityExecutor(HttpCheckExecutor):
                 try:
                     if not start<=utcnow()<=end:raise ValueError
                     # Reuse all four selected identities around each role read.
-                    ctx.cprobe.verify_owned_generations();reader=readers[role];b=reader.binding['engine']
-                    raw,provenance=reader.read_file(reader,ctx.target,container=b['container'],image=b['image'],
-                        path='/guard-identity/data/'+values['forwarded_session']+'/forwarded-identity.json')
+                    ctx.cprobe.verify_owned_generations();reader=readers[role]
+                    raw,provenance=reader.read_record(ctx.target)
                     packet=validate_record(strict_json(raw,limit=MAX_BYTES),role=role,environment_ref=ctx.env.ref().model_dump(mode='json'),
                         target_sha256=values['forwarded_target_sha256'],run_sha256=sha256_hex(ctx.cprobe.binding['run_id'].encode()),
                         session=values['forwarded_session'],source_sha256=values['forwarded_'+role+'_source_sha256'],

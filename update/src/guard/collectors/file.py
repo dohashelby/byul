@@ -12,6 +12,14 @@ from typing import Any
 import yaml
 
 from guard.models import DataOrigin, Environment, Pack, Policy, new_id
+from guard.runtime.bounded import strict_json
+
+
+def load_bounded_json(path: str | Path) -> Any:
+    """Read a local JSON document of at most 64 KiB."""
+    limit = 64 * 1024
+    with Path(path).open("rb") as stream:
+        return strict_json(stream.read(limit + 1), limit=limit)
 
 
 def _read(path: Path) -> dict[str, Any]:

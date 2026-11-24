@@ -785,6 +785,11 @@
       "manifest_sha256": "251340907a2b8c587b529b81f511015b4f070ed826e1bae3181502888036c0a3",
       "reviewed_by": "Codex / observer projection and scoped record reuse / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T14:32:25.837Z"
+    },
+    {
+      "manifest_sha256": "692f3084a38367f2685f73898e9a7c62209edc949132824e4bd87dec3ea5fda8",
+      "reviewed_by": "Codex / CI import resolution / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:36:51.652Z"
     }
   ]
 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime
+from functools import cache, partial
 import json
 import os
 from pathlib import Path
@@ -38,6 +39,7 @@ from guard.core.select import select
 from guard.executors import passive_api_hop
 from guard.collectors.change import read_change, resolve_plan, save_change
 from guard.core.change_selection import build_context
+from guard.input_matrix_policy import PROFILE as INPUT_MATRIX_PROFILE
 from guard.models import ExecStatus, Mode, Side, utcnow
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
@@ -683,10 +685,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         if allowed_checks is not None and len(executable) != len(selected):
             record("execution-scope", False,
                    f"{len(selected) - len(executable)} selected checks are outside the configured update execution scope")
+        managed = prepared[0] == "managed"
+        selected_ids = [item.check_id for item in selected]
+        config_for_check = {} if managed else {side: cache(partial(for_check, c)) for side, c in prepared[1].items()}
         for (side, c), env in zip(prepared[1].items(), envs):
             check_support.extend({"side": side, **row} for row in assess_check_support(
-                pack, env, policy, c, selected_check_ids=[item.check_id for item in selected],
-                managed=prepared[0] == "managed", allowed_checks=allowed_checks, passive_hop=passive_hop))
+                pack, env, policy, c, selected_check_ids=selected_ids,
+                managed=managed, allowed_checks=allowed_checks, passive_hop=passive_hop,
+                config_for_check=config_for_check.get(side)))
         support_by_key = {(row["side"], row["check_id"]): row for row in check_support}
         for item in executable:
             if item.gaps:
@@ -704,9 +710,12 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 kube = implementation == "kubernetes" and prepared[0] == "external"
                 if factory is None or implementation != "real" and not kube:
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
-                if prepared[0] == "managed":
-                    c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
-                c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
+                if managed:
+                    # Route role defaults must be in place before applying check overrides.
+                    c, _ = _credentials(c, c.get(option_group, {}).get("gateway_profile", "single"))
+                    c = for_check(c, item.executor, item.check_id)
+                else:
+                    c = config_for_check[side](item.executor, item.check_id)
                 settings = c.get(item.executor, {})
                 check_def = pack.checks[item.check_id]
                 supplied_roles = (kube and run_binding.is_supply_record_binding(check_def)
@@ -747,9 +756,12 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 # These collectors distinguish a valid policy outside their
                 # bounded profile from malformed input. Still validate launch
                 # settings, budgets and fixtures; never shrink the policy.
+                # Input matrix validation checks the budget against the paired policy.
+                # Its inherited configuration check cannot enforce that constraint.
                 if (support.get("policy_valid") is True and support.get("policy_supported") is False
+                        and getattr(check_def, "collection_profile", None) != INPUT_MATRIX_PROFILE
                         and hasattr(executor, "validate_configuration")):
-                    executor.validate_configuration(pack.checks[item.check_id])
+                    executor.validate_configuration(check_def)
                 else:
                     values = policy.values.get(item.check_id, {})
                     if run_binding.keys_for(check_def):

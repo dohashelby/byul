@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from guard.adapters.engine_provider import evidence_contract, get_provider
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from functools import partial
 import re
 
 from guard.automation_policy import (string_list, validate_log_integrity_policy,
@@ -95,14 +96,17 @@ def _policy_shape(check, values, *, kubernetes_template=False):
 
 
 def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: Iterable[str],
-                         managed: bool = True, allowed_checks=None, passive_hop: bool = False) -> list[dict]:
+                         managed: bool = True, allowed_checks=None, passive_hop: bool = False,
+                         config_for_check: Callable[[str, str], dict] | None = None) -> list[dict]:
     """Describe each selected check without rejecting or rewriting its policy.
 
-    The caller supplies the effective configuration for one side. Input shape,
-    launch validation and host readiness stay with prepare-*; this assessment
-    never removes selected checks or promotes declared inputs to observations.
+    Resolve overrides from the side configuration or reuse the preparation
+    caller's per-check resolution. Input and host validation stay with prepare-*.
+    Support remains advisory for every selected check.
     """
     rows = []
+    if config_for_check is None:
+        config_for_check = partial(for_check, cfg)
     try:
         provider = get_provider(env.engine.name)
         adapter = provider.adapter()
@@ -177,9 +181,17 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
         row['code_available'] = True
+        try:
+            check_cfg = config_for_check(executor, check_id)
+        except (AttributeError, TypeError, ValueError):
+            if executor == 'engine_sensor':
+                raise
+            row["reasons"].append("CHECK_CONFIG_INVALID")
+            continue
+        executor_cfg = check_cfg.get(executor, {})
         if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-07', 'PLT-12', 'LIF-01', 'LIF-03', 'LIF-04',
                                  'REQ-09', 'REQ-10', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12'}:
-            effective = for_check(cfg, executor, check_id).get(executor, {})
+            effective = executor_cfg
             setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
             if type(effective) is dict and effective.get(setting) is True:
                 if check_id == 'OBS-01':
@@ -233,7 +245,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 row["reasons"].append("the exact target and policy inputs must pass static preparation")
                 continue
         if executor == 'engine_sensor':
-            selected_executor = selected_factory(for_check(cfg, executor, check.id))
+            selected_executor = selected_factory(check_cfg)
             describe = getattr(selected_executor, 'support', None)
             state = describe(check.id, check.collection_profile, env) if callable(describe) else {'implemented': False, 'reason': 'PLUGIN_SUPPORT_CONTRACT_UNAVAILABLE'}
             row.update(code_available=state.get('code_available', state['implemented']),
@@ -262,7 +274,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
 
         if kube_template:
             try:
-                selected_factory(for_check(cfg, executor, check_id)).validate_policy(check, values)
+                selected_factory(check_cfg).validate_policy(check, values)
             except (TypeError, ValueError):
                 unsupported("the check or policy is outside the configured Kubernetes template collector's scope",
                             policy_scope=True)
@@ -286,13 +298,13 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 row["limitations"].append("worker group attribution, isolation and shared-resource scope require separate evidence")
                 if kube:
                     try:
-                        selected_factory(for_check(cfg, executor, check_id)).validate_policy(check, values)
+                        selected_factory(check_cfg).validate_policy(check, values)
                     except (ValueError, TypeError):
                         unsupported("the configured Kubernetes collector does not admit this worker trust profile")
                 continue
             from guard.executors.unix_ipc import UnixIPCExecutor
             try:
-                UnixIPCExecutor(cfg.get("unix_ipc", {}), docker=object()).validate_policy(check, values)
+                UnixIPCExecutor(executor_cfg, docker=object()).validate_policy(check, values)
             except (ValueError, TypeError):
                 row["status"] = "UNKNOWN"
                 row["reasons"].append("explicit allowed/disallowed probe UID configuration and bounded IPC settings are required")
@@ -303,7 +315,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 if values.get("request_template_override_allowed") is True:
                     unsupported("valid policy allowing request-template overrides exceeds the restricted collector", policy_scope=True)
                 limit = values.get("max_rendered_input_tokens")
-                budget = cfg.get(executor, {}).get("max_probe_tokens", 4096)
+                budget = executor_cfg.get("max_probe_tokens", 4096)
                 if type(limit) is int and type(budget) is int and limit + 1 > budget:
                     unsupported("valid policy boundary exceeds the bounded token-fixture budget; policy is not reduced", policy_scope=True)
             elif executor == "request_binding":
@@ -375,7 +387,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 unsupported("valid endpoint/input-format policy exceeds the single submitted token-array profile", policy_scope=True)
             if set(values.get("rejection_codes", [])) - {"400", "413", "422"}:
                 unsupported("valid rejection policy names responses outside the bounded input profile", policy_scope=True)
-            limit, budget = values.get("max_input_tokens"), cfg.get(executor, {}).get("max_probe_tokens", 4096)
+            limit, budget = values.get("max_input_tokens"), executor_cfg.get("max_probe_tokens", 4096)
             if type(limit) is int and type(budget) is int and limit + 1 > budget:
                 unsupported("valid input limit exceeds the bounded probe budget; policy is not reduced", policy_scope=True)
             row["limitations"].append("submitted endpoint/format is a bounded fixture, not proof of all parser consumption paths")
@@ -391,7 +403,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 unsupported("valid sampling policy contains options outside the bounded API profile", policy_scope=True)
             if set(values.get("rejection_codes", [])) - {"400", "422"}:
                 unsupported("valid rejection policy names responses outside the bounded sampling profile", policy_scope=True)
-            if cfg.get(executor, {}).get("constraint_engine_version") != env.engine.version:
+            if executor_cfg.get("constraint_engine_version") != env.engine.version:
                 unsupported("declared sampling constraint version differs from the selected engine")
             row["limitations"].append("runner/count consumption remains unverified; API collection alone cannot establish overall security PASS")
         elif executor == "response_content":
@@ -399,7 +411,7 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 unsupported("valid return-option policy exceeds the existing bounded response profile", policy_scope=True)
             if set(values.get("required_targets", [])) - {"engine", "gateway"}:
                 unsupported("valid target policy exceeds engine/gateway collection support", policy_scope=True)
-            if cfg.get(executor, {}).get("endpoint", "/v1/completions") != "/v1/chat/completions":
+            if executor_cfg.get("endpoint", "/v1/completions") != "/v1/chat/completions":
                 unsupported("completion-only collection cannot cover the required private-system chat branch; other observations remain useful")
             row["limitations"].append("actual response fields and private-context behavior remain unobserved; model instruction quality is outside this check")
         elif executor == "log_analysis":

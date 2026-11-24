@@ -153,15 +153,18 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
             raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
     validate_policy_time(store.resolve(plan.inputs.policy))
     environments = [store.resolve(r) for r in plan.inputs.environments]
+    software_digests: dict[Path, tuple[bytes, str]] = {}
     if (plan.inputs.execution_recipe_sha256 is not None
-            and configuration_sha256(requested, environments, plan=plan) != plan.inputs.execution_recipe_sha256):
+            and configuration_sha256(requested, environments, plan=plan,
+                                     software_digests=software_digests) != plan.inputs.execution_recipe_sha256):
         raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
     with execution_lock(store.root, plan.id):
         cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
-        return _run_plan(store, pack, plan, cfg, only_side=only_side)
+        return _run_plan(store, pack, plan, cfg, software_digests=software_digests, only_side=only_side)
 
 
-def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
+def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
+              software_digests: dict[Path, tuple[bytes, str]], only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
@@ -233,7 +236,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                                         missing_native_route_prepared_sides=missing_route_prepared,
                                         rank_common_files=rank_common_files,
                                         record_access_digests=record_access_digests,
-                                        retry_snapshot_digests=retry_snapshot_digests) != plan.inputs.execution_recipe_sha256:
+                                        retry_snapshot_digests=retry_snapshot_digests,
+                                        software_digests=software_digests) != plan.inputs.execution_recipe_sha256:
                     raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)

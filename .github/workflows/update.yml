@@ -89,6 +89,28 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: python3 .github/scripts/update_ci_relevance.py >> "$GITHUB_OUTPUT"
 
+  # Early diagnostics run in parallel with the existing required jobs.
+  update-preflight:
+    name: Update pin and profile preflight
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: update
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.3"
+      - name: Report pin and profile inconsistencies
+        shell: bash
+        env:
+          PYTHONPATH: src
+        run: python -B -m tools.ci_preflight | tee -a "$GITHUB_STEP_SUMMARY"
+
   update-default:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'

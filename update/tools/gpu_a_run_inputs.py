@@ -176,7 +176,10 @@ def _normal_tp2_topology(render, namespace, pod):
         labels = pod['metadata']['labels']
         engine, = (row for row in pod['spec']['containers'] if row['name'] == 'engine')
         launch = render['launch']
-        selectors = [arg.split('=', 1)[0] for arg in engine['args']]
+        argv = engine['args']
+        selectors = [arg.partition('=')[0].replace('_', '-') for arg in argv]
+        max_model_len = render['max_model_len']
+        model_lengths = [value for option, value in zip(argv, argv[1:]) if option == '--max-model-len']
         quantities = [engine['resources'][key][GPU_RESOURCE] for key in ('requests', 'limits')]
         if (type(layout) is not dict or layout != NORMAL_TP2 or any(type(value) is not int for value in layout.values())
                 or render['schema'] != 'byul-gpu-a-aws-render/2' or render['generation'] != 'v2-default'
@@ -187,7 +190,9 @@ def _normal_tp2_topology(render, namespace, pod):
                 or labels.get('byul.a/generation') != render['generation'] or binding['image'] != render['engine_image']
                 or engine['command'] != launch['command'] or engine['args'] != launch['argv']
                 or engine['args'][-len(NORMAL_TP2_ARGS):] != list(NORMAL_TP2_ARGS)
-                or any(selectors.count(key) != 1 for key in NORMAL_TP2_ARGS[::2])
+                or any(selectors.count(key) != 1 for key in (*NORMAL_TP2_ARGS[::2], '--max-model-len'))
+                or type(max_model_len) is not int or not 256 <= max_model_len <= 131072
+                or model_lengths != [str(max_model_len)]
                 or any(type(quantity) not in (int, str) or str(quantity) != '2' for quantity in quantities)):
             raise ValueError
         verify_owned_pod(pod, namespace['metadata'], binding, render['run_id'], require_ready=False)

@@ -160,6 +160,9 @@ def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, sid
     assert saved['environment_ref'] == env.ref().model_dump(mode='json')
     assert 'chat_template' not in render and saved['lab'] is False
     assert saved['comparison_config']['launch'] == {'argv': engine['args'], 'max_model_len': render['max_model_len']}
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+        inputs.target(env, {**render, 'max_model_len': 1024}, namespace, pod, pods['probe'],
+                      context='byul-aws-lab', observed_engine_version=release['version'])
     with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_MODEL_MISMATCH$'):
         inputs.target(env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
                       api_model='different-model', observed_engine_version=release['version'])

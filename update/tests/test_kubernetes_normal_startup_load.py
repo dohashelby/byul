@@ -6,7 +6,7 @@ import pytest
 
 from guard.core.run import _normalize
 from guard.executors.kubernetes_normal_startup_load import (
-    KubernetesNormalStartupLoadExecutor, capture_startup_log_prefix,
+    KubernetesNormalStartupLoadExecutor, _load_cost, capture_startup_log_prefix,
 )
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
@@ -179,6 +179,25 @@ def test_lif01_observes_only_current_startup_elapsed_and_reported_gpu_delta(tmp_
     assert projected["supply_boot_normal_verified"]["collected"] is False
     evd = evidence(check_id=check.id, observations=projected)
     assert RuleTableJudge().judge(check, evd, check.judge.params, VALUES).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("instant,observed_at", [
+    ("00:00:00.123456788Z", None),
+    ("00:00:00.123456789Z", "2026-10-26T00:00:00.123456+00:00"),
+    ("00:00:12.000000000Z", "2026-10-26T00:00:12+00:00"),
+    ("00:00:12.000000001Z", None),
+])
+def test_lif01_load_report_respects_exact_nanosecond_boot_window(instant, observed_at):
+    window = {"container_started_at": "2026-10-26T00:00:00.123456789Z", "ready_at": READY}
+    raw = (f"2026-10-26T{instant} INFO 10-26 00:00:00 [gpu_model_runner.py:5416] "
+           "Model loading took 0.47 GiB memory and 4.463586 seconds\n").encode()
+    if observed_at is None:
+        with pytest.raises(ValueError):
+            _load_cost(raw, window, 5416)
+    else:
+        observed = _load_cost(raw, window, 5416)
+        assert observed["observed_at"] == observed_at
+        assert observed["elapsed_us"] == 4463586
 
 
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])

@@ -39,6 +39,14 @@ def _stamp(value):
     return datetime.fromisoformat(value)
 
 
+def _window_stamp(value):
+    """Use the original UTC precision for ordering, including the sub-microsecond remainder."""
+    parsed = _stamp(value)
+    fraction = value[:-1].partition(".")[2]
+    remainder_ns = int(fraction[6:].ljust(3, "0"))
+    return parsed, remainder_ns
+
+
 def _transport(target, env, *, duration, binary, runner):
     if (type(target) is not dict or target.get("lab") is not False or target.get("synthetic") is True
             or not supports(env.engine.name, env.engine.version, "log_integrity")
@@ -55,7 +63,7 @@ def normal_startup_load_transport(target, env, *, duration, binary="kubectl", ru
             or type(prefix["byte_count"]) is not int or not 0 < prefix["byte_count"] < _LIMIT
             or type(prefix["sha256"]) is not str or not _SHA.fullmatch(prefix["sha256"])
             or prefix["container_started_at"] != transport.binding["engine"]["started_at"]
-            or _stamp(prefix["ready_at"]) < _stamp(prefix["container_started_at"])):
+            or _window_stamp(prefix["ready_at"]) < _window_stamp(prefix["container_started_at"])):
         raise ValueError("LIF01_BOOT_PREFIX_UNVERIFIED")
     return transport
 
@@ -66,7 +74,7 @@ def _ready_window(transport):
     selected, = [row for row in pod["spec"]["containers"] if row["name"] == engine["container"]]
     condition, = [row for row in pod["status"]["conditions"] if row.get("type") == "Ready"]
     started_at, ready_at = engine["started_at"], condition["lastTransitionTime"]
-    if engine["restart_count"] != 0 or not _stamp(started_at) <= _stamp(ready_at) <= utcnow():
+    if engine["restart_count"] != 0 or not _window_stamp(started_at) <= _window_stamp(ready_at) <= (utcnow(), 0):
         raise ValueError("LIF01_BOOT_WINDOW_UNVERIFIED")
     return {"container_started_at": started_at, "ready_at": ready_at}, selected
 
@@ -159,7 +167,7 @@ def _verify_source(transport, source):
 
 
 def _load_cost(raw, window, line_number):
-    started, ready = (_stamp(window[key]) for key in ("container_started_at", "ready_at"))
+    started, ready = (_window_stamp(window[key]) for key in ("container_started_at", "ready_at"))
     matches = []
     for row in raw.split(b"\n")[:-1]:
         if b"Model loading took " not in row:
@@ -167,14 +175,14 @@ def _load_cost(raw, window, line_number):
         timestamp, separator, message = row.partition(b" ")
         if not separator or not _LOG_TIME.fullmatch(timestamp):
             raise ValueError("LIF01_BOOT_LOG_TIMESTAMP_UNAVAILABLE")
-        event = _stamp(timestamp.decode("ascii"))
+        event = _window_stamp(timestamp.decode("ascii"))
         if not started <= event <= ready:
             continue
         match = _COST_LINE.fullmatch(message)
         if match and int(match[1]) == line_number:
             matches.append((event, match))
     (event, match), = matches
-    return {"stage": "load", "observed_at": event.isoformat(),
+    return {"stage": "load", "observed_at": event[0].isoformat(),
             "elapsed_us": int(Decimal(match[3].decode("ascii")) * 1000000),
             "reported_allocator_delta_centi_gib": int(Decimal(match[2].decode("ascii")) * 100),
             "allocator_delta_scope": "reported_cuda_torch_allocated_after_minus_before"}

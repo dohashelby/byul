@@ -198,6 +198,10 @@ def assess_effects(method: str, facts: dict[str, Any]) -> dict[str, Any]:
 
 def reassess_record(record: dict[str, Any]) -> dict[str, Any]:
     """Rebuild displayed claims from bounded evidence instead of trusting a label."""
+    if record.get("method") == "lsm_bprm_check":
+        from .exec_verification import reassess_execution
+
+        return reassess_execution(record)
     facts = dict(record.get("facts") or {})
     if facts.get("agent_changed") is True or (
         record.get("agent_before") is not None

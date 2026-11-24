@@ -6,6 +6,7 @@ from typing import Any
 import copy
 
 from .intent import EnforcementIntent
+from .exec_policy_render import execution_policy
 from .attribution import KERNEL_DATA
 from .codeload import CODE_SUFFIXES, RULE_ID, watch_prefixes
 
@@ -114,7 +115,7 @@ def _policy(
 
 def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
     """New explicit methods start in monitor mode with their action loaded."""
-    method = intent.tetragon_enforce_method
+    method = intent.enforce_method("TG-SECRET-01")
     exact = list(intent.protected_paths.enforce_exact_files)
     if method == "lsm_file_open":
         manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True)
@@ -228,7 +229,7 @@ def _code_policy(intent: EnforcementIntent) -> dict[str, Any]:
 
 
 def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
-    """Render file policies; TG-EXEC-01 is intentionally adapter-only."""
+    """Render reviewed policies; monitor-only execution remains adapter-only."""
 
     paths = intent.protected_paths
     assets = intent.assets
@@ -245,7 +246,7 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
         manifests["tetragon-tg-asset-02.json"] = _policy(intent, "TG-ASSET-02", [assets.tokenizer_dir], 2)
     if paths.secret_paths:
         secret_enforce = "enforce" in intent.allowed_modes("TG-SECRET-01")
-        if secret_enforce and intent.tetragon_enforce_method:
+        if secret_enforce and intent.enforce_method("TG-SECRET-01"):
             manifests["tetragon-tg-secret-01.json"] = _secret_enforcement_policy(intent)
         else:
             manifests["tetragon-tg-secret-01.json"] = _policy(
@@ -266,6 +267,8 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             override=True,
         )
     manifests["tetragon-tg-code-01.json"] = _code_policy(intent)
+    if "enforce" in intent.allowed_modes("TG-EXEC-01"):
+        manifests["tetragon-tg-exec-01.json"] = execution_policy(intent)
     for filename, manifest in manifests.items():
         # Code-open classification requires confirmed identity even when the
         # other file policies retain their legacy, opt-in instrumentation.

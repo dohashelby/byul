@@ -71,7 +71,7 @@ platform/scripts/run-with-runtime.sh
 | AWS GPU 랩 · vLLM | 실제 엔진에서 요청 처리·통신 제한·관측을 시험했습니다. 환경별 절차와 확인 범위는 [인수 시험 절차](deploy/gpu-lab/ACCEPTANCE.md)에 있습니다. |
 | AWS GPU 랩 · SGLang | 이전 판본에서 일부 요청·관측 시험을 통과했습니다. Tetragon 보호 파일 읽기 차단은 확인하지 못했습니다. |
 
-별도 검증 브랜치에서는 단일 노드·단일 엔진으로 **정상 추론 → 지정 셸 실행 거부(EPERM) → 정상 추론**을 3회 확인했습니다. [셸 실행 차단 검증 기록](https://github.com/dohashelby/byul/blob/3d08eed991190ae2e10a626215627ebb27715f79/runtime/docs/verification/shell-exec-deny.md)
+2026년 11월 17일 AWS GPU 랩에서 단일 노드의 vLLM 엔진을 관측 모드로 기동한 뒤 차단 모드로 전환했습니다. 같은 엔진 Pod에서 **정상 추론 → 지정 셸 실행 거부(EPERM) → 정상 추론**을 3회 확인했습니다. [셸 실행 차단 검증 기록](docs/verification/shell-exec-deny.md)
 
 ## 6. 남은 목표
 

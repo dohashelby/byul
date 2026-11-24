@@ -14,7 +14,9 @@ SCHEMA = "runtime-enforcement-intent/1.0"
 SCHEMA_V11 = "runtime-enforcement-intent/1.1"
 DEFAULT_KUBE_API_PORT = 6443
 SCHEMAS = frozenset({SCHEMA, SCHEMA_V11})
-TETRAGON_RULE_MODES = frozenset({"TG-SECRET-01", "TG-ASSET-01", "TG-ASSET-02", "TG-CACHE-01"})
+from serving_runtime.common.enforce_rules import ENFORCE_RULE_METHODS
+
+TETRAGON_RULE_MODES = frozenset({"TG-SECRET-01", "TG-EXEC-01", "TG-ASSET-01", "TG-ASSET-02", "TG-CACHE-01"})
 PHASES = ("loading", "compiling", "inferring")
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _KUBERNETES_NAME = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
@@ -25,8 +27,7 @@ _FQDN = re.compile(
 )
 
 
-class IntentError(ValueError):
-    """The intent is not valid for the strict 1.0 schema."""
+from serving_runtime.common.enforce_rules import IntentError
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -175,6 +176,14 @@ class EnforcementIntent:
     tetragon_kernel_identity: bool = False
     # Additional download/code locations, e.g. a custom HF_MODULES_CACHE.
     code_load_watch_paths: tuple[str, ...] = ()
+
+    exec_deny_binaries: tuple[str, ...] = ()
+    exec_deny_exempt_callers: tuple[str, ...] = ()
+    tetragon_enforce_methods: tuple[tuple[str, str], ...] = ()
+
+    def enforce_method(self, rule_id: str) -> str | None:
+        legacy = self.tetragon_enforce_method if rule_id == "TG-SECRET-01" else None
+        return dict(self.tetragon_enforce_methods).get(rule_id, legacy)
 
     def tetragon_rule_mode(self, rule_id: str) -> str:
         return dict(self.tetragon_rule_modes).get(rule_id, "monitor")
@@ -383,6 +392,9 @@ def _parse_root(document):
             "tetragon_enforce_method",
             "tetragon_openat_symbol",
             "tetragon_kernel_identity",
+            "exec_deny_binaries",
+            "exec_deny_exempt_callers",
+            "tetragon_enforce_methods",
             "code_load_watch_paths",
         },
     )
@@ -405,6 +417,9 @@ def _parse_root(document):
         "tetragon_enforce_method",
         "tetragon_openat_symbol",
         "tetragon_kernel_identity",
+        "exec_deny_binaries",
+        "exec_deny_exempt_callers",
+        "tetragon_enforce_methods",
         "code_load_watch_paths",
     }
     if not v11:
@@ -504,7 +519,7 @@ def _parse_rule_modes(root):
         for rule_id, rule_mode in raw_modes.items():
             if rule_mode not in ("monitor", "enforce"):
                 raise IntentError(f"$.tetragon_rule_modes.{rule_id} must be monitor or enforce")
-            if rule_mode == "enforce" and rule_id != "TG-SECRET-01":
+            if rule_mode == "enforce" and rule_id not in ENFORCE_RULE_METHODS:
                 raise IntentError(f"$.tetragon_rule_modes.{rule_id} cannot enforce yet")
             rule_modes.append((rule_id, rule_mode))
     allowed_modes = []
@@ -520,8 +535,8 @@ def _parse_rule_modes(root):
                 or "monitor" not in modes
             ):
                 raise IntentError("allowed modes require unique monitor/enforce values including monitor")
-            if "enforce" in modes and rule_id != "TG-SECRET-01":
-                raise IntentError("only TG-SECRET-01 supports enforce")
+            if "enforce" in modes and rule_id not in ENFORCE_RULE_METHODS:
+                raise IntentError("only reviewed rules support enforce")
             if rule_id in dict(rule_modes) and ((dict(rule_modes)[rule_id] == "enforce") != ("enforce" in modes)):
                 raise IntentError("tetragon_rule_modes conflicts with tetragon_allowed_modes")
             allowed_modes.append((rule_id, tuple(modes)))
@@ -739,9 +754,7 @@ def _parse_assets(root, protected, assets):
                     raise IntentError("$.assets.cache_root must be separate from supply paths")
             manifest = Path(assets.manifest_path)
             manifest_parent = manifest.parent
-            if manifest.is_relative_to(assets.cache_root) or Path(assets.cache_root).is_relative_to(
-                manifest_parent
-            ):
+            if manifest.is_relative_to(assets.cache_root) or Path(assets.cache_root).is_relative_to(manifest_parent):
                 raise IntentError("$.assets.cache_root must be separate from the approved manifest mount")
     return assets
 
@@ -873,7 +886,13 @@ def parse_intent(document: Any) -> EnforcementIntent:
     protected = _parse_protected_paths(root, v11)
     binaries, mode, probe = _parse_binaries_and_probe(root)
     rule_modes, allowed_modes = _parse_rule_modes(root)
-    _validate_enforcement_method(root, rule_modes, allowed_modes, protected)
+    from .exec_intent import parse_execution_control
+
+    methods, denied, exempt = parse_execution_control(root, rule_modes, allowed_modes)
+    validation_root = dict(root)
+    if "TG-SECRET-01" in methods:
+        validation_root["tetragon_enforce_method"] = methods["TG-SECRET-01"]
+    _validate_enforcement_method(validation_root, rule_modes, allowed_modes, protected)
     (
         acquire,
         receivers,
@@ -885,6 +904,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
         kube_api,
         kube_api_port,
     ) = _parse_v11_extras(root, v11, engine, egress, protected, binaries, (namespace, gateway, collectors))
+    if any(binary not in suspect for binary in denied):
+        raise IntentError("exec_deny_binaries must be included in suspect_binaries")
     code_paths = _parse_code_paths(root)
 
     return EnforcementIntent(
@@ -914,6 +935,9 @@ def parse_intent(document: Any) -> EnforcementIntent:
         tetragon_openat_symbol=root.get("tetragon_openat_symbol"),
         tetragon_kernel_identity=root.get("tetragon_kernel_identity", False),
         code_load_watch_paths=code_paths,
+        exec_deny_binaries=denied,
+        exec_deny_exempt_callers=exempt,
+        tetragon_enforce_methods=tuple(methods.items()),
     )
 
 

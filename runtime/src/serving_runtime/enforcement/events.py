@@ -342,6 +342,8 @@ def parse_tetragon(
                 if isinstance(parent, dict) and isinstance(parent.get("binary"), str) and parent.get("binary")
                 else None
             )
+            if exec_policy.intent.exec_deny_binaries:
+                normalized["caller_binary"] = parent_binary
             normalized.update(
                 exec_policy.classify_exec(
                     binary=binary or "",
@@ -373,6 +375,21 @@ def parse_tetragon(
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
+    if event_name == "process_lsm" and function_name == "bprm_check_security":
+        from .exec_events import execution_attempt
+
+        if event.get("policy_name") != "runtime-tg-exec-01" and not str(event.get("policy_name", "")).startswith(
+            "runtime-tg-exec-01-"
+        ):
+            raise UnsupportedTetragonEvent("unrecognized exec policy")
+        base = _base(observed_at, "tetragon", "process_exec", data_origin, environment=environment, run_id=run_id)
+        try:
+            result = execution_attempt(event, base, exec_policy.intent if exec_policy is not None else None)
+        except (ValueError, TypeError, AttributeError) as error:
+            raise EventError("invalid execution attempt event") from error
+        if identity is not None:
+            result["identity"] = identity
+        return result
     if (event_name == "process_lsm" and function_name != "file_open") or (
         event_name == "process_kprobe"
         and function_name

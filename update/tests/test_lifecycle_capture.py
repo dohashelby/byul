@@ -3,8 +3,6 @@ import base64
 from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
-import tempfile
 from types import SimpleNamespace
 
 import pytest
@@ -13,47 +11,11 @@ from typer.testing import CliRunner
 from guard.cli import app
 from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture_module, owned_capture
-from guard.models import canonical_json, DataOrigin
-from tests.builders import environment
-from tests.test_lifecycle_sensor import writer_factory, CONTEXT, CANARY
+from guard.models import DataOrigin
+from tests.lifecycle_fixtures import CANARY, CONTEXT, IMAGE, REPOSITORY, SOURCE_MODULE, revised
+from tests.lifecycle_fixtures import case, external, writer_factory  # noqa: F401 (legacy fixtures)
 
-IMAGE="example.invalid/engine@sha256:"+"a"*64
 IMAGE_ID="sha256:"+"b"*64
-REPOSITORY=Path(__file__).resolve().parents[2]
-SOURCE_MODULE="vllm.v1.engine.input_processor"
-
-
-@pytest.fixture
-def external():
-    directory=tempfile.TemporaryDirectory(prefix="byul-lifecycle-test-")
-    root=Path(directory.name).resolve()
-    assert root.is_relative_to(Path(tempfile.gettempdir()).resolve()) and not root.is_relative_to(REPOSITORY)
-    try:
-        yield root
-    finally:
-        assert root.name.startswith("byul-lifecycle-test-")
-        directory.cleanup()
-
-
-@pytest.fixture
-def case(external,writer_factory):
-    manifest=lifecycle.prepare_assets(external/"assets",REPOSITORY)
-    prepared=lifecycle.load_prepared(external/"assets/manifest.json")
-    assert manifest==prepared
-    writer,fake=writer_factory(session=prepared["session"],settings_sha=prepared["assets"]["settings.json"]["sha256"])
-    writer.write("MODULE",{"module":SOURCE_MODULE,"verified":True,
-        "source_sha256":capture_module.sensor.SOURCE_SHA[SOURCE_MODULE],"code_sha256":"c"*64})
-    writer.write("ASGI",{"request_sha256":"d"*64,"phase":"DISCONNECT_RECEIVED","more_body":None})
-    writer.close("SEALED")
-    env=environment(engine={"name":"vllm","version":"0.31.0","image_digest":IMAGE})
-    target={"run_id":"EXAMPLE-lifecycle","environment_ref":env.ref().model_dump(mode="json"),
-            "engine":{"container":"EXAMPLE-engine"}}
-    source={"container":"EXAMPLE-engine","image":IMAGE,
-        "path":"/guard-lifecycle/data/"+prepared["session"]+"/pid-42-99.jsonl"}
-    (external/"env.json").write_bytes(canonical_json(env.to_dict()))
-    (external/"target.json").write_text(json.dumps(target),encoding="utf-8")
-    return SimpleNamespace(root=external,prepared=prepared,env=env,target=target,source=source,
-        raw=bytes(fake.data),manifest_path=external/"assets/manifest.json")
 
 
 class Docker:
@@ -132,17 +94,6 @@ def test_partial_last_write_keeps_safe_prefix_and_only_hashes_discarded_values(c
     assert summary["recording_closed"] is False and summary["incomplete_final_row"] is True
     assert summary["discarded_tail_sha256"]==hashlib.sha256(partial[len(case.raw):]).hexdigest()
     assert CANARY not in json.dumps({"records":rows,"summary":summary})
-
-
-def revised(raw,change):
-    rows=[json.loads(line) for line in raw.splitlines()]
-    change(rows)
-    previous="0"*64;lines=[]
-    for seq,row in enumerate(rows):
-        row["seq"]=seq;row["previous_sha256"]=previous
-        line=capture_module.canonical_row(row)
-        lines.append(line);previous=hashlib.sha256(line).hexdigest()
-    return b"".join(lines)
 
 
 @pytest.mark.parametrize("change",[

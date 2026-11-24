@@ -730,6 +730,31 @@
       "manifest_sha256": "1e3f4814cb277be7aefc77a0dc02cf94ca9ee1f538509e7b468c555e36db6cf3",
       "reviewed_by": "Codex / REQ-09 per-case outcomes; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T06:36:44+00:00"
+    },
+    {
+      "manifest_sha256": "22ac51aad1b4b3169585b369484fa52e1a4854a0dc793d5ea0bbce5fc6db2914",
+      "reviewed_by": "Codex / lifecycle release asset declaration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T08:01:00+00:00"
+    },
+    {
+      "manifest_sha256": "6083a0b4c8ad7f4fffe25d951b6ba214831d190da5e9d0050cbf36fc02801c13",
+      "reviewed_by": "Codex / effective readiness check configuration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T05:10:22+00:00"
+    },
+    {
+      "manifest_sha256": "582a242dcb6951832e8a04209372c39132c20723ec605b687615aca5455326b0",
+      "reviewed_by": "Codex / execution recipe byte-verified digest reuse; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T05:16:35+00:00"
+    },
+    {
+      "manifest_sha256": "1f18e43e062557790c4c552474fc10219a9d2c4009c628237037c84d6ecf3604",
+      "reviewed_by": "Codex / optional readiness profile compatibility; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T06:00:26+00:00"
+    },
+    {
+      "manifest_sha256": "78b88709dba4f2fae2471107063bad5e3bac92cd028f67e56f55a89c35ac3ada",
+      "reviewed_by": "Codex / combined lifecycle and update preparation sources; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T06:42:54+00:00"
     }
   ]
 }

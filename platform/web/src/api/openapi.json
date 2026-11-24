@@ -4541,6 +4541,22 @@
               }
             ]
           },
+          "data_origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "MEASURED",
+                  "DECLARED",
+                  "EXAMPLE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Origin"
+          },
           "finding": {
             "anyOf": [
               {

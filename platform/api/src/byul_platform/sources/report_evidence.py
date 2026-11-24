@@ -88,7 +88,9 @@ def _observed(evd, key):
 
 
 def _finding(check_id, view, result, evd):
-    if evd.get("execution", {}).get("status") != "COMPLETED" or evd.get("execution", {}).get("operator") is not None:
+    execution = evd.get("execution", {})
+    if (evd.get("data_origin") != "MEASURED" or execution.get("status") != "COMPLETED"
+            or execution.get("operator") is not None):
         return None
     verdicts = result.get("verdicts", {})
     if view["security"] == verdicts.get("security") == "FAIL":
@@ -213,6 +215,9 @@ def _enrich(conn, report, vr, artifacts):
             if evd.get("check_id") != check["check_id"] or evd.get("side") != side:
                 continue
             view["evidence_ref"] = evd_ref
+            origin = evd.get("data_origin")
+            if origin in ("MEASURED", "DECLARED", "EXAMPLE"):
+                view["data_origin"] = origin
             view["unverified_observations"] = [
                 key for key in _SCOPE_OBSERVATIONS.get(check["check_id"], ())
                 if _observed(evd, key) is False

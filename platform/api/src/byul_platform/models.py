@@ -249,6 +249,7 @@ class ReportSide(BaseModel):
     missing_observations: list[str] = Field(default_factory=list)
     unverified_observations: list[str] = Field(default_factory=list)
     evidence_ref: ManifestRef | None = None
+    data_origin: Literal["MEASURED", "DECLARED", "EXAMPLE"] | None = None
     finding: ReportFinding | None = None
     decisions: list[ReportDecision] = Field(default_factory=list)
 

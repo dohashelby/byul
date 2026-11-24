@@ -59,10 +59,14 @@ const report: ReportView = {
 };
 
 describe("검증 보고서 화면", () => {
-  it("출처 안내 없이 종합 판정·위험·실제 점검 한계를 보여준다", async () => {
+  it("보고서 자료 등급과 비공식 상태, 원본 한계 및 자동 실행 건수를 표시한다", async () => {
     mockApi({});
     const { container } = renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
-    expect(container.textContent).not.toMatch(/공식 아님|EXAMPLE|예시|후퇴/);
+    expect(screen.getByText("예시")).toBeTruthy();
+    expect(screen.getByText("비공식 보고서")).toBeTruthy();
+    expect(screen.getByText("정책 DRAFT: 공식 아님")).toBeTruthy();
+    expect(container.textContent).toContain("자동 실행 2");
+    expect(container.textContent).not.toContain("자동 측정");
     expect(screen.getByText("위험 1건")).toBeTruthy();
     expect(screen.getByText("관측 수집 중단으로 일부 점검 미확인")).toBeTruthy();
     expect(screen.getByText("미충족 1건")).toBeTruthy();
@@ -90,7 +94,7 @@ describe("검증 보고서 화면", () => {
     mockApi({});
     const row = check("SUP-08", {
       headline: "FAIL", comparison,
-      candidate: { ...side("FAIL"), finding: {
+      candidate: { ...side("FAIL"), data_origin: "MEASURED", finding: {
         code: "forbidden_code_revision_imported", field: "mm_processor_kwargs.code_revision", revision: "recorded-revision",
       } },
     });
@@ -103,7 +107,7 @@ describe("검증 보고서 화면", () => {
     expect(within(drawer.getByText("기준 · vLLM 0.7.0").parentElement!).getByText("보안 충족")).toBeTruthy();
     expect(within(drawer.getByText("후보 · vLLM 0.30.0").parentElement!).getByText("보안 미충족")).toBeTruthy();
     const heading = comparison === "REGRESSED"
-      ? "기준은 보안 충족, 후보에서는 요청에 지정한 코드가 로드됨"
+      ? "기준 판정은 보안 충족, 후보 실측에서 요청에 지정한 코드가 로드됨"
       : "후보 vLLM 0.30.0 · 요청에 지정한 코드가 실제로 로드됨";
     expect(drawer.getByRole("heading", { name: heading })).toBeTruthy();
     if (comparison === "NOT_COMPARABLE") expect(drawer.getByText(/비교 조건을 충족하지 못했으며/)).toBeTruthy();
@@ -142,7 +146,7 @@ describe("검증 보고서 화면", () => {
     mockApi({});
     const row = check("PLT-08", {
       headline: "FAIL", baseline: null, candidate: null,
-      single: { ...side("FAIL"), finding: { code: "forbidden_plaintext_succeeded" },
+      single: { ...side("FAIL"), data_origin: "MEASURED", finding: { code: "forbidden_plaintext_succeeded" },
         unverified_observations: ["api_transport_scope_complete"] },
     });
     const audit = { ...report, mode: "audit", checks: [row] };
@@ -151,6 +155,21 @@ describe("검증 보고서 화면", () => {
     expect(drawer.getByRole("heading", { name: "평문 연결이 금지된 구간에서 API 요청이 성공함" })).toBeTruthy();
     expect(drawer.getByText(/평문 HTTP 요청을 보냈고, API가 정상 응답했습니다/)).toBeTruthy();
     expect(drawer.getByText(/대상 API 전송 구간 전체의 관측입니다/)).toBeTruthy();
+  });
+
+  it("예시 측의 판정은 표시하고 실측 확인 문구는 표시하지 않는다", () => {
+    mockApi({});
+    const row = check("PLT-08", { headline: "FAIL",
+      baseline: { ...side("PASS"), data_origin: "MEASURED" },
+      candidate: { ...side("FAIL"), data_origin: "EXAMPLE", finding: { code: "forbidden_plaintext_succeeded" } },
+    });
+    renderAt("/update/results", "/update/results", <FullReport report={{ ...report, checks: [row] }}
+      rawChecks={null} selected="PLT-08" onSelect={() => {}} />);
+    const drawer = within(screen.getByLabelText("상세"));
+    expect(drawer.getByTitle("MEASURED")).toBeTruthy();
+    expect(drawer.getByText("예시")).toBeTruthy();
+    expect(drawer.getByText("보안 미충족")).toBeTruthy();
+    expect(drawer.queryByRole("heading", { name: /평문 연결이 금지된 구간에서 API 요청이 성공함/ })).toBeNull();
   });
 
   it("기존 전용 문구가 없는 점검도 축별 관측과 미확인 조건을 표시한다", () => {

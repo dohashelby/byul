@@ -1592,6 +1592,8 @@ export interface components {
             /** Unverified Observations */
             unverified_observations?: string[];
             evidence_ref?: components["schemas"]["ManifestRef"] | null;
+            /** Data Origin */
+            data_origin?: ("MEASURED" | "DECLARED" | "EXAMPLE") | null;
             finding?: components["schemas"]["ReportFinding"] | null;
             /** Decisions */
             decisions?: components["schemas"]["ReportDecision"][];

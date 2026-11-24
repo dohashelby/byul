@@ -92,6 +92,25 @@ def test_reports_dir_source(tmp_path):
         assert len(detail["item"]["checks"]) == 77
 
 
+def test_report_detail_uses_raw_rows_from_selected_revision(tmp_path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    older = load_json(RPT)
+    newer = copy.deepcopy(older)
+    newer.update(revision=2, created_at="2026-11-18T00:00:00Z")
+    newer["by_check"][0]["question"] = "선택한 보고서 판본의 질문"
+    newer.pop("content_sha256")
+    newer["content_sha256"] = canonical_sha256(newer)
+    (reports / "a-newer.json").write_text(json.dumps(newer))
+    (reports / "z-older.json").write_text(json.dumps(older))
+    with TestClient(create_app(Settings(update_reports_dir=reports))) as client:
+        response = client.get(f"/api/update/results/{older['id']}")
+        assert response.status_code == 200
+        detail = response.json()
+        assert detail["item"]["report_ref"]["revision"] == 2
+        assert detail["raw_checks"]["SUP-01"]["question"] == detail["item"]["checks"][0]["question"] == "선택한 보고서 판본의 질문"
+
+
 @pytest.mark.parametrize(("check_id", "observation", "value", "code"), [
     ("PLT-02", "unix_ipc_violations", ["ipc"], "forbidden_ipc_connection"),
     ("PLT-07", "forbidden_egress_successes", ["egress"], "forbidden_egress_succeeded"),
@@ -104,8 +123,10 @@ def test_report_security_finding_requires_matching_collected_evidence(check_id, 
     view = {"security": "FAIL", "functional": None}
     result = {"verdicts": view}
     observed = {"collected": True, "value": value}
-    evidence = {"execution": {"status": "COMPLETED"}, "observations": {observation: observed}}
+    evidence = {"data_origin": "MEASURED", "execution": {"status": "COMPLETED"}, "observations": {observation: observed}}
     assert _finding(check_id, view, result, evidence) == {"code": code}
+    for origin in ("EXAMPLE", "DECLARED", None):
+        assert _finding(check_id, view, result, {**evidence, "data_origin": origin}) is None
     assert _finding(check_id, {**view, "security": "UNKNOWN"}, result, evidence) is None
     observed["collected"] = False
     assert _finding(check_id, view, result, evidence) is None
@@ -117,11 +138,12 @@ def test_report_functional_finding_checks_planned_probe_outcomes():
     view = {"security": "UNKNOWN", "functional": "PASS"}
     result = {"verdicts": view}
     outcomes = {"first": "pass", "second": "pass"}
-    evidence = {"execution": {"status": "COMPLETED"}, "observations": {
+    evidence = {"data_origin": "MEASURED", "execution": {"status": "COMPLETED"}, "observations": {
         "functional_probes_planned": {"collected": True, "value": ["first", "second"]},
         "functional_probe_results": {"collected": True, "value": outcomes},
     }}
     assert _finding("REQ-01", view, result, evidence) == {"code": "normal_probes_passed"}
+    assert _finding("REQ-01", view, result, {**evidence, "data_origin": "EXAMPLE"}) is None
     outcomes.pop("second")
     assert _finding("REQ-01", view, result, evidence) is None
     view["functional"] = "FAIL"

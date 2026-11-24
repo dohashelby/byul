@@ -755,6 +755,11 @@
       "manifest_sha256": "78b88709dba4f2fae2471107063bad5e3bac92cd028f67e56f55a89c35ac3ada",
       "reviewed_by": "Codex / combined lifecycle and update preparation sources; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T06:42:54+00:00"
+    },
+    {
+      "manifest_sha256": "64a51b5e696477a5e6d76e390c0c34b13522ec178a431023f3aaaf2705d34533",
+      "reviewed_by": "Codex / preparation input consolidation; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T07:26:58+00:00"
     }
   ]
 }

@@ -25,6 +25,7 @@ from guard.models import (
     Mode,
     Pack,
     Plan,
+    Policy,
     Side,
     canonical_json,
     new_id,
@@ -107,30 +108,29 @@ def validate_update_run_config(cfg: RunConfig) -> None:
 
 def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
     from .execution_recipe import execution_lock, configuration_sha256, validate_policy_time
-    validate_policy_time(store.resolve(plan.inputs.policy))
+    policy = store.resolve(plan.inputs.policy)
+    validate_policy_time(policy)
     environments = [store.resolve(r) for r in plan.inputs.environments]
     expected_recipe = plan.inputs.execution_recipe_sha256
     software_digests: dict[Path, tuple[bytes, str]] = {}
 
-    def verify_recipe(envs):
+    def verify_recipe():
         if expected_recipe is None:
             return
         requested = cfg.requested if cfg.requested is not None else cfg.raw
-        if configuration_sha256(requested, envs, software_digests=software_digests) != expected_recipe:
+        if configuration_sha256(requested, environments, software_digests=software_digests) != expected_recipe:
             raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
 
-    verify_recipe(environments)
+    verify_recipe()
     with execution_lock(store.root, plan.id):
         cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
-        return _run_plan(store, pack, plan, cfg, verify_recipe=verify_recipe, only_side=only_side)
+        return _run_plan(store, pack, plan, cfg, environments, policy, verify_recipe=verify_recipe, only_side=only_side)
 
 
-def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
-              verify_recipe: Callable[[list[Environment]], None], only_side: Side | None = None) -> list[Evidence]:
+def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[Environment], policy: Policy, *,
+              verify_recipe: Callable[[], None], only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
-    envs = [store.resolve(r) for r in plan.inputs.environments]
-    policy = store.resolve(plan.inputs.policy)
     if plan.mode == Mode.update:
         validate_update_run_config(cfg)
 
@@ -154,7 +154,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
         for side, env in _sides(plan, envs):
             if only_side is not None and side != only_side:
                 continue
-            verify_recipe(envs)
+            verify_recipe()
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
             adapter = adapter_factory() if adapter_factory else None
@@ -168,13 +168,14 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
                 out.append(prev)  # 사람이 입력한 증거를 말 없이 덮지 않는다(SPEC §4.5 증거 대체 규칙)
                 continue
             ident = {"id": prev.id, "revision": prev.revision + 1} if prev else {"id": new_id("EVD"), "revision": 1}
+            environment_ref = env.ref()
             common = dict(
                 **ident,
                 plan=plan_ref,
                 check_id=check.id,
                 side=side,
-                environment=env.ref(),
-                refs=[plan_ref, env.ref()],
+                environment=environment_ref,
+                refs=[plan_ref, environment_ref],
             )
             side_cfg.attempt_id = cfg.attempt_id
             evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,

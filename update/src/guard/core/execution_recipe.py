@@ -13,22 +13,22 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
     paths added after selection are absent from the original requested config.
     An execution can reuse software digests after comparing fresh file bytes.
     """
+    package = Path(__file__).parents[1]
+    software_suffixes = {'.py', '.json', '.yaml', '.txt'}
     file_digests: dict[Path, str] = {}
+    software_candidates: dict[Path, tuple[bytes, str]] = {}
 
-    def digest_file(path: Path, *, software=False):
+    def digest_file(path: Path):
         if path in file_digests:
             return file_digests[path]
         raw = path.read_bytes()
-        cache = software_digests if software else None
+        cache = software_digests if path.is_relative_to(package) and path.suffix in software_suffixes else None
         previous = cache.get(path) if cache is not None else None
-        if previous is not None and raw == previous[0]:
-            digest = previous[1]
-        else:
-            digest = sha256_hex(raw)
-            if cache is not None:
-                cache[path] = (raw, digest)
-        file_digests[path] = digest
-        return digest
+        current = previous if previous is not None and raw == previous[0] else (raw, sha256_hex(raw))
+        if cache is not None:
+            software_candidates[path] = current
+        file_digests[path] = current[1]
+        return current[1]
 
     def normalize(value):
         if isinstance(value, dict):
@@ -77,10 +77,15 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
     for side, env in sides.items():
         factories(merge_config(cfg, cfg.get('sides', {}).get(side, {})), side, env)
     # Commit the actual installed common implementation, not a manifest's
-    # assertion about its own bytes. This is outside the measured trial.
-    package = Path(__file__).parents[1]
-    software = {p.relative_to(package).as_posix(): digest_file(p, software=True)
-        for p in sorted(package.rglob('*')) if p.is_file() and p.suffix in {'.py', '.json', '.yaml', '.txt'}}
+    # assertion about its own bytes. Cache only files in this fresh enumeration,
+    # including any already read as factory or provider sources above.
+    software = {}
+    for path in sorted(package.rglob('*')):
+        if not path.is_file() or path.suffix not in software_suffixes:
+            continue
+        software[path.relative_to(package).as_posix()] = digest_file(path)
+        if software_digests is not None:
+            software_digests[path] = software_candidates[path]
     return sha256_hex(canonical_json({'schema': 'guard-execution-recipe/1', 'requested': normalize(cfg),
         'inputs': inputs, 'implementations': implementations, 'software_sha256': sha256_hex(canonical_json(software))}))
 

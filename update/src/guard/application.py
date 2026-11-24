@@ -420,6 +420,10 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     def record(name, ok, detail):
         checks.append({"check": name, "ok": bool(ok), "detail": detail})
 
+    def error_detail(exc):
+        # Validation errors contain field descriptions; daemon output is never copied.
+        return str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+
     prepared = None
     check_support = []
     try:
@@ -442,53 +446,69 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         managed = prepared[0] == "managed"
         selected_ids = [item.check_id for item in selected]
         config_for_check = {} if managed else {side: cache(partial(for_check, c)) for side, c in prepared[1].items()}
-        for (side, c), env in zip(prepared[1].items(), envs):
-            check_support.extend({"side": side, **row} for row in assess_check_support(
-                pack, env, policy, c, selected_check_ids=selected_ids,
-                managed=managed, config_for_check=config_for_check.get(side)))
+        input_errors = []
+        failed_support_sides = set()
+        side_inputs = list(zip(prepared[1].items(), envs, strict=True))
+        for (side, c), env in side_inputs:
+            try:
+                support_rows = assess_check_support(pack, env, policy, c, selected_check_ids=selected_ids,
+                    managed=managed, config_for_check=config_for_check.get(side))
+            except Exception as exc:
+                input_errors.append((side, error_detail(exc)))
+                failed_support_sides.add(side)
+                continue
+            check_support.extend({"side": side, **row} for row in support_rows)
         support_by_key = {(row["side"], row["check_id"]): row for row in check_support}
         for item in selected:
             if item.gaps:
-                raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
-            for side, c in prepared[1].items():
-                selected_env = envs[0] if side in {'single', 'baseline'} else envs[-1]
-                factory = registry.resolve_executor(item.executor, c.get("executors", {}).get(item.executor, ""), engine=selected_env.engine.name, version=selected_env.engine.version)
-                kube=(c.get("executors",{}).get(item.executor)=="kubernetes" and prepared[0]=="external")
-                if factory is None or c.get("executors", {}).get(item.executor) != "real" and not kube:
-                    raise ValueError(f"{side}/{item.check_id}: real executor is required")
-                if managed:
-                    # Route role defaults must be in place before applying check overrides.
-                    c, _ = _credentials(c, c.get(option_group, {}).get("gateway_profile", "single"))
-                    c = for_check(c, item.executor, item.check_id)
-                else:
-                    c = config_for_check[side](item.executor, item.check_id)
-                executor = factory(c)
-                support = support_by_key[side, item.check_id]
-                check_def = pack.checks[item.check_id]
-                # These collectors distinguish a valid policy outside their
-                # bounded profile from malformed input. Still validate launch
-                # settings, budgets and fixtures; never shrink the policy.
-                # Input matrix validation checks the budget against the paired policy.
-                # Its inherited configuration check cannot enforce that constraint.
-                if (support.get("policy_valid") is True and support.get("policy_supported") is False
-                        and getattr(check_def, "collection_profile", None) != INPUT_MATRIX_PROFILE
-                        and hasattr(executor, "validate_configuration")):
-                    executor.validate_configuration(check_def)
-                else:
-                    from guard.executors import run_binding
-                    values = policy.values.get(item.check_id, {})
-                    if run_binding.keys_for(check_def):
-                        # Static preparation computes the same per-run binding guard run will compute.
-                        _, values = run_binding.effective_values(
-                            check_def, c.get(item.executor, {}), selected_env, values, side=side, attempt_id=None,
-                            issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
-                            run_cfg=run_binding.run_config(c, item.check_id), policy_ref=policy.ref())
-                    executor.validate_policy(check_def, values)
-                executor.keys()
-        record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
+                input_errors.append((item.check_id, f"{item.check_id}: unresolved selection gaps {item.gaps}"))
+                continue
+            for (side, side_cfg), env in side_inputs:
+                try:
+                    impl = side_cfg.get("executors", {}).get(item.executor, "")
+                    factory = registry.resolve_executor(item.executor, impl, engine=env.engine.name, version=env.engine.version)
+                    kube = impl == "kubernetes" and prepared[0] == "external"
+                    if factory is None or impl != "real" and not kube:
+                        raise ValueError(f"{side}/{item.check_id}: real executor is required")
+                    if managed:
+                        # Route role defaults must be in place before applying check overrides.
+                        c, _ = _credentials(side_cfg, side_cfg.get(option_group, {}).get("gateway_profile", "single"))
+                        c = for_check(c, item.executor, item.check_id)
+                    else:
+                        c = config_for_check[side](item.executor, item.check_id)
+                    executor = factory(c)
+                    support = {} if side in failed_support_sides else support_by_key[side, item.check_id]
+                    check_def = pack.checks[item.check_id]
+                    # A valid policy can exceed a collector's bounded profile.
+                    # Still validate launch settings, budgets and fixtures.
+                    # The input matrix budget depends on the paired policy.
+                    if (support.get("policy_valid") is True and support.get("policy_supported") is False
+                            and getattr(check_def, "collection_profile", None) != INPUT_MATRIX_PROFILE
+                            and hasattr(executor, "validate_configuration")):
+                        executor.validate_configuration(check_def)
+                    else:
+                        from guard.executors import run_binding
+                        values = policy.values.get(item.check_id, {})
+                        if run_binding.keys_for(check_def):
+                            # Use the same per-run binding calculation as guard run.
+                            _, values = run_binding.effective_values(
+                                check_def, c.get(item.executor, {}), env, values, side=side, attempt_id=None,
+                                issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
+                                run_cfg=run_binding.run_config(c, item.check_id), policy_ref=policy.ref())
+                        executor.validate_policy(check_def, values)
+                    executor.keys()
+                except Exception as exc:
+                    input_errors.append((f"{side}/{item.check_id}", error_detail(exc)))
+        if len(input_errors) == 1:
+            record("inputs", False, input_errors[0][1])
+        elif input_errors:
+            record("inputs", False, f"{len(input_errors)} preparation input errors are listed below")
+            for label, detail in input_errors:
+                record(f"inputs:{label}", False, detail.removeprefix(f"{label}: "))
+        else:
+            record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
     except Exception as exc:
-        # Validation errors contain field descriptions; daemon output is never copied.
-        record("inputs", False, str(exc) if isinstance(exc, ValueError) else type(exc).__name__)
+        record("inputs", False, error_detail(exc))
 
     kube_requested=cfg.get("executors",{}).get("request_binding")=="kubernetes" or any(
         c.get("executors",{}).get("request_binding")=="kubernetes" for c in cfg.get("sides",{}).values())

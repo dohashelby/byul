@@ -263,17 +263,22 @@ def test_deferred_target_derivation_preserves_recipe_but_baseline_tampering_does
 
 
 def test_recipe_reuses_overlapping_source_digest_and_preserves_wire_hash(tmp_path, monkeypatch):
-    source = tmp_path / 'factory.py'
+    package = tmp_path / 'installed'
+    package.mkdir()
+    source = package / 'factory.py'
     raw_source = b'# EXAMPLE executor source\n'
     source.write_bytes(raw_source)
-    monkeypatch.setattr(execution_recipe, '__file__', str(tmp_path / 'core' / 'execution_recipe.py'))
+    external = tmp_path / 'extension.py'
+    raw_external = b'# EXAMPLE external provider source\n'
+    external.write_bytes(raw_external)
+    monkeypatch.setattr(execution_recipe, '__file__', str(package / 'core' / 'execution_recipe.py'))
 
     def factory(_):
         pytest.fail('recipe must only inspect the factory')
 
     provider = engine_provider.EngineProvider('example-recipe', FakeAdapter)
     monkeypatch.setitem(engine_provider.PROVIDERS, provider.name, provider)
-    monkeypatch.setattr(provider, 'execution_recipe_files', lambda _: (source,))
+    monkeypatch.setattr(provider, 'execution_recipe_files', lambda _: (source, external))
     monkeypatch.setattr(registry, 'resolve_executor', lambda *args, **kwargs: factory)
     getsourcefile = execution_recipe.inspect.getsourcefile
     monkeypatch.setattr(execution_recipe.inspect, 'getsourcefile',
@@ -281,32 +286,62 @@ def test_recipe_reuses_overlapping_source_digest_and_preserves_wire_hash(tmp_pat
     cfg = {'adapter': {'name': provider.name}, 'executors': {'direct_route': 'example'},
            'sides': {'baseline': {}, 'candidate': {}}}
 
-    hashed = Counter()
+    reads, hashed = Counter(), Counter()
+    read_bytes = Path.read_bytes
+
+    def record_read(path):
+        reads[path] += 1
+        return read_bytes(path)
+
     def record_hash(data):
         hashed[data] += 1
         return sha256_hex(data)
+
+    monkeypatch.setattr(Path, 'read_bytes', record_read)
     monkeypatch.setattr(execution_recipe, 'sha256_hex', record_hash)
 
     source_sha256 = sha256_hex(raw_source)
     implementation = {'implementation': 'example', 'factory': factory.__qualname__,
                       'source_sha256': source_sha256,
-                      'provider_sources': [{'name': source.name, 'sha256': source_sha256}]}
+                      'provider_sources': [{'name': external.name, 'sha256': sha256_hex(raw_external)},
+                                           {'name': source.name, 'sha256': source_sha256}]}
     expected = sha256_hex(canonical_json({
         'schema': 'guard-execution-recipe/1', 'requested': cfg, 'inputs': {},
         'implementations': {f'{side}:direct_route': implementation for side in ('root', 'baseline', 'candidate')},
         'software_sha256': sha256_hex(canonical_json({source.name: source_sha256})),
     }))
-    assert execution_recipe.configuration_sha256(cfg) == expected
+    software_digests = {}
+    assert execution_recipe.configuration_sha256(cfg, software_digests=software_digests) == expected
+    assert execution_recipe.configuration_sha256(cfg, software_digests=software_digests) == expected
+    assert reads == {source: 2, external: 2}
     assert hashed[raw_source] == 1
+    assert hashed[raw_external] == 2
+    assert set(software_digests) == {source}
+
+    original_stat = source.stat()
+    updated_source = raw_source.replace(b'executor', b'provider')
+    source.write_bytes(updated_source)
+    os.utime(source, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+    assert source.stat().st_size == original_stat.st_size
+    assert source.stat().st_mtime_ns == original_stat.st_mtime_ns
+    assert execution_recipe.configuration_sha256(cfg, software_digests=software_digests) != expected
+    assert reads == {source: 3, external: 3}
+    assert hashed[updated_source] == 1
 
 
-@pytest.mark.parametrize('mutation', ['unchanged', 'target', 'software', 'added', 'removed'])
+@pytest.mark.parametrize('mutation', ['unchanged', 'target', 'software', 'symlink', 'added', 'removed'])
 def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path, monkeypatch, mutation):
     package = tmp_path / 'installed'
     package.mkdir()
     source = package / 'fixed.py'
     source_bytes = b'# EXAMPLE source A\n'
-    source.write_bytes(source_bytes)
+    if mutation == 'symlink':
+        first_source, next_source = tmp_path / 'first.py', tmp_path / 'next.py'
+        first_source.write_bytes(source_bytes)
+        next_source.write_bytes(b'# EXAMPLE source B\n')
+        source.symlink_to(first_source)
+    else:
+        source.write_bytes(source_bytes)
     target = tmp_path / 'target.json'
     target.write_bytes(b'{"example":"A"}')
     monkeypatch.setattr(execution_recipe, '__file__', str(package / 'core' / 'execution_recipe.py'))
@@ -329,6 +364,9 @@ def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path,
                     replace_bytes_preserving_mtime(target, b'{"example":"B"}')
                 elif mutation == 'software':
                     replace_bytes_preserving_mtime(source, b'# EXAMPLE source B\n')
+                elif mutation == 'symlink':
+                    source.unlink()
+                    source.symlink_to(next_source)
                 elif mutation == 'added':
                     (package / 'new.txt').write_bytes(b'EXAMPLE added source')
                 elif mutation == 'removed':
@@ -347,16 +385,25 @@ def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path,
     plan = bind_recipe(select(pack, envs, pol, mode='update'), cfg, envs)
     store.put_many([*envs, pol, plan])
 
-    reads, hashes = Counter(), Counter()
+    reads, hashes, resolved = Counter(), Counter(), Counter()
     read_bytes = Path.read_bytes
+    resolve = store.resolve
+
     def record_read(path):
         reads[path] += 1
         return read_bytes(path)
+
     def record_hash(data):
         hashes[data] += 1
         return sha256_hex(data)
+
+    def record_resolve(ref):
+        resolved[ref.id] += 1
+        return resolve(ref)
+
     monkeypatch.setattr(Path, 'read_bytes', record_read)
     monkeypatch.setattr(execution_recipe, 'sha256_hex', record_hash)
+    monkeypatch.setattr(store, 'resolve', record_resolve)
 
     run_cfg = RunConfig(raw=cfg, executors=cfg['executors'])
     if mutation == 'unchanged':
@@ -372,6 +419,8 @@ def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path,
     assert reads[target] == 3
     assert reads[source] == (2 if mutation == 'removed' else 3)
     assert hashes[source_bytes] == 1
+    assert hashes[b'{"example":"A"}'] == (2 if mutation == 'target' else 3)
+    assert resolved == {pol.id: 1, envs[0].id: 1, envs[1].id: 1}
 
 
 @pytest.mark.parametrize('adapter', [VllmAdapter(), SGLangAdapter(), TensorRTAdapter()])

@@ -141,8 +141,6 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
         try:
             check_cfg = config_for_check(executor, check_id)
         except (AttributeError, TypeError, ValueError):
-            if executor == 'engine_sensor':
-                raise
             row["reasons"].append("CHECK_CONFIG_INVALID")
             continue
         executor_cfg = check_cfg.get(executor, {})

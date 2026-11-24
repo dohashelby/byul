@@ -225,6 +225,9 @@ class UpdateExecutionService:
                 digest.update(name.encode() + b"\0" + hashlib.sha256(data).digest())
                 if destination:
                     path = destination / name
+                    if source == path:
+                        # Registered inputs already live in the run snapshot.
+                        continue
                     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
                     path.write_bytes(data)
                     path.chmod(0o600)

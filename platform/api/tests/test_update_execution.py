@@ -211,6 +211,23 @@ def test_host_is_checked_again_before_execution(execution):
     assert [argv[0] for argv in calls(update)] == ["prepare-validation"] * 2
 
 
+def test_preparation_writes_each_registered_snapshot_file_once(execution, monkeypatch):
+    client, _, _ = execution
+    generated = {"baseline.json", "candidate.json", "policy.json", "source-baseline.json",
+                 "source-candidate.json", "source-policy.json", "provenance.json"}
+    writes = []
+    write_bytes = Path.write_bytes
+
+    def track_write(path, data):
+        if path.parent.name == "inputs" and path.name in generated:
+            writes.append(path.name)
+        return write_bytes(path, data)
+
+    monkeypatch.setattr(Path, "write_bytes", track_write)
+    prepared(client, "update")
+    assert sorted(writes) == sorted(generated)
+
+
 @pytest.mark.parametrize("changed", ["guard.toml", "packs/PACK-BASELINE/manifest.yaml"])
 def test_changed_source_requires_new_preparation(execution, changed):
     client, update, _ = execution

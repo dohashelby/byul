@@ -1,14 +1,20 @@
 """Saved paired inputs through the existing Runtime bundle and target loaders."""
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import socket
 import subprocess
+import sys
+from types import SimpleNamespace
 
 import pytest
 
-from guard.models import Environment, canonical_json
+from guard.executors.kubernetes_gateway_observation import principal_sha256, snapshot_record
+from guard.models import DataOrigin, Environment, canonical_json
+from guard.models.objects import FactValue
+from guard.runtime.kubernetes_binding import verify_owned_pod
+from guard.store import Store
 from tests.test_mvp_metadata_wiring import sources
 from tools import mvp_gateway_preparation as tool
 
@@ -107,11 +113,11 @@ def test_both_engines_need_their_own_published_target_and_revocation_bytes(gatew
         tool.prepare_pair(inputs, revoked, digest, issued_at=NOW)
 
 
-def test_only_verified_saved_gateway_configuration_binds_the_target(gateway_pair):
+def _gateway_owner(gateway_pair, side):
     inputs, _, _ = gateway_pair
-    prepared = tool.prepare_pair(*gateway_pair, issued_at=NOW)['baseline']
-    env = Environment.model_validate(tool._source(inputs['baseline']['environment'])[0])
-    target_path = inputs['baseline']['target']
+    prepared = tool.prepare_pair(*gateway_pair, issued_at=NOW)[side]
+    env = Environment.model_validate(tool._source(inputs[side]['environment'])[0])
+    target_path = inputs[side]['target']
     target, _ = tool._source(target_path)
     engine = target['kubernetes']['engine']
     namespace = {'metadata': {'name': engine['namespace'], 'uid': engine['namespace_uid'],
@@ -124,13 +130,140 @@ def test_only_verified_saved_gateway_configuration_binds_the_target(gateway_pair
                                             'containerID': 'containerd://' + '9' * 64, 'restartCount': 0,
                                             'ready': True, 'state': {'running': {'startedAt': START}}}]}
     config = deepcopy(prepared['deployment']['configuration'])
+    return env, target_path, target, prepared, {'namespace': namespace, 'pod': pod, 'configuration': config}
+
+
+def test_only_verified_saved_gateway_configuration_binds_the_target(gateway_pair):
+    env, target_path, target, prepared, owner = _gateway_owner(gateway_pair, 'baseline')
 
     def bind():
-        return tool.bind_gateway(target_path, env, prepared, namespace=namespace, pod=pod, configuration=config)
+        return tool.bind_gateway(target_path, env, prepared, **owner)
 
     result = bind()
-    assert result['kubernetes_gateway']['pod_uid'] == pod['metadata']['uid']
+    assert result['kubernetes_gateway']['pod_uid'] == owner['pod']['metadata']['uid']
     assert {key: value for key, value in result.items() if key != 'kubernetes_gateway'} == target
-    config['data']['input-0'] = '{}'
+    owner['configuration']['data']['input-0'] = '{}'
     with pytest.raises(ValueError, match='GATEWAY_OBSERVED_CONFIGURATION_MISMATCH'):
         bind()
+
+
+def _ordinary_receipts(directory, env, bound, prepared, owner):
+    from serving_runtime.gateway.request_records import RequestRecords
+    from serving_runtime.gateway.validator import Decision
+
+    target_id, run = prepared['runtime_target_id'], bound['kubernetes']['run_id']
+    session, request_id, principal = 'b' * 32, 'c' * 32, 'fixture-approved-actor'
+    route = 'POST /v1/chat/completions'
+    policy_sha = prepared['runtime_policy_sha256']
+    policy = SimpleNamespace(target_id=target_id, schema_version='runtime-mvp/1.1', profile=None,
+                             policy_id='fixture-policy', policy_version='1', cache_isolation=None)
+    state = SimpleNamespace(policy=policy, sha256=policy_sha, path='fixture-policy.json')
+    writer = RequestRecords(directory, session, lambda: state, 'vllm', environment=tool.GATEWAY_ENV, run_id=run,
+                            target_context=lambda: {'target_id': target_id, 'registration': 'ok'})
+    writer.clear_context(route)
+    writer.bind_context(state)
+    writer.set_auth({'state': 'authenticated', 'principal_id': principal})
+    decision = Decision('ALLOWED', 200, 'ALLOWED', None, 'allowed', MODEL, 1)
+    final = writer.build('final', request_id, decision, attempted=True, backend_receipt='not_available',
+                         response='completed', error_code=None, final_outcome='completed')
+    final['recorded_at'] = (NOW + timedelta(seconds=1)).isoformat()
+    assert writer.append(final)
+    journal = directory / 'gateway_records.jsonl'
+    journal_raw = journal.read_bytes()
+    request_sha = sha256(request_id.encode()).hexdigest()
+    actor_sha = principal_sha256(principal)
+    source = {'environment': tool.GATEWAY_ENV, 'target_id': target_id, 'runtime_policy_sha256': policy_sha,
+              'request_sha256': request_sha}
+    _, row_sha, recorded_at = snapshot_record(journal_raw, source=source, run_id=run,
+        values={'observation_session': session, 'observation_allowed_actor_sha256': actor_sha})
+    gateway_owner = verify_owned_pod(owner['pod'], owner['namespace']['metadata'], bound['kubernetes_gateway'], run)
+    common = {'environment_ref': env.ref().model_dump(mode='json'), 'request_sha256': request_sha,
+              'engine_owner_sha256': tool._owner_sha256(bound['kubernetes']['engine']),
+              'gateway_owner_sha256': sha256(canonical_json(gateway_owner)).hexdigest()}
+    response = {**common, 'body_sha256': sha256(b'ordinary fixture response').hexdigest(), 'body_bytes': 25,
+                'status': 200, 'request_id': request_id, 'route': route, 'run_sha256': sha256(run.encode()).hexdigest(),
+                'observed_started_ns': int(NOW.timestamp()) * 10**9,
+                'observed_finished_ns': int(NOW.timestamp()) * 10**9 + 100_000_000}
+    audit = {**common, 'event': 'ACCESS_ALLOWED', 'gateway_target_sha256': sha256(canonical_json(bound)).hexdigest(),
+             'owner_before_after_verified': True, 'producer_sha256': tool.PRODUCER_SHA256,
+             'runtime_policy_sha256': policy_sha, 'journal_bytes': len(journal_raw),
+             'journal_sha256': sha256(journal_raw).hexdigest(), 'selected_row_sha256': row_sha,
+             'recorded_at': recorded_at, 'actor_sha256': actor_sha, 'session': session,
+             'independent_denied_event_observed': False}
+    return response, audit, journal
+
+
+@pytest.mark.parametrize(('side', 'changed'), [('baseline', None), ('candidate', None),
+    ('candidate', 'gateway_owner_sha256'), ('candidate', 'observed_finished_ns'), ('candidate', 'journal')])
+def test_bind_publishes_only_same_owner_normal_gateway_fact(tmp_path, gateway_pair, monkeypatch, side, changed):
+    def forbidden(*args, **kwargs):
+        pytest.fail('Saved observation binding must not send requests or invoke subprocesses')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    env, target_path, _, prepared, owner = _gateway_owner(gateway_pair, side)
+    bound = tool.bind_gateway(target_path, env, prepared, **owner)
+    response, audit, journal = _ordinary_receipts(tmp_path, env, bound, prepared, owner)
+    if changed == 'gateway_owner_sha256':
+        response[changed] = audit[changed] = '0' * 64
+    if changed == 'observed_finished_ns':
+        response[changed] = response['observed_started_ns'] - 1
+    response_path, audit_path = tmp_path / 'response.json', tmp_path / 'audit.json'
+    selection = {'response_receipt': {'path': str(response_path), 'sha256': _write(response_path, response)},
+                 'audit_receipt': {'path': str(audit_path), 'sha256': _write(audit_path, audit)},
+                 'journal': {'path': str(journal), 'sha256': sha256(journal.read_bytes()).hexdigest()}}
+    selection_path = tmp_path / 'selection.json'
+    selection_sha = _write(selection_path, selection)
+    if changed == 'journal':
+        journal.write_bytes(journal.read_bytes() + b'\n')
+
+    prep_dir = tmp_path / 'prepared'
+    prep_dir.mkdir()
+    preparation = prep_dir / 'preparation.json'
+    preparation_sha = _write(preparation, {'image': tool.GATEWAY_IMAGE, 'producer_sha256': tool.PRODUCER_SHA256,
+        'gateway_environment': tool.GATEWAY_ENV, 'sides': {side: prepared}})
+    output = tmp_path / 'output'
+    environment = gateway_pair[0][side]['environment']
+    sources = []
+    for key, obj in owner.items():
+        path = tmp_path / (key + '.json')
+        _write(path, obj)
+        sources.extend(['--' + key, str(path)])
+    argv = ['mvp_gateway_preparation', 'bind', '--side', side, '--preparation', str(preparation),
+            '--preparation-sha256', preparation_sha, '--environment', environment, '--output', str(output), *sources]
+    original_env = tool._source(environment)[0]
+    original_target = tool._source(target_path)[0]
+    monkeypatch.setattr(sys, 'argv', [*argv, '--observation', str(selection_path), '--observation-sha256', selection_sha])
+    if changed is not None:
+        with pytest.raises(SystemExit, match='2'):
+            tool.main()
+        assert not output.exists()
+        return
+    tool.main()
+    derived = Environment.model_validate_json((output / 'environment.json').read_bytes())
+    target = json.loads((output / 'target.json').read_bytes())
+    provenance_raw = (output / 'gateway-observation.json').read_bytes()
+    assert derived.hash_ok() and derived.id != env.id and derived.revision == 1
+    assert derived.refs == env.refs
+    assert Store(tmp_path / 'store').put(derived) == derived.ref()
+    assert derived.facts['gateway'] == FactValue(value=True, origin=DataOrigin.DECLARED,
+        source='gateway-observation.json#sha256=' + sha256(provenance_raw).hexdigest())
+    assert json.loads(provenance_raw)['environment_ref'] == env.ref().model_dump(mode='json')
+    source = json.loads((output / 'gateway-source.json').read_bytes())
+    assert source['request_sha256'] == response['request_sha256']
+    assert target['environment_ref'] == target['model_mapping']['environment_ref'] == derived.ref().model_dump(mode='json')
+    assert target['kubernetes_gateway'] == bound['kubernetes_gateway']
+    assert tool._source(environment)[0] == original_env and tool._source(target_path)[0] == original_target
+
+    for fact in (FactValue(value=False), FactValue(conflict=[True, False])):
+        existing = env.model_copy(update={'facts': {**env.facts, 'gateway': fact}}).seal()
+        with pytest.raises(ValueError, match='GATEWAY_ENVIRONMENT_FACT_ALREADY_BOUND'):
+            tool._observation_environment(existing, bound, prepared, selection_path, selection_sha)
+    legacy = tmp_path / 'legacy'
+    argv[argv.index('--output') + 1] = str(legacy)
+    monkeypatch.setattr(sys, 'argv', argv)
+    tool.main()
+    assert sorted(path.name for path in legacy.iterdir()) == ['gateway-source.json', 'target.json']
+    assert json.loads((legacy / 'target.json').read_bytes()) == bound
+    assert json.loads((legacy / 'gateway-source.json').read_bytes()) == {
+        key: value for key, value in source.items() if key != 'request_sha256'}

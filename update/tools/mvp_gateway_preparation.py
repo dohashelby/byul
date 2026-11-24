@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+from datetime import datetime, timezone
 from hashlib import sha256
 import io
 import json
@@ -19,7 +20,10 @@ from tempfile import TemporaryDirectory
 
 import yaml
 
-from guard.models import Environment, canonical_json, utcnow
+from guard.executors.kubernetes_gateway_observation import MAX_BYTES, final_records, snapshot_record
+from guard.models import DataOrigin, Environment, canonical_json, new_id, utcnow
+from guard.models.objects import FactValue
+from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import verify_owned_pod
 from guard.update_validation import _plain_path, reserve_output
 from tools.gpu_a_run_inputs import _binding
@@ -41,6 +45,15 @@ INPUT_ANNOTATION = 'byul.lab/gateway-inputs-sha256'
 RUNTIME_ROLES = {'gateway_policy', 'policy_approvals', 'target'}
 INPUT_FIELDS = {'environment', 'target', 'bundle', 'bundle_sha256', 'auth_secret'}
 FILE_LIMIT = 256 * 1024
+_ORDINARY_ROUTE = 'POST /v1/chat/completions'
+_OBSERVATION_FILES = {'response_receipt', 'audit_receipt', 'journal'}
+_OWNER_PIN_FIELDS = {'engine_owner_sha256', 'gateway_owner_sha256', 'environment_ref', 'request_sha256'}
+_RESPONSE_FIELDS = _OWNER_PIN_FIELDS | {'body_sha256', 'body_bytes', 'status', 'request_id', 'route', 'run_sha256',
+                                        'observed_started_ns', 'observed_finished_ns'}
+_AUDIT_FIELDS = _OWNER_PIN_FIELDS | {'event', 'gateway_target_sha256', 'owner_before_after_verified',
+    'producer_sha256', 'runtime_policy_sha256', 'journal_bytes', 'journal_sha256', 'selected_row_sha256',
+    'recorded_at', 'actor_sha256', 'session', 'independent_denied_event_observed'}
+_OBSERVATION_INVALID = 'GATEWAY_ORDINARY_OBSERVATION_INVALID'
 
 
 def reviewed_producer(archive):
@@ -289,6 +302,106 @@ def bind_gateway(target_path, env, prepared, *, namespace, pod, configuration):
     return {**target, 'kubernetes_gateway': binding}
 
 
+def _owner_sha256(binding):
+    """Match the existing owned capture's verify_owned_pod projection."""
+    fields = ('namespace_uid', 'pod_uid', 'container', 'container_id', 'node', 'restart_count', 'started_at')
+    owner = {key: binding[key] for key in fields}
+    owner.update(transport='kubernetes', image_reference=binding['image'], reported_image_id=binding['image_id'])
+    return sha256(canonical_json(owner)).hexdigest()
+
+
+def _check_observation_times(response, recorded_at, target, prepared):
+    def epoch_ns(value):
+        instant = datetime.fromisoformat(value)
+        if instant.tzinfo is None:
+            raise ValueError(_OBSERVATION_INVALID)
+        delta = instant - datetime(1970, 1, 1, tzinfo=timezone.utc)
+        return (delta.days * 86400 + delta.seconds) * 10**9 + delta.microseconds * 1000
+
+    config = prepared['deployment']['configuration']['data']
+    policy_raw, = (raw for raw in config.values() if sha256(raw.encode()).hexdigest() == prepared['runtime_policy_sha256'])
+    policy = strict_json(policy_raw.encode(), limit=FILE_LIMIT)
+    start, finish = (response[key] for key in ('observed_started_ns', 'observed_finished_ns'))
+    valid_from, valid_until = (epoch_ns(policy[key]) for key in ('valid_from', 'valid_until'))
+    owner_started = max(epoch_ns(role['started_at'])
+                        for role in (target['kubernetes']['engine'], target['kubernetes_gateway']))
+    # The Runtime final can be appended after the client receives the response.
+    if (type(start) is not int or type(finish) is not int or not 0 < start < finish < 2**63
+            or not valid_from <= start < finish < valid_until or owner_started > start
+            or not start <= epoch_ns(recorded_at) < valid_until):
+        raise ValueError(_OBSERVATION_INVALID)
+
+
+def _observation_environment(env, target, prepared, observation, expected_sha256):
+    """Join existing owned receipts without reading response content or sending requests."""
+    if env.data_origin == DataOrigin.EXAMPLE or target.get('synthetic', False) is not False:
+        raise ValueError(_OBSERVATION_INVALID)
+    selection = strict_json(_pinned_file(observation, expected_sha256), limit=FILE_LIMIT)
+    if (type(selection) is not dict or selection.keys() != _OBSERVATION_FILES or any(
+            type(row) is not dict or row.keys() != {'path', 'sha256'}
+            or type(row['path']) is not str or not row['path']
+            or type(row['sha256']) is not str or not re.fullmatch('[0-9a-f]{64}', row['sha256'])
+            for row in selection.values())):
+        raise ValueError(_OBSERVATION_INVALID)
+    inputs = {}
+    for key, row in selection.items():
+        raw, _ = _read(_plain_path(Path(row['path'])), max_bytes=MAX_BYTES)
+        if sha256(raw).hexdigest() != row['sha256']:
+            raise ValueError(_OBSERVATION_INVALID)
+        inputs[key] = raw
+    response, audit = (strict_json(inputs[key], limit=MAX_BYTES) for key in ('response_receipt', 'audit_receipt'))
+    journal = inputs['journal']
+    gateway_fact = env.facts.get('gateway')
+    if gateway_fact is not None and (gateway_fact.value is not None or gateway_fact.conflict):
+        raise ValueError('GATEWAY_ENVIRONMENT_FACT_ALREADY_BOUND')
+    if (type(response) is not dict or response.keys() != _RESPONSE_FIELDS or type(audit) is not dict
+            or audit.keys() != _AUDIT_FIELDS or response['route'] != _ORDINARY_ROUTE or response['status'] != 200
+            or type(response['status']) is not int or not isinstance(response['request_id'], str)
+            or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}', response['request_id'])
+            or type(response['body_bytes']) is not int or not 0 < response['body_bytes'] <= MAX_BYTES
+            or not isinstance(response['body_sha256'], str) or not re.fullmatch('[0-9a-f]{64}', response['body_sha256'])
+            or audit['owner_before_after_verified'] is not True or audit['event'] != 'ACCESS_ALLOWED'
+            or audit['independent_denied_event_observed'] is not False or type(audit['journal_bytes']) is not int
+            or audit['journal_bytes'] != len(journal) or audit['journal_sha256'] != selection['journal']['sha256']
+            or audit['producer_sha256'] != PRODUCER_SHA256 or not journal.endswith(b'\n')
+            or not isinstance(audit['session'], str) or not re.fullmatch('[0-9a-f]{32}', audit['session'])):
+        raise ValueError(_OBSERVATION_INVALID)
+
+    run = target['kubernetes']['run_id']
+    old_ref = env.ref().model_dump(mode='json')
+    target_sha256 = sha256(canonical_json(target)).hexdigest()
+    common = {'environment_ref': old_ref, 'request_sha256': sha256(response['request_id'].encode()).hexdigest(),
+              'engine_owner_sha256': _owner_sha256(target['kubernetes']['engine']),
+              'gateway_owner_sha256': _owner_sha256(target['kubernetes_gateway'])}
+    if (any(response[key] != value or audit[key] != value for key, value in common.items())
+            or response['run_sha256'] != sha256(run.encode()).hexdigest() or audit['gateway_target_sha256'] != target_sha256
+            or audit['runtime_policy_sha256'] != prepared['runtime_policy_sha256']):
+        raise ValueError(_OBSERVATION_INVALID)
+    matches = [row for row in final_records(journal.decode('utf-8').split('\n'), run_id=run, session=audit['session'])
+               if row.get('request_id') == response['request_id']]
+    if len(matches) != 1 or matches[0].get('route') != _ORDINARY_ROUTE:
+        raise ValueError(_OBSERVATION_INVALID)
+    source = {'environment': GATEWAY_ENV, 'target_id': prepared['runtime_target_id'],
+              'runtime_policy_sha256': prepared['runtime_policy_sha256'], 'request_sha256': common['request_sha256']}
+    _, selected_sha256, recorded_at = snapshot_record(canonical_json(matches[0]) + b'\n', source=source, run_id=run,
+        values={'observation_session': audit['session'], 'observation_allowed_actor_sha256': audit['actor_sha256']})
+    if (selected_sha256, recorded_at) != (audit['selected_row_sha256'], audit['recorded_at']):
+        raise ValueError(_OBSERVATION_INVALID)
+    _check_observation_times(response, recorded_at, target, prepared)
+
+    provenance = {**common, 'gateway_target_sha256': target_sha256,
+        'runtime_policy_sha256': source['runtime_policy_sha256'], 'route': _ORDINARY_ROUTE, 'recorded_at': recorded_at,
+        'observation_sha256': expected_sha256, 'input_sha256': {key: row['sha256'] for key, row in selection.items()}}
+    fact = FactValue(value=True, origin=DataOrigin.DECLARED,
+                     source='gateway-observation.json#sha256=' + sha256(canonical_json(provenance)).hexdigest())
+    result = env.model_copy(update={'id': new_id('ENV'), 'revision': 1, 'created_at': utcnow(),
+                                    'facts': {**env.facts, 'gateway': fact}}).seal()
+    ref = result.ref().model_dump(mode='json')
+    revised = {**target, 'environment_ref': ref, 'model_mapping': {**target['model_mapping'], 'environment_ref': ref}}
+    _transport({key: value for key, value in revised.items() if key != 'kubernetes_gateway'}, result)
+    return result, revised, provenance, [Path(observation), *(Path(row['path']) for row in selection.values())]
+
+
 def _prepare(args):
     producer = reviewed_producer(args.archive)
     inputs, _ = _source(_plain_path(args.inputs))
@@ -315,13 +428,21 @@ def _bind(args):
     env = Environment.model_validate(_source(_plain_path(args.environment))[0])
     sources = {key: _source(_plain_path(getattr(args, key)))[0] for key in ('namespace', 'pod', 'configuration')}
     target = bind_gateway(prepared['engine_target']['path'], env, prepared, **sources)
-    output = reserve_output(args.output, protected=[args.preparation.parent, args.environment, args.namespace,
-        args.pod, args.configuration, Path(prepared['engine_target']['path'])])
+    protected = [args.preparation.parent, args.environment, args.namespace, args.pod, args.configuration,
+                 Path(prepared['engine_target']['path'])]
+    source = {'environment': GATEWAY_ENV, 'target_id': prepared['runtime_target_id'],
+              'runtime_policy_sha256': prepared['runtime_policy_sha256']}
+    if args.observation is not None:
+        env, target, provenance, observation_files = _observation_environment(
+            env, target, prepared, args.observation, args.observation_sha256)
+        protected.extend(observation_files)
+        source['request_sha256'] = provenance['request_sha256']
+    output = reserve_output(args.output, protected=protected)
+    if args.observation is not None:
+        (output / 'gateway-observation.json').write_bytes(canonical_json(provenance))
+        (output / 'environment.json').write_bytes(canonical_json(env.to_dict()))
     (output / 'target.json').write_bytes(canonical_json(target))
-    (output / 'gateway-source.json').write_bytes(canonical_json({
-        'environment': GATEWAY_ENV, 'target_id': prepared['runtime_target_id'],
-        'runtime_policy_sha256': prepared['runtime_policy_sha256'],
-    }))
+    (output / 'gateway-source.json').write_bytes(canonical_json(source))
 
 
 def main():
@@ -334,9 +455,13 @@ def main():
     binding = commands.add_parser('bind')
     binding.add_argument('--side', choices=('baseline', 'candidate'), required=True)
     binding.add_argument('--preparation-sha256', required=True)
+    binding.add_argument('--observation', type=Path, help='Pinned response receipt, audit receipt and journal pointers')
+    binding.add_argument('--observation-sha256', help='Independent raw SHA-256 of the observation pointers')
     for name in ('preparation', 'environment', 'namespace', 'pod', 'configuration', 'output'):
         binding.add_argument('--' + name, type=Path, required=True)
     args = parser.parse_args()
+    if args.command == 'bind' and (args.observation is None) != (args.observation_sha256 is None):
+        parser.error('--observation and --observation-sha256 are required together')
     try:
         (_prepare if args.command == 'prepare' else _bind)(args)
     except (AttributeError, ImportError, KeyError, TypeError, OSError, ValueError) as error:

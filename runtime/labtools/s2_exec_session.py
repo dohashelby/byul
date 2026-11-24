@@ -9,7 +9,6 @@ import subprocess
 from serving_runtime.enforcement.intent import load_intent
 from serving_runtime.operations.safety import evaluate
 from tools.tetragon_exec_demo import ExecDemo, normal_request, read_status
-from tools.tetragon_mode import switch_mode
 from tools.tetragon_monitor_window import human_reviews, read_object, scope_execution_review
 from tools.tetragon_trial import atomic_json, now
 from tools.trial_cli import add_options
@@ -69,8 +68,8 @@ def scoped_review(config, intent, snapshot):
     return path
 
 
-def restore(config, report, baseline_bytes):
-    report["restore"] = switch_mode(config["context"], config["namespace"], "runtime-tg-exec-01", "monitor")
+def restore(demo, config, report, baseline_bytes):
+    report["restore"] = demo.restore()
     if baseline_bytes is not None:
         Path(config["baseline"]).write_bytes(baseline_bytes)
 
@@ -136,7 +135,7 @@ def execute(config):
     finally:
         if demo.activated:
             try:
-                restore(config, report, baseline_bytes)
+                restore(demo, config, report, baseline_bytes)
             except Exception as error:
                 report.update(passed=False, restore_error_class=type(error).__name__)
         report["finished_at"] = now()

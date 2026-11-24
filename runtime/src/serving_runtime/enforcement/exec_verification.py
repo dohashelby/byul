@@ -51,6 +51,9 @@ def exemption_check(record):
 
 def reassess_execution(record):
     facts = {}
+    cleanup = record.get("cleanup")
+    if not isinstance(cleanup, dict):
+        cleanup = {}
     try:
         probe, baseline = record["probe"], record["monitor_probe"]
         before, after = record["pod_before"], record["pod_after"]
@@ -89,7 +92,7 @@ def reassess_execution(record):
             and before["containers"]
             and all(c["running"] is True for c in after["containers"])
         )
-        facts["cleanup_ok"] = all(record["cleanup"].get(k) is True for k in ("monitor_restored", "namespace_deleted"))
+        facts["cleanup_ok"] = all(cleanup.get(k) is True for k in ("monitor_restored", "namespace_deleted"))
         passed = bool(all(facts.values()) and record.get("kernel"))
     except (KeyError, ValueError, TypeError, AttributeError):
         passed = False
@@ -103,6 +106,6 @@ def reassess_execution(record):
             "file_read_denial": "unknown",
             "process_termination": "unknown",
             "service_recovery": "unknown",
-            "monitor_restored": record.get("cleanup", {}).get("monitor_restored") is True,
+            "monitor_restored": cleanup.get("monitor_restored") is True,
         },
     }

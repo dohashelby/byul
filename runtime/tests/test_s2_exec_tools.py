@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import pytest
 
+from labtools.s2_exec_session import restore as restore_session
 from tests.test_s2_exec import source
 from tools.tetragon_exec_trial import ExecTrial
 from tools.tetragon_exec_probe import PROBE, EXEMPT
@@ -14,6 +15,7 @@ from tools.tetragon_public import public_snapshot
 from serving_runtime.enforcement.intent import parse_intent
 from serving_runtime.enforcement.exec_verification import reassess_execution
 from serving_runtime.enforcement.tetragon import render_manifests, comparable_spec
+from serving_runtime.observation.tetragon_state import SCHEMA, read_tetragon_state
 from tools.tetragon_exec_trial import digest
 from serving_runtime.operations.safety import evaluate
 
@@ -27,6 +29,7 @@ class Fake:
         self.missing_event = missing_event
         self.fail = fail
         self.ns = "test"
+        self.policy_id = "7"
         self.policy = None
         self.probe = {}
         self.pod = {
@@ -66,7 +69,9 @@ class Fake:
             self.mode = command[-1]
             return result()
         if "tracingpolicy" in command and "list" in command:
-            return result(f"ID NAME STATE NAMESPACE MODE\n7 runtime-tg-exec-01 enabled {self.ns} {self.mode}\n")
+            return result(
+                f"ID NAME STATE NAMESPACE MODE\n{self.policy_id} runtime-tg-exec-01 enabled {self.ns} {self.mode}\n"
+            )
         if "tracingpolicynamespaced" in command:
             return result(self.policy)
         if "get" in command and "pods" in command:
@@ -161,6 +166,36 @@ def test_proof_mutations_fail(tmp_path, change):
     assert reassess_execution(report)["verification"]["status"] == "failed"
 
 
+@pytest.mark.parametrize("cleanup", [None, [], "invalid"])
+def test_malformed_cleanup_fails_only_one_verification(tmp_path, cleanup):
+    valid = trial(tmp_path, Fake()).execute(allow_isolated_trials=True)
+    at = datetime.now(timezone.utc)
+    path = tmp_path / "state.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": SCHEMA,
+                "context": "test",
+                "state": "ok",
+                "generated_at": at.isoformat(),
+                "policies": [{"name": "independent-policy"}],
+                "capabilities": [],
+                "transitions": [],
+                "verifications": [dict(valid, id="malformed-cleanup", cleanup=cleanup), valid],
+            }
+        )
+    )
+
+    state = read_tetragon_state(path, context="test", now=at)
+    assert state["state"] == "ok" and state["fresh"]
+    assert state["policies"] == [{"name": "independent-policy"}]
+    failed, passed = state["verifications"]
+    assert failed["facts"]["cleanup_ok"] is False
+    assert failed["verification"]["status"] == "failed"
+    assert failed["verification"]["monitor_restored"] is False
+    assert passed["verification"]["status"] == "passed"
+
+
 @pytest.mark.parametrize("failure", ["wait", "exec probe", "logs", "set-mode"])
 def test_trial_failure_still_restores_and_deletes(tmp_path, failure):
     fake = Fake(fail=failure)
@@ -185,6 +220,7 @@ def ready_inputs(tmp_path):
     intent = parse_intent(source())
     fake.ns = intent.namespace
     fake.policy = render_manifests(intent)["tetragon-tg-exec-01.json"]
+    fake.policy["metadata"]["uid"] = "original-policy"
     sha = digest(comparable_spec(fake.policy["spec"]))
     report["policy_spec_sha256"] = sha
     at = datetime.now(timezone.utc)
@@ -364,6 +400,55 @@ def test_three_exercises_share_one_checked_activation(tmp_path):
     fake.mode = "monitor"
     with pytest.raises(ValueError, match="identity or mode"):
         demo.exercise({"transition": transition["transition"]}, already_enforced=True)
+
+
+@pytest.mark.parametrize("changed", ["uid", "policy_id", "spec", "terminating"])
+def test_session_cleanup_refuses_policy_that_is_no_longer_owned(tmp_path, changed):
+    fake, intent, status, review = ready_inputs(tmp_path)
+    demo = ExecDemo(
+        {"context": "test", "pod": "engine", "output": tmp_path / "session"},
+        intent,
+        status,
+        review,
+        runner=fake,
+    )
+    demo.monitor_seconds = 300
+    demo.activate({})
+    if changed == "uid":
+        fake.policy["metadata"]["uid"] = "replacement-policy"
+    elif changed == "policy_id":
+        fake.policy_id = "8"
+    elif changed == "spec":
+        fake.policy["spec"]["description"] = "changed"
+    else:
+        fake.policy["metadata"]["deletionTimestamp"] = datetime.now(timezone.utc).isoformat()
+    fake.commands.clear()
+
+    baseline = tmp_path / "baseline.json"
+    result = {}
+    restore_session(demo, {"baseline": baseline}, result, b"original")
+    assert result["restore"]["ok"] is False
+    assert not any("set-mode" in command for command in fake.commands)
+    assert baseline.read_bytes() == b"original"
+
+
+def test_demo_does_not_restore_a_mode_it_did_not_change(tmp_path):
+    fake, intent, status, review = ready_inputs(tmp_path)
+    demo = ExecDemo(
+        {"context": "test", "pod": "engine", "output": tmp_path / "demo"},
+        intent,
+        status,
+        review,
+        runner=fake,
+    )
+    demo.monitor_seconds = 300
+    fake.mode = "enforce"
+    fake.commands.clear()
+
+    with pytest.raises(ValueError, match="enforce transition was not verified"):
+        demo.activate({})
+    assert demo.restore()["reason"] == "no mode change attempted"
+    assert not any("set-mode" in command for command in fake.commands)
 
 
 def test_actual_error_message_uses_probe_eperm_without_changing_action_claim(tmp_path):

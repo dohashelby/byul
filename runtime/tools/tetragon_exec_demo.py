@@ -18,7 +18,7 @@ from serving_runtime.enforcement.tetragon import comparable_spec, render_manifes
 from tools.tetragon_exec_trial import digest
 from tools.tetragon_exec_probe import PROBE, wait_bound_events, probe_passed
 from tools.tetragon_trial import atomic_json, now, run
-from tools.tetragon_mode import switch_mode, parse_policy_row
+from tools.tetragon_mode import ModePolicyIdentity, parse_policy_row, switch_mode
 from tools.tetragon_monitor_window import read_object
 from serving_runtime.observation.tetragon_state import read_tetragon_state
 
@@ -78,6 +78,7 @@ class ExecDemo:
         self.pod_name, self.output, self.run, self.infer = config["pod"], Path(config["output"]), runner, infer
         self.name = "runtime-tg-exec-01"
         self.activated = False
+        self._policy_identity = None
         self.config = config
         self.emit = config.get("emit", lambda _: None)
 
@@ -113,42 +114,56 @@ class ExecDemo:
             raise ValueError("generated policy differs from reviewed snapshot")
         report["transition"] = ready
         installed = self.kube("get", "tracingpolicynamespaced", self.name, "-o", "json")
-        if (
-            installed.returncode
-            or digest(comparable_spec(json.loads(installed.stdout)["spec"]))
-            != report["transition"]["expected"]["spec_sha256"]
-        ):
-            raise ValueError("live policy spec differs from approved snapshot")
-        current = self.kube(
-            "exec",
-            "daemonset/tetragon",
-            "-c",
-            "tetragon",
-            "--",
-            "tetra",
-            "tracingpolicy",
-            "list",
-            namespace="kube-system",
+        identity = (
+            None
+            if installed.returncode
+            else ModePolicyIdentity.from_manifest(json.loads(installed.stdout), ready["expected"]["policy_id"])
         )
-        row = parse_policy_row(current.stdout, self.name, self.intent.namespace) if current.returncode == 0 else None
-        if not row or row["id"] != ready["expected"]["policy_id"] or row["mode"] != "monitor":
-            raise ValueError("live policy identity or mode changed")
-        self.activated = True
+        if identity is None or identity.spec_sha256 != ready["expected"]["spec_sha256"]:
+            raise ValueError("live policy identity or spec differs from approved snapshot")
+        self._policy_identity = identity
         self.emit("[4/5 반영] tools.tetragon_mode.switch_mode — enforce")
-        switched = switch_mode(self.context, self.intent.namespace, self.name, "enforce", run=self.run)
+        # An interrupted or timed-out request may have changed the mode.
+        self.activated = True
+        switched = switch_mode(
+            self.context,
+            self.intent.namespace,
+            self.name,
+            "enforce",
+            run=self.run,
+            expected_policy=identity,
+            expected_current_mode="monitor",
+        )
+        self.activated = switched.get("mutation_attempted") is True
         if not switched["ok"]:
             raise ValueError("enforce transition was not verified")
 
-    def verify_enforced(self, report):
+    def restore(self):
         if not self.activated:
+            return {"ok": True, "reason": "no mode change attempted"}
+        if self._policy_identity is None:
+            return {"ok": False, "reason": "original policy identity unavailable"}
+        return switch_mode(
+            self.context,
+            self.intent.namespace,
+            self.name,
+            "monitor",
+            run=self.run,
+            expected_policy=self._policy_identity,
+        )
+
+    def verify_enforced(self, report):
+        if not self.activated or self._policy_identity is None:
             raise ValueError("this session has not passed activation checks")
         expected = report["transition"]["expected"]
         installed = self.kube("get", "tracingpolicynamespaced", self.name, "-o", "json")
         if (
             installed.returncode
-            or digest(comparable_spec(json.loads(installed.stdout)["spec"])) != expected["spec_sha256"]
+            or ModePolicyIdentity.from_manifest(json.loads(installed.stdout), expected["policy_id"])
+            != self._policy_identity
+            or self._policy_identity.spec_sha256 != expected["spec_sha256"]
         ):
-            raise ValueError("enforced policy spec changed")
+            raise ValueError("enforced policy identity or spec changed")
         current = self.kube(
             "exec",
             "daemonset/tetragon",
@@ -288,11 +303,7 @@ class ExecDemo:
         except (OSError, ValueError, KeyError, RuntimeError) as error:
             report["error"] = type(error).__name__
         finally:
-            report["restore"] = (
-                switch_mode(self.context, self.intent.namespace, self.name, "monitor", run=self.run)
-                if self.activated
-                else {"ok": True, "reason": "no mode change attempted"}
-            )
+            report["restore"] = self.restore()
             if not report["restore"]["ok"]:
                 report["denial_confirmed"] = False
             report["finished_at"] = now()

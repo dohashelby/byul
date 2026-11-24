@@ -45,6 +45,12 @@ def _read_declared_json(path, limit):
         return strict_json(stream.read(limit + 1), limit=limit)
 
 
+def _read_bound_json(path, limit):
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    return strict_json(dependency(path, None), limit=limit)
+
+
 def normalize_policy(values):
     try:
         # @38 (RB3-Q4): the record-access policy reference is the enterprise's policy key.
@@ -204,17 +210,13 @@ class KubernetesRecordAccessExecutor:
 
     def prepared_record_access(self, check, env, values, *, expected_target_sha256=None):
         """Validate canonical saved declarations locally without creating a reader."""
-        from guard.adapters.vllm_file_read_sensor import dependency
         from .run_binding import stages_for
 
         self.validate_policy(check, values)
         if check.executor != self.name or stages_for(check) != (1, 2, 3, 4) or DECISION_KEY not in values:
             raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID")
 
-        def read(path, limit):
-            return strict_json(dependency(path, None), limit=limit)
-
-        target, subjects, _, policy_ref = self._bound_inputs(env, values, read=read,
+        target, subjects, _, policy_ref = self._bound_inputs(env, values, read=_read_bound_json,
                                                              expected_target_sha256=expected_target_sha256)
         try:
             _inputs(env, target, subjects, policy_ref, self.cfg.get("kubectl_binary", "kubectl"),
@@ -223,10 +225,14 @@ class KubernetesRecordAccessExecutor:
             raise ValueError("RECORD_ACCESS_BUDGET_INVALID") from None
 
     def run(self, check, env, policy_values, adapter, workdir):
+        from .run_binding import stages_for
+
         started = utcnow()
         self.validate_policy(check, policy_values)
         begin, end = normalize_policy(policy_values)
-        target, subjects, digest, expected_policy_ref = self._bound_inputs(env, policy_values)
+        bound = stages_for(check) == (1, 2, 3, 4) and DECISION_KEY in policy_values
+        read = _read_bound_json if bound else _read_declared_json
+        target, subjects, digest, expected_policy_ref = self._bound_inputs(env, policy_values, read=read)
         if not begin <= started <= end:
             raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID")
         workdir = Path(workdir)

@@ -7,6 +7,7 @@ import re
 
 from guard.adapters.engine_profiles import supports
 from guard.adapters.engine_provider import get_provider
+from guard.adapters.vllm_file_read_sensor import dependency
 from guard.core.select import check_policy_value
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -232,8 +233,6 @@ class KubernetesNormalStartupLoadExecutor:
 
     def prepared_normal_startup_load(self, check, env, values, *, expected_target_sha256):
         """Validate the saved target, source profile and transport settings without collecting."""
-        from guard.adapters.vllm_file_read_sensor import dependency
-
         self.validate_policy(check, values)
         try:
             raw = dependency(self.cfg["target"], None)
@@ -247,8 +246,7 @@ class KubernetesNormalStartupLoadExecutor:
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 20)
         try:
-            with Path(self.cfg["target"]).open("rb") as stream:
-                raw = stream.read(_LIMIT + 1)
+            raw = dependency(self.cfg["target"], None)
             if adapter is None:
                 raise ValueError
             target, target_sha, source, transport, source_reader = self._target_setup(

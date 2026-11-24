@@ -141,9 +141,18 @@ def _run(tmp_path, version, fault=None, *, values=VALUES):
     world.fault = original_fault
     config = {"normal_startup_load_only": fault != "disabled", "target": str(path)}
     pin = "0" * 64 if fault == "wrong-target-pin" else sha256_hex(path.read_bytes())
-    executor = KubernetesNormalStartupLoadExecutor(config, expected_target_sha256=pin, runner=world.runner)
+    runner = world.runner
+    if fault == "target-alias":
+        original = path.with_name("original-target.json")
+        path.rename(original)
+        path.symlink_to(original)
+
+        def runner(*args, **kwargs):
+            pytest.fail("A late target alias must be rejected before transport dispatch")
+
+    executor = KubernetesNormalStartupLoadExecutor(config, expected_target_sha256=pin, runner=runner)
     check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["LIF-01"]
-    if fault in {"disabled", "wrong-target-pin"}:
+    if fault in {"disabled", "wrong-target-pin", "target-alias"}:
         with pytest.raises(ValueError, match=r"^LIF01_BOOT_(SCOPE_INVALID|TARGET_OR_SOURCE_UNVERIFIED)$"):
             executor.run(check, env, values, world.adapter, tmp_path / "work")
         assert not world.log_calls and not world.hash_calls
@@ -229,7 +238,7 @@ def test_lif01_rejects_unbound_sources_without_a_load_observation(tmp_path, faul
     assert not draft.observations["supply_boot_sessions"].collected
 
 
-@pytest.mark.parametrize("fault", ["disabled", "wrong-target-pin"])
+@pytest.mark.parametrize("fault", ["disabled", "wrong-target-pin", "target-alias"])
 def test_lif01_pre_io_requires_explicit_scope_and_exact_target(tmp_path, fault):
     _run(tmp_path, "0.30.0", fault)
 

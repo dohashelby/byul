@@ -1250,6 +1250,11 @@
       "manifest_sha256": "503cc9d7bc64b22471de6bb34bbd86e5193a3305883f6d8e3eb16d419564b385",
       "reviewed_by": "Codex / merge reviewed UPDATE changes into development; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T08:21:54+00:00"
+    },
+    {
+      "manifest_sha256": "ff6ca7e70698e068ddae7fa1560077205dd00933d385265b118c56c9c05d1f41",
+      "reviewed_by": "Codex / LIF-01 and OBS-06 stable input reads; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:00:12+00:00"
     }
   ]
 }

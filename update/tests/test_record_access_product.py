@@ -66,6 +66,8 @@ def test_real_collector_reaches_original_pack_evidence_and_restored_verdict(prep
 
 @pytest.mark.parametrize(('issue', 'reason'), [
     (None, None),
+    ('target-link-after-preparation', None),
+    ('subjects-link-after-preparation', None),
     ('stale-environment', 'RECORD_ACCESS_SUBJECT_PLAN_INVALID'),
     ('stale-policy', 'RECORD_ACCESS_CONFIGURATION_INVALID'),
     ('stale-target', 'RECORD_ACCESS_SUBJECT_PLAN_INVALID'),
@@ -109,6 +111,15 @@ def test_obs06_preparation_uses_bound_subject_source_without_collection(access_c
     else:
         with pytest.raises(ValueError, match=f'^{reason}$'):
             executor.prepared_record_access(check, case.env, values, expected_target_sha256=expected)
+
+    if issue in ('target-link-after-preparation', 'subjects-link-after-preparation'):
+        selected = target_path if issue.startswith('target-') else subjects_path
+        original = selected.with_name('original-' + selected.name)
+        selected.rename(original)
+        selected.symlink_to(original.name)
+        with pytest.raises(ValueError, match='^RECORD_ACCESS_CONFIGURATION_INVALID$'):
+            executor.run(check, case.env, values, VllmAdapter(), tmp_path / 'work')
+        assert not (tmp_path / 'work').exists()
 
 
 @pytest.mark.parametrize('change', ['matching', 'wrong-target', 'after-window', 'unverified-owner'])

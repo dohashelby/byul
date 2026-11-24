@@ -740,6 +740,11 @@
       "manifest_sha256": "582a242dcb6951832e8a04209372c39132c20723ec605b687615aca5455326b0",
       "reviewed_by": "Codex / execution recipe byte-verified digest reuse; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T05:16:35+00:00"
+    },
+    {
+      "manifest_sha256": "1f18e43e062557790c4c552474fc10219a9d2c4009c628237037c84d6ecf3604",
+      "reviewed_by": "Codex / optional readiness profile compatibility; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T06:00:26+00:00"
     }
   ]
 }

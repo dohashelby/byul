@@ -471,7 +471,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 # Input matrix validation checks the budget against the paired policy.
                 # Its inherited configuration check cannot enforce that constraint.
                 if (support.get("policy_valid") is True and support.get("policy_supported") is False
-                        and check_def.collection_profile != INPUT_MATRIX_PROFILE
+                        and getattr(check_def, "collection_profile", None) != INPUT_MATRIX_PROFILE
                         and hasattr(executor, "validate_configuration")):
                     executor.validate_configuration(check_def)
                 else:

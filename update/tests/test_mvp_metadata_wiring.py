@@ -1251,7 +1251,7 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
     monkeypatch.setattr(subprocess, 'Popen', forbid_io)
     configuration = tmp_path / 'guard.toml'
 
-    def gateway_rows(selected_config=cfg, *, pinned=True, index_bindings=bindings):
+    def gateway_rows(selected_config=cfg, *, pinned=True, index_bindings=bindings, expected_record_inputs=None):
         tool.write_config(selected_config, configuration)
         config_ref = {'path': str(configuration), 'sha256': sha256_hex(configuration.read_bytes())}
         index_rows = [{**binding, 'configuration': config_ref} for binding in index_bindings]
@@ -1259,16 +1259,27 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
             for entry in index_rows:
                 entry.pop('record_inputs')
         index = _write(tmp_path / 'inputs.json', {**tool.readiness.template(pack), 'inputs': index_rows})
-        return {row['side']: row for row in tool.readiness.audit(index, pack=pack)['rows']
-                if row['check_id'] == 'OBS-01'}
+        result = tool.readiness.audit(index, pack=pack, expected_record_inputs=expected_record_inputs)
+        return {row['side']: row for row in result['rows'] if row['check_id'] == 'OBS-01'}
 
-    for pinned in (True, False):
-        rows = gateway_rows(pinned=pinned)
+    def declared_target_rows():
+        # These tests validate target contents; supply the independent pins for those exact declarations.
+        expected = None if include_denied else {
+            (row['check_id'], row['side']): {**row['record_inputs'],
+                'target_file_sha256': sha256_hex(sides[row['side']]['target'].read_bytes())} for row in bindings}
+        return gateway_rows(pinned=False, expected_record_inputs=expected)
+
+    unpinned = gateway_rows(pinned=False)
+    if not include_denied:
+        assert set(unpinned) == set(sides)
+        assert all(not row['file_binding_valid'] and not row['executor_policy_valid']
+                   and row['blocking_codes'] == ['MVP_RECORD_INPUT_REFERENCE_REQUIRED'] for row in unpinned.values())
+        unpinned = declared_target_rows()
+    for rows in (gateway_rows(), unpinned):
         assert all(row['file_binding_valid'] and row['executor_policy_valid']
                    and not row['ready_for_execution'] and not row['engine_executed']
                    and row['actual_results'] is None for row in rows.values())
-        if not pinned:
-            assert all('record_inputs' not in row for row in rows.values())
+    assert all('record_inputs' not in row for row in unpinned.values())
     for binding in bindings:
         side = binding['side']
         assert binding['record_inputs'] == {
@@ -1337,7 +1348,7 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
         else:
             malformed['kubernetes_gateway']['namespace_uid'] = '00000000-0000-0000-0002-000000000001'
         _write(baseline, malformed)
-        rows = gateway_rows(pinned=False)
+        rows = declared_target_rows()
         assert not rows['baseline']['file_binding_valid']
         assert 'KUBERNETES_SCOPED_TARGET_INVALID' in rows['baseline']['blocking_codes']
         assert rows['candidate']['file_binding_valid'] and not rows['candidate']['engine_executed']
@@ -1348,7 +1359,7 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
     wrong_model = json.loads(original)
     wrong_model['model_mapping']['revision'] = '1' * 40
     _write(baseline, wrong_model)
-    wrong_model_rows = gateway_rows(pinned=False)
+    wrong_model_rows = declared_target_rows()
     baseline.write_bytes(original)
 
     bad_budget = deepcopy(cfg)

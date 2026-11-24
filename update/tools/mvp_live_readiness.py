@@ -585,6 +585,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             side=source['side'], attempt_id='mvp-offline-readiness', issued_at=issued_at,
             valid_from=policy.valid_from, valid_until=policy.valid_until,
             run_cfg=run_cfg, policy_ref=policy.ref(), **binding_options)
+        if (prebound_gateway_snapshot and _OBSERVATION_DENIED_ACTOR not in effective
+                and expected_record_inputs is None):
+            raise ValueError('MVP_RECORD_INPUT_REFERENCE_REQUIRED')
         if expected_record_inputs is not None:
             if observation_record_binding:
                 session_key = 'observation_session'

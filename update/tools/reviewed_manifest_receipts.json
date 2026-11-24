@@ -1215,6 +1215,11 @@
       "manifest_sha256": "691428b3d94f398846debbfe782637bdd63d12688900a0139b82795b42f1759b",
       "reviewed_by": "Codex / OBS09 CRI and attach source receipt review / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T07:47:23.594Z"
+    },
+    {
+      "manifest_sha256": "192b6ec65c98923887624a1fcd0154c599a5745c42dde641556f4034490c4601",
+      "reviewed_by": "Codex / REQ13 target pins and SUP05 sealed diagnostics review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T08:14:37.419Z"
     }
   ]
 }

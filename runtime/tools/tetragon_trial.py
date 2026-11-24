@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from tools.trial_cli import add_options
 from datetime import datetime, timezone
 import json
 import os
 import tempfile
 import hashlib
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -669,23 +669,27 @@ class KindTrial:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--methods", nargs="+", choices=METHODS, default=METHODS)
-    parser.add_argument("--node-access", choices=("kind-docker", "local-sudo"), default="kind-docker")
-    parser.add_argument("--context", required=True)
-    parser.add_argument("--image", default="serving-runtime-lab:dev", help="Python을 포함한 시험용 이미지")
-    parser.add_argument("--image-pull-policy", choices=("IfNotPresent", "Never"), default="IfNotPresent")
-    parser.add_argument(
-        "--allow-isolated-trials",
-        "--allow-isolated-kind-trials",
-        dest="allow_isolated_trials",
-        action="store_true",
-        required=True,
-    )
-    parser.add_argument(
-        "--override-only-diagnostic",
-        action="store_true",
-        help="시험 전용으로 Sigkill을 제거해 Override의 errno를 분리 측정",
+    add_options(
+        parser,
+        [
+            (("--output",), {"type": Path, "required": True}),
+            (("--methods",), {"nargs": "+", "choices": METHODS, "default": METHODS}),
+            (("--node-access",), {"choices": ("kind-docker", "local-sudo"), "default": "kind-docker"}),
+            (("--context",), {"required": True}),
+            (("--image",), {"default": "serving-runtime-lab:dev", "help": "Python을 포함한 시험용 이미지"}),
+            (("--image-pull-policy",), {"choices": ("IfNotPresent", "Never"), "default": "IfNotPresent"}),
+            (
+                (
+                    "--allow-isolated-trials",
+                    "--allow-isolated-kind-trials",
+                ),
+                {"dest": "allow_isolated_trials", "action": "store_true", "required": True},
+            ),
+            (
+                ("--override-only-diagnostic",),
+                {"action": "store_true", "help": "시험 전용으로 Sigkill을 제거해 Override의 errno를 분리 측정"},
+            ),
+        ],
     )
     args = parser.parse_args()
     exit_code = 0

@@ -25,6 +25,8 @@ def method_from_spec(policy):
         if policy.get("spec", {}).get("kprobes") or len(hooks) != 1:
             return None
         actions = {a.get("action") for s in hooks[0].get("selectors", []) for a in s.get("matchActions", [])}
+        if hooks[0].get("hook") == "bprm_check_security" and "Override" in actions and "Sigkill" not in actions:
+            return "lsm_bprm_check"
         return (
             "lsm_file_open"
             if hooks[0].get("hook") == "file_open" and "Override" in actions and "Sigkill" not in actions

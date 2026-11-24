@@ -2201,12 +2201,14 @@ export interface components {
              * Expected Effect
              * @enum {string}
              */
-            expected_effect: "file_read_denial" | "process_termination";
+            expected_effect: "file_read_denial" | "process_termination" | "exec_denial";
             /**
              * File Read Denial
              * @enum {string}
              */
             file_read_denial: "confirmed" | "failed" | "unknown";
+            /** Exec Denial */
+            exec_denial?: ("confirmed" | "failed" | "unknown") | null;
             /** File Denial Basis */
             file_denial_basis?: ("userspace_errno" | "kernel_permission_return") | null;
             /**

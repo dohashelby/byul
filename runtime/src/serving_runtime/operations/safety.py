@@ -8,6 +8,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import re
 
+from serving_runtime.common.enforce_rules import ENFORCE_METHODS, POLICY_RULES, supports_enforce
+
 CHECKS = ("policy", "evidence", "capability", "monitor_period", "collection", "allowed_mode")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
@@ -20,12 +22,7 @@ def requires_restart_confirmation(policy: dict) -> bool:
 
 
 def is_mode_switch_target(policy: dict) -> bool:
-    return policy.get("mode") in {"monitor", "enforce"} and policy.get("method") in {
-        "lsm_file_open",
-        "override_lsm",
-        "sigkill_fd_install",
-        "override_syscall",
-    }
+    return policy.get("mode") in {"monitor", "enforce"} and policy.get("method") in ENFORCE_METHODS
 
 
 def recent(stamp, seconds, now=None):
@@ -189,7 +186,8 @@ def evaluate(snapshot: dict, name: str, intent, review: dict, monitor_seconds: i
         checks["monitor_period"] = all(period_ok)
     # Current render supports enforce for this rule only. Unknown names cannot
     # inherit another rule's allowance.
-    checks["allowed_mode"] = name == "runtime-tg-secret-01" and "enforce" in intent.allowed_modes("TG-SECRET-01")
+    rule = POLICY_RULES.get(name)
+    checks["allowed_mode"] = bool(rule and supports_enforce(rule, method) and "enforce" in intent.allowed_modes(rule))
     monitoring = snapshot.get("monitoring") or {}
     checks["collection"] = (
         snapshot.get("fresh") is True

@@ -15,4 +15,12 @@ export function isTetragonSigkill(event: RuntimeEvent): boolean {
     && (record.action_raw === "KPROBE_ACTION_SIGKILL" || record.action === "KPROBE_ACTION_SIGKILL");
 }
 
-export const isTetragonBlockAttempt = (event: RuntimeEvent): boolean => isTetragonOverride(event) || isTetragonSigkill(event);
+export function isTetragonExecDenyAttempt(event: RuntimeEvent): boolean {
+  const record = event.native.record as Record<string, unknown>;
+  return event.source === "tetragon" && event.observation?.kind === "process_exec"
+    && event.observation.rule_id === "TG-EXEC-01" && event.observation.exec_verdict === "deny_attempted"
+    && event.observation.action_mode === "enforce"
+    && (record.action_raw === "KPROBE_ACTION_OVERRIDE" || record.action === "KPROBE_ACTION_OVERRIDE");
+}
+
+export const isTetragonBlockAttempt = (event: RuntimeEvent): boolean => isTetragonOverride(event) || isTetragonSigkill(event) || isTetragonExecDenyAttempt(event);

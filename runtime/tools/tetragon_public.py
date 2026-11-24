@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from serving_runtime.common.enforce_rules import ENFORCE_METHODS
+
+PUBLIC_METHODS = ENFORCE_METHODS | {"monitor", "override_only"}
+
 
 def fields(names, **children):
     return {**dict.fromkeys(names.split()), **children}
@@ -47,9 +51,22 @@ TRIAL = fields(
     termination=fields("exitCode signal finishedAt"),
     load=fields("state id"),
 )
+EXEC_PROBE = fields("pid started_at finished_at alive", cases=[fields("name returncode errno")])
+EXEC_POD = fields("", uid="alias", containers=[fields("name restarts running", id="alias")])
+TRIAL.update(
+    probe=EXEC_PROBE,
+    monitor_probe=EXEC_PROBE,
+    exempt=fields("returncode"),
+    exemption_test=fields("status"),
+    empty_exemption_candidate=fields("", engine_labels=[fields("key value")], deny_paths=[fields("path")]),
+    pod_before=EXEC_POD,
+    pod_after=EXEC_POD,
+    cleanup=fields("monitor_restored namespace_deleted"),
+)
+
 FACTS = set(
     (
-        "enforce_active event_bound collector_complete sigkill_event override_event override_configured "
+        "exec_denied monitor_exec_ok exemption_check exempt_allowed pod_stable enforce_active event_bound collector_complete sigkill_event override_event override_configured "
         "kernel_read_denied read_denied read_succeeded process_terminated monitor_read_ok restore_read_ok "
         "same_policy_id cleanup_ok main_process service_unavailable container_restarted service_recovered "
         "unsupported agent_changed main_process_identified child_process_identified distinct_pods_identified "
@@ -134,7 +151,7 @@ def public_snapshot(snapshot):
     )
     result = project(snapshot, shape)
     # Capability lists are fixed method names, never arbitrary diagnostics.
-    methods = {"monitor", "lsm_file_open", "override_syscall", "override_lsm", "override_only", "sigkill_fd_install"}
+    methods = PUBLIC_METHODS
     for raw, safe in zip(snapshot.get("capabilities", []), result.get("capabilities", [])):
         for key in ("available", "unavailable", "unknown"):
             safe[key] = [m for m in raw.get(key, []) if m in methods]

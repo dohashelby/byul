@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from datetime import datetime, timezone
 import os
@@ -12,7 +13,30 @@ import time
 from urllib.parse import quote
 from typing import Callable, Any
 
+from serving_runtime.enforcement.sync import digest as spec_digest
 from serving_runtime.enforcement.tetragon import comparable_spec
+
+
+@dataclass(frozen=True)
+class ModePolicyIdentity:
+    policy_id: str
+    resource_uid: str
+    spec_sha256: str
+
+    @classmethod
+    def from_manifest(cls, manifest: Any, policy_id: str) -> ModePolicyIdentity | None:
+        if not isinstance(manifest, dict):
+            return None
+        metadata, spec = manifest.get("metadata"), manifest.get("spec")
+        if not isinstance(metadata, dict) or not isinstance(spec, dict):
+            return None
+        uid = metadata.get("uid")
+        if not isinstance(uid, str) or not uid or metadata.get("deletionTimestamp") is not None:
+            return None
+        try:
+            return cls(policy_id, uid, spec_digest(spec, "tetragon"))
+        except (AttributeError, TypeError):
+            return None
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
@@ -85,6 +109,8 @@ def _switch_mode(
     *,
     tetragon_namespace: str = "kube-system",
     run: Callable[[list[str]], Any] = _run,
+    expected_policy: ModePolicyIdentity | None = None,
+    expected_current_mode: str | None = None,
 ) -> dict:
     """Switch an already loaded policy and verify both success and rollback."""
     if target_mode not in {"monitor", "enforce"}:
@@ -92,22 +118,39 @@ def _switch_mode(
     before = _read_policy(run, context, tetragon_namespace, policy_name, policy_namespace)
     if before is None or before["state"] != "enabled" or before["mode"] not in {"monitor", "enforce"}:
         return {"ok": False, "reason": "current policy state or mode unavailable", "before": before, "after": None}
+
+    def same_policy(row):
+        if row is None or row["id"] != before["id"] or row["state"] != "enabled":
+            return False
+        if expected_policy is None:
+            return True
+        if row["id"] != expected_policy.policy_id:
+            return False
+        manifest = _read_manifest(run, context, policy_namespace, policy_name)
+        return ModePolicyIdentity.from_manifest(manifest, row["id"]) == expected_policy
+
+    if not same_policy(before) or (expected_current_mode is not None and before["mode"] != expected_current_mode):
+        return {"ok": False, "reason": "expected policy identity or mode changed", "before": before, "after": None}
     if before["mode"] == target_mode:
         return {"ok": True, "reason": "already in target mode", "before": before, "after": before}
+    # The daemon's name-based mode command has no Kubernetes UID precondition.
+    # Check identity on both sides and never roll back a policy we no longer recognize.
     command = _tetra(
         context, tetragon_namespace, "tp", "set-mode", "--namespace", policy_namespace, policy_name, target_mode
     )
     changed = _try_run(run, command)
     after = _read_policy(run, context, tetragon_namespace, policy_name, policy_namespace)
-    if (
-        changed is not None
-        and changed.returncode == 0
-        and after is not None
-        and after["id"] == before["id"]
-        and after["state"] == "enabled"
-        and after["mode"] == target_mode
-    ):
-        return {"ok": True, "reason": "mode verified", "before": before, "after": after}
+    if not same_policy(after):
+        return {
+            "ok": False,
+            "reason": "mode switch unverified; rollback requires the original policy",
+            "before": before,
+            "after": after,
+            "mutation_attempted": True,
+            "rollback_ok": False,
+        }
+    if changed is not None and changed.returncode == 0 and after["mode"] == target_mode:
+        return {"ok": True, "reason": "mode verified", "before": before, "after": after, "mutation_attempted": True}
     rollback = _try_run(
         run,
         _tetra(
@@ -118,9 +161,7 @@ def _switch_mode(
     rollback_ok = (
         rollback is not None
         and rollback.returncode == 0
-        and restored is not None
-        and restored["id"] == before["id"]
-        and restored["state"] == "enabled"
+        and same_policy(restored)
         and restored["mode"] == before["mode"]
     )
     return {
@@ -128,6 +169,7 @@ def _switch_mode(
         "reason": "mode switch failed; rollback verified" if rollback_ok else "mode switch and rollback unverified",
         "before": before,
         "after": after,
+        "mutation_attempted": True,
         "rollback": restored,
         "rollback_ok": rollback_ok,
     }
@@ -142,9 +184,18 @@ def switch_mode(
     tetragon_namespace: str = "kube-system",
     run: Callable[[list[str]], Any] = _run,
     history_path: str | Path | None = None,
+    expected_policy: ModePolicyIdentity | None = None,
+    expected_current_mode: str | None = None,
 ) -> dict:
     result = _switch_mode(
-        context, policy_namespace, policy_name, target_mode, tetragon_namespace=tetragon_namespace, run=run
+        context,
+        policy_namespace,
+        policy_name,
+        target_mode,
+        tetragon_namespace=tetragon_namespace,
+        run=run,
+        expected_policy=expected_policy,
+        expected_current_mode=expected_current_mode,
     )
     record = {
         "at": datetime.now(timezone.utc).isoformat(),

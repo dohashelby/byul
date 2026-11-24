@@ -6645,7 +6645,8 @@
             "type": "string",
             "enum": [
               "file_read_denial",
-              "process_termination"
+              "process_termination",
+              "exec_denial"
             ],
             "title": "Expected Effect"
           },
@@ -6657,6 +6658,22 @@
               "unknown"
             ],
             "title": "File Read Denial"
+          },
+          "exec_denial": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "confirmed",
+                  "failed",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exec Denial"
           },
           "file_denial_basis": {
             "anyOf": [

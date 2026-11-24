@@ -34,6 +34,8 @@ def prepare(intent_path: Path, image: str, output: Path, *, context=None):
     sentinel_intent["protected_paths"].pop("enforce_exact_files", None)
     sentinel_intent.pop("tetragon_rule_modes", None)
     sentinel_intent.pop("tetragon_enforce_method", None)
+    sentinel_intent.pop("tetragon_allowed_modes", None)
+    sentinel_intent.pop("tetragon_enforce_methods", None)
     sentinel_intent["tetragon_mode"] = "monitor"
     health = render_manifests(parse_intent(sentinel_intent))["tetragon-tg-secret-01.json"]
     health["metadata"]["name"] = "runtime-tg-health-01"

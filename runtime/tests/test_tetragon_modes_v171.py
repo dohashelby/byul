@@ -178,6 +178,21 @@ class ModeTests(unittest.TestCase):
         self.assertTrue(outcome["rollback_ok"])
         self.assertEqual([command[-1] for command in changes], ["enforce", "monitor"])
 
+    def test_failed_switch_does_not_roll_back_replacement(self):
+        outputs = [table(mode="monitor"), table(mode="enforce", id="8")]
+        changes = []
+
+        def run(command):
+            if command[-2:] == ["tracingpolicy", "list"]:
+                return Result(output=outputs.pop(0))
+            changes.append(command[-1])
+            return Result(code=1)
+
+        outcome = switch_mode("ctx", "serving-lab", "runtime-tg-secret-01", "enforce", run=run)
+        self.assertFalse(outcome["ok"])
+        self.assertFalse(outcome["rollback_ok"])
+        self.assertEqual(changes, ["enforce"])
+
     def test_timeout_after_switch_still_attempts_and_verifies_rollback(self):
         for rollback_fails in (False, True):
             with self.subTest(rollback_fails=rollback_fails):

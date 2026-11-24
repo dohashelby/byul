@@ -9,6 +9,7 @@ from guard.adapters import vllm_stream_buffer_sensor as sensor,vllm_stream_buffe
 from guard.adapters import vllm_release_observation_sensor as release_observation
 from guard.adapters import vllm_lifecycle_catalog as configured
 from guard.adapters import vllm_baseline_stream_composition as baseline_stream
+from guard.adapters.vllm_file_read_sensor import dependency
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
@@ -52,7 +53,6 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
 
     def prepared_normal_stream(self, check, env, values, *, expected_target_sha256=None):
         """Validate only the saved, bounded LIF-04 normal-stream declaration."""
-        from guard.adapters.vllm_file_read_sensor import dependency
         from .run_binding import stages_for
 
         if not self.normal_only or check.id != 'LIF-04' or check.executor != self.name or stages_for(check) != (1,):
@@ -81,7 +81,11 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
         try:
             if (adapter is None or not self.normal_only and set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            if self.normal_only:
+                target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+            else:
+                with Path(self.cfg['target']).open('rb') as stream:
+                    target = strict_json(stream.read(65537), limit=65536)
             start,end,profiles=normalize_policy(policy_values,normal_only=self.normal_only)
             self._validate_target(target, env, policy_values)
             if not start<=utcnow()<=end:raise ValueError

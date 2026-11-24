@@ -16,6 +16,7 @@ import hashlib
 import re
 
 from guard.executors.kubernetes_gateway_observation import RECORD_SCHEMA, final_records
+from guard.executors.native_observations import validate_capture
 
 PRODUCER = 'byul-runtime-gateway'
 _PATH = re.compile(r'/[A-Za-z0-9/_-]{1,255}')
@@ -71,5 +72,13 @@ def route_events(records, *, ingress_id, upstream_id):
 
 
 def route_packet(records, *, run_id, environment_ref, image, ingress_id, upstream_id):
-    return {'schema': 'guard-route-native-observations/1', 'run_id': run_id, 'environment_ref': environment_ref,
-            'image': image, 'events': route_events(records, ingress_id=ingress_id, upstream_id=upstream_id)}
+    """Project selected final rows from the same run as the owned route packet."""
+    records = tuple(records)
+    if (type(run_id) is not str or not run_id
+            or any(type(row) is not dict or row.get('schema_version') != RECORD_SCHEMA
+                   or row.get('phase') != 'final' or row.get('run_id') != run_id for row in records)):
+        raise ValueError('RUNTIME_ROUTE_SOURCE_SCOPE_INVALID')
+    packet = {'schema': 'guard-route-native-observations/1', 'run_id': run_id, 'environment_ref': environment_ref,
+              'image': image, 'events': route_events(records, ingress_id=ingress_id, upstream_id=upstream_id)}
+    validate_capture(packet, kind='route', env_ref=environment_ref, run_id=run_id, image=image)
+    return packet

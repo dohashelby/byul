@@ -377,6 +377,55 @@ def test_local_metadata_scope_pins_public_update_targets_and_withholds_shared_si
             assert row.execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
 
 
+@pytest.mark.parametrize("case", ["ready", "invalid-candidate", "empty"])
+def test_prepare_update_reports_static_prebound_scope(tmp_path, monkeypatch, sources, case):
+    from typer.testing import CliRunner
+    from guard.cli import app
+
+    pack, sides, policy_path = sources
+    prior = tool.Policy.model_validate_json(policy_path.read_bytes())
+    selected = ["SUP-04", "SUP-10", "PLT-01"]
+    pol = prior.model_copy(update={"scope": prior.scope.model_copy(update={"include": selected})}).seal()
+    _write(policy_path, pol.to_dict())
+    store = tmp_path / "store"
+    config, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=store,
+        node_image_verification="local-k3s-containerd-v1", installed_plugin_inventory=True)
+    assert all(decisions[check]["configuration_enabled"] for check in selected), decisions
+    included = ["SUP-04", "SUP-10"]
+    config["update"]["allowed_checks"] = included
+    if case == "invalid-candidate":
+        config["sides"]["candidate"]["check_config"] = {"SUP-10": {"max_duration_seconds": 0}}
+    elif case == "empty":
+        config = {"update": {"mode": "external", "allowed_checks": []}}
+        included = []
+    config_path = tmp_path / "guard.toml"
+    tool.write_config(config, config_path)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Static preparation must not dispatch or inspect Docker")
+
+    monkeypatch.setattr(application, "Docker", forbidden)
+    monkeypatch.setattr(socket, "socket", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    result = CliRunner().invoke(app, ["prepare-update", "--pack", str(tool.readiness.ROOT / "packs/PACK-BASELINE"),
+        "--baseline", str(sides["baseline"]["environment"]), "--candidate", str(sides["candidate"]["environment"]),
+        "--policy", str(policy_path), "--config", str(config_path), "--store", str(store)])
+    assert result.exit_code == 1, result.output
+    readiness = json.loads(result.output)
+    assert readiness["ready"] is False
+    excluded = [check for check in selected if check not in included]
+    assert readiness["execution_scope"] == {"included_check_ids": included, "excluded_check_ids": excluded,
+                                             "static_preparation_ready": case == "ready"}
+    checks = {row["check"]: row for row in readiness["checks"]}
+    assert checks["execution-scope"] == {"check": "execution-scope", "ok": False,
+        "detail": f"{len(excluded)} selected checks are outside the configured update execution scope"}
+    assert checks["kubernetes-static-preparation"]["ok"] is True
+    assert checks["inputs"]["ok"] is (case != "invalid-candidate")
+    if case == "invalid-candidate":
+        assert checks["inputs"]["detail"] == "SUP10_INVENTORY_TARGET_UNVERIFIED"
+    assert not store.exists()
+
+
 def _bind_cilium_fixture_targets(sides):
     from guard.executors.kubernetes_passive_egress_policy import CILIUM_AGENT_IMAGE, CILIUM_AGENT_IMAGE_ID
 

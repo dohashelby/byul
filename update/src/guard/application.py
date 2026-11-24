@@ -605,7 +605,7 @@ def _execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_o
 
 def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                      change=None, previous_plan=None, source_store=None) -> dict:
-    """Read-only preparation check. It neither pulls images nor starts an engine."""
+    """Read-only preparation check of the full plan and explicit static Kubernetes scope."""
     from guard.executors import registry, run_binding
     from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
     from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
@@ -639,9 +639,13 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                             ) if change_input is not None or previous is not None else None
     checks = []
     def record(name, ok, detail):
-        checks.append({"check": name, "ok": bool(ok), "detail": detail})
+        check = {"check": name, "ok": bool(ok), "detail": detail}
+        checks.append(check)
+        return check
 
     prepared = None
+    execution_scope = None
+    scope_exclusion = None
     check_support = []
     kube_only = False
     transition_requested = False
@@ -682,9 +686,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             pack, prepared[1].values(), allowed_checks, plan=plan,
             explicitly_requested=passive_api_hop.requested(cfg))
         executable = selected if allowed_checks is None else [item for item in selected if item.check_id in allowed_checks]
-        if allowed_checks is not None and len(executable) != len(selected):
-            record("execution-scope", False,
-                   f"{len(selected) - len(executable)} selected checks are outside the configured update execution scope")
+        if allowed_checks is not None:
+            excluded_ids = [item.check_id for item in selected if item.check_id not in allowed_checks]
+            if excluded_ids:
+                scope_exclusion = record("execution-scope", False,
+                    f"{len(excluded_ids)} selected checks are outside the configured update execution scope")
+            if kube_only and prebound and not transition_requested:
+                execution_scope = {"included_check_ids": [item.check_id for item in executable],
+                                   "excluded_check_ids": excluded_ids}
         managed = prepared[0] == "managed"
         selected_ids = [item.check_id for item in selected]
         config_for_check = {} if managed else {side: cache(partial(for_check, c)) for side, c in prepared[1].items()}
@@ -905,8 +914,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                    "External Kubernetes configuration inspected. Target identity, live Pods and GPU require runtime verification.")
         if envs[0].engine.image_digest == envs[1].engine.image_digest:
             record("image-pair", False, "use different image digests for an update validation")
-        return {"ready": all(c["ok"] for c in checks), "checks": checks, "check_support": check_support,
-                "limitations": limitations}
+        result = {"ready": all(c["ok"] for c in checks), "checks": checks, "check_support": check_support,
+                  "limitations": limitations}
+        if execution_scope is not None:
+            # This one row describes PLAN coverage. All preparation failures still apply to the subset.
+            execution_scope["static_preparation_ready"] = bool(execution_scope["included_check_ids"]) and all(
+                row["ok"] for row in checks if row is not scope_exclusion)
+            result["execution_scope"] = execution_scope
+        return result
     docker = Docker("readiness")
     try:
         server = docker.daemon_info(timeout=15)

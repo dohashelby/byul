@@ -1260,6 +1260,11 @@
       "manifest_sha256": "316d32a064fecffa5731c6021dec5bef7d116fdcf193f8d27d07fe16965926df",
       "reviewed_by": "Codex / OBS-05 verified sink arrival; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T09:18:09+00:00"
+    },
+    {
+      "manifest_sha256": "eea55b3b92326ee8c86562ddde84ceb93e4f02739a369acdf6dc13fe49e12d64",
+      "reviewed_by": "Codex / scoped preparation and original Gateway route rows; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:29:09+00:00"
     }
   ]
 }

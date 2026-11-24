@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable
 
 from guard.judges import registry
@@ -19,6 +19,7 @@ from guard.models import (
     DataOrigin,
     Evidence,
     ExecStatus,
+    Mode,
     Pack,
     Plan,
     Policy,
@@ -62,13 +63,11 @@ def _exception(check_id: str, policy: Policy, as_of: datetime) -> tuple[Exceptio
     for exc in policy.exceptions:
         if exc.check_id != check_id:
             continue
-        if not (exc.approved_by and exc.approved_at):
-            reasons.append(f"policy exception not shown: not approved ({exc.reason})")
-        elif exc.expires_at is None:
-            reasons.append(f"policy exception not shown: no expiry ({exc.reason})")
-        elif exc.expires_at <= as_of:
-            reasons.append(f"policy exception not shown: expired at {exc.expires_at.isoformat()} ({exc.reason})")
-        else:
+        reason = exc.unavailable_reason(as_of)
+        if reason is not None:
+            detail = {"unapproved": "not approved", "expired": f"expired at {exc.expires_at}"}.get(reason, reason)
+            reasons.append(f"policy exception not shown: {detail} ({exc.reason})")
+        elif exc.expires_at is not None:
             mark = ExceptionMark(check_id=check_id, expires_at=exc.expires_at)
     return mark, reasons
 
@@ -80,9 +79,14 @@ def judge_evidence(
     as_of: datetime,
     condition_origins: Iterable[DataOrigin | None] | None = None,
     plan: Plan | None = None,
+    *,
+    carryover: bool = False,
 ) -> Result:
     if evd.check_id != check.id:
         raise ValueError(f"evidence is for {evd.check_id}, not {check.id}")
+    if as_of.utcoffset() is None:
+        raise ValueError("JUDGMENT_TIMEZONE_REQUIRED")
+    as_of = as_of.astimezone(timezone.utc)
 
     reasons: list[str] = []
     missing = sorted(
@@ -166,6 +170,8 @@ def judge_evidence(
         missing_observations=missing,
         exception=mark,
         verification_level=level,
+        as_of=as_of,
+        evaluation_mode="carryover" if carryover else None,
     ).seal()
 
 
@@ -178,15 +184,69 @@ def _same_content(a: Result, b: Result) -> bool:
     return da == db
 
 
-def judge_plan(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> list[Result]:
-    """PLAN의 최신 EVD마다 RES를 만든다. 같은 내용이면 새 revision을 만들지 않는다."""
+def plan_evidence(store: Store, plan: Plan, attempt_id: str | None = None) -> tuple[str | None, list[Evidence]]:
+    plan_ref = plan.ref()
+    if attempt_id is not None:
+        reports = store.find_latest("RPT", lambda r: r.execution_attempt_id == attempt_id and plan_ref in r.inputs_manifest)
+        if reports:
+            # The first report records the selected snapshot, including DECLARED
+            # manual evidence intentionally retained by the run.
+            original = min(reports, key=lambda r: (r.created_at, r.id))
+            store.validate_object(original)
+            evds = [store.resolve(ref) for ref in original.inputs_manifest if ref.kind == "EVD"]
+            return attempt_id, [evd for evd in evds if evd.plan == plan_ref]
+        evidence = store.find_latest("EVD", lambda e: e.plan == plan_ref and e.execution.attempt_id == attempt_id)
+        if not evidence:
+            raise ValueError("ATTEMPT_NOT_FOUND")
+        return attempt_id, evidence
+    evidence = store.find_latest("EVD", lambda e: e.plan == plan_ref)
+    if plan.mode == Mode.update:
+        attempted = [e for e in evidence if e.execution.attempt_id is not None]
+        if attempted:
+            latest = max(attempted, key=lambda e: (e.created_at, e.execution.attempt_id))
+            attempt_id = latest.execution.attempt_id
+            evidence = [e for e in evidence if e.execution.attempt_id == attempt_id or e.execution.operator is not None]
+    return attempt_id, evidence
+
+
+def result_for_policy(result, policy_ref) -> bool:
+    policies = [ref for ref in result.refs if ref.kind == "POL"]
+    return result.evaluation_mode is None and (not policies or policies == [policy_ref])
+
+
+def judge_plan(store: Store, pack: Pack, plan: Plan, as_of: datetime, *,
+               attempt_id: str | None = None, evidence: Iterable[Evidence] | None = None) -> list[Result]:
+    """Judge one coherent evidence snapshot while protecting its result revisions."""
+    from guard.core.execution_recipe import execution_lock
+    with execution_lock(store.root, plan.id):
+        return judge_plan_locked(store, pack, plan, as_of, attempt_id=attempt_id, evidence=evidence)
+
+
+def judge_plan_locked(store: Store, pack: Pack, plan: Plan, as_of: datetime, *,
+                      attempt_id: str | None = None, evidence: Iterable[Evidence] | None = None) -> list[Result]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     policy = store.resolve(plan.inputs.policy)
+    evds = list(evidence) if evidence is not None else plan_evidence(store, plan, attempt_id)[1]
     plan_ref = plan.ref()
-    evds = store.find_latest("EVD", lambda e: e.plan == plan_ref)
-    evd_ids = {e.id for e in evds}
-    prior = {r.evidence.id: r for r in store.find_latest("RES", lambda r: r.evidence.id in evd_ids)}
+    if len({(evd.check_id, evd.side) for evd in evds}) != len(evds):
+        raise ValueError("EVIDENCE_SLOT_AMBIGUOUS")
+    for evd in evds:
+        if evd.plan != plan_ref or not plan.item(evd.check_id).selected:
+            raise ValueError("EVIDENCE_PLAN_SCOPE_MISMATCH")
+        store.validate_object(evd)
+    evd_refs = {evd.id: evd.ref() for evd in evds}
+    prior: dict[str, Result] = {}
+    same_time: dict[str, Result] = {}
+    for result in store.iter_kind("RES") if evd_refs else ():
+        eid = result.evidence.id
+        if eid not in evd_refs or not result_for_policy(result, plan.inputs.policy):
+            continue
+        if eid not in prior or result.revision > prior[eid].revision:
+            prior[eid] = result
+        if result.evidence == evd_refs[eid] and result.as_of == as_of:
+            if eid not in same_time or result.revision > same_time[eid].revision:
+                same_time[eid] = result
     out = []
     for evd in sorted(evds, key=lambda e: (e.check_id, e.side.value)):
         check = pack.checks[evd.check_id]
@@ -194,12 +254,14 @@ def judge_plan(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> list[Re
         res = judge_evidence(
             check, evd, policy, as_of, condition_origins=[c.origin for c in item.conditions], plan=plan
         )
+        recorded = same_time.get(evd.id)
+        if recorded is not None and _same_content(recorded, res):
+            store.validate_object(recorded)
+            out.append(recorded)
+            continue
         prev = prior.get(evd.id)
         if prev is not None:
             res = res.model_copy(update={"id": prev.id, "revision": prev.revision + 1}).seal()
-            if _same_content(prev, res):
-                out.append(prev)
-                continue
         store.put(res)
         out.append(res)
     return out

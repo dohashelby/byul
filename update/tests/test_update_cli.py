@@ -158,14 +158,18 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
         assert candidate.execution.abort_reason == 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
         assert any('cleanup' in note for note in report()['limitations'])
         return
-    assert len(exited) == 2 and len(set(exited)) == 2
-    assert len(set(calls)) == 2
     row = next(r for r in report()["by_check"] if r["check_id"] == "REQ-01")
     if fail_baseline:
+        assert len(exited) == len(calls) == 1
         assert row["baseline"]["security"] == "UNKNOWN"
-        assert row["comparison"] != "FIXED"
-        assert len(seen) == 1 and "candidate" in seen[0]
+        assert row["candidate"]["execution_status"] == "ABORTED"
+        assert row["comparison"] == "NOT_COMPARABLE"
+        assert not seen
+        candidate, = [e for e in Store(Path('.guard')).iter_kind('EVD') if e.side.value == 'candidate']
+        assert candidate.execution.abort_reason == 'BASELINE_EXECUTION_FAILED'
     else:
+        assert len(exited) == 2 and len(set(exited)) == 2
+        assert len(set(calls)) == 2
         assert row["baseline"]["security"] == "PASS"
         assert len(set(seen)) == 2
         assert "baseline" in seen[0] and "candidate" in seen[1]

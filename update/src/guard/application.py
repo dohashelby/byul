@@ -12,15 +12,17 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import for_check
-from guard.core.judge import judge_plan
+from guard.configuration import for_check, validate_requested_config
+from guard.core.judge import judge_plan_locked
 from guard.core.report import build_report
-from guard.core.run import RunConfig, run_plan, validate_update_run_config
+from guard.core.run import RunConfig, run_plan_locked, validate_update_run_config
+from guard.core.execution_recipe import configuration_sha256, execution_lock, validate_policy_time
 from guard.core.select import select
 from guard.collectors.change import read_change, resolve_plan, save_change
 from guard.core.change_selection import build_context
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX_PROFILE
-from guard.models import ExecStatus, Mode, Side, utcnow
+from guard.models import ExecStatus, Mode, Side, new_id, sha256_hex, utcnow
+from guard.models.objects import Artifact
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
 from guard.runtime import generation_readiness, sandbox
@@ -33,6 +35,7 @@ def merge_config(base: dict, override: dict) -> dict:
 
 
 def run_config(cfg: dict) -> RunConfig:
+    validate_requested_config(cfg)
     rc = RunConfig(executors=cfg.get("executors", {}), adapter=cfg.get("adapter", {}).get("name"), raw=cfg, requested=deepcopy(cfg))
     rc.side_configs = {
         side: RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
@@ -72,6 +75,9 @@ def _credentials(cfg, gateway_profile):
 
 def update_inputs(envs, cfg: dict):
     """Shared input checks; no containers, stores or output directories are created."""
+    validate_requested_config(cfg)
+    if len(envs) != 2:
+        raise ValueError("UPDATE_REQUIRES_TWO_ENVIRONMENTS")
     mode = cfg.get("update", {}).get("mode", "external")
     if mode not in {"external", "managed"}:
         raise ValueError("update.mode must be external or managed")
@@ -122,29 +128,18 @@ def update_inputs(envs, cfg: dict):
 
 def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
                    *, change=None, previous_plan=None):
-    from guard.core.execution_recipe import validate_policy_time
-    from guard.runtime.resource_lease import provider_leases
+    """Select and execute two sides under one attempt, then publish its report."""
+    from guard.core.execution_recipe import bind_recipe
     validate_policy_time(policy)
     cfg = deepcopy(cfg)
     prepared = update_inputs(envs, cfg)
-    with provider_leases(envs, [prepared[2].get(s, {}) for s in ('baseline', 'candidate')]) as leases:
-        return _execute_update(store, pack, envs, policy, cfg, run_dir, as_of,
-            change=change, previous_plan=previous_plan, prepared=prepared, leases=leases)
-
-
-def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
-                   *, change=None, previous_plan=None, prepared=None, leases=()):
-    """Return (report, execution_failed). Never publish fake results as measured."""
-    from guard.core.execution_recipe import bind_recipe, validate_policy_time
-    validate_policy_time(policy)
-    mode, side_cfgs, managed = prepared
     change_input = read_change(change, pack, store)
     previous = resolve_plan(store, previous_plan)
+    preview = None
     if change_input is not None or previous is not None:
-        build_context(store, previous, pack, envs, policy, cfg,
-                      change_input.change if change_input else None, mode=Mode.update, as_of=as_of, read_only=True)
-    if any(c.get("update", {}).get("credential_canary", False) for c in side_cfgs.values()) and policy.status.value != "DRAFT":
-        raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
+        preview = build_context(store, previous, pack, envs, policy, cfg,
+                                change_input.change if change_input else None, mode=Mode.update, as_of=as_of, read_only=True)
+    _validate_update_policy(prepared[1], policy)
     # No input or historical evidence is overwritten.
     run_dir.mkdir(parents=True, exist_ok=False)
     put_pack(store, pack.path)
@@ -154,12 +149,69 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
     chg = save_change(store, change_input) if change_input is not None else None
     context = build_context(store, previous, pack, envs, policy, cfg, chg, mode=Mode.update,
                             as_of=as_of) if chg is not None or previous is not None else None
+    if preview and context and preview.execution_recipe_sha256 != context.execution_recipe_sha256:
+        raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
     plan = (select(pack, envs, policy, change=chg, mode=Mode.update, context=context)
             if context is not None else select(pack, envs, policy, mode=Mode.update))
     plan = bind_recipe(plan, cfg, envs)
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
-    rc = RunConfig(executors=cfg.get("executors", {}), requested=deepcopy(cfg))
+    with execution_lock(store.root, plan.id):
+        execution = _run_update_trial(store, pack, plan, envs, cfg, run_dir, prepared)
+        return _finish_run(store, pack, plan, as_of, *execution)
+
+
+def _validate_update_policy(side_cfgs, policy):
+    if any(c.get("update", {}).get("credential_canary", False) for c in side_cfgs.values()) and policy.status.value != "DRAFT":
+        raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
+
+
+def execute_saved_update(store, pack, plan, cfg: dict, run_dir: Path, *, replace_manual: bool = False):
+    """Run an existing paired PLAN through the same lifecycle without judging it."""
+    if plan.mode != Mode.update or plan.inputs.pack != pack.ref():
+        raise ValueError("UPDATE_PLAN_REQUIRED")
+    store.validate_object(plan)
+    policy = store.resolve(plan.inputs.policy)
+    validate_policy_time(policy)
+    envs = [store.resolve(ref) for ref in plan.inputs.environments]
+    cfg = deepcopy(cfg)
+    prepared = update_inputs(envs, cfg)
+    _validate_update_policy(prepared[1], policy)
+    with execution_lock(store.root, plan.id):
+        run_dir.mkdir(parents=True, exist_ok=False)
+        (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
+        evidence, _, errors, _, _ = _run_update_trial(
+            store, pack, plan, envs, cfg, run_dir, prepared, replace_manual=replace_manual)
+        return evidence, _execution_failed(pack, evidence, errors)
+
+
+def _run_update_trial(store, pack, plan, envs, cfg, run_dir, prepared, *, replace_manual=False):
+    from guard.runtime.resource_lease import provider_leases
+    if not any(item.selected for item in plan.items):
+        return [], None, [], [], []
+    expected = plan.inputs.execution_recipe_sha256
+    if expected is None and any(impl in {"real", "kubernetes"}
+                                for side in prepared[1].values() for impl in side.get("executors", {}).values()):
+        raise ValueError("EXECUTION_RECIPE_MISSING_RESELECT_REQUIRED")
+    if expected is not None and configuration_sha256(cfg, envs) != expected:
+        raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
+    options = [prepared[2].get(side, {}) for side in ('baseline', 'candidate')]
+    with provider_leases(envs, options) as leases:
+        return _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, replace_manual)
+
+
+def _record_attempt(run_dir: Path, attempt_id: str):
+    with (run_dir / "attempt.txt").open("x", encoding="utf-8") as stream:
+        stream.write(attempt_id + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, replace_manual):
+    mode, side_cfgs, managed = prepared
+    rc = RunConfig(executors=cfg.get("executors", {}), requested=deepcopy(cfg),
+                   attempt_id=new_id('ATTEMPT'), replace_manual=replace_manual)
+    _record_attempt(run_dir, rc.attempt_id)
     for side, c in side_cfgs.items():
         if mode == "managed":
             for name in c.get("executors", {}):
@@ -167,20 +219,23 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
         rc.side_configs[side] = RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
     lifecycle_errors = []
     diagnostic_refs = []
+    diagnostics = []
+    evidence = []
+
+    def dispatch(side):
+        evidence.extend(run_plan_locked(store, pack, plan, rc, only_side=side))
     kube_transition=None
     if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()
            for name in ("request_binding","input_validation")):
         kube_transition=KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
             poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
                 candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
-    candidate_blocked = False
+    candidate_blocked = None
     for side, env in zip((Side.baseline, Side.candidate), envs):
-        if not any(item.selected for item in plan.items):
-            break  # 이월 전용 PLAN은 엔진을 기동하지 않는다.
         side_cfg = rc.side_configs[side.value]
         if side == Side.candidate and candidate_blocked:
-            side_cfg.abort_reason = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
-            run_plan(store, pack, plan, rc, only_side=side)
+            side_cfg.abort_reason = candidate_blocked
+            dispatch(side)
             continue
         if mode == "external":
             if kube_transition is not None:
@@ -188,7 +243,8 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                     if side==Side.baseline:
                         kube_transition.prepare_baseline()
                     else:
-                        previous_evidence=store.find_latest("EVD",lambda e:e.plan==plan.ref() and e.side==Side.baseline)
+                        previous_evidence = [e for e in evidence if e.side == Side.baseline
+                                             and e.execution.attempt_id == rc.attempt_id]
                         if not _baseline_ran_without_abort(previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
@@ -198,7 +254,10 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
-            run_plan(store, pack, plan, rc, only_side=side)
+            dispatch(side)
+            if side == Side.baseline and any(e.execution.status == ExecStatus.ABORTED or e.execution.cleanup_errors
+                                             for e in evidence):
+                candidate_blocked = 'BASELINE_EXECUTION_FAILED'
             continue
         c = side_cfg.raw
         options = c.get("update", {})
@@ -227,42 +286,58 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                     for name in side_cfg.executors:
                         c.setdefault(name, {})["target"] = str(side_dir / "target.json")
                     side_cfg.raw = c
-                    run_plan(store, pack, plan, rc, only_side=side)
+                    dispatch(side)
                     executed = True
                 finally:
-                    diagnostic_refs.append(_managed_diagnostic_reference(docker, side_dir, keys, side.value))
+                    diagnostic_refs.append(_managed_diagnostic_reference(
+                        docker, side_dir, keys, side.value, store=store, diagnostics=diagnostics))
         except Exception as exc:
             # Error messages may contain engine secrets; retain type, not raw daemon output.
             if executed:
                 # Do not replace completed evidence (including confirmed violations)
                 # with empty ABORTED evidence because post-run teardown failed.
                 lifecycle_errors.append(f"{side.value}: cleanup incomplete ({type(exc).__name__}); guard.run={run_id}")
-                candidate_blocked |= side == Side.baseline
+                if side == Side.baseline:
+                    candidate_blocked = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
                 for lease in leases: lease.mark_uncertain(run_id)
             else:
                 lifecycle_errors.append(f"{side.value}: startup/execution interrupted ({type(exc).__name__}); sealed evidence retained; guard.run={run_id}")
                 if _has_cleanup_note(exc, run_id):
                     lifecycle_errors.append(f"{side.value}: cleanup incomplete after startup/execution failure ({type(exc).__name__}); guard.run={run_id}")
-                    candidate_blocked |= side == Side.baseline
+                    if side == Side.baseline:
+                        candidate_blocked = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
                     for lease in leases: lease.mark_uncertain(run_id)
                 side_cfg.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
-                run_plan(store, pack, plan, rc, only_side=side)
+                dispatch(side)
+        if side == Side.baseline and candidate_blocked is None and any(
+                e.execution.status == ExecStatus.ABORTED or e.execution.cleanup_errors for e in evidence):
+            candidate_blocked = 'BASELINE_EXECUTION_FAILED'
     if kube_transition is not None:
         from guard.models import canonical_json
         try:
-            stored=store.put_artifact(canonical_json(kube_transition.report()))
-            diagnostic_refs.append(f"Kubernetes transition diagnostic (not EVD): artifacts/{stored.sha256}; GPU release unverified")
+            artifact = _diagnostic_artifact(store, "kubernetes-transition.json", canonical_json(kube_transition.report()))
+            diagnostics.append(artifact)
+            diagnostic_refs.append(f"Kubernetes transition diagnostic (not EVD): {artifact.path}; GPU release unverified")
         except Exception:
             lifecycle_errors.append("KUBERNETES_TRANSITION_DIAGNOSTIC_STORE_UNAVAILABLE")
-    judge_plan(store, pack, plan, as_of)
-    report = build_report(store, pack, plan, as_of)
-    if lifecycle_errors or diagnostic_refs:
-        report = report.model_copy(update={"limitations": [*report.limitations, *lifecycle_errors, *diagnostic_refs]}).seal()
+    return evidence, rc.attempt_id, lifecycle_errors, diagnostic_refs, diagnostics
+
+
+def _execution_failed(pack, evidence, lifecycle_errors):
+    return bool(lifecycle_errors) or any(
+        e.execution.cleanup_errors or e.execution.status == ExecStatus.ABORTED
+        or (e.execution.status == ExecStatus.NOT_RUN and pack.checks[e.check_id].executor is not None)
+        for e in evidence)
+
+
+def _finish_run(store, pack, plan, as_of, evidence, attempt_id, lifecycle_errors, diagnostic_refs, diagnostics):
+    results = judge_plan_locked(store, pack, plan, as_of, evidence=evidence)
+    report = build_report(store, pack, plan, as_of, attempt_id=attempt_id, evidence=evidence, judged=results)
+    if lifecycle_errors or diagnostic_refs or diagnostics:
+        report = report.model_copy(update={"limitations": [*report.limitations, *lifecycle_errors, *diagnostic_refs],
+                                           "diagnostic_artifacts": diagnostics or None}).seal()
     store.put(report)
-    failed = any(e.execution.cleanup_errors or e.execution.status == ExecStatus.ABORTED
-                 or (e.execution.status == ExecStatus.NOT_RUN and pack.checks[e.check_id].executor is not None)
-                 for e in store.find_latest("EVD", lambda e: e.plan == plan.ref()))
-    return report, failed or bool(lifecycle_errors)
+    return report, _execution_failed(pack, evidence, lifecycle_errors)
 
 
 def _managed_sentinel_dir(run_dir: Path, engine_profile: str, side: str = "single") -> Path | None:
@@ -284,12 +359,32 @@ def _has_cleanup_note(exc: Exception, run_id: str) -> bool:
     return expected in getattr(exc, "__notes__", [])
 
 
-def _managed_diagnostic_reference(docker, folder: Path, keys: dict, side: str) -> str:
+def _diagnostic_artifact(store, name: str, data: bytes) -> Artifact:
+    stored = store.put_artifact(data)
+    return Artifact(name=name, path=stored.path, sha256=stored.sha256, bytes=stored.bytes,
+                    collected_at=utcnow(), collector="guard-lifecycle-diagnostic/1")
+
+
+def _managed_diagnostic_reference(docker, folder: Path, keys: dict, side: str, *, store, diagnostics) -> str:
     """A separate diagnostic reference, never an EVD or a verdict input."""
+    def preserve(saved, label):
+        filename = saved["path"]
+        if Path(filename).name != filename:
+            raise ValueError("DIAGNOSTIC_PATH_INVALID")
+        path = folder / filename
+        if path.is_symlink():
+            raise ValueError("DIAGNOSTIC_PATH_INVALID")
+        data = path.read_bytes()
+        if sha256_hex(data) != saved["sha256"]:
+            raise ValueError("DIAGNOSTIC_HASH_MISMATCH")
+        artifact = _diagnostic_artifact(store, f"{side}-{filename}", data)
+        diagnostics.append(artifact)
+        return f"{side}: {label} (not EVD): {artifact.path} sha256={artifact.sha256}"
+
     try:
         saved = sandbox.capture_diagnostics(docker, folder, secret_values=list(keys.values()), phase="run-final")
         if saved.get("path") == "managed-diagnostic.json" and re.fullmatch(r"[0-9a-f]{64}", saved.get("sha256", "")):
-            detail = f"{side}: separate run diagnostic (not EVD): {side}/managed-diagnostic.json sha256={saved['sha256']}"
+            detail = preserve(saved, "separate run diagnostic")
         else:
             detail = f"{side}: separate run diagnostic unavailable ({saved.get('error_type', 'UnknownError')})"
     except Exception as exc:
@@ -297,7 +392,7 @@ def _managed_diagnostic_reference(docker, folder: Path, keys: dict, side: str) -
     try:
         saved = generation_readiness.reference(folder)
         if saved is not None:
-            detail += f"; separate startup generation (not EVD): {side}/{saved['path']} sha256={saved['sha256']}"
+            detail += "; " + preserve(saved, "separate startup generation")
     except Exception as exc:
         detail += f"; separate startup generation unavailable ({type(exc).__name__})"
     return detail
@@ -305,6 +400,7 @@ def _managed_diagnostic_reference(docker, folder: Path, keys: dict, side: str) -
 
 def _validation_inputs(env, cfg: dict):
     """One managed engine, using the same launch contract as update."""
+    validate_requested_config(cfg)
     effective = deepcopy(cfg)
     options = effective.get("validation", {})
     if type(options) is not dict or type(options.get("credential_canary", False)) is not bool:
@@ -322,23 +418,15 @@ def _validation_inputs(env, cfg: dict):
 
 
 def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of: datetime):
-    from guard.core.execution_recipe import validate_policy_time
-    from guard.runtime.resource_lease import provider_leases
-    validate_policy_time(policy)
-    cfg = deepcopy(cfg)
-    prepared = _validation_inputs(env, deepcopy(cfg))
-    with provider_leases([env], [prepared[1]]) as leases:
-        return _execute_validation(store, pack, env, policy, cfg, run_dir, as_of, prepared=prepared, leases=leases)
-
-
-def _execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of: datetime, *, prepared=None, leases=()):
     """Audit a single managed engine; retain evidence when teardown fails."""
     from guard.core.preflight import validate_pack
-    from guard.core.execution_recipe import bind_recipe, validate_policy_time
+    from guard.core.execution_recipe import bind_recipe
+    from guard.runtime.resource_lease import provider_leases
 
     validate_policy_time(policy)
     validate_pack(pack)
-    effective, managed = prepared
+    cfg = deepcopy(cfg)
+    effective, managed = _validation_inputs(env, cfg)
     options = effective.get("validation", {})
     if options.get("credential_canary", False) and policy.status.value != "DRAFT":
         raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
@@ -353,14 +441,27 @@ def _execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_o
     store.put(policy)
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
+    with execution_lock(store.root, plan.id):
+        with provider_leases([env], [managed]) as leases:
+            execution = _run_validation_trial(store, pack, plan, env, cfg, run_dir, effective, managed, keys, leases)
+        return _finish_run(store, pack, plan, as_of, *execution)
+
+
+def _run_validation_trial(store, pack, plan, env, cfg, run_dir, effective, managed, keys, leases):
+    options = effective.get("validation", {})
+    profile = options.get("gateway_profile", "single")
     target_dir = run_dir / "single"
     sentinel_dir = _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"))
     for name in effective["executors"]:
         effective.setdefault(name, {})["target"] = str(target_dir / "target.json")
-    rc = RunConfig(executors=effective["executors"], adapter=env.engine.name, raw=effective, requested=deepcopy(cfg))
+    rc = RunConfig(executors=effective["executors"], adapter=env.engine.name, raw=effective, requested=deepcopy(cfg),
+                   attempt_id=new_id('ATTEMPT'))
+    _record_attempt(run_dir, rc.attempt_id)
     completed = False
+    evidence = []
     lifecycle_errors = []
     diagnostic_refs = []
+    diagnostics = []
     run_id = "v" + secrets.token_hex(6)
     for lease in leases: lease.note_owner(run_id)
     try:
@@ -377,10 +478,11 @@ def _execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_o
                 observed = target.get("images", {}).get(managed["image"], "")
                 if observed.split("@")[-1] != env.engine.image_digest.split("@")[-1]:
                     raise ValueError("observed image digest differs from ENV")
-                run_plan(store, pack, plan, rc)
+                evidence = run_plan_locked(store, pack, plan, rc)
                 completed = True
             finally:
-                diagnostic_refs.append(_managed_diagnostic_reference(docker, target_dir, keys, "single"))
+                diagnostic_refs.append(_managed_diagnostic_reference(
+                    docker, target_dir, keys, "single", store=store, diagnostics=diagnostics))
     except Exception as exc:
         if completed:
             lifecycle_errors.append(f"single: cleanup incomplete ({type(exc).__name__}); guard.run={run_id}")
@@ -391,16 +493,8 @@ def _execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_o
                 lifecycle_errors.append(f"single: cleanup incomplete after startup/execution failure ({type(exc).__name__}); guard.run={run_id}")
                 for lease in leases: lease.mark_uncertain(run_id)
             rc.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
-            run_plan(store, pack, plan, rc)
-    judge_plan(store, pack, plan, as_of)
-    report = build_report(store, pack, plan, as_of)
-    if lifecycle_errors or diagnostic_refs:
-        report = report.model_copy(update={"limitations": [*report.limitations, *lifecycle_errors, *diagnostic_refs]}).seal()
-    store.put(report)
-    failed = any(e.execution.cleanup_errors or e.execution.status == ExecStatus.ABORTED
-                 or (e.execution.status == ExecStatus.NOT_RUN and pack.checks[e.check_id].executor is not None)
-                 for e in store.find_latest("EVD", lambda e: e.plan == plan.ref()))
-    return report, failed or bool(lifecycle_errors)
+            evidence = run_plan_locked(store, pack, plan, rc)
+    return evidence, rc.attempt_id, lifecycle_errors, diagnostic_refs, diagnostics
 
 
 def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
@@ -426,7 +520,18 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
 
     prepared = None
     check_support = []
+    selected_ids = []
+
+    def result(limitations):
+        ready = all(c["ok"] for c in checks)
+        sides = ("single",) if single else ("baseline", "candidate")
+        required = {(side, check) for side in sides for check in selected_ids}
+        supported = {(r["side"], r["check_id"]) for r in check_support if r["status"] == "SUPPORTED"}
+        return {"ready": ready, "execution_ready": ready and required <= supported, "selected_checks": selected_ids,
+                "checks": checks, "check_support": check_support, "limitations": limitations}
+
     try:
+        validate_policy_time(policy)
         validate_pack(pack)
         if single:
             effective, managed = _validation_inputs(envs[0], cfg)
@@ -442,6 +547,9 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 else select(pack, envs, policy, mode=plan_mode))
         selected = [item for item in plan.items if item.selected]
         if not selected:
+            if not single and any(item.carried_over is not None for item in plan.items):
+                record("inputs", True, "Carryover-only PLAN; no new trials are required")
+                return result(["Only prior, eligible evidence is used; engine and Docker need not start."])
             raise ValueError("policy selected no checks")
         managed = prepared[0] == "managed"
         selected_ids = [item.check_id for item in selected]
@@ -510,18 +618,18 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
     except Exception as exc:
         record("inputs", False, error_detail(exc))
 
-    kube_requested=cfg.get("executors",{}).get("request_binding")=="kubernetes" or any(
-        c.get("executors",{}).get("request_binding")=="kubernetes" for c in cfg.get("sides",{}).values())
-    if kube_requested:
-        record("kubernetes-static-binding",prepared is not None,"Exact target/ENV declarations checked; actual cluster, Pods, template and GPU remain unverified")
+    if prepared is None:
+        return result(["Preparation stopped before host checks because the inputs could not be validated."])
+    implementations = {impl for c in prepared[1].values() for impl in c.get("executors", {}).values()}
+    if prepared[0] == "external" and "kubernetes" in implementations and "real" not in implementations:
+        record("kubernetes-static-binding", True, "Static target and executor configuration only; actual cluster, Pods, template and GPU remain unverified")
         if cfg.get("update",{}).get("kubernetes_candidate_binding")=="after_baseline":
             record("candidate-binding-deferred",True,"Only baseline target is selected; exact candidate ENV/generation will be required after baseline API termination, before candidate dispatch")
         if not single and envs[0].engine.image_digest==envs[1].engine.image_digest:
             record("image-pair",False,"use different image digests for an update validation")
-        return {"ready":all(c["ok"] for c in checks),"checks":checks,"check_support":check_support,
-            "limitations":["Static Kubernetes preparation only; no kubectl, Docker, engine or GPU execution.",
+        return result(["Static Kubernetes preparation only; no kubectl, Docker, engine or GPU execution.",
                 "Existing inspected image/source limits remain; unreviewed GPU images are unsupported.",
-                "Operator supplies exact running generations and controls termination/recovery. API termination does not prove GPU release."]}
+                "Operator supplies exact running generations and controls termination/recovery. API termination does not prove GPU release."])
     docker = Docker("readiness")
     try:
         server = docker.daemon_info(timeout=15)
@@ -572,12 +680,11 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 record("resources", False, f"Linux Docker capacity unavailable ({type(exc).__name__}); check Docker Desktop/WSL2 memory allocation")
     if not single and envs[0].engine.image_digest == envs[1].engine.image_digest:
         record("image-pair", False, "use different image digests for an update validation")
-    return {"ready": all(c["ok"] for c in checks), "checks": checks, "check_support": check_support,
-            "limitations": ["Preparation only: no engine, security verdict or performance was measured.",
+    return result(["Preparation only: no engine, security verdict or performance was measured.",
                             "ready describes input/host preparation; per-check static support is separate and does not remove checks or prove challenge completion.",
                             "CPU model/kernel/threads and GPU availability require verification on the test host.",
                             "On Windows, use Docker Desktop Linux containers and WSL2 integration; readiness does not start or reconfigure them.",
-                            "Container RAM/shm/swap bounds are ceilings, not reservations or a guarantee that the model fits; preserve unrelated containers."]}
+                            "Container RAM/shm/swap bounds are ceilings, not reservations or a guarantee that the model fits; preserve unrelated containers."])
 
 
 def validation_readiness(pack, env, policy, cfg: dict) -> dict:

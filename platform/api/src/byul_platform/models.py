@@ -212,6 +212,10 @@ class ReportSide(BaseModel):
     performance: str | None
     verification_level: str | None
     reasons: list[str]
+    result_sha256: str | None = None
+    execution_status: Literal["PENDING", "RUNNING", "COMPLETED", "ABORTED", "NOT_RUN"] | None = None
+    data_origin: Literal["MEASURED", "DECLARED", "EXAMPLE"] | None = None
+    evidence_ref: ManifestRef | None = None
 
 
 class ReportMark(BaseModel):
@@ -311,6 +315,9 @@ class ReportView(BaseModel):
     approval: JsonValue = None
     inputs_manifest: list[ManifestRef]
     checks: list[ReportCheck]
+    execution_attempt_id: str | None = None
+    as_of: str | None = None
+    byul_policy_ref: Annotated[dict[str, Any] | None, WithJsonSchema({"x-contract": "Common_nullable_policy_ref"})] = None
 
 
 class VerificationDetail(BaseModel):

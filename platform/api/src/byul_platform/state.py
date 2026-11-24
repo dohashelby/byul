@@ -25,7 +25,7 @@ class AppState:
     settings: Settings
     contracts: Contracts
     runtime: RuntimeSource
-    update: UpdateSource
+    update: ExecutionUpdateSource
     evidence: EvidenceSource
     environments: EnvironmentStore
     policies: PolicyStore
@@ -39,15 +39,15 @@ class AppState:
         return "example" in (self.runtime.mode, self.update.mode, self.evidence.mode, self.store_mode)
 
     def source_infos(self) -> list[dict[str, Any]]:
-        return [
-            {"name": "runtime", "mode": self.runtime.mode, "detail": self.runtime.detail},
-            {"name": "update", "mode": self.update.mode, "detail": self.update.detail},
-            {"name": "evidence", "mode": self.evidence.mode, "detail": self.evidence.detail},
-            {"name": "store", "mode": self.store_mode, "detail": self.store_detail},
-        ]
+        return [self.source(name) for name in ("runtime", "update", "evidence", "store")]
 
     def source(self, name: str) -> dict[str, Any]:
-        return next(s for s in self.source_infos() if s["name"] == name)
+        if name == "update":
+            return self.update.source_info()
+        if name == "store":
+            return {"name": name, "mode": self.store_mode, "detail": self.store_detail}
+        adapter = {"runtime": self.runtime, "evidence": self.evidence}[name]
+        return {"name": name, "mode": adapter.mode, "detail": adapter.detail}
 
     def close(self) -> None:
         for item in self._cleanup:
@@ -74,7 +74,7 @@ def build_state(settings: Settings) -> AppState:
     else:
         runtime = ExampleRuntimeSource(examples)
 
-    update: UpdateSource = (
+    initial_update: UpdateSource = (
         ReportDirUpdateSource(settings.update_reports_dir)
         if settings.update_reports_dir
         else ExampleUpdateSource(examples)
@@ -103,7 +103,7 @@ def build_state(settings: Settings) -> AppState:
     execution = UpdateExecutionService(settings, root / "update-runs", contracts, envs, pols)
     # Finish guard cleanup before the example store's temporary directory is removed.
     cleanup.insert(0, execution.close)
-    update = ExecutionUpdateSource(update, execution.root / "reports")
+    update = ExecutionUpdateSource(initial_update, execution.root / "reports", contracts)
 
     return AppState(
         settings=settings,

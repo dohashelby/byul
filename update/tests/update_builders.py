@@ -9,12 +9,14 @@ never inferred from the raw HTTP status or presented as real consumer sensing.
 from copy import deepcopy
 from datetime import timedelta
 
-from guard.core.judge import judge_plan
+from guard.core.judge import judge_plan, judge_plan_locked
 from guard.core.report import build_report
 from guard.core.select import select
 from guard.executors.fake import SCENARIOS_BY_CHECK
 from guard.models import Evidence, sha256_hex
+from guard.models.artifacts import model_closure_sha256
 from guard.store import Store, StoredArtifact
+from guard.store.integrity import validate_relationships
 from guard.store.packs import put_pack
 from guard.update_acceptance import CHECKS
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
@@ -78,6 +80,10 @@ class _PureGraph:
         self.objects[key] = deepcopy(obj)
         return obj.ref()
 
+    def validate_object(self, obj):
+        assert obj.hash_ok()
+        validate_relationships(obj, self.resolve)
+
     def get(self, id_, revision):
         return deepcopy(self.objects[(id_, revision)])
 
@@ -105,7 +111,8 @@ class _PureGraph:
 
 
 def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, different_config=False,
-                      same_version=False, same_image=False, mutate_evidence=None, in_memory=False):
+                      same_version=False, same_image=False, mutate_evidence=None, in_memory=False,
+                      model_metadata=None):
     """Build only synthetic objects with the real pack/rules and product report.
 
     mutate_evidence(cid, side, raw) may modify test input before sealing and
@@ -123,7 +130,8 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
                                 "a" if side == "baseline" or same_image else "b") * 64},
                     adapter={"name": "vllm", "version": "SYNTHETIC"},
                     runtime=dict(GPU_RUNTIME),
-                    model={"id": "SYNTHETIC", "revision": "SYNTHETIC", "inventory_sha256": "c" * 64},
+                    model={"id": "SYNTHETIC", "revision": "SYNTHETIC", "inventory_sha256": "c" * 64,
+                           **(model_metadata or {})},
                     facts={"gateway": {"value": True, "origin": "DECLARED", "source": "synthetic test input"}})
         for side in ("baseline", "candidate")
     ]
@@ -152,7 +160,7 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
                 "artifacts": [{"name": "probe_log.jsonl", "path": artifact.path, "sha256": artifact.sha256,
                                "bytes": artifact.bytes, "collected_at": T0,
                                "collector": f"{check.executor}/SYNTHETIC"}],
-                "comparability": {"model_inventory_sha256": env.model.inventory_sha256,
+                "comparability": {"model_inventory_sha256": model_closure_sha256(env.model),
                                   "fixture_sha256": sha256_hex(b"synthetic fixture"),
                                   "config_sha256": sha256_hex(b"changed synthetic config"
                                       if different_config and side == "candidate" else b"synthetic config"),
@@ -161,7 +169,8 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
             if mutate_evidence:
                 mutate_evidence(cid, side, raw)
             store.put(Evidence(**raw).seal())
-    judge_plan(store, pack, plan, T0)
+    judge = judge_plan_locked if in_memory else judge_plan
+    judge(store, pack, plan, T0)
     report = build_report(store, pack, plan, T0)
     store.put(report)
     objects = [obj.to_dict() for kind in ("ENV", "POL", "CHG", "PLAN", "EVD", "RES", "RPT")

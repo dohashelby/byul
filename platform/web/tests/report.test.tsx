@@ -59,10 +59,14 @@ const report: ReportView = {
 };
 
 describe("검증 보고서 화면", () => {
-  it("출처 안내 없이 종합 판정·위험·실제 점검 한계를 보여준다", async () => {
+  it("자료 등급과 비공식 상태, 종합 판정 및 원본 한계를 함께 보여준다", async () => {
     mockApi({});
     const { container } = renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
-    expect(container.textContent).not.toMatch(/공식 아님|EXAMPLE|예시|후퇴/);
+    expect(container.textContent).toContain("예시");
+    expect(screen.getByText("비공식 보고서")).toBeTruthy();
+    expect(screen.getByText("정책 DRAFT: 공식 아님")).toBeTruthy();
+    expect(container.textContent).not.toContain("자동 측정");
+    expect(container.textContent).toContain("자동 실행 2");
     expect(screen.getByText("위험 1건")).toBeTruthy();
     expect(screen.getByText("관측 수집 중단으로 일부 점검 미확인")).toBeTruthy();
     expect(screen.getByText("미충족 1건")).toBeTruthy();
@@ -71,6 +75,21 @@ describe("검증 보고서 화면", () => {
     // 질문은 텍스트로만 들어간다
     expect(document.querySelector("b")).toBeNull();
     expect(screen.getAllByText("REQ-01 질문 <b>굵게</b>?").length).toBeGreaterThan(0);
+  });
+
+  it("혼합 자료의 측별 완료·중단과 실측을 구분한다", () => {
+    mockApi({});
+    const checks = [...report.checks];
+    checks[0] = { ...checks[0], baseline: { ...side("PASS"), execution_status: "COMPLETED", data_origin: "MEASURED",
+      evidence_ref: { kind: "EVD", id: "EVD-fixture", revision: 1, sha256: "c".repeat(64) } },
+      candidate: { ...side("FAIL"), execution_status: "ABORTED", data_origin: "DECLARED" } };
+    renderAt("/update/results", "/update/results", <FullReport report={{ ...report, checks }} rawChecks={null}
+      selected="REQ-01" onSelect={() => {}} />);
+    const baseline = screen.getByText("기준 환경").closest("article")!;
+    const candidate = screen.getByText("후보 환경").closest("article")!;
+    expect(baseline.textContent).toContain("실측 완료 1건");
+    expect(candidate.textContent).toContain("실측 완료 0건");
+    expect(candidate.textContent).toContain("중단 1");
   });
 
   it("미충족·미확인 쪽의 판정 이유를 RES 원문 그대로 보여준다", () => {

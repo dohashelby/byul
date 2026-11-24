@@ -7,6 +7,7 @@ import { AREAS, areaFor, titleFor } from "../src/app/nav";
 import { renderAt } from "./helpers";
 
 const ID = "RUN-" + "a".repeat(32);
+const REPORT_REF = { kind: "RPT" as const, id: "RPT-fixture", revision: 2, sha256: "c".repeat(64) };
 const REQUEST = { mode: "validate" as const, policy: { id: "policy-one", revision: 1 }, environment: { id: "environment-one", revision: 1 } };
 const READY: UpdateRun = { id: ID, request: REQUEST, status: "ready", created_at: "2026-11-15T09:00:00Z",
   requested_by: "admin", input_sha256: "a".repeat(64), source_refs: {}, preparation: { ready: true,
@@ -49,7 +50,7 @@ function api({ initial, prepared = READY, unavailable = false, readonly = false,
     else if (path === "/api/update/runs/prepare") { run = { ...prepared, request: body }; result = run; status = 202; }
     else if (path.endsWith("/execute")) {
       if (executionError) { result = { detail: { code: "INPUT_CHANGED", message: "입력이 바뀌었습니다. 다시 준비 점검하세요" } }; status = 409; }
-      else { run = { ...run!, status: "completed", report_ids: ["RPT-fixture"], log_tail: "<script>alert('fixture')</script>", exit_code: 0 }; result = run; status = 202; }
+      else { run = { ...run!, status: "completed", report_ids: [REPORT_REF.id], report_refs: [REPORT_REF], log_tail: "<script>alert('fixture')</script>", exit_code: 0 }; result = run; status = 202; }
     } else if (path === `/api/update/runs/${ID}` && run) result = run;
     else { result = { detail: { code: "NOT_FOUND", message: "없음" } }; status = 404; }
     return new Response(JSON.stringify(result), { status });
@@ -91,7 +92,7 @@ describe("Update 등록 판본 검증 실행", () => {
     expect(calls.filter((call) => call.method === "POST")).toEqual([{ path: "/api/update/runs/prepare", method: "POST", body: REQUEST }]);
     fireEvent.click(start);
     const report = await screen.findByRole("link", { name: "생성된 보고서 보기" });
-    expect(report.getAttribute("href")).toBe("/update/results?report=RPT-fixture");
+    expect(report.getAttribute("href")).toBe(`/update/results?report=RPT-fixture&revision=2&sha256=${REPORT_REF.sha256}`);
     expect(calls.filter((call) => call.method === "POST").map((call) => call.path)).toEqual(["/api/update/runs/prepare", `/api/update/runs/${ID}/execute`]);
     expect(screen.getByText(/보안 판정과 미확인 항목은 보고서에서/)).toBeTruthy();
     expect(screen.queryByText("PASS")).toBeNull();

@@ -69,6 +69,13 @@ class SelectedDocumentRef(DocumentSelection):
     sha256: str
 
 
+class UpdateReportRef(BaseModel):
+    kind: Literal["RPT"]
+    id: str
+    revision: int = Field(ge=1)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class PreparationCheck(BaseModel):
     model_config = ConfigDict(extra="allow")
     check: str
@@ -94,11 +101,12 @@ class PreparationGuidance(BaseModel):
 
 class UpdatePreparation(BaseModel):
     model_config = ConfigDict(extra="allow")
-    ready: bool
+    ready: bool = Field(strict=True)
     checks: list[PreparationCheck] = Field(default_factory=list)
     check_support: list[dict[str, Any]] = Field(default_factory=list)
     guidance: PreparationGuidance | None = None
     limitations: list[str] = Field(default_factory=list)
+    execution_ready: bool | None = Field(default=None, strict=True)
 
 
 class UpdateRun(BaseModel):
@@ -119,6 +127,8 @@ class UpdateRun(BaseModel):
     input_sha256: str
     source_refs: dict[str, SelectedDocumentRef] = Field(default_factory=dict)
     pack: dict[str, Any] | None = None
+    report_refs: list[UpdateReportRef] = Field(default_factory=list)
+    required_checks: list[str] = Field(default_factory=list)
 
 
 class UpdateRunList(BaseModel):

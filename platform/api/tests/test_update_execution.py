@@ -18,6 +18,7 @@ from byul_platform.accounts import AccountStore
 from byul_platform.config import REPO_ROOT, Settings
 from byul_platform.main import create_app
 from byul_platform.contracts import canonical_json, canonical_sha256
+from byul_platform.sources.update import report_content_sha256
 
 FIXTURE = Path(__file__).parent / "fixtures/update/RPT-01M598RR3HPSJNHA1MENFA6P74.json"
 PREPARATION = {"ready": True, "checks": [{"check": "inputs", "ok": True, "detail": "fixture inputs"}],
@@ -47,6 +48,8 @@ if args[0].startswith("prepare-"):
         data = json.loads(Path("preparation.json").read_text())
         data["ready"] = not flags.get("blocked", False)
         print(json.dumps(data))
+    if flags.get("prepare_stderr"):
+        print("준비 경고 password='literal-private-value'", file=sys.stderr)
     sys.exit(1 if flags.get("blocked") else 0)
 print("fixture verification starting", flush=True)
 if flags.get("split_secret"):
@@ -72,6 +75,7 @@ def execution(tmp_path):
     (update / "guard").mkdir(parents=True)
     (update / "guard/__init__.py").touch()
     (update / "guard/cli.py").write_text(CLI)
+    shutil.copytree(update / "guard", update / "src/guard")
     shutil.copytree(REPO_ROOT / "update/packs/PACK-BASELINE", update / "packs/PACK-BASELINE")
     (update / "tools").mkdir()
     shutil.copyfile(REPO_ROOT / "update/tools/import_byul_inputs.py", update / "tools/import_byul_inputs.py")
@@ -157,7 +161,7 @@ def prepared(client, mode="validate"):
 def test_prepare_execute_report_and_immutable_inputs(execution, mode, commands):
     client, update, settings = execution
     before = {path: path.read_bytes() for path in settings.platform_data_dir.rglob("*.json")}
-    # GETs cannot start a command.
+    # GETs cannot start a verification command.
     assert client.get("/api/update/execution-settings").json()["can_execute"] is True
     assert client.get("/api/update/runs").json()["items"] == []
     assert calls(update) == []
@@ -182,6 +186,10 @@ def test_prepare_execute_report_and_immutable_inputs(execution, mode, commands):
     report = client.get(f"/api/update/results/{done['report_ids'][0]}")
     assert report.status_code == 200, report.text
     assert report.json()["item"]["report_ref"]["id"] == json.loads(FIXTURE.read_bytes())["id"]
+    ref, = done["report_refs"]
+    assert ref == report.json()["item"]["report_ref"]
+    exact = client.get(f"/api/update/results/{ref['id']}", params={"revision": ref["revision"], "sha256": ref["sha256"]})
+    assert exact.json()["raw_checks"] == report.json()["raw_checks"]
     assert report.json()["source"]["mode"] == "live"
     assert json.loads(FIXTURE.read_bytes()) == json.loads(Path(report.json()["raw_path"]).read_bytes())
     for path in (settings.platform_data_dir / "update-runs" / run["id"]).rglob("*"):
@@ -280,6 +288,60 @@ def test_malformed_preparation_output_is_failure_and_releases_lock(execution):
     assert prepared(client)["status"] == "ready"
 
 
+def test_stderr_does_not_invalidate_preparation_and_is_redacted(execution):
+    client, update, _ = execution
+    flags(update, prepare_stderr=True)
+    run = prepared(client)
+    assert run["preparation"]["ready"]
+    assert "준비 경고" in run["log_tail"]
+    assert "[REDACTED]" in run["log_tail"]
+    assert "literal-private-value" not in run["log_tail"]
+
+
+def test_required_support_is_side_specific_and_blocks_before_execution(execution):
+    _, update, settings = execution
+    (update / "preparation.json").write_text(json.dumps({
+        **PREPARATION, "check_support": [
+            {"side": "baseline", "check_id": "OBS-02", "status": "SUPPORTED"},
+            {"side": "candidate", "check_id": "OBS-02", "status": "UNKNOWN"},
+        ],
+    }))
+    scoped = replace(settings, update_required_checks=("OBS-02",))
+    with TestClient(create_app(scoped)) as client:
+        response = client.post("/api/update/runs/prepare", json=payload("update"))
+        run = settled(client, response.json()["id"])
+        assert run["status"] == "blocked"
+        assert run["required_checks"] == ["OBS-02"]
+        assert [(i["side"], i["check_id"], i["code"]) for i in run["preparation"]["guidance"]["issues"]] == [
+            ("candidate", "OBS-02", "REQUIRED_SCOPE_UNSUPPORTED")]
+        assert client.post(f"/api/update/runs/{run['id']}/execute").status_code == 409
+        assert [argv[0] for argv in calls(update)] == ["prepare-update"]
+
+
+def test_stale_child_guard_install_is_reported_before_preparation(execution):
+    _, update, settings = execution
+    (update / "guard/cli.py").write_text("# stale alternate Guard installation\n")
+    with TestClient(create_app(settings)) as client:
+        config = client.get("/api/update/execution-settings").json()
+        assert config["available"] is False
+        assert client.post("/api/update/runs/prepare", json=payload()).status_code == 503
+        assert calls(update) == []
+
+
+def test_changed_toml_reference_requires_preparation_again(execution):
+    client, update, _ = execution
+    target = update / "demo-target.json"
+    target.write_text('{"version": 1}')
+    config = update / "guard.toml"
+    config.write_text(config.read_text() + '\n[direct_route]\ntarget = "demo-target.json"\n')
+    run = prepared(client)
+    target.write_text('{"version": 2}')
+    response = client.post(f"/api/update/runs/{run['id']}/execute")
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "INPUT_CHANGED"
+    assert [argv[0] for argv in calls(update)] == ["prepare-validation"]
+
+
 @pytest.mark.parametrize("long_log", [False, True])
 def test_secrets_split_across_reads_are_redacted_and_logs_are_bounded(execution, monkeypatch, long_log):
     client, update, _ = execution
@@ -306,6 +368,35 @@ def test_history_and_report_survive_a_platform_restart(execution):
         assert restarted.get("/api/update/runs").json()["items"][0]["id"] == run["id"]
         assert restarted.get(f"/api/update/runs/{run['id']}").json()["status"] == "completed"
         assert restarted.get(f"/api/update/results/{done['report_ids'][0]}").status_code == 200
+
+
+def test_report_restarts_from_durable_exit_and_keeps_registered_policy_ref(execution):
+    client, update, settings = execution
+    run = prepared(client)
+    run_folder = settings.platform_data_dir / "update-runs" / run["id"]
+    mapping = json.loads((run_folder / "inputs/provenance.json").read_text())["import"]
+    report = json.loads(FIXTURE.read_bytes())
+    for name in ("refs", "inputs_manifest"):
+        report[name] = [mapping["guard_policy_ref"] if ref["kind"] == "POL" else ref for ref in report[name]]
+    report["content_sha256"] = report_content_sha256(report)
+    (update / "fixture-rpt.json").write_text(json.dumps(report))
+    assert client.post(f"/api/update/runs/{run['id']}/execute").status_code == 202
+    assert settled(client, run["id"])["status"] == "completed"
+    policies = client.app.state.byul.policies
+    old = policies.get("policy-one", 1).document
+    policies.append("policy-one", 2, {**old, "policy_version": "new-draft"}, status="DRAFT", label="new-draft")
+    saved = run_folder / "run.json"
+    record = json.loads(saved.read_bytes())
+    record.update(status="running", report_ids=[], report_refs=[], finished_at=None)
+    saved.write_text(json.dumps(record))
+    with TestClient(create_app(settings)) as restarted:
+        recovered = restarted.get(f"/api/update/runs/{run['id']}").json()
+        assert recovered["status"] == "completed"
+        ref, = recovered["report_refs"]
+        detail = restarted.get(f"/api/update/results/{ref['id']}", params={
+            "revision": ref["revision"], "sha256": ref["sha256"]}).json()
+        assert detail["item"]["byul_policy_ref"] == mapping["byul_policy_ref"]
+        assert detail["report"]["byul_policy_ref"] == mapping["byul_policy_ref"]
 
 
 def test_relative_data_dir_keeps_subprocess_paths_absolute(execution, tmp_path, monkeypatch):

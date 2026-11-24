@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 // 모양은 runtime에서 가져온 platform 디자인을 따른다. 판정·집계 값은 서버가 RPT에서 꺼낸 그대로 쓴다.
 import type { ReactNode } from "react";
 import type { ReportCheck, ReportMark, ReportSide, ReportView as Report } from "../api/types";
-import { Badge, EnumBadge, VerdictBadge } from "../components/Badges";
+import { Badge, EnumBadge, OriginBadge, VerdictBadge } from "../components/Badges";
 import { DataTable, type Column } from "../components/DataTable";
 import { Pagination, usePagination } from "../components/Pagination";
 import { DetailPanel, KeyValue } from "../components/DetailPanel";
@@ -32,6 +32,14 @@ const AXES = [
   ["functional", "기능"],
   ["performance", "성능"],
 ] as const;
+
+const EXECUTION_LABELS = {
+  PENDING: "대기",
+  RUNNING: "진행 중",
+  COMPLETED: "완료",
+  ABORTED: "중단",
+  NOT_RUN: "미실행",
+} as const;
 
 const VERDICT_COLOR: Record<string, string> = {
   PASS: "var(--accent)",
@@ -189,7 +197,14 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                         ["보안", <VerdictBadge verdict={s.security} />],
                         ["기능", <VerdictBadge verdict={s.functional} />],
                         ["성능", <VerdictBadge verdict={s.performance} />],
+                        ["검증 수준", <OriginBadge origin={s.verification_level} />],
+                        ["실행 상태", s.execution_status ? EXECUTION_LABELS[s.execution_status] : "확인 기록 없음"],
+                        ["증거 자료 등급", <OriginBadge origin={s.data_origin} />],
                         ["판정(RES)", s.result_id ? <span className="mono">{`${s.result_id}@${s.result_revision}`}</span> : <Value v={null} />],
+                        ["판정 SHA-256", <Short value={s.result_sha256} n={16} />],
+                        ["증거(EVD)", s.evidence_ref
+                          ? <span className="mono">{s.evidence_ref.id}@{s.evidence_ref.revision} · <Short value={s.evidence_ref.sha256} n={16} /></span>
+                          : <Value v={null} />],
                       ]}
                     />
                     {s.reasons.length > 0 && (
@@ -227,7 +242,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
   const byId = new Map(report.checks.map((c) => [c.check_id, c]));
   const selectedRows = report.checks.filter((c) => c.selected);
   const n = report.counts;
-  const limitations = report.limitations.filter((text) => !/예시|example|런타임|runtime|에비던스|evidence|비공식|공식.*(?:아님|아닙|제외|불가)/i.test(text));
+  const limitations = report.limitations;
   const total = Math.max(1, n.fail + n.unknown + n.pass + n.not_applicable);
   const current = selected ? byId.get(selected) : undefined;
 
@@ -239,6 +254,9 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
   });
   const evidence = Object.entries(report.evidence_counts);
   const sum = (k: string) => evidence.reduce((acc, [, c]) => acc + (c[k] ?? 0), 0);
+  const comparable = selectedRows.filter((row) => row.comparison != null &&
+    row.comparison !== "UNKNOWN" && row.comparison !== "NOT_COMPARABLE").length;
+  const sides = update ? ["baseline", "candidate"] as const : ["single"] as const;
   const notSelectedByReason = new Map<string, string[]>();
   for (const ns of report.not_selected) notSelectedByReason.set(ns.reason ?? "–", [...(notSelectedByReason.get(ns.reason ?? "–") ?? []), ns.check_id ?? "–"]);
 
@@ -268,6 +286,25 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
       <span className="muted mono">
         {report.report_id}@{report.revision} · {report.created_at} · {label(MODE_LONG, report.mode)}
       </span>
+      <div className="row wrap">
+        <OriginBadge origin={report.data_origin} />
+        <Badge tone={report.official ? "neutral" : "caution"}>{report.official ? "공식 보고서" : "비공식 보고서"}</Badge>
+        {update && <span className="small">비교 판정 확보 {comparable}/{selectedRows.length}건</span>}
+      </div>
+      <div className={p.grid2}>
+        {sides.map((side) => {
+          const rows = selectedRows.map((row) => row[side]);
+          const completed = rows.filter((row) => row?.execution_status === "COMPLETED");
+          return <article key={side} className="card card-pad stack">
+            <strong>{side === "single" ? "검증 환경" : side === "baseline" ? "기준 환경" : "후보 환경"}</strong>
+            <span className="small">선정 {rows.length}건 · 실측 완료 {completed.filter((row) =>
+              row?.data_origin === "MEASURED" && row.evidence_ref).length}건</span>
+            <span className="small">{Object.entries(EXECUTION_LABELS).map(([status, name]) =>
+              `${name} ${rows.filter((row) => row?.execution_status === status).length}`).join(" · ")}
+              {" · "}상태 기록 없음 {rows.filter((row) => !row?.execution_status).length}</span>
+          </article>;
+        })}
+      </div>
 
       <div className={ui.cards}>
         <MetricCard title="종합 보안 판정" dot={report.overall === "FAIL" ? "bad" : report.overall === "PASS" ? "ok" : "none"} value={VERDICT[report.overall]?.label ?? report.overall} caption={`선정 ${n.selected}건`}>
@@ -317,14 +354,15 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
           </table>
         </MetricCard>
 
-        <MetricCard title="증거 출처" value={sum("manual") + sum("automated")} caption={`수동 입력 ${sum("manual")} · 자동 측정 ${sum("automated")} · 미실행 ${sum("not_run")}`}>
+        <MetricCard title={update ? "후보 환경 증거 출처" : "증거 출처"} value={sum("manual") + sum("automated")}
+          caption={`수동 입력 ${sum("manual")} · 자동 실행 ${sum("automated")} · 완료 기록 없음 ${sum("not_run")}`}>
           <table className={ui.miniTable}>
             <thead>
               <tr>
                 <th>영역</th>
                 <th className={ui.num}>수동</th>
                 <th className={ui.num}>자동</th>
-                <th className={ui.num}>미실행</th>
+                <th className={ui.num}>완료 기록 없음</th>
               </tr>
             </thead>
             <tbody>
@@ -476,6 +514,11 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
               ["보고서", <span className="mono">{`${report.report_id}@${report.revision}`}</span>],
               ["content_sha256", <Short value={report.content_sha256} n={16} />],
               ["작성", <Time iso={report.created_at} />],
+              ["판정 기준 시각", report.as_of ? <Time iso={report.as_of} /> : "확인 기록 없음"],
+              ["실행 시도", <Value v={report.execution_attempt_id} mono />],
+              ["등록 정책 원본", report.byul_policy_ref
+                ? <span className="mono">{report.byul_policy_ref.policy_id} · {report.byul_policy_ref.policy_version} · <Short value={report.byul_policy_ref.sha256} n={16} /></span>
+                : "확인 기록 없음"],
               ["팩", <EnumBadge table={PACK_STATUS} value={report.pack_review_status} />],
               ["정책", <EnumBadge table={POLICY_STATUS} value={report.policy_status} />],
             ]}
@@ -488,7 +531,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
               { id: "sha", header: "sha256", cell: (r) => <Short value={r.sha256} n={16} /> },
             ]}
             rows={report.inputs_manifest}
-            rowKey={(r) => `${r.kind}:${r.id}:${r.revision}`}
+            rowKey={(r) => `${r.kind}:${r.id}:${r.revision}:${r.sha256}`}
             pageParam="page_manifest"
           />
         </div>

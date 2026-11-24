@@ -113,6 +113,18 @@ def test_database_failure_rolls_back_all_evidence_objects(tmp_path, monkeypatch)
     assert count == 2 and refs(store) == before and store.verify() == []
 
 
+def test_import_shares_execution_lock_and_can_retry(tmp_path):
+    from guard.core.execution_recipe import execution_lock
+
+    store, pack, doc, path = two_manual_entries(tmp_path)
+    before = refs(store)
+    with execution_lock(store.root, doc["plan"]["id"]):
+        with pytest.raises(ManualEvidenceError, match="no evidence objects imported"):
+            import_evidence(store, pack, path)
+        assert refs(store) == before
+    assert len(import_evidence(store, pack, path)["imported"]) == 2
+
+
 def test_late_schema_failure_is_rejected_before_writes(tmp_path):
     store, pack, doc, path = two_manual_entries(tmp_path)
     doc["checks"][-1]["observation_notes"][0]["answer"] = 123

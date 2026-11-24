@@ -760,6 +760,11 @@
       "manifest_sha256": "64a51b5e696477a5e6d76e390c0c34b13522ec178a431023f3aaaf2705d34533",
       "reviewed_by": "Codex / preparation input consolidation; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T07:26:58+00:00"
+    },
+    {
+      "manifest_sha256": "49e22edf14565ca377ae51cce33baedba74c9872fd02339879d1b0a0d0af5de9",
+      "reviewed_by": "Codex / customer handoff and scoped collection reuse / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:47:10.991Z"
     }
   ]
 }

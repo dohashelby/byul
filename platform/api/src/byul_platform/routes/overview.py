@@ -23,10 +23,11 @@ def _error(error: Exception) -> dict[str, str]:
 
 @router.get("/meta", response_model=Meta)
 def meta(state: AppState = Depends(get_state)) -> dict[str, Any]:
+    sources = state.source_infos()
     return {
         "contracts_version": state.contracts.version,
-        "example_mode": state.example_mode,
-        "sources": state.source_infos(),
+        "example_mode": any(source["mode"] == "example" for source in sources),
+        "sources": sources,
         "runtime_connection": state.runtime.ping(),
     }
 

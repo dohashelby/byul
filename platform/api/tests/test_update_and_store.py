@@ -15,7 +15,7 @@ from byul_platform.contracts import canonical_sha256
 from byul_platform.diff import json_diff
 from byul_platform.inputs import MVP_PACK
 from byul_platform.main import create_app
-from byul_platform.sources.update import rpt_to_verification_result
+from byul_platform.sources.update import report_content_sha256, rpt_to_verification_result
 from byul_platform.store import FileDocumentStore, RevisionExists
 from conftest import EXAMPLES, FIXTURES, load_json
 
@@ -87,6 +87,41 @@ def test_reports_dir_source(tmp_path):
         detail = c.get("/api/update/results/RPT-01M598RR3HPSJNHA1MENFA6P74").json()
         assert detail["raw_checks"]["SUP-01"]["question"]
         assert len(detail["item"]["checks"]) == 77
+
+
+def test_exact_report_ref_keeps_raw_rows_and_invalid_neighbors_isolated(tmp_path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    original = load_json(RPT)
+    latest = copy.deepcopy(original)
+    latest.update(revision=2, created_at="2026-11-24T09:00:00Z", as_of="2026-11-24T08:00:00Z",
+                  execution_attempt_id="RUN-exact-two")
+    latest["by_check"][0]["question"] = "revision two"
+    latest["by_check"][0]["single"].update(
+        execution_status="ABORTED", data_origin="DECLARED",
+        evidence_ref={"kind": "EVD", "id": "EVD-01M598RQXY78K2P5F8YDVJB902", "revision": 1, "sha256": "1" * 64},
+    )
+    latest["content_sha256"] = report_content_sha256(latest)
+    (reports / "revision-1.json").write_text(json.dumps(original))
+    (reports / "revision-2.json").write_text(json.dumps(latest))
+    malformed = {**original, "by_check": None}
+    malformed["content_sha256"] = report_content_sha256(malformed)
+    (reports / "RPT-malformed.json").write_text(json.dumps(malformed))
+    (reports / "RPT-tampered.json").write_text(json.dumps({**original, "mode": "update"}))
+    with TestClient(create_app(Settings(update_reports_dir=reports))) as client:
+        listing = client.get("/api/update/results").json()
+        assert [row["report_ref"]["revision"] for row in listing["items"]] == [2, 1]
+        assert {row["errors"][0] for row in listing["invalid"]} == {"RPT_STRUCTURE_INVALID", "RPT_SHA256_MISMATCH"}
+        url = f"/api/update/results/{original['id']}"
+        first = client.get(url, params={"revision": 1, "sha256": original["content_sha256"]}).json()
+        latest_detail = client.get(url).json()
+        assert first["raw_checks"]["SUP-01"]["question"] == original["by_check"][0]["question"]
+        assert latest_detail["raw_checks"]["SUP-01"]["question"] == "revision two"
+        assert latest_detail["report"]["execution_attempt_id"] == "RUN-exact-two"
+        assert latest_detail["report"]["as_of"] == latest["as_of"]
+        assert latest_detail["report"]["checks"][0]["single"]["execution_status"] == "ABORTED"
+        assert client.get(url, params={"revision": 1, "sha256": latest["content_sha256"]}).status_code == 404
+        assert client.get(url, params={"revision": 1}).status_code == 422
 
 
 # --- store -------------------------------------------------------------------

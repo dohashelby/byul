@@ -73,7 +73,7 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
                     target_sha256=values['copy_target_sha256'],session=values['copy_record_session'],
                     source_sha256=values['copy_record_source_sha256'],inventory_sha256=values['copy_inventory_sha256'],policy_sha256=values['copy_policy_sha256'])
                 if provenance.get('owner_binding_verified') is not True or not start<=utcnow()<=end:raise ValueError
-                row.update(collected=True,file_bytes_sha256=sha256_hex(raw),file_bytes=len(raw),
+                row.update(collected=True,file_bytes_sha256=provenance['capture_sha256'],file_bytes=provenance['bytes'],
                     owner_binding_verified=provenance.get('owner_binding_verified') is True)
                 snapshots.append({'stage':stage,'collected':True,'packet':packet})
             except Exception:diagnostics.append('COPY_RECORD_UNAVAILABLE')

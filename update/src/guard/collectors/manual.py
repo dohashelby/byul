@@ -327,7 +327,6 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
 
     plan_ref = plan.ref()
     env_refs = plan.inputs.environments
-    existing = {(e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)}
     default_judge = registry.EXECUTOR_DEFAULT_JUDGES.get(EXECUTOR_NAME)
     imported = []
     prepared = []
@@ -375,12 +374,10 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
             config[OBSERVATION] = observations[OBSERVATION]["value"]
         if manual_audit.OBSERVATION in observations:
             config[manual_audit.OBSERVATION] = observations[manual_audit.OBSERVATION]["value"]
-        prev = existing.get((check.id, side))
         env_ref = env_refs[0] if side in (Side.single, Side.baseline) else env_refs[1]
         attempted_nc = v["normal"] != "not_attempted"
         evd = Evidence(
-            id=prev.id if prev else new_id("EVD"),
-            revision=prev.revision + 1 if prev else 1,
+            id=new_id("EVD"),
             data_origin=DataOrigin.DECLARED,
             refs=[plan_ref, env_ref],
             plan=plan_ref,
@@ -405,9 +402,18 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
         prepared.append(evd)
         imported.append(check.id)
     try:
-        for data in payloads.values():
-            store.put_artifact(data)
-        store.put_many(prepared)
+        if prepared:
+            from guard.core.execution_recipe import execution_lock
+
+            with execution_lock(store.root, plan.id):
+                existing = {(e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)}
+                for index, evd in enumerate(prepared):
+                    prev = existing.get((evd.check_id, evd.side))
+                    if prev is not None:
+                        prepared[index] = evd.model_copy(update={"id": prev.id, "revision": prev.revision + 1}).seal()
+                for data in payloads.values():
+                    store.put_artifact(data)
+                store.put_many(prepared)
     except Exception as exc:
         # Content-addressed blobs may remain after an I/O failure. No EVD batch
         # is partially committed, and existing blobs are never deleted/rewritten.

@@ -1,6 +1,7 @@
 # update.yml의 push 경로 필터와 같은 목록이다. PR은 이 목록으로 실행 여부를 job 단위에서 정한다.
 # GitHub 경로 필터처럼 위에서 아래로 읽고 마지막으로 맞은 줄이 이긴다. '!'로 시작하면 제외다.
 .github/workflows/update.yml
+.github/workflows/runtime-platform.yml
 .github/scripts/update_ci_relevance.py
 .github/update-ci-paths.txt
 update/**
@@ -53,4 +54,10 @@ update/docs/dev-1/ma7-local-materialization-20261113.json
 update/docs/dev-1/req17-split-collection.md
 contracts/**
 platform/api/**
+platform/web/**
+platform/scripts/**
+runtime/src/**
+runtime/labtools/**
+runtime/pyproject.toml
+runtime/uv.lock
 update/docs/dev-1/mvp-enterprise-policy-20261118.json

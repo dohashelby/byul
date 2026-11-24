@@ -329,12 +329,14 @@ def test_missing_prior_artifact_cannot_back_a_carried_pass(reuse_case):
     from guard.models.objects import Artifact
 
     case = reuse_case
-    artifact = Artifact(name="missing", path="artifacts/" + "d" * 64, sha256="d" * 64,
-                        bytes=12, collected_at=T0, collector="test")
+    stored = case["store"].put_artifact(b"EXAMPLE prior test attachment")
+    artifact = Artifact(name="missing", path=stored.path, sha256=stored.sha256,
+                        bytes=stored.bytes, collected_at=T0, collector="test")
     evd = case["evidence"].model_copy(update={"revision": 2, "artifacts": [artifact]}).seal()
     case["store"].put(evd)
     result = case["result"].model_copy(update={"revision": 2, "evidence": evd.ref(), "refs": [evd.ref()]}).seal()
     case["store"].put(result)
+    (case["store"].root / stored.path).unlink()
     context = _context(case)
     assert "PLT-04" not in context.carried_over
     assert context.triggers["PLT-04"][0].refs == ["PRIOR_ARTIFACT_MISSING_OR_CHANGED"]

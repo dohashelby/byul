@@ -262,6 +262,53 @@ def test_deferred_target_derivation_preserves_recipe_but_baseline_tampering_does
     assert configuration_sha256(cfg) != before
 
 
+def test_recipe_fixes_prepared_assets_and_other_candidate_inputs(tmp_path):
+    from guard.core.execution_recipe import configuration_sha256
+    late = tmp_path / 'late.json'
+    receiver = tmp_path / 'receiver.json'
+    receiver.write_bytes(b'initial')
+    manifest = tmp_path / 'prepared.json'
+    manifest.write_text('{"assets":{"asset.py":{}}}')
+    asset = tmp_path / 'asset.py'
+    asset.write_bytes(b'first')
+    cfg = {'update': {'kubernetes_candidate_binding': 'after_baseline'}, 'sides': {
+        'candidate': {'request_binding': {'target': str(late)},
+                      'check_config': {'LIF-03': {'prepared': str(manifest)},
+                                       'PLT-07': {'receiver_target': str(receiver)}}}}}
+    selected = configuration_sha256(cfg)
+    late.write_bytes(b'current-generation')
+    assert configuration_sha256(cfg) == selected
+    info = asset.stat()
+    asset.write_bytes(b'other')
+    os.utime(asset, ns=(info.st_atime_ns, info.st_mtime_ns))
+    assert configuration_sha256(cfg) != selected
+    asset.write_bytes(b'first')
+    receiver.write_bytes(b'changed')
+    assert configuration_sha256(cfg) != selected
+
+
+def test_requested_input_paths_uses_explicit_working_directory(tmp_path):
+    from guard.configuration import requested_input_paths
+
+    (tmp_path / "prepared.json").write_text('{"assets":{"asset.py":{}}}')
+    paths = list(requested_input_paths({"stream_buffer": {"prepared": "prepared.json"}}, base_dir=tmp_path))
+    assert [(path.name, deferred) for _, path, deferred in paths] == [
+        ("prepared.json", False), ("asset.py", False),
+    ]
+
+
+def test_requested_config_blocks_internal_overrides_and_preserves_selected_commitment():
+    from guard.core.execution_recipe import configuration_sha256
+    pack, env = baseline_pack(), environment()
+    pol = policy(pack.ref())
+    with pytest.raises(ValueError, match='REQUESTED_CONFIG_RESERVED_KEY'):
+        configuration_sha256({'sides': {'candidate': {'_kubernetes_target_sha256': 'f' * 64}}})
+    plan = bind_recipe(select(pack, [env], pol), {'fixture': 'selected'}, [env])
+    assert bind_recipe(plan, {'fixture': 'selected'}, [env]) is plan
+    with pytest.raises(ValueError, match='EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED'):
+        bind_recipe(plan, {'fixture': 'changed'}, [env])
+
+
 def test_recipe_reuses_overlapping_source_digest_and_preserves_wire_hash(tmp_path, monkeypatch):
     package = tmp_path / 'installed'
     package.mkdir()

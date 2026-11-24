@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
+import re
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 from guard.executors import registry
@@ -107,7 +110,20 @@ def validate_update_run_config(cfg: RunConfig) -> None:
 
 
 def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
-    from .execution_recipe import execution_lock, configuration_sha256, validate_policy_time
+    from .execution_recipe import execution_lock
+    if plan.mode == Mode.update:
+        validate_update_run_config(cfg)
+        effective = cfg.side_configs.values() if cfg.side_configs else (cfg,)
+        if only_side is not None or any({"real", "kubernetes"} & set(c.executors.values()) for c in effective):
+            raise ValueError("PAIRED_EXECUTION_REQUIRES_COORDINATOR")
+    with execution_lock(store.root, plan.id):
+        return run_plan_locked(store, pack, plan, cfg, only_side=only_side)
+
+
+def run_plan_locked(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
+                    only_side: Side | None = None) -> list[Evidence]:
+    """Dispatch under the PLAN lock held by the caller across lifecycle transitions."""
+    from .execution_recipe import configuration_sha256, validate_policy_time
     policy = store.resolve(plan.inputs.policy)
     validate_policy_time(policy)
     environments = [store.resolve(r) for r in plan.inputs.environments]
@@ -122,9 +138,26 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
             raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
 
     verify_recipe()
-    with execution_lock(store.root, plan.id):
-        cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
-        return _run_plan(store, pack, plan, cfg, environments, policy, verify_recipe=verify_recipe, only_side=only_side)
+    cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
+    return _run_plan(store, pack, plan, cfg, environments, policy, verify_recipe=verify_recipe, only_side=only_side)
+
+
+def recover_pending_locked(store: Store, plan: Plan, attempt_id: str) -> list[Evidence]:
+    if re.fullmatch(r"ATTEMPT-[A-Za-z0-9][A-Za-z0-9-]{0,95}", attempt_id) is None:
+        raise ValueError("ATTEMPT_ID_INVALID")
+    pending = store.root / 'pending-evidence' / attempt_id
+    if pending.is_symlink():
+        raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
+    recovered = []
+    for path in sorted(pending.glob('*.json')):
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
+        saved = Evidence.model_validate_json(path.read_bytes())
+        if saved.plan != plan.ref() or saved.execution.attempt_id != attempt_id or not saved.hash_ok() or path.stem != saved.content_sha256:
+            raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
+        recovered.append(saved)
+    store.put_many(recovered)
+    return recovered
 
 
 def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[Environment], policy: Policy, *,
@@ -135,13 +168,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
         validate_update_run_config(cfg)
 
     plan_ref = plan.ref()
-    pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
-    if pending.is_dir():
-        for path in sorted(pending.glob('*.json')):
-            saved = Evidence.model_validate_json(path.read_bytes())
-            if saved.plan != plan_ref or saved.execution.attempt_id != cfg.attempt_id or not saved.hash_ok() or path.stem != saved.content_sha256:
-                raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
-            store.put(saved)  # Idempotent commit of the exact sealed fragment.
+    recover_pending_locked(store, plan, cfg.attempt_id)
     existing = {
         (e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)
     }
@@ -187,10 +214,15 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
                 # accept it. Recovery never fabricates an empty replacement.
                 pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
                 pending.mkdir(parents=True, exist_ok=True)
-                with (pending / (evd.content_sha256 + '.json')).open('xb') as stream:
+                with NamedTemporaryFile(dir=pending, delete=False) as stream:
+                    temporary = Path(stream.name)
                     stream.write(canonical_json(evd.to_dict()))
-                    import os
-                    stream.flush(); os.fsync(stream.fileno())
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                try:
+                    os.link(temporary, pending / (evd.content_sha256 + '.json'))
+                finally:
+                    temporary.unlink()
                 raise
             out.append(evd)
     return out

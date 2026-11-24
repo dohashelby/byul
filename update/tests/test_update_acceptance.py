@@ -56,6 +56,37 @@ def test_concrete_pass_pass_accepts_but_remains_nonofficial_gpu_only(tmp_path):
     assert case[:2] == before
 
 
+def test_extended_model_is_accepted_only_with_the_entered_model_closure(tmp_path):
+    case = build_update_case(tmp_path, model_metadata={"tokenizer_revision": "synthetic-tokenizer"})
+    assert assess(case)["accepted"]
+    case = patch_case(case, "EVD", lambda raw: raw["comparability"].update(model_inventory_sha256="c" * 64))
+    result = assess(case)
+    assert not result["evidence_contract_valid"]
+    assert any("GPU/model/fixture/config" in problem for problem in result["problems"])
+
+
+def test_history_plan_in_report_does_not_replace_current_measurement_pairs(tmp_path):
+    report, objects, pack = build_update_case(tmp_path)
+    current = next(obj for obj in objects if obj["kind"] == "PLAN")
+    previous = object_from_dict(current).model_copy(update={"id": "PLAN-SYNTHETIC-PREVIOUS"}).seal()
+    previous_ref = previous.ref().model_dump(mode="json")
+
+    def attach_predecessor(raw):
+        raw["refs"].append(previous_ref)
+        raw["inputs"]["previous_plan"] = previous_ref
+
+    case = patch_case((report, [*objects, previous.to_dict()], pack), "PLAN",
+                      attach_predecessor, lambda raw: raw["id"] == current["id"])
+
+    def attach_report_predecessor(raw):
+        raw["refs"].insert(0, previous_ref)
+        raw["inputs_manifest"].insert(0, previous_ref)
+
+    result = assess(patch_case(case, "RPT", attach_report_predecessor))
+    assert result["accepted"], result["problems"]
+    assert result["refs"]["plan"]["id"] == current["id"]
+
+
 @pytest.mark.parametrize("baseline,candidate,comparison", [
     (False, True, "REGRESSED"), (True, False, "FIXED"), (True, True, "STILL_FAILING"),
 ])

@@ -1536,6 +1536,13 @@ export interface components {
             verification_level: string | null;
             /** Reasons */
             reasons: string[];
+            /** Result Sha256 */
+            result_sha256?: string | null;
+            /** Execution Status */
+            execution_status?: ("PENDING" | "RUNNING" | "COMPLETED" | "ABORTED" | "NOT_RUN") | null;
+            /** Data Origin */
+            data_origin?: ("MEASURED" | "DECLARED" | "EXAMPLE") | null;
+            evidence_ref?: components["schemas"]["ManifestRef"] | null;
         };
         /**
          * ReportView
@@ -1590,6 +1597,11 @@ export interface components {
             inputs_manifest: components["schemas"]["ManifestRef"][];
             /** Checks */
             checks: components["schemas"]["ReportCheck"][];
+            /** Execution Attempt Id */
+            execution_attempt_id?: string | null;
+            /** As Of */
+            as_of?: string | null;
+            byul_policy_ref?: components["schemas"]["Common_nullable_policy_ref"];
         };
         /** RequestCounts */
         RequestCounts: {
@@ -2541,8 +2553,24 @@ export interface components {
             guidance?: components["schemas"]["PreparationGuidance"] | null;
             /** Limitations */
             limitations?: string[];
+            /** Execution Ready */
+            execution_ready?: boolean | null;
         } & {
             [key: string]: unknown;
+        };
+        /** UpdateReportRef */
+        UpdateReportRef: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "RPT";
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Sha256 */
+            sha256: string;
         };
         /** UpdateRun */
         UpdateRun: {
@@ -2592,6 +2620,10 @@ export interface components {
             pack?: {
                 [key: string]: unknown;
             } | null;
+            /** Report Refs */
+            report_refs?: components["schemas"]["UpdateReportRef"][];
+            /** Required Checks */
+            required_checks?: string[];
         };
         /** UpdateRunList */
         UpdateRunList: {
@@ -4199,7 +4231,10 @@ export interface operations {
     };
     result_api_update_results__report_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                revision?: number | null;
+                sha256?: string | null;
+            };
             header?: never;
             path: {
                 report_id: string;

@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import os
 import inspect
+from guard.configuration import merge_config, requested_input_paths
 from guard.models import canonical_json, sha256_hex, utcnow
 
 
@@ -32,25 +33,18 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
 
     def normalize(value):
         if isinstance(value, dict):
-            return {k: normalize(v) for k, v in value.items() if not k.startswith('_')}
+            return {k: normalize(v) for k, v in value.items()}
         if isinstance(value, list): return [normalize(v) for v in value]
         if isinstance(value, Path): return str(value)
         return value
     inputs = {}
-    late_candidate = cfg.get('update', {}).get('kubernetes_candidate_binding') == 'after_baseline'
-    def files(value, location=()):
-        if not isinstance(value, dict): return
-        for key, item in value.items():
-            if key.startswith('_'): continue
-            if key in {'target', 'manifest', 'gateway_target'} and isinstance(item, (str, Path)):
-                path = Path(item)
-                if key == 'target' and late_candidate and location[:2] == ('sides', 'candidate'):
-                    # Its derivation and ENV are committed now; the owned Pod
-                    # generation is observed/sealed by the transition at run time.
-                    inputs[str(path)] = {'binding': 'owned-candidate-after-baseline/1'}
-                else: inputs[str(path)] = digest_file(path) if path.is_file() else None
-            elif isinstance(item, dict): files(item, (*location, key))
-    files(cfg)
+    for _, path, deferred in requested_input_paths(cfg):
+        if not deferred:
+            inputs[str(path)] = digest_file(path) if path.is_file() else None
+        elif str(path) not in inputs:
+            # Its derivation and ENV are committed now; the owned Pod
+            # generation is observed/sealed by the transition at run time.
+            inputs[str(path)] = {'binding': 'owned-candidate-after-baseline/1'}
     implementations = {}
     from guard.executors.registry import resolve_executor
     def factories(config, side, env=None):
@@ -71,7 +65,6 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
                         ({'name': Path(path).name, 'sha256': digest_file(Path(path))} for path in closure),
                         key=lambda item: (item['name'], item['sha256']))
     factories(cfg, 'root', environments[0] if len(environments) == 1 else None)
-    from guard.configuration import merge_config
     sides = {s: None for s in cfg.get('sides', {})}
     if len(environments) == 2: sides.update(zip(('baseline', 'candidate'), environments))
     for side, env in sides.items():
@@ -90,8 +83,10 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
         'inputs': inputs, 'implementations': implementations, 'software_sha256': sha256_hex(canonical_json(software))}))
 
 
-def validate_policy_time(policy):
-    now = utcnow()
+def validate_policy_time(policy, *, as_of=None):
+    now = utcnow() if as_of is None else as_of
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError('POLICY_VALIDITY_REQUIRES_TIMEZONE')
     if policy.valid_from is not None and now < policy.valid_from:
         raise ValueError('POLICY_NOT_YET_VALID')
     if policy.valid_until is not None and now >= policy.valid_until:
@@ -99,8 +94,14 @@ def validate_policy_time(policy):
 
 
 def bind_recipe(plan, cfg, environments=()):
+    actual = configuration_sha256(cfg, environments)
+    expected = plan.inputs.execution_recipe_sha256
+    if expected is not None:
+        if expected != actual:
+            raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
+        return plan
     return plan.model_copy(update={'inputs': plan.inputs.model_copy(update={
-        'execution_recipe_sha256': configuration_sha256(cfg, environments)})}).seal()
+        'execution_recipe_sha256': actual})}).seal()
 
 
 @contextmanager

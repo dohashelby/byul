@@ -68,6 +68,10 @@ def _run(tmp_path, version, fault=None, graph_option=None):
         rows[2], rows[3] = completion, progress
     if fault == "duplicate-return":
         rows.append(completion)
+    if fault == "return-out-of-window":
+        rows[3] = completion.replace("00:00:06.514Z", "00:00:16.514Z")
+    if fault == "skip-and-return":
+        rows.insert(2, "2026-10-26T00:00:05.000Z Skipping CUDA graph capture")
     world.raw = ("\n".join(rows) + "\n").encode()
 
     target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=world.runner)
@@ -159,9 +163,25 @@ def test_req20_retains_parser_diagnostic_only_after_owner_and_source_recheck(tmp
         assert "native_report_diagnostic" not in summary
     else:
         assert summary["native_report_diagnostic"] == "REQ20_CAPTURE_" + suffix
+    if suffix is None:
+        assert "native_capture_return_report" not in summary and summary["installed_source_sha256"] is None
+    else:
+        return_line, = [row for row in world.raw.split(b"\n") if b"Graph capturing finished" in row]
+        assert summary["native_capture_return_report"] == {
+            "reported_at": "2026-10-26T00:00:06.514000+00:00",
+            "log_line_sha256": sha256_hex(return_line),
+        }
+        assert summary["installed_source_sha256"] and summary["capture_completion_call_linenumber"] == 6929
     observations = _normalize(check, draft)["observations"]
     result = RuleTableJudge().judge(check, evidence(check_id=check.id, observations=observations), check.judge.params, {})
     assert result.verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("fault", ["wrong-callsite", "duplicate-return", "return-out-of-window", "skip-and-return"])
+def test_req20_does_not_retain_ambiguous_or_out_of_scope_return(tmp_path, fault):
+    draft, summary, _, _ = _run(tmp_path, "0.30.0", fault)
+    assert draft.status == ExecStatus.ABORTED and summary["observation"] is None
+    assert "native_capture_return_report" not in summary and summary["installed_source_sha256"] is None
 
 
 @pytest.mark.parametrize("fault", ["disabled", "wrong-target"])

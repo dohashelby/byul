@@ -106,6 +106,24 @@ def _capture_observation(raw, window, callsite):
             "native_capture_return_report_observed": True}
 
 
+def _capture_return_report(raw, window, callsite):
+    """Retain a unique reviewed return line independently of the progress display."""
+    rows = raw.split(b"\n")[:-1]
+    if any(_SKIP_TITLE in row for row in rows):
+        return None
+    try:
+        row, = (line for line in rows if _RETURN_TITLE in line)
+        timestamp, _, message = row.partition(b" ")
+        at = _stamp(timestamp.decode("ascii"))
+        started, ready = (_stamp(window[key]) for key in ("container_started_at", "ready_at"))
+    except ValueError:
+        return None
+    matched = _RETURN.fullmatch(message)
+    if not matched or int(matched["line"]) != callsite or not started <= at <= ready:
+        return None
+    return {"reported_at": at.isoformat(), "log_line_sha256": sha256_hex(row)}
+
+
 class KubernetesNormalGraphCaptureExecutor:
     name = "engine_sensor"
     version = "0.1.0+k8s-normal-graph-capture"
@@ -173,7 +191,7 @@ class KubernetesNormalGraphCaptureExecutor:
 
         prefix = target["startup_log_prefix"]
         observed = None
-        report_diagnostic = None
+        report_diagnostic = retained_return = None
         failure = "REQ20_CAPTURE_OWNER_BEFORE_UNVERIFIED"
         try:
             window, container = _ready_window(logs)
@@ -187,12 +205,13 @@ class KubernetesNormalGraphCaptureExecutor:
             if len(raw) != prefix["byte_count"] or sha256_hex(raw) != prefix["sha256"]:
                 raise ValueError
             failure = "REQ20_CAPTURE_NATIVE_REPORT_UNVERIFIED"
-            capture = diagnostic = None
+            capture = diagnostic = return_report = None
             try:
                 capture = _capture_observation(raw, window, callsite)
                 failure = "REQ20_CAPTURE_OWNER_AFTER_UNVERIFIED"
             except _CaptureReportGap as exc:
                 diagnostic = str(exc)
+                return_report = _capture_return_report(raw, window, callsite)
             after, container = _ready_window(logs)
             _verify_graph_launch(target, container, source)
             _verify_source(source_reader, source)
@@ -200,6 +219,7 @@ class KubernetesNormalGraphCaptureExecutor:
                                            for t in (logs, source_reader)):
                 observed = capture
                 report_diagnostic = diagnostic
+                retained_return = return_report
         except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
             pass
 
@@ -208,15 +228,18 @@ class KubernetesNormalGraphCaptureExecutor:
         conditions = (sha256_hex(canonical_json(execution_conditions(target, settings, [])))
                       if observed and target.get("comparison_config") else None)
         error = None if observed else failure
+        source_verified_report = observed is not None or retained_return is not None
         summary = {"profile": PROFILE, "target_sha256": target_sha, "environment_sha256": env.ref().sha256,
                    "binding_sha256": logs.report()["binding_sha256"], "fixed_boot_prefix": prefix,
-                   "installed_source_sha256": source["file_sha256"] if observed else None,
-                   "capture_completion_call_linenumber": callsite if observed else None,
+                   "installed_source_sha256": source["file_sha256"] if source_verified_report else None,
+                   "capture_completion_call_linenumber": callsite if source_verified_report else None,
                    "observation": observed, "conditions_sha256": conditions, "gap": error,
                    "missing": ["actual_graph_handle_and_descriptor_contents", "current_input_refresh_and_replay",
                                "output_consumption_and_buffer_lifetime", "replay_functional_control"]}
         if report_diagnostic is not None:
             summary["native_report_diagnostic"] = report_diagnostic
+        if retained_return is not None:
+            summary["native_capture_return_report"] = retained_return
         artifacts = []
         try:
             path = Path(workdir) / "normal_graph_capture.json"

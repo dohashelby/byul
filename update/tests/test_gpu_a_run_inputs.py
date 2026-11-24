@@ -120,6 +120,57 @@ def test_external_envs_keep_reviewed_v1_with_comparable_runtime(tmp_path, capsys
     ]
 
 
+@pytest.mark.parametrize('side', ('baseline', 'candidate'))
+def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, side):
+    release = versions()[side]
+    pods, render = deployed(tmp_path, 'v2-default', engine_version=release['version'], engine_image=release['image'],
+                             release_launch=True, normal_tp2=True)
+    pod = pods['engine']
+    pod['kind'] = 'Pod'
+    engine = pod['spec']['containers'][0]
+    assert engine['args'][-len(lab.NORMAL_TP2_ARGS):] == list(lab.NORMAL_TP2_ARGS)
+    assert all(engine['args'].count(key) == 1 for key in lab.NORMAL_TP2_ARGS[::2])
+    assert [engine['resources'][key][lab.GPU_RESOURCE] for key in ('requests', 'limits')] == ['2', '2']
+    engine_path = tmp_path / 'engine-pod.json'
+    engine_path.write_bytes(canonical_json(pod))
+    namespace_path = tmp_path / 'namespace.json'
+    namespace = json.loads(namespace_path.read_bytes())
+    assert render['normal_tp2'] == lab.NORMAL_TP2
+    kwargs = {'inventory': 'b' * 64, 'gpu_model': 'NVIDIA L4', 'driver': 'EXAMPLE-driver',
+              'observed_engine_version': release['version'], 'external_platform': 'Linux x86_64',
+              'namespace': namespace, 'engine_pod': pod}
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_OBSERVATION_REQUIRED$'):
+        inputs.environment(render, **kwargs)
+    env_path = tmp_path / 'env.json'
+    inputs.main(['env', '--render', str(tmp_path / 'render.json'), '--external-platform', 'Linux x86_64',
+                 '--gpu-model', 'NVIDIA L4', '--driver', 'EXAMPLE-driver', '--model-inventory', 'b' * 64,
+                 '--observed-engine-version', release['version'], '--observed-gpu-count', '2',
+                 '--engine-pod', str(engine_path), '--namespace', str(namespace_path), '--out', str(env_path)])
+    env = load_environment(env_path)
+    assert {key: getattr(env.runtime, key) for key in lab.NORMAL_TP2} == lab.NORMAL_TP2
+    assert env.data_origin.value == 'DECLARED'
+
+    target_path = tmp_path / 'target.json'
+    inputs.main(['target', '--env', str(env_path), '--render', str(tmp_path / 'render.json'),
+                 '--engine-pod', str(engine_path), '--namespace', str(namespace_path),
+                 '--probe-pod', str(tmp_path / 'probe-pod.json'), '--context', 'byul-aws-lab',
+                 '--observed-engine-version', release['version'], '--out', str(target_path)])
+    saved = json.loads(target_path.read_bytes())
+    assert saved['observed_version'] == release['version']
+    assert saved['environment_ref'] == env.ref().model_dump(mode='json')
+    assert 'chat_template' not in render and saved['lab'] is False
+    assert saved['comparison_config']['launch'] == {'argv': engine['args'], 'max_model_len': render['max_model_len']}
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_MODEL_MISMATCH$'):
+        inputs.target(env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
+                      api_model='different-model', observed_engine_version=release['version'])
+    with pytest.raises(ValueError, match='^RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH$'):
+        inputs.target(env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
+                      observed_engine_version='other-version')
+    engine['resources']['limits'][lab.GPU_RESOURCE] = '1'
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+        inputs.environment(render, observed_gpu_count=2, **kwargs)
+
+
 @pytest.mark.parametrize('damage', ('legacy', 'mode-missing', 'mode-v2', 'mode-env', 'image'))
 def test_external_env_requires_reviewed_v1_render(tmp_path, damage):
     release = versions()['baseline']

@@ -44,7 +44,7 @@ function columns(sessionId: string | null | undefined): Column<RequestRow>[] {
       ),
       sort: (r) => r.request_id,
     },
-    { id: "scope", header: "환경·실행", cell: (r) => <ScopeBadges environment={r.environment} runId={r.run_id} />, sort: (r) => r.environment },
+    { id: "scope", header: "환경·실행", cell: (r) => <ScopeBadges environment={r.environment} runId={r.run_id} />, sort: (r) => r.environment, hidden: true },
     {
       id: "model",
       header: "모델",
@@ -60,12 +60,12 @@ function columns(sessionId: string | null | undefined): Column<RequestRow>[] {
       ),
       sort: (r) => r.model,
     },
-    { id: "max_tokens", header: "max_tokens", cell: (r) => <Value v={r.max_tokens} />, sort: (r) => r.max_tokens },
+    { id: "max_tokens", header: "max_tokens", cell: (r) => <Value v={r.max_tokens} />, sort: (r) => r.max_tokens, hidden: true },
     { id: "outcome", header: "결과", cell: (r) => <EnumBadge table={REQUEST_RESULT} value={r.outcome} />, sort: (r) => r.outcome },
     { id: "reason_code", header: "사유", cell: (r) => label(GATEWAY_REASON, r.reason_code), sort: (r) => r.reason_code },
     { id: "delivery_attempted", header: "엔진 전달", cell: (r) => r.delivery_attempted === true ? "전달" : r.delivery_attempted === false ? "미전달" : "–", sort: (r) => r.delivery_attempted },
     // platform 추가 열(기본 숨김)
-    { id: "http_status", header: "클라이언트 HTTP 상태", cell: (r) => <Value v={r.http_status} />, sort: (r) => r.http_status, hidden: true },
+    { id: "http_status", header: "HTTP", cell: (r) => <Value v={r.http_status} />, sort: (r) => r.http_status },
     { id: "engine_http_status", header: "엔진 HTTP", cell: (r) => <Value v={r.engine_http_status} />, sort: (r) => r.engine_http_status, hidden: true },
     { id: "backend_kind", header: "백엔드", cell: (r) => <Value v={r.backend_kind} />, sort: (r) => r.backend_kind, hidden: true },
     { id: "data_origin", header: "자료 등급", cell: (r) => <OriginBadge origin={r.data_origin} detail={r.origin_detail} />, sort: (r) => r.data_origin, hidden: true },
@@ -133,16 +133,19 @@ export function RequestsPage() {
             <FilterBar>
               <input
                 className="input"
-                style={{ width: 240, height: 26 }}
-                placeholder="request_id 또는 모델 검색"
+                style={{ width: "min(360px, 100%)", height: 32 }}
+                placeholder="요청 ID 또는 모델 검색"
                 value={filters.q ?? ""}
                 onChange={(e) => patch({ q: e.target.value || null })}
                 aria-label="검색"
               />
+              <details>
+                <summary>추가 필터</summary>
+                <FilterBar>
               <FilterSelect label="모델" value={filters.model} onChange={(v) => patch({ model: v })} options={opt(uniq(all.map((r) => r.model)))} />
               <FilterSelect label="사유" value={filters.reason} onChange={(v) => patch({ reason: v })} options={opt(uniq(all.map((r) => r.reason_code)), GATEWAY_REASON)} />
               <FilterSelect label="스트리밍" value={filters.stream} onChange={(v) => patch({ stream: v })} options={[{ value: "true", label: "예" }, { value: "false", label: "아니오" }]} />
-              <FilterSelect label="run_id" value={filters.run} onChange={(v) => patch({ run: v })} options={opt(uniq(all.map((r) => r.run_id)))} />
+              <FilterSelect label="실행 회차" value={filters.run} onChange={(v) => patch({ run: v })} options={opt(uniq(all.map((r) => r.run_id)))} />
               <button className="btn btn-small" type="button" onClick={saveCurrent}>
                 필터 저장
               </button>
@@ -156,13 +159,15 @@ export function RequestsPage() {
                   ))}
                 </select>
               )}
+                </FilterBar>
+              </details>
               {FILTER_KEYS.some((k) => filters[k]) && (
                 <button className="btn btn-small btn-ghost" type="button" onClick={() => patch(Object.fromEntries(FILTER_KEYS.map((k) => [k, null])))}>
                   필터 지우기
                 </button>
               )}
             </FilterBar>
-            {data.truncated && <div className="small muted">runtime에서 최근 요청만 가져왔습니다(상한 200건).</div>}
+            {data.truncated && <div className="notice">최근 요청 중 일부만 표시합니다.</div>}
             <div>
               <DataTable
                 columns={columns(status.data?.item?.observation_session_id)}
@@ -171,13 +176,12 @@ export function RequestsPage() {
                 onRowClick={(r) => patch({ sel: r.request_id })}
                 selectedKey={selected}
                 initialSort={{ id: "recorded_at", dir: "desc" }}
-                storageKey="requests-v2"
-                empty={<p className="muted" style={{ margin: 0, padding: "24px 0", textAlign: "center" }}>{filters.outcome ? `${REQUEST_RESULT[filters.outcome]?.label ?? filters.outcome} 요청 미기록. 필터와 기간을 확인하세요.` : "요청 기록 없음. 수집 상태와 기간을 확인하세요."}</p>}
+                storageKey="requests-v3"
+                empty={<p className="muted" style={{ margin: 0, padding: "24px 0", textAlign: "center" }}>{filters.outcome ? `${REQUEST_RESULT[filters.outcome]?.label ?? filters.outcome} 요청 기록 없음. 필터와 기간을 확인하세요.` : "요청 기록 없음. 수집 상태와 기간을 확인하세요."}</p>}
               />
               {selected && <RequestDrawer id={selected} onClose={() => patch({ sel: null })} />}
             </div>
             <InvalidRows items={data.invalid} what="요청 기록" />
-            <p className="small muted">지연시간·토큰 수·비용: 런타임 미수집 항목.</p>
           </>
         )}
       </Query>

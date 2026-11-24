@@ -469,5 +469,5 @@ def test_saved_partial_permission_evidence_remains_verifiable_after_restore(tmp_
     restored = Store(tmp_path / "restored")
     assert restored.verify() == []
     assert canonical_json(restored.resolve(evd.ref()).to_dict()) == original
-    replayed, = judge_plan(restored, get_pack(restored, pack.ref()), restored.resolve(evd.plan), as_of=evd.created_at)
+    replayed, = judge_plan(restored, get_pack(restored, pack.ref()), restored.resolve(evd.plan), as_of=result.as_of)
     assert replayed.ref() == result.ref() and replayed.verdicts.security == Verdict.FAIL

@@ -189,7 +189,7 @@ def test_saved_pack_report_export_restore_and_rejudge_preserve_verified_failure(
     from tests.builders import PACK_DIR
     store, pack, plan, evd, result, _ = run(tmp_path, monkeypatch, World(connected=True))
     before = evd.to_dict()
-    report = build_report(store, pack, plan, as_of=evd.created_at)
+    report = build_report(store, pack, plan, as_of=result.as_of)
     store.put(report)
     assert put_pack(store, PACK_DIR) == pack.ref()
     assert report.official is False and "PLT-02" in json.dumps(report.to_dict())
@@ -198,7 +198,7 @@ def test_saved_pack_report_export_restore_and_rejudge_preserve_verified_failure(
     restored = Store(tmp_path / "restored")
     assert store.verify() == restored.verify() == []
     saved = get_pack(restored, pack.ref())
-    replay, = judge_plan(restored, saved, restored.resolve(plan.ref()), as_of=evd.created_at)
+    replay, = judge_plan(restored, saved, restored.resolve(plan.ref()), as_of=result.as_of)
     assert replay.ref() == result.ref() and restored.resolve(evd.ref()).to_dict() == before
 
 

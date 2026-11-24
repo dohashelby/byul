@@ -443,7 +443,7 @@ def test_saved_export_restore_and_rejudge_preserve_the_same_partial_failure(tmp_
     from tests.builders import PACK_DIR
     store, pack, plan, evd, result, _ = run(tmp_path, monkeypatch, World(change))
     before = evd.to_dict()
-    report = build_report(store, pack, plan, as_of=evd.created_at)
+    report = build_report(store, pack, plan, as_of=result.as_of)
     store.put(report)
     assert put_pack(store, PACK_DIR) == pack.ref() and report.official is False
     export_bundle(store.root, tmp_path / "evidence.zip")
@@ -451,5 +451,5 @@ def test_saved_export_restore_and_rejudge_preserve_the_same_partial_failure(tmp_
     restored = Store(tmp_path / "restored")
     assert store.verify() == restored.verify() == []
     saved = get_pack(restored, pack.ref())
-    replay, = judge_plan(restored, saved, restored.resolve(plan.ref()), as_of=evd.created_at)
+    replay, = judge_plan(restored, saved, restored.resolve(plan.ref()), as_of=result.as_of)
     assert replay.ref() == result.ref() and restored.resolve(evd.ref()).to_dict() == before

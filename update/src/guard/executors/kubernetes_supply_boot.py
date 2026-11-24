@@ -63,6 +63,7 @@ def _read_projection(captured, prepared, digest, prepared_sha256, analysis):
 
 
 def _approved_read_gap_recordings(captured):
+    """Retain verified recording digests even when no approved file reads were recorded."""
     from guard.adapters.vllm_approved_file_read_composition import EVENT
 
     diagnostics = []
@@ -76,9 +77,8 @@ def _approved_read_gap_recordings(captured):
                 or capture["summary"]["discarded_tail_bytes"] != 0):
             continue
         phases = [row["payload"]["phase"] for row in capture["records"] if row["event"] == EVENT]
-        if phases:
-            diagnostics.append({"recording_sha256": provenance["capture_sha256"],
-                                "file_read_event_count": len(phases), "open_raise_count": phases.count("OPEN_RAISE")})
+        diagnostics.append({"recording_sha256": provenance["capture_sha256"],
+                            "file_read_event_count": len(phases), "open_raise_count": phases.count("OPEN_RAISE")})
     return diagnostics
 
 

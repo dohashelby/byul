@@ -1,4 +1,5 @@
 """A GPU 1차 입력 조립. 렌더링한 Pod에 상태를 붙인 EXAMPLE로만 확인한다. kubectl·엔진 없음."""
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -121,7 +122,7 @@ def test_external_envs_keep_reviewed_v1_with_comparable_runtime(tmp_path, capsys
 
 
 @pytest.mark.parametrize('side', ('baseline', 'candidate'))
-@pytest.mark.parametrize('generation', ('v2-default', 'v2-template'))
+@pytest.mark.parametrize('generation', ('v2-default', 'v2-template', lab.NORMAL_TP2_V1_EAGER_GENERATION))
 def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, side, generation):
     release = versions()[side]
     pods, render = deployed(tmp_path, generation, engine_version=release['version'], engine_image=release['image'],
@@ -161,7 +162,7 @@ def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, sid
     assert saved['environment_ref'] == env.ref().model_dump(mode='json')
     assert saved['lab'] is False
     launch = {'argv': engine['args'], 'max_model_len': render['max_model_len']}
-    if generation == 'v2-template':
+    if generation in lab.NORMAL_TP2_TEMPLATE_GENERATIONS:
         assert engine['args'].count('--chat-template') == 1
         launch['chat_template'] = {'profile': inputs.CHAT_TEMPLATE_PROFILE, 'version': '1',
                                    'sha256': lab.CHAT_TEMPLATE_SHA256, 'container_path': lab.CHAT_TEMPLATE_PATH,
@@ -187,6 +188,43 @@ def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, sid
     engine['resources']['limits'][lab.GPU_RESOURCE] = '1'
     with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
         inputs.environment(render, observed_gpu_count=2, **kwargs)
+    engine['resources']['limits'][lab.GPU_RESOURCE] = '2'
+    if generation != lab.NORMAL_TP2_V1_EAGER_GENERATION:
+        assert render['launch']['runner'] == 'engine-default'
+        return
+    assert render['launch']['runner'] == 'v1'
+    assert 'runner=v1' in env.runtime.platform.split('; ')
+    assert approved_file_read_preparation(env)['model_root'] == '/models'
+    assert engine['args'].count(lab.EAGER_WEIGHT_READ_ARG) == 1
+    assert '--enforce-eager' not in engine['args']
+    fixed_env = {'name': lab.V2_MODEL_RUNNER_ENV, 'value': '0'}
+    assert engine['env'].count(fixed_env) == 1
+    with pytest.raises(ValueError, match='^AWS_NORMAL_TP2_V1_EAGER_LAUNCH_UNAVAILABLE$'):
+        deployed(tmp_path, generation, engine_version=release['version'], engine_image=release['image'], release_launch=True)
+    wrong_runtime = env.runtime.model_copy(update={'platform': env.runtime.platform.replace('runner=v1', 'runner=engine-default')})
+    wrong_env = env.model_copy(update={'runtime': wrong_runtime}).seal()
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+        inputs.target(wrong_env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
+                      observed_engine_version=release['version'])
+
+    def validate_changed_pod(changed_pod, changed_render=render):
+        with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+            inputs.environment(changed_render, **{**kwargs, 'engine_pod': changed_pod}, observed_gpu_count=2)
+        with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+            inputs.target(env, changed_render, namespace, changed_pod, pods['probe'],
+                          context='byul-aws-lab', observed_engine_version=release['version'])
+
+    for selectors in ([], [{**fixed_env, 'value': '1'}], [fixed_env, fixed_env]):
+        changed_pod = deepcopy(pod)
+        changed_engine = changed_pod['spec']['containers'][0]
+        changed_engine['env'] = [item for item in changed_engine['env'] if item['name'] != lab.V2_MODEL_RUNNER_ENV]
+        changed_engine['env'].extend(selectors)
+        validate_changed_pod(changed_pod)
+    changed_pod = deepcopy(pod)
+    changed_argv = changed_pod['spec']['containers'][0]['args']
+    changed_argv.remove(lab.EAGER_WEIGHT_READ_ARG)
+    validate_changed_pod(changed_pod, {**render, 'launch': {**render['launch'], 'argv': changed_argv}})
+
 
 
 @pytest.mark.parametrize('damage', ('legacy', 'mode-missing', 'mode-v2', 'mode-env', 'image'))

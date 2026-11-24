@@ -190,32 +190,42 @@ def _enrich(conn, report, vr, artifacts):
     def manifest(pack_id, revision, sha):
         return archived_manifest(artifacts, {"kind": "PACK", "id": pack_id, "revision": revision, "sha256": sha})
     sides = ("baseline", "candidate") if report["mode"] == "update" else ("single",)
-    plan = _object(conn, vr.get("plan_ref"), "PLAN")
+    plan_ref = vr.get("plan_ref")
+    plan = _object(conn, plan_ref, "PLAN")
     refs = plan.get("inputs", {}).get("environments", [])
-    if len(refs) == len(sides):
+    side_environments = {}
+    if isinstance(refs, list) and len(refs) == len(sides):
         for side, ref in zip(sides, refs, strict=True):
             if ref not in vr["environment_refs"]:
                 continue
+            side_environments[side] = ref
             engine = _object(conn, ref, "ENV").get("engine", {})
             if isinstance(engine.get("name"), str) and isinstance(engine.get("version"), str):
                 report["targets"][side] = {"name": engine["name"], "version": engine["version"]}
+    report_inputs = vr["inputs_manifest"]
     for check, source in zip(report["checks"], vr["checks"], strict=True):
         for side in sides:
             view = check[side]
-            if view is None:
+            if view is None or side not in side_environments:
                 continue
             ref = source["sides"][side].get("result_ref")
+            if ref not in report_inputs:
+                continue
             result = _object(conn, ref, "RES")
             if result.get("check_id") != check["check_id"] or result.get("side") != side:
                 continue
+            evd_ref = result.get("evidence")
+            if evd_ref not in report_inputs or view.get("evidence_ref") not in (None, evd_ref):
+                continue
+            evd = _object(conn, evd_ref, "EVD")
+            origin = evd.get("data_origin")
+            if (evd.get("check_id") != check["check_id"] or evd.get("side") != side
+                    or evd.get("plan") != plan_ref or evd.get("environment") != side_environments[side]
+                    or view.get("data_origin") not in (None, origin)):
+                continue
             missing = result.get("missing_observations", [])
             view["missing_observations"] = [key for key in missing if isinstance(key, str)]
-            evd_ref = result.get("evidence")
-            evd = _object(conn, evd_ref, "EVD")
-            if evd.get("check_id") != check["check_id"] or evd.get("side") != side:
-                continue
             view["evidence_ref"] = evd_ref
-            origin = evd.get("data_origin")
             if origin in ("MEASURED", "DECLARED", "EXAMPLE"):
                 view["data_origin"] = origin
             view["unverified_observations"] = [
@@ -223,8 +233,7 @@ def _enrich(conn, report, vr, artifacts):
                 if _observed(evd, key) is False
             ]
             view["finding"] = _finding(check["check_id"], view, result, evd)
-            evidence_plan = _object(conn, evd.get("plan"), "PLAN")
-            inputs = evidence_plan.get("inputs", {})
+            inputs = plan.get("inputs", {})
             ref = inputs.get("pack") or {}
             policy_ref = inputs.get("policy")
             traces = None

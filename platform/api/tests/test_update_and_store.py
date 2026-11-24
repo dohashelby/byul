@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import json
 import shutil
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -15,7 +17,7 @@ from byul_platform.contracts import canonical_sha256
 from byul_platform.diff import json_diff
 from byul_platform.inputs import MVP_PACK
 from byul_platform.main import create_app
-from byul_platform.sources.report_evidence import _decisions, _finding, _import_violation
+from byul_platform.sources.report_evidence import _decisions, _enrich, _finding, _import_violation
 from byul_platform.sources.update import report_content_sha256, rpt_to_verification_result
 from byul_platform.store import FileDocumentStore, RevisionExists
 from conftest import EXAMPLES, FIXTURES, load_json
@@ -144,6 +146,48 @@ def test_report_detail_uses_raw_rows_from_selected_revision(tmp_path):
         detail = response.json()
         assert detail["item"]["report_ref"]["revision"] == 2
         assert detail["raw_checks"]["SUP-01"]["question"] == detail["item"]["checks"][0]["question"] == "선택한 보고서 판본의 질문"
+
+
+@pytest.mark.parametrize("issue", [None, "missing-result", "missing-evidence", "other-plan", "other-environment", "different-bound-evidence"])
+def test_archived_details_require_exact_manifest_plan_and_side(tmp_path, issue):
+    with closing(sqlite3.connect(":memory:")) as conn:
+        conn.execute("CREATE TABLE objects (id, revision, kind, content_sha256, body)")
+
+        def save(kind, name, **fields):
+            data = {"id": f"{kind}-{name}", "revision": 1, "kind": kind, **fields}
+            sha = canonical_sha256(data)
+            conn.execute("INSERT INTO objects VALUES (?,?,?,?,?)",
+                         (data["id"], 1, kind, sha, json.dumps({**data, "content_sha256": sha})))
+            return {"id": data["id"], "revision": 1, "kind": kind, "sha256": sha}
+
+        environment = save("ENV", "fixture", engine={"name": "vllm", "version": "0.30.0"})
+        other_environment = save("ENV", "other")
+        plan = save("PLAN", "fixture", inputs={"environments": [environment]})
+        other_plan = save("PLAN", "other", inputs={"environments": [environment]})
+        evidence = save("EVD", "fixture", check_id="SUP-04", side="single", data_origin="MEASURED",
+                        plan=other_plan if issue == "other-plan" else plan,
+                        environment=other_environment if issue == "other-environment" else environment,
+                        execution={"status": "COMPLETED"},
+                        observations={"running_image_unapproved": {"collected": True, "value": True}})
+        result = save("RES", "fixture", evidence=evidence, side="single", check_id="SUP-04", verdicts={"security": "FAIL"})
+        report_inputs = [plan, environment]
+        if issue != "missing-result":
+            report_inputs.append(result)
+        if issue != "missing-evidence":
+            report_inputs.append(evidence)
+        view = {"security": "FAIL", "functional": None}
+        if issue == "different-bound-evidence":
+            view["evidence_ref"] = {**evidence, "id": "EVD-bound"}
+        original = view.copy()
+        report = {"mode": "audit", "targets": {}, "checks": [{"check_id": "SUP-04", "single": view}]}
+        verification = {"plan_ref": plan, "environment_refs": [environment], "inputs_manifest": report_inputs,
+                        "checks": [{"sides": {"single": {"result_ref": result}}}]}
+        _enrich(conn, report, verification, tmp_path)
+        if issue is None:
+            assert view["finding"] == {"code": "unapproved_running_image"}
+            assert view["evidence_ref"] == evidence and view["data_origin"] == "MEASURED"
+        else:
+            assert view == original
 
 
 @pytest.mark.parametrize(("check_id", "observation", "value", "code"), [

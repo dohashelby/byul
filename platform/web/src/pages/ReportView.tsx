@@ -34,6 +34,14 @@ const AXES = [
   ["performance", "성능"],
 ] as const;
 
+const EXECUTION_LABELS = {
+  PENDING: "대기",
+  RUNNING: "진행 중",
+  COMPLETED: "완료",
+  ABORTED: "중단",
+  NOT_RUN: "미실행",
+} as const;
+
 const VERDICT_COLOR: Record<string, string> = {
   PASS: "var(--accent)",
   FAIL: "var(--error)",
@@ -306,6 +314,7 @@ function unconfirmedReasons(side: ReportSide) {
 
 function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Report; raw: unknown; onClose: () => void }) {
   const update = report.mode === "update";
+  const rawRow = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
   const sides: SideKey[] = update ? ["baseline", "candidate"] : ["single"];
   const present = sides.filter((key) => c[key]);
   const candidateFinding = measuredFinding(c.candidate);
@@ -336,6 +345,7 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                       <strong>{SIDE_LABEL[key]} · {targetLabel(report, key)}</strong>
                       {side ? <>
                         <SideChips side={side} />
+                        <span className="small">실행 상태 {side.execution_status ? EXECUTION_LABELS[side.execution_status] : "확인 기록 없음"}</span>
                         <span className="row small">증거 등급 {side.data_origin ? <OriginBadge origin={side.data_origin} /> : "확인 기록 없음"}</span>
                       </> : <span className="muted">판정 기록 없음</span>}
                     </div>;
@@ -343,6 +353,8 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                 </div>
                 {update && !summarizesComparison && <p>{comparisonText(c)}</p>}
               </section>
+              {rawRow?.carried_over != null && <section><h4>이월 근거</h4><JsonView value={rawRow.carried_over} /></section>}
+              {rawRow?.previous_result != null && <section><h4>이전 판정</h4><JsonView value={rawRow.previous_result} /></section>}
               {present.some((key) => measuredFinding(c[key])) && (
                 <section>
                   {present.map((key) => {
@@ -412,8 +424,11 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                   return (
                     <div key={key} className="stack">
                       <h4>{SIDE_LABEL[key]}</h4>
-                      {side.result_id && <p className="mono">RES · {side.result_id}@{side.result_revision}</p>}
-                      {side.evidence_ref && <p className="mono">EVD · {side.evidence_ref.id}@{side.evidence_ref.revision}</p>}
+                      {side.verification_level && <p className="row small">판정 검증 등급 <OriginBadge origin={side.verification_level} /></p>}
+                      {side.result_id && <p className="mono">RES · {side.result_id}@{side.result_revision}
+                        {side.result_sha256 && <> · <Short value={side.result_sha256} n={16} /></>}</p>}
+                      {side.evidence_ref && <p className="mono">EVD · {side.evidence_ref.id}@{side.evidence_ref.revision}
+                        {side.evidence_ref.sha256 && <> · <Short value={side.evidence_ref.sha256} n={16} /></>}</p>}
                       {measuredFinding(side)?.code === "forbidden_code_revision_imported" && (
                         <KeyValue items={[
                           ["요청 필드", <code>{side.finding?.field}</code>],
@@ -457,6 +472,9 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
   });
   const evidence = Object.entries(report.evidence_counts);
   const sum = (k: string) => evidence.reduce((acc, [, c]) => acc + (c[k] ?? 0), 0);
+  const comparable = selectedRows.filter((row) => row.comparison != null &&
+    row.comparison !== "UNKNOWN" && row.comparison !== "NOT_COMPARABLE").length;
+  const sides = update ? ["baseline", "candidate"] as const : ["single"] as const;
   const notSelectedByReason = new Map<string, string[]>();
   for (const ns of report.not_selected) notSelectedByReason.set(ns.reason ?? "–", [...(notSelectedByReason.get(ns.reason ?? "–") ?? []), ns.check_id ?? "–"]);
 
@@ -493,12 +511,19 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
 
       <section className="stack" aria-label="검증 대상 엔진 판본">
         <div className={p.reportSides}>
-          {(update ? ["baseline", "candidate"] as const : ["single"] as const).map((side) => {
-            const verdicts = update ? selectedRows.flatMap((row) => row[side]?.security ?? []) : [];
+          {sides.map((side) => {
+            const rows = selectedRows.map((row) => row[side]);
+            const verdicts = update ? rows.flatMap((row) => row?.security ?? []) : [];
+            const measured = rows.filter((row) => row?.execution_status === "COMPLETED"
+              && row.data_origin === "MEASURED" && row.evidence_ref).length;
             return (
-              <div key={side} className="card stack">
+              <article key={side} className="card stack" aria-label={`${SIDE_LABEL[side]} 환경`}>
                 <strong>{SIDE_LABEL[side]}</strong>
                 <span>{targetLabel(report, side)}</span>
+                <span className="small">선정 {rows.length}건 · 실측 완료 {measured}건</span>
+                <span className="small">{Object.entries(EXECUTION_LABELS).map(([status, name]) =>
+                  `${name} ${rows.filter((row) => row?.execution_status === status).length}`).join(" · ")}
+                  {" · "}상태 기록 없음 {rows.filter((row) => !row?.execution_status).length}</span>
                 {verdicts.length > 0 && (
                   <span className="small muted">
                     보안 {["PASS", "FAIL", "UNKNOWN", "NOT_APPLICABLE"].map((value) =>
@@ -506,11 +531,12 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
                     ).join(" · ")}
                   </span>
                 )}
-              </div>
+              </article>
             );
           })}
         </div>
         {pairedRows.length > 0 && <p className="small">두 판본에 모두 기록된 보안 판정 중 {changed}건이 달라졌습니다.</p>}
+        {update && <p className="small">비교 판정 확보 {comparable}/{selectedRows.length}건</p>}
         <p className="small muted">PASS 충족 · FAIL 미충족 · UNKNOWN 근거 부족으로 판정 미확정</p>
       </section>
 
@@ -722,6 +748,11 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
               ["보고서", <span className="mono">{`${report.report_id}@${report.revision}`}</span>],
               ["content_sha256", <Short value={report.content_sha256} n={16} />],
               ["작성", <Time iso={report.created_at} />],
+              ["판정 기준 시각", report.as_of ? <Time iso={report.as_of} /> : "확인 기록 없음"],
+              ["실행 시도", <Value v={report.execution_attempt_id} mono />],
+              ["등록 정책 원본", report.byul_policy_ref
+                ? <span className="mono">{report.byul_policy_ref.policy_id} · {report.byul_policy_ref.policy_version} · <Short value={report.byul_policy_ref.sha256} n={16} /></span>
+                : "확인 기록 없음"],
               ["팩", <EnumBadge table={PACK_STATUS} value={report.pack_review_status} />],
               ["정책", <EnumBadge table={POLICY_STATUS} value={report.policy_status} />],
             ]}
@@ -734,7 +765,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
               { id: "sha", header: "sha256", cell: (r) => <Short value={r.sha256} n={16} /> },
             ]}
             rows={report.inputs_manifest}
-            rowKey={(r) => `${r.kind}:${r.id}:${r.revision}`}
+            rowKey={(r) => `${r.kind}:${r.id}:${r.revision}:${r.sha256}`}
             pageParam="page_manifest"
           />
         </div>

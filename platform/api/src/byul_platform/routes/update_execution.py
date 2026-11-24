@@ -31,8 +31,9 @@ def _call(callback, *args):
 @router.get("/execution-settings", response_model=UpdateExecutionSettings)
 def execution_settings(request: Request, state: AppState = Depends(get_state)):
     service = state.update_execution
-    return UpdateExecutionSettings(available=service.available, can_execute=_can_execute(request, state),
-        unavailable_reason=service.unavailable_reason(), temporary=state.store_mode == "example")
+    reason = service.unavailable_reason()
+    return UpdateExecutionSettings(available=reason is None, can_execute=_can_execute(request, state),
+        unavailable_reason=reason, temporary=state.store_mode == "example")
 
 
 @router.get("/runs", response_model=UpdateRunList)

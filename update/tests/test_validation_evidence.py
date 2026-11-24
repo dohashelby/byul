@@ -14,7 +14,7 @@ from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import put_pack
 from guard.validation_evidence import (
-    file_sha256, inventory_tree, read_objects, verify_saved_bundle, verify_store_files,
+    file_sha256, inventory_tree, read_objects, report_plan_ref, verify_saved_bundle, verify_store_files,
 )
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, evidence, policy
 from tests.prepared_fixtures import manual_setup_seed
@@ -72,6 +72,20 @@ def test_reads_original_pack_and_artifact_without_writes_or_database_sidecars(sa
     assert file_sha256(root / evd.artifacts[0].path) == evd.artifacts[0].sha256
     assert _state(root) == before
     assert not any(root.glob("store.sqlite-*"))
+
+
+def test_reads_exact_current_pack_with_multiple_saved_plans(saved, monkeypatch):
+    root, old, _ = saved
+    current = old.model_copy(update={"id": "PLAN-EXAMPLE-CURRENT", "refs": [*old.refs, old.ref()],
+                                    "inputs": old.inputs.model_copy(update={"previous_plan": old.ref()})}).seal()
+    Store(root).put(current)
+    before = _state(root)
+    _forbid_writes_and_processes(monkeypatch)
+    objects = read_objects(root)
+    report = {"inputs_manifest": [old.ref().model_dump(mode="json"), current.ref().model_dump(mode="json")]}
+    assert report_plan_ref(report, objects) == current.ref()
+    assert verify_store_files(root, objects, current.ref()).ref() == current.inputs.pack
+    assert _state(root) == before
 
 
 @pytest.mark.parametrize("suffix", ["-wal", "-journal"])

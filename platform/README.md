@@ -10,19 +10,16 @@ platform/
 
 ## 실행
 
-```sh
-# 1. 화면 빌드 (Node는 빌드할 때만 쓴다. 운영에는 Node 프로세스가 없다)
-cd platform/web
-npm install
-npm run build              # → web/dist
+저장소 루트에서 같은 커밋의 소스, Python 3.12, `uv`, Node로 준비한다.
 
-# 2. API + 화면
-cd ../api
-uv sync
-uv run --with-editable ../../update byul-platform  # http://127.0.0.1:8700 (등록 입력 변환 연동)
+```sh
+(cd update && uv sync --frozen)
+(cd platform/web && npm ci && npm run build)
+(cd platform/api && uv sync --frozen && uv run --frozen --with-editable ../../update byul-platform)
 ```
 
-- 서버는 `127.0.0.1`(루프백)에만 연다. 로그인이 없으므로 외부 주소를 주면 시작하지 않는다.
+- 서버는 기본적으로 로그인과 CSRF 검사를 사용하며 `127.0.0.1:8700`에서 시작한다. 고객 인수에서는 초기 관리자 비밀번호 변경과 별도 영속 데이터 디렉터리를 준비한다.
+- API에 등록 입력 변환용 Guard가 연결되어야 하며, 별도 실행용 Python에서도 같은 Guard 소스를 찾을 수 있어야 한다. 설치 환경을 변경하면 서버를 다시 시작한다.
 - `web/dist`가 없으면 `/api/*` 밖의 경로는 503 `WEB_NOT_BUILT`를 돌려준다.
 - 화면 개발: API를 띄운 채 `cd web && npm run dev` (Vite가 `/api`를 8700으로 넘긴다).
 
@@ -51,6 +48,7 @@ runtime 기록은 `platform/.runtime-data`에 쌓인다(git 제외). 조회 보�
 | `BYUL_UPDATE_DIR` | 검증 실행에 사용할 update 작업 폴더. Pack·입력 변환 도구·TOML 내부 상대 경로의 기준 | 저장소의 `update/` |
 | `BYUL_UPDATE_PYTHON` | guard를 설치한 Python 실행 파일. CLI를 셸 없이 별도 프로세스로 실행한다 | `BYUL_UPDATE_DIR/.venv/bin/python` |
 | `BYUL_UPDATE_CONFIG` | 서버 관리자가 준비한 검증 실행 TOML. 브라우저에서 선택·변경하지 않는다. 상대 경로는 update 폴더 기준 | `examples/gpu-bounded.toml` |
+| `BYUL_UPDATE_REQUIRED_CHECKS` | 양쪽 또는 단일 환경에서 지원을 확인할 추가 필수 점검 ID를 쉼표로 나열 | 준비 결과가 지정한 선택 범위 |
 | `PLATFORM_DATA_DIR` | 환경·정책 저장 폴더. `<kind>/<id>/<판본 6자리>.json`, 판본마다 새 파일(덮어쓰기 금지) | 임시 폴더에 예시 1판본, 종료 시 삭제 |
 | `EVIDENCE_INDEX_PATHS` | `evidence-index` 파일 경로(`:`로 여러 개) | 예시 모드 |
 | `BYUL_PLATFORM_PORT` | 포트 | `8700` |
@@ -74,7 +72,7 @@ runtime 기록은 `platform/.runtime-data`에 쌓인다(git 제외). 조회 보�
 
 ## 예시 모드
 
-위 출처 환경변수가 없으면 그 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`다. 첫 화면과 Runtime 영역에는 예시인 출처 이름을 표시하며, Runtime 사이드바 아래에 출처별 모드와 연결 상태를 보여준다. 격리 검증 결과에는 보고서 자료 등급과 공식 상태, 연결된 측별 증거의 등급과 원본 한계를 표시한다. 실제 관측을 설명하는 문구는 완료된 `MEASURED` 증거를 사용한다.
+위 출처 환경변수가 없으면 해당 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`다. 첫 화면과 Runtime 영역에는 예시인 출처 이름을 표시하며, Runtime 사이드바 아래에 출처별 모드와 연결 상태를 보여준다. 격리 검증 결과에는 보고서 자료 등급과 공식 상태, 측별 실행 상태·증거 등급·원본 한계를 표시한다. 실제 관측을 설명하는 문구는 완료된 `MEASURED` 증거를 사용한다.
 
 ### 실제 반출 증거 연결
 
@@ -122,13 +120,13 @@ Update 사이드바의 **검증 → 검증 실행**에서 단일 환경 검증 �
 
 Pack과 TOML은 서버에서 결정하며 화면에 입력란을 두지 않는다. Pack은 저장된 정책의 `verification.pack`을 따르고 서버의 `update/packs/<id>`와 정확한 판본이 일치해야 한다. 다르면 정책이나 Pack을 자동으로 올리지 않고 원인을 표시한다. 실행 TOML은 서버 관리자가 `BYUL_UPDATE_CONFIG`로 설정한다. 기본 예제는 실제 모델 경로·실행 설정으로 준비해야 한다. 브라우저 요청은 문서 ID·저장 판본만 받으며 파일 경로·명령 문자열·임의 CLI 옵션은 거부한다.
 
-서버에 update Python 환경을 한 번 준비해야 한다(`cd update && uv sync`). 플랫폼은 `uv run --with-editable ../../update byul-platform`으로 시작한다(`run-with-runtime.sh`도 같은 연동을 사용한다). Docker·GPU·모델·대상 커넥터·키 환경변수는 CLI를 실행할 때와 같이 **플랫폼 서버**에서 사용할 수 있어야 한다. 기존 `update/tools/import_byul_inputs.py`의 `/2` 변환을 사용하고, 후보 환경은 정책 참조를 변경하지 않고 동일한 ENV 필드 매핑만 적용한다.
+Docker·GPU·모델·대상 커넥터·키 환경변수는 CLI를 실행할 때와 같이 **플랫폼 서버**에서 사용할 수 있어야 한다. 기존 `update/tools/import_byul_inputs.py`의 `/2` 변환을 사용하고, 후보 환경은 정책 참조를 변경하지 않고 동일한 ENV 필드 매핑만 적용한다.
 
-로그인 사용 시 관리자가 준비 점검·실행하고 다른 역할은 기록을 조회한다. 기존 세션·CSRF 검사를 적용한다. 준비 점검은 엔진을 기동하지 않는다. 실행 버튼을 누르면 준비 상태·선택한 저장 판본의 정규 해시·정책 유효 기간을 다시 검사한 뒤 기존 guard 명령을 실행한다. 저장된 원본 문서의 정규 JSON, 정확한 문서 Ref, 변환 결과·매핑, Pack·설정 복사본을 고정한다. 새 환경·정책 판본이 추가돼도 선택한 과거 판본을 바꾸지 않는다. 저장 판본 내용·복사본·서버의 Pack·설정이 바뀌면 재점검을 요구한다. TOML이 참조하는 모델·대상 파일 등은 기존 CLI와 동일하게 검증하며 이 복사본 묶음에 포함하지 않는다. 기존 파일 입력 실행 이력은 조회할 수 있으며 재실행하려면 등록한 환경·정책으로 다시 준비 점검한다.
+로그인 사용 시 관리자가 준비 점검·실행하고 다른 역할은 기록을 조회한다. 기존 세션·CSRF 검사를 적용한다. 준비 점검은 엔진을 기동하지 않고 측·점검별 지원 결과를 표시한다. 실행 직전에는 준비 상태, 필수 점검 지원, 선택한 판본 해시, 정책 유효 기간을 다시 검사한다. 저장된 원본 문서의 정규 JSON, 정확한 문서 Ref, 변환 결과·매핑, Pack·설정 복사본을 고정한다. TOML의 직접 참조 파일도 지문에 포함하며 기준 종료 후에만 확정할 수 있는 후보 대상은 Guard 전환 단계에서 결합한다. 입력이 달라지면 다시 준비 점검을 요청한다. 기존 파일 입력 실행 이력은 조회할 수 있다.
 
-실행은 백그라운드에서 진행하고 페이지 이동·새로고침으로 중단하지 않는다. 플랫폼 작업은 호스트당 한 번에 하나씩 실행한다(같은 저장 경로를 사용하는 프로세스 간 잠금). 임의 시간 제한이나 강제 종료 버튼을 추가하지 않으며, 정상 서버 종료는 guard의 정리가 끝날 때까지 기다린다. 비정상 종료 후에는 기록을 `interrupted`로 남기고, 남아 있는 검증 프로세스가 있으면 새 작업을 막는다. 그 경우 이전 프로세스·자원 정리 상태를 확인한다.
+실행은 백그라운드에서 진행하며 같은 저장 경로의 프로세스들은 잠금을 공유한다. Guard 자식 프로세스도 잠금을 이어받으며 정상 서버 종료는 정리가 끝날 때까지 기다린다. 비정상 종료 뒤에는 보존한 실행 종료 코드와 유효한 RPT로 복구할 수 있는 기록을 회수한다. 종료 확인이 없는 기록은 `interrupted`로 남긴다.
 
-기록·로그·고정 입력·보고서·guard 객체는 `PLATFORM_DATA_DIR/update-runs/`에 저장한다. `PLATFORM_DATA_DIR`이 없으면 기존 예시 저장소와 함께 임시 저장하고 서버 종료 시 삭제한다. 로그는 비밀값을 가리고 마지막 64 KiB를 표시한다. 생성한 RPT는 `UPDATE_REPORTS_DIR`의 기존 보고서와 함께 검증 결과에서 조회한다. 준비됨·명령 종료 코드 0은 보안 PASS나 기업 승인이 아니며 판정·자료 등급은 원본 RPT를 그대로 따른다.
+기록·로그·고정 입력·보고서·Guard 객체는 `PLATFORM_DATA_DIR/update-runs/`에 저장한다. `PLATFORM_DATA_DIR`이 없으면 임시 저장하고 서버 종료 시 삭제한다. 로그는 비밀값을 가리고 마지막 64 KiB를 표시한다. 생성한 RPT는 `UPDATE_REPORTS_DIR`의 기존 보고서와 함께 검증 결과에서 조회한다. 상세 링크는 RPT의 ID, 판본, SHA-256을 지정한다. 인수 시 그 링크를 열어 원본 정책 판본·양측 자료 등급과 판정을 확인한 뒤 서버를 다시 시작해 같은 Ref를 확인한다.
 
 ## 지키는 것
 

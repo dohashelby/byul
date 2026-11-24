@@ -62,8 +62,9 @@ describe("검증 보고서 화면", () => {
   it("보고서 자료 등급과 비공식 상태, 원본 한계 및 자동 실행 건수를 표시한다", async () => {
     mockApi({});
     const { container } = renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
-    expect(screen.getByText("예시")).toBeTruthy();
-    expect(screen.getByText("비공식 보고서")).toBeTruthy();
+    const provenance = within(screen.getByLabelText("보고서 자료 등급과 공식 상태"));
+    expect(provenance.getByText("예시")).toBeTruthy();
+    expect(provenance.getByText("비공식 보고서")).toBeTruthy();
     expect(screen.getByText("정책 DRAFT: 공식 아님")).toBeTruthy();
     expect(container.textContent).toContain("자동 실행 2");
     expect(container.textContent).not.toContain("자동 측정");
@@ -75,6 +76,21 @@ describe("검증 보고서 화면", () => {
     // 질문은 텍스트로만 들어간다
     expect(document.querySelector("b")).toBeNull();
     expect(screen.getAllByText("REQ-01 질문 <b>굵게</b>?").length).toBeGreaterThan(0);
+  });
+
+  it("혼합 자료의 측별 완료·중단과 실측을 구분한다", () => {
+    mockApi({});
+    const checks = [...report.checks];
+    checks[0] = { ...checks[0], baseline: { ...side("PASS"), execution_status: "COMPLETED", data_origin: "MEASURED",
+      evidence_ref: { kind: "EVD", id: "EVD-fixture", revision: 1, sha256: "c".repeat(64) } },
+      candidate: { ...side("FAIL"), execution_status: "ABORTED", data_origin: "DECLARED" } };
+    renderAt("/update/results", "/update/results", <FullReport report={{ ...report, checks }} rawChecks={null}
+      selected="REQ-01" onSelect={() => {}} />);
+    const baseline = screen.getByRole("article", { name: "기준 환경" });
+    const candidate = screen.getByRole("article", { name: "후보 환경" });
+    expect(baseline.textContent).toContain("실측 완료 1건");
+    expect(candidate.textContent).toContain("실측 완료 0건");
+    expect(candidate.textContent).toContain("중단 1");
   });
 
   it("과거 판정은 유지하고 근거 부족을 안내하며 기술 사유와 원본 행을 열 수 있다", () => {
@@ -166,8 +182,9 @@ describe("검증 보고서 화면", () => {
     renderAt("/update/results", "/update/results", <FullReport report={{ ...report, checks: [row] }}
       rawChecks={null} selected="PLT-08" onSelect={() => {}} />);
     const drawer = within(screen.getByLabelText("상세"));
-    expect(drawer.getByTitle("MEASURED")).toBeTruthy();
-    expect(drawer.getByText("예시")).toBeTruthy();
+    const summary = within(drawer.getByRole("heading", { name: "판정 요약" }).closest("section")!);
+    expect(summary.getByTitle("MEASURED")).toBeTruthy();
+    expect(summary.getByText("예시")).toBeTruthy();
     expect(drawer.getByText("보안 미충족")).toBeTruthy();
     expect(drawer.queryByRole("heading", { name: /평문 연결이 금지된 구간에서 API 요청이 성공함/ })).toBeNull();
   });

@@ -62,7 +62,8 @@ def load_policy(path: Path, pack: Pack) -> Policy:
         return obj
     want = data.get("pack") or {}
     ref = pack.ref()
-    if want.get("id") != ref.id or int(want.get("revision", -1)) != ref.revision:
+    if (want.get("id") != ref.id or int(want.get("revision", -1)) != ref.revision
+            or "sha256" in want and want["sha256"] != ref.sha256):
         raise ValueError(
             f"{path}: policy is for {want.get('id')} rev {want.get('revision')}, "
             f"loaded pack is {ref.id} rev {ref.revision}"
@@ -77,4 +78,7 @@ def load_policy(path: Path, pack: Pack) -> Policy:
         exceptions=data.get("exceptions") or [],
         confirmed_by=data.get("confirmed_by"),
         confirmed_at=data.get("confirmed_at"),
+        valid_from=data.get("valid_from"),
+        valid_until=data.get("valid_until"),
+        source_document_sha256=data.get("source_document_sha256"),
     ).seal()

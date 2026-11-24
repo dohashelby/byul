@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 
 SCHEMA = "guard-preparation-guidance/1"
+_SIDES = {"baseline", "candidate", "single"}
+_CHECK_ID = re.compile(r"(?:REQ|PLT|SUP|LIF|OBS)-\d{2}")
 
 
 def _issue(code, stage, cause, action, *, side=None, check_id=None, status="FAILED", blocking=True):
@@ -86,14 +88,17 @@ def contract_issue(exc):
 def annotate(data, *, input_issues=()):
     """Add stable guidance without changing ready/checks/check_support semantics."""
     issues = [dict(row) for row in input_issues]
-    for row in data.get("checks", []):
+    checks = data.get("checks", [])
+    has_input_details = any(row.get("ok") is False and isinstance(row.get("check"), str)
+                            and row["check"].startswith("inputs:") for row in checks)
+    for row in checks:
         if row.get("ok") is True:
             continue
         name = row.get("check", "")
         if not isinstance(name, str):
             continue
         prefix, _, suffix = name.partition(":")
-        side = suffix if suffix in {"baseline", "candidate", "single"} else None
+        side = suffix if suffix in _SIDES else None
         if prefix == "docker":
             issue = _issue("DOCKER_UNAVAILABLE", "docker", "로컬 Linux Docker 준비 상태를 확인하지 못했습니다.",
                 "Docker Desktop의 Linux 컨테이너·WSL2 연동과 접속 권한을 확인하세요. 자동 시작·설정 변경은 하지 않습니다.")
@@ -110,7 +115,14 @@ def annotate(data, *, input_issues=()):
                 "Docker Desktop/WSL2 할당과 실행 제한을 확인하세요. 기존 컨테이너를 임의 중지하지 마세요.",
                 side=side, status="UNKNOWN" if side is None else "FAILED")
         elif prefix == "inputs":
+            if not suffix and has_input_details:
+                continue
             issue = contract_issue(ValueError(row.get("detail", "") if isinstance(row.get("detail"), str) else ""))
+            input_side, separator, check_id = suffix.partition("/")
+            if not separator:
+                check_id = input_side
+            issue["side"] = input_side if input_side in _SIDES else None
+            issue["check_id"] = check_id if _CHECK_ID.fullmatch(check_id) else None
         elif prefix == "input-files" and issues:
             continue
         else:
@@ -121,9 +133,9 @@ def annotate(data, *, input_issues=()):
         if row.get("status") == "SUPPORTED":
             continue
         check_id = row.get("check_id")
-        if not isinstance(check_id, str) or re.fullmatch(r"(?:REQ|PLT|SUP|LIF|OBS)-\d{2}", check_id) is None:
+        if not isinstance(check_id, str) or _CHECK_ID.fullmatch(check_id) is None:
             check_id = None
-        side = row.get("side") if row.get("side") in {"baseline", "candidate", "single"} else None
+        side = row.get("side") if row.get("side") in _SIDES else None
         known = row.get("status") == "UNSUPPORTED"
         issues.append(_issue("CHECK_UNSUPPORTED" if known else "CHECK_SUPPORT_UNKNOWN", "check-support",
             "현재 제한 프로파일에서 해당 점검을 지원하지 않습니다." if known else "해당 점검의 지원 여부가 확인되지 않았습니다.",

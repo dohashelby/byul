@@ -260,7 +260,7 @@ def test_rejudging_saved_evidence_preserves_exact_verdict_and_identity(tmp_path,
 
     store, pack, plan, evd, result, _, _ = _run(tmp_path, monkeypatch, values={"approved_image_digests": [OTHER]})
     before = evd.to_dict()
-    (again,) = judge_plan(store, pack, plan, as_of=evd.created_at)
+    (again,) = judge_plan(store, pack, plan, as_of=result.as_of)
     assert again.ref() == result.ref() and again.verdicts.security == Verdict.FAIL
     assert store.resolve(evd.ref()).to_dict() == before
     assert put_pack(store, PACK_DIR) == pack.ref()
@@ -269,7 +269,7 @@ def test_rejudging_saved_evidence_preserves_exact_verdict_and_identity(tmp_path,
     restored = Store(tmp_path / "restored")
     assert restored.verify() == []
     saved_pack = get_pack(restored, pack.ref())
-    (replayed,) = judge_plan(restored, saved_pack, restored.resolve(plan.ref()), as_of=evd.created_at)
+    (replayed,) = judge_plan(restored, saved_pack, restored.resolve(plan.ref()), as_of=result.as_of)
     assert replayed.ref() == result.ref()
     assert restored.resolve(evd.ref()).to_dict() == before
 

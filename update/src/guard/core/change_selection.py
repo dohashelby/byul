@@ -199,7 +199,10 @@ def _prior_pair(store, previous, cid):
     if len(evidence) > 1 and (evidence[0].created_at, evidence[0].revision) == (evidence[1].created_at, evidence[1].revision):
         return None
     evd = evidence[0]
-    results = store.find_latest("RES", lambda result: result.evidence == evd.ref())
+    from .judge import result_for_policy
+    evidence_ref = evd.ref()
+    results = store.find_latest("RES", lambda result:
+        result.evidence == evidence_ref and result_for_policy(result, previous.inputs.policy))
     if not results:
         return None
     results.sort(key=lambda result: (result.created_at, result.revision), reverse=True)
@@ -267,7 +270,15 @@ def _eligible(store, previous, oldpack, pack, cid, env, policy, cfg, as_of, read
             return None, "READ_ONLY_REJUDGMENT_PENDING"
         from .judge import judge_evidence
         result = judge_evidence(check, evidence, policy, as_of,
-                                condition_origins=[condition.origin for condition in olditem.conditions], plan=previous)
+                                condition_origins=[condition.origin for condition in olditem.conditions],
+                                plan=previous, carryover=True)
+        previous_evaluation = store.find_latest("RES", lambda r: r.evidence.id == evidence.id
+            and r.evaluation_mode == "carryover" and policy.ref() in r.refs)
+        if previous_evaluation:
+            prior_result = previous_evaluation[0]
+            from .judge import _same_content
+            result = (prior_result if _same_content(prior_result, result) else result.model_copy(
+                update={"id": prior_result.id, "revision": prior_result.revision + 1}).seal())
         store.put(result)
     if result.verdicts.security != Verdict.PASS:
         return None, "PRIOR_SECURITY_NOT_PASS"

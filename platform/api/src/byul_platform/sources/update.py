@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Iterator, Protocol
+
+from ..contracts import canonical_sha256
 
 VR_SCHEMA = "byul-verification-result/0.2"
 _SIDES = ("single", "baseline", "candidate")
@@ -127,29 +129,53 @@ def rpt_to_verification_result(rpt: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@dataclass
+@dataclass(frozen=True)
 class ReportEntry:
     candidate: Any  # verification-result 후보(검증 전)
     raw_checks: dict[str, Any] | None
     path: str | None
+    execution_attempt_id: str | None = None
+    as_of: str | None = None
     object_store: Path | None = None
 
 
-def _read_rpt_dir(directory: Path, object_store: Path | None = None) -> list[ReportEntry]:
+def report_content_sha256(rpt: dict[str, Any]) -> str:
+    """Guard's object hash covers every persisted field except the seal itself."""
+    return canonical_sha256({key: value for key, value in rpt.items() if key != "content_sha256"})
+
+
+def _read_rpt_dir(directory: Path, object_store: Path | None = None) -> Iterator[ReportEntry]:
     """폴더(하위 포함)의 RPT JSON을 읽는다. RPT가 아닌 JSON은 건너뛴다."""
-    out: list[ReportEntry] = []
     for path in sorted(directory.rglob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (OSError, UnicodeDecodeError, ValueError, RecursionError) as error:
             if path.name.startswith("RPT-") or path.name == "report.json":
-                out.append(ReportEntry({"_unreadable": str(path), "_error": type(error).__name__}, None, str(path)))
+                yield ReportEntry({"_report": path.name, "_error": type(error).__name__}, None, str(path))
             continue
         if not isinstance(data, dict) or data.get("kind") != "RPT":
+            if path.name.startswith("RPT-") or path.name == "report.json":
+                yield ReportEntry({"_report": path.name, "_error": "RPT_KIND_INVALID"}, None, str(path))
             continue
-        raw = {str(r.get("check_id")): r for r in data.get("by_check", []) if isinstance(r, dict)}
-        out.append(ReportEntry(rpt_to_verification_result(data), raw, str(path), object_store or directory / "objects" / "store.sqlite"))
-    return out
+        try:
+            if data.get("content_sha256") != report_content_sha256(data):
+                yield ReportEntry({"_report": path.name, "_error": "RPT_SHA256_MISMATCH"}, None, str(path))
+                continue
+            rows = data["by_check"]
+            if not isinstance(rows, list) or any(not isinstance(row, dict) or not isinstance(row.get("check_id"), str) for row in rows):
+                raise ValueError("invalid RPT check rows")
+            raw = {row["check_id"]: row for row in rows}
+            if len(raw) != len(rows):
+                raise ValueError("duplicate RPT check row")
+            projected = rpt_to_verification_result(data)
+        except (AttributeError, KeyError, TypeError, ValueError, RecursionError):
+            yield ReportEntry({"_report": path.name, "_error": "RPT_STRUCTURE_INVALID"}, None, str(path))
+            continue
+        attempt_id, as_of = data.get("execution_attempt_id"), data.get("as_of")
+        yield ReportEntry(projected, raw, str(path),
+                          execution_attempt_id=attempt_id if isinstance(attempt_id, str) else None,
+                          as_of=as_of if isinstance(as_of, str) else None,
+                          object_store=object_store or directory / "objects" / "store.sqlite")
 
 
 class UpdateSource(Protocol):
@@ -171,7 +197,7 @@ class ExampleUpdateSource:
 
     def reports(self) -> list[ReportEntry]:
         if self.rpt_dir.is_dir():
-            return _read_rpt_dir(self.rpt_dir)
+            return list(_read_rpt_dir(self.rpt_dir))
         data = json.loads(self.path.read_text(encoding="utf-8"))
         return [ReportEntry(item, None, None) for item in (data if isinstance(data, list) else [data])]
 
@@ -187,7 +213,11 @@ class ReportDirUpdateSource:
         self.detail = str(reports_dir)
 
     def reports(self) -> list[ReportEntry]:
-        return _read_rpt_dir(self.dir, self.object_store) if self.dir.is_dir() else []
+        return list(self.iter_reports())
+
+    def iter_reports(self) -> Iterator[ReportEntry]:
+        if self.dir.is_dir():
+            yield from _read_rpt_dir(self.dir, self.object_store)
 
 
 # --- 보고서 화면용 투영 -----------------------------------------------------------
@@ -226,18 +256,27 @@ def _unofficial_reasons(vr: dict[str, Any]) -> list[str]:
     return why or ["CONDITIONS_UNMET"]
 
 
-def _side_view(side: dict[str, Any] | None) -> dict[str, Any] | None:
+def _side_view(side: dict[str, Any] | None, raw: Any) -> dict[str, Any] | None:
     if side is None:
         return None
     res = side.get("result_ref")
+    raw = raw if isinstance(raw, dict) else {}
+    status, origin, evidence = raw.get("execution_status"), raw.get("data_origin"), raw.get("evidence_ref")
     return {
         "result_id": res.get("id") if res else None,
         "result_revision": res.get("revision") if res else None,
+        "result_sha256": res.get("sha256") if res else None,
         "security": side.get("security"),
         "functional": side.get("functional"),
         "performance": side.get("performance"),
         "verification_level": side.get("verification_level"),
         "reasons": list(side.get("reasons") or []),
+        "execution_status": status if status in ("PENDING", "RUNNING", "COMPLETED", "ABORTED", "NOT_RUN") else None,
+        "data_origin": origin if origin in ("MEASURED", "DECLARED", "EXAMPLE") else None,
+        "evidence_ref": evidence if (isinstance(evidence, dict) and evidence.get("kind") == "EVD"
+                                     and isinstance(evidence.get("id"), str)
+                                     and type(evidence.get("revision")) is int
+                                     and isinstance(evidence.get("sha256"), str)) else None,
     }
 
 
@@ -257,7 +296,7 @@ def _marks(check: dict[str, Any]) -> list[dict[str, Any]]:
     return marks
 
 
-def report_view(vr: dict[str, Any]) -> dict[str, Any]:
+def report_view(vr: dict[str, Any], entry: ReportEntry | None = None) -> dict[str, Any]:
     """계약 검증을 통과한 verification-result(0.2)에서 보고서 화면 자료를 만든다."""
     update = vr["mode"] == "update"
     selected = [c for c in vr["checks"] if c["selected"]]
@@ -265,11 +304,15 @@ def report_view(vr: dict[str, Any]) -> dict[str, Any]:
     regressed = [c["check_id"] for c in selected if update and c["comparison"] == "REGRESSED"]
     by_area = vr["summary"]["by_area"]
     by_purpose = vr["summary"]["by_purpose"]
+    raw_checks = (entry.raw_checks or {}) if entry else {}
     return {
         "report_id": vr["report_ref"]["id"],
         "revision": vr["report_ref"]["revision"],
         "content_sha256": vr["report_ref"]["sha256"],
         "created_at": vr["created_at"],
+        "as_of": entry.as_of if entry else None,
+        "execution_attempt_id": entry.execution_attempt_id if entry else None,
+        "byul_policy_ref": vr.get("byul_policy_ref"),
         "mode": vr["mode"],
         "data_origin": vr["data_origin"],
         "official": vr["official"],
@@ -310,9 +353,8 @@ def report_view(vr: dict[str, Any]) -> dict[str, Any]:
                 "applicability": c["applicability"],
                 "selected": c["selected"],
                 "headline": heads.get(c["check_id"]),
-                "single": _side_view(c["sides"].get("single")),
-                "baseline": _side_view(c["sides"].get("baseline")),
-                "candidate": _side_view(c["sides"].get("candidate")),
+                **{side: _side_view(c["sides"].get(side), raw_checks.get(c["check_id"], {}).get(side))
+                   for side in _SIDES},
                 "comparison": c["comparison"],
                 "functional_comparison": c["functional_comparison"],
                 "comparison_reasons": list(c["comparison_reasons"]),

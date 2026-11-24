@@ -43,7 +43,7 @@ def _local(monkeypatch):
     return calls
 
 
-def test_update_support_is_side_specific_and_does_not_remove_other_checks(tmp_path, monkeypatch):
+def _managed_update_inputs(tmp_path):
     pack, env, _, base = setup_inputs(tmp_path)
     cfg = tomllib.loads((ROOT/"examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     cfg["vllm"]["models_dir"] = base["vllm"]["models_dir"]
@@ -57,8 +57,13 @@ def test_update_support_is_side_specific_and_does_not_remove_other_checks(tmp_pa
         "REQ-09": {"max_input_tokens": 127, "rejection_codes": ["400", "422"],
                    "allowed_endpoints": ["POST /v1/completions"], "allowed_input_formats": ["token_ids"]},
         "REQ-11": {"result_binding": "originating_connection", "client_request_id_trust": "untrusted_correlation"}})
+    return pack, [env, candidate], pol, cfg
+
+
+def test_update_support_is_side_specific_and_does_not_remove_other_checks(tmp_path, monkeypatch):
+    pack, envs, pol, cfg = _managed_update_inputs(tmp_path)
     calls = _local(monkeypatch)
-    data = application.update_readiness(pack, [env, candidate], pol, cfg)
+    data = application.update_readiness(pack, envs, pol, cfg)
     assert data["ready"] is True, data
     rows = {(row["side"], row["check_id"]): row for row in data["check_support"]}
     assert set(rows) == {(side, check) for side in ("baseline", "candidate") for check in ("REQ-09", "REQ-11")}
@@ -68,6 +73,48 @@ def test_update_support_is_side_specific_and_does_not_remove_other_checks(tmp_pa
     assert "independent" in " ".join(rows["baseline", "REQ-11"]["limitations"])
     assert calls and set(calls) <= {"daemon-info", "daemon-resources", "image-info"}
     assert not list(tmp_path.rglob("guard.db")) and not list(tmp_path.rglob("target.json"))
+
+
+@pytest.mark.parametrize("fail_support", [False, True])
+def test_update_readiness_reports_independent_failures_for_both_sides(tmp_path, monkeypatch, fail_support):
+    from guard import readiness_support
+    from guard.preparation_guidance import annotate
+
+    pack, envs, pol, cfg = _managed_update_inputs(tmp_path)
+    _local(monkeypatch)
+    cfg["sides"] = {
+        "baseline": {"check_config": {"REQ-09": {"max_probe_tokens": 1}}},
+        "candidate": {"check_config": {"REQ-11": {"request_timeout": 0}}},
+    }
+    assess = readiness_support.assess_check_support
+
+    def assess_support(pack, env, *args, **kwargs):
+        if fail_support and env is envs[0]:
+            raise ValueError("EXAMPLE support evaluation unavailable")
+        return assess(pack, env, *args, **kwargs)
+
+    monkeypatch.setattr(readiness_support, "assess_check_support", assess_support)
+
+    data = application.update_readiness(pack, envs, pol, cfg)
+
+    assert data["ready"] is False
+    failures = {row["check"]: row["detail"] for row in data["checks"] if not row["ok"]}
+    expected = {
+        "inputs:baseline/REQ-09": "max_probe_tokens must be an integer of at least two tokens",
+        "inputs:candidate/REQ-11": "request_timeout must be finite, positive and at most 120 seconds",
+    }
+    identities = {("baseline", "REQ-09"), ("candidate", "REQ-11")}
+    expected_sides = {"baseline", "candidate"}
+    if fail_support:
+        expected["inputs:baseline"] = "EXAMPLE support evaluation unavailable"
+        identities.add(("baseline", None))
+        expected_sides.remove("baseline")
+    assert failures == {**expected, "inputs": f"{len(expected)} preparation input errors are listed below"}
+    assert {(issue["side"], issue["check_id"]) for issue in annotate(data)["guidance"]["issues"]
+            if issue["blocking"]} == identities
+    assert {(row["side"], row["check_id"]) for row in data["check_support"]} == {
+        (side, check) for side in expected_sides for check in ("REQ-09", "REQ-11")
+    }
 
 
 def test_valid_unsupported_policy_is_advisory_but_invalid_launch_budget_still_fails(tmp_path, monkeypatch):

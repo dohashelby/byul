@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import runpy
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -58,7 +59,19 @@ def test_pull_request_runs_always_and_job_filter_matches_push_filter():
     assert all(jobs[name]["needs"] == "changes" for name in filtered)
     assert all(jobs[name]["if"] == "needs.changes.outputs.relevant == 'true'" for name in filtered)
     assert jobs["update-ci-ok"]["if"] == "always()"
-    assert set(jobs["update-ci-ok"]["needs"]) == {"changes", *filtered} - {"update-preflight"}
+    assert set(jobs["update-ci-ok"]["needs"]) == {"changes", *filtered}
+
+
+@pytest.mark.parametrize("relevant,results,code", [
+    ("false", "success skipped", 0), ("true", "success success", 0),
+    ("true", "success skipped", 1), ("true", "success failure", 1),
+    ("true", "success cancelled", 1), ("", "success skipped", 1),
+])
+def test_required_update_aggregate_rejects_unexpected_skips(relevant, results, code):
+    job = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]["update-ci-ok"]
+    process = subprocess.run(["bash", "-c", job["steps"][0]["run"]], check=False,
+                             env={"RELEVANT": relevant, "RESULTS": results, "GITHUB_SHA": "EXAMPLE"})
+    assert process.returncode == code
 
 
 @pytest.mark.parametrize("files,expected", [
@@ -67,6 +80,10 @@ def test_pull_request_runs_always_and_job_filter_matches_push_filter():
     (["update/docs/evidence/gpu-a-01.json"], True),
     (["update/src/guard/cli.py"], True),
     (["runtime/README.md"], False),
+    (["runtime/src/serving_runtime/main.py"], True),
+    (["platform/web/src/pages/ReportView.tsx"], True),
+    (["platform/scripts/run-with-runtime.sh"], True),
+    ([".github/workflows/runtime-platform.yml"], True),
     (["update/docs/gpu-b/notes.md", "contracts/schemas/common.schema.json"], True),
     ([".github/workflows/update.yml"], True),
     ([".github/update-ci-paths.txt"], True),

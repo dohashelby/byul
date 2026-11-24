@@ -20,12 +20,16 @@ import tomllib
 from guard.application import merge_config, update_readiness
 from guard.collectors.file import load_environment, load_policy
 from guard.collectors.change import read_change, resolve_plan
+from guard.configuration import validate_requested_config
 from guard.core.change_selection import build_context
+from guard.core.execution_recipe import validate_policy_time
 from guard.store import Store
 from guard.core.select import select
 from guard.models import Mode, load_pack
+from guard.models.artifacts import model_closure_sha256
 from guard.update_acceptance import CHECKS, assess_update
 from guard.validation_evidence import (inventory_tree, read_objects,
+                                       report_plan_ref, stored_pack_refs,
                                        verify_saved_bundle, verify_store_files)
 from guard.preparation_guidance import (PreparationInputError, annotate, contract_issue,
                                         input_failure, missing_input, read_inputs)
@@ -90,20 +94,24 @@ def _conditions(cfg: dict, side: str, *, profile="execution-v1") -> dict:
     return value
 
 
-def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1") -> dict:
+def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1", selection=None) -> dict:
     """Pure declared-input checks, never an observed engine-identity claim."""
+    validate_requested_config(cfg)
+    validate_policy_time(policy)
     if cfg.get("update", {}).get("mode") != "managed":
         raise ValueError("the harness requires update.mode=managed")
     for side in ("baseline", "candidate"):
         settings = merge_config(cfg, cfg.get("sides", {}).get(side, {}))
         if settings.get("vllm", {}).get("launch_profile") != "gpu-bounded":
             raise ValueError("both sides require the explicit gpu-bounded launch profile")
-    selected = {item.check_id for item in select(pack, envs, policy, mode=Mode.update).items if item.selected}
+    selection = selection if selection is not None else select(pack, envs, policy, mode=Mode.update)
+    selected = {item.check_id for item in selection.items if item.selected}
+    carried = {item.check_id for item in selection.items if item.carried_over is not None}
     if profile not in {'legacy-five/1', 'plan-scope/2'}:
         raise ValueError('ACCEPTANCE_PROFILE_UNSUPPORTED')
     if profile == 'legacy-five/1' and selected != set(CHECKS):
         raise ValueError('legacy-five/1 scope must select exactly the five minimum checks')
-    if not selected:
+    if not selected and not carried:
         raise ValueError('scope must select at least one check')
     digests = []
     for side, env in zip(("baseline", "candidate"), envs):
@@ -129,7 +137,7 @@ def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1") -
             raise ValueError("actual model ID, revision and full inventory are required")
     if digests[0] == digests[1]:
         raise ValueError("two distinct image digests are required; aliases of one image do not qualify")
-    if envs[0].model.model_dump() != envs[1].model.model_dump():
+    if len({(env.model.id, env.model.revision, model_closure_sha256(env.model)) for env in envs}) != 1:
         raise ValueError("model identity and inventory must match")
     if envs[0].runtime.model_dump() != envs[1].runtime.model_dump():
         raise ValueError("declared GPU/runtime conditions must match (GPU model, driver, GPU count, TP/PP/DP)")
@@ -144,10 +152,17 @@ def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1") -
 
 
 def _support_ready(readiness: dict, expected_checks=None) -> bool:
-    rows = {(row.get("side"), row.get("check_id")): row for row in readiness.get("check_support", [])}
-    return readiness.get("ready") is True and all(
-        rows.get((side, check), {}).get("status") == "SUPPORTED"
-        for side in ("baseline", "candidate") for check in (CHECKS if expected_checks is None else expected_checks))
+    if not isinstance(readiness, dict):
+        return False
+    support = readiness.get("check_support", [])
+    if not isinstance(support, list) or any(not isinstance(row, dict) for row in support):
+        return False
+    rows = {(row.get("side"), row.get("check_id")): row for row in support}
+    pairs = {(side, check) for side in ("baseline", "candidate")
+             for check in (CHECKS if expected_checks is None else expected_checks)}
+    return (readiness.get("ready") is True and len(rows) == len(support)
+            and (expected_checks is None or rows.keys() == pairs)
+            and all(rows.get(pair, {}).get("status") == "SUPPORTED" for pair in pairs))
 
 
 def _command(args: list[str], label: str, timeout: int) -> tuple[dict, str]:
@@ -179,9 +194,11 @@ def _report_path(source: Path) -> Path:
 
 def _assess_store(store: Path, report_path: Path, *, diagnostic: bool = False) -> dict:
     objects = read_objects(store)
-    pack = verify_store_files(store, objects)
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    return assess_update(report, objects, pack, diagnostic=diagnostic, profile="plan-scope/2")
+    current_plan = report_plan_ref(report, objects)
+    pack = verify_store_files(store, objects, current_plan)
+    return assess_update(report, objects, pack, diagnostic=diagnostic, profile="plan-scope/2",
+                         verified_pack_refs=stored_pack_refs(objects))
 
 
 def _report_pair(report_path: Path) -> dict:
@@ -205,10 +222,17 @@ def _preserved_graph(source: Path) -> dict:
         raise ValueError("replay added execution inputs or evidence instead of rejudging stored evidence")
     report = _report_pair(_report_path(source))
     replay_report = _report_pair(source / "replay-report.json")
-    original_plan = [ref for ref in report["inputs_manifest"] if ref["kind"] == "PLAN"]
-    replay_plan = [ref for ref in replay_report["inputs_manifest"] if ref["kind"] == "PLAN"]
+    original_plan = report_plan_ref(report, original)
+    replay_plan = report_plan_ref(replay_report, replay)
     if original_plan != replay_plan:
         raise ValueError("replay report uses a different original PLAN")
+    for field in ("as_of", "execution_attempt_id"):
+        if report.get(field) is not None and replay_report.get(field) != report[field]:
+            raise ValueError(f"replay report uses different original {field}")
+    original_evidence = {tuple(sorted(ref.items())) for ref in report["inputs_manifest"] if ref["kind"] == "EVD"}
+    replay_evidence = {tuple(sorted(ref.items())) for ref in replay_report["inputs_manifest"] if ref["kind"] == "EVD"}
+    if original_evidence != replay_evidence:
+        raise ValueError("replay report uses a different original EVD set")
     def outcomes(data):
         return {row["check_id"]: {field: row.get(field) for field in (
             "selected", "single", "baseline", "candidate", "comparison", "functional_comparison")}
@@ -226,10 +250,7 @@ def _target_proof(source: Path, report_path: Path) -> dict:
     lookup = {(obj["kind"], obj["id"], obj["revision"], obj["content_sha256"]): obj for obj in objects}
     def deref(ref):
         return lookup[(ref["kind"], ref["id"], ref["revision"], ref["sha256"])]
-    plans = [ref for ref in report["inputs_manifest"] if ref["kind"] == "PLAN"]
-    if len(plans) != 1:
-        raise ValueError("report must identify exactly one source PLAN")
-    plan = deref(plans[0])
+    plan = deref(report_plan_ref(report, objects).model_dump(mode="json"))
     env_refs = plan["inputs"]["environments"]
     if len(env_refs) != 2:
         raise ValueError("update PLAN needs two ENV references")
@@ -314,7 +335,7 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
     ok, prepare_output = invoke("prepare-update", ["prepare-update", *common, *prepare_store])
     try:
         latest = json.loads(prepare_output)
-        support = _support_ready(latest)
+        support = _support_ready(latest, declared.get("selected_checks"))
         summary["readiness"] = latest
     except (ValueError, TypeError):
         support = False
@@ -346,9 +367,13 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
         report_path = _report_path(output)
         report = _report_pair(report_path)
         summary["acceptance"] = _assess_store(store, report_path)
+        expected_checks = declared.get("selected_checks")
+        if expected_checks is not None and set(summary["acceptance"].get("checks", {})) != set(expected_checks):
+            summary["acceptance"]["accepted"] = False
+            summary["problems"].append("saved PLAN selection differs from the prepared scope")
         summary["target_identity"] = _target_proof(output, report_path)
         before = inventory_tree(store)
-        verified, _ = invoke("verify-original", ["verify", "--store", str(store), "--config", str(inputs["config"])])
+        verified, _ = invoke("verify-original", ["verify", "--store", str(store)])
         exported, _ = invoke("export", ["evidence", "export", "--store", str(store), "--output", str(output / "evidence.zip")])
         restored = False
         if exported:
@@ -362,17 +387,19 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
             if not restored_again:
                 raise ValueError("replay restore failed")
             restored_objects = read_objects(output / "replay-store")
-            verify_store_files(output / "replay-store", restored_objects)
-            plan = next(ref for ref in report["inputs_manifest"] if ref["kind"] == "PLAN")
-            plan_id = f"{plan['id']}@{plan['revision']}"
+            plan = report_plan_ref(report, restored_objects)
+            verify_store_files(output / "replay-store", restored_objects, plan)
+            plan_id = f"{plan.id}@{plan.revision}"
+            as_of = report.get("as_of") or summary["as_of"]
+            attempt = ["--attempt", report["execution_attempt_id"]] if report.get("execution_attempt_id") else []
+            replay_inputs = ["--plan", plan_id, "--from-report", str(report_path), "--as-of", as_of, *attempt]
             # Deliberately absent: allow_snapshot must resolve the PLAN's saved
             # pack rather than a same-revision folder in the current checkout.
             absent_pack = output / "no-current-pack-use-saved-snapshot"
-            judged, _ = invoke("judge-restored", ["judge", "--plan", plan_id, "--pack", str(absent_pack),
-                "--store", str(output / "replay-store"), "--config", str(inputs["config"]), "--as-of", summary["as_of"]])
-            reported, _ = invoke("report-restored", ["report", "--plan", plan_id, "--pack", str(absent_pack),
-                "--store", str(output / "replay-store"), "--config", str(inputs["config"]), "--as-of", summary["as_of"],
-                "--json", str(output / "replay-report.json")])
+            judged, _ = invoke("judge-restored", ["judge", *replay_inputs, "--pack", str(absent_pack),
+                "--store", str(output / "replay-store")])
+            reported, _ = invoke("report-restored", ["report", *replay_inputs, "--pack", str(absent_pack),
+                "--store", str(output / "replay-store"), "--json", str(output / "replay-report.json")])
             replayed = judged and reported
             if replayed:
                 summary["replay_acceptance"] = _assess_store(output / "replay-store", output / "replay-report.json")
@@ -433,13 +460,15 @@ def main(argv: list[str] | None = None) -> int:
             source = Store.read_only(args.previous_store) if args.previous_store is not None else None
             change_input = read_change(args.change, pack, source)
             previous = resolve_plan(source, args.previous_plan)
-            extra = {}
+            extra, context = {}, None
             if change_input is not None or previous is not None:
-                build_context(source, previous, pack, envs, policy, cfg,
-                              change_input.change if change_input else None, mode=Mode.update, read_only=True)
+                context = build_context(source, previous, pack, envs, policy, cfg,
+                                        change_input.change if change_input else None, mode=Mode.update, read_only=True)
                 extra = {"change": change_input, "previous_plan": previous, "source_store": source}
             try:
-                declared = validate_inputs(pack, envs, policy, cfg, profile="plan-scope/2")
+                selection = select(pack, envs, policy, change=change_input.change if change_input else None,
+                                   mode=Mode.update, context=context)
+                declared = validate_inputs(pack, envs, policy, cfg, profile="plan-scope/2", selection=selection)
             except Exception as exc:
                 raise PreparationInputError(input_failure([contract_issue(exc)])["guidance"]) from exc
             if extra:

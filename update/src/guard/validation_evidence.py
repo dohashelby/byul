@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import zipfile
 
 from guard.models import Pack, Ref, canonical_json, sha256_hex
+from guard.store.integrity import ref_key
 from guard.store.packs import get_pack
 
 _DIGEST = re.compile(r"[0-9a-f]{64}")
@@ -59,20 +60,49 @@ def read_objects(store: Path) -> list[dict]:
                 raise ValueError("close/checkpoint the source store before read-only analysis")
     # Context managers on sqlite connections do not close the connection.
     with closing(sqlite3.connect(db.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)) as con:
-        rows = con.execute("SELECT kind,id,revision,content_sha256,body FROM objects ORDER BY kind,id,revision")
+        con.execute("PRAGMA trusted_schema = OFF")
+        rows = con.execute("SELECT kind,id,revision,content_sha256,created_at,body FROM objects ORDER BY kind,id,revision")
         objects = []
-        for kind, ident, revision, digest, body in rows:
+        for kind, ident, revision, digest, created_at, body in rows:
             obj = json.loads(body)
             if (not isinstance(obj, dict)
-                    or (obj.get("kind"), obj.get("id"), obj.get("revision"), obj.get("content_sha256"))
-                    != (kind, ident, revision, digest)):
+                    or (obj.get("kind"), obj.get("id"), obj.get("revision"), obj.get("content_sha256"),
+                        obj.get("created_at")) != (kind, ident, revision, digest, created_at)):
                 raise ValueError("database index and stored object identity differ")
             objects.append(obj)
         return objects
 
 
-def verify_store_files(store: Path, objects: list[dict]) -> Pack:
-    """Check canonical artifact bytes and return the PLAN's original stored pack."""
+def _object_ref(obj):
+    return Ref(kind=obj["kind"], id=obj["id"], revision=obj["revision"], sha256=obj["content_sha256"])
+
+
+def report_plan_ref(report: dict, objects: list[dict]) -> Ref:
+    """Resolve the current PLAN while permitting its exact predecessor in the RPT."""
+    refs = [Ref.model_validate(ref) for ref in report["inputs_manifest"] if ref["kind"] == "PLAN"]
+    if len(refs) == 1:
+        return refs[0]
+    if len(refs) != 2 or refs[0] == refs[1]:
+        raise ValueError("report must identify one current PLAN and at most one predecessor")
+    plans = {ref_key(_object_ref(obj)): obj for obj in objects if obj.get("kind") == "PLAN"}
+    candidates = []
+    for ref, other in (refs, refs[::-1]):
+        plan = plans.get(ref_key(ref))
+        if plan is not None and plan["inputs"].get("previous_plan") == other.model_dump(mode="json"):
+            candidates.append(ref)
+    if len(candidates) != 1:
+        raise ValueError("report current PLAN and predecessor do not match stored PLAN inputs")
+    return candidates[0]
+
+
+def stored_pack_refs(objects: list[dict]) -> tuple[Ref, ...]:
+    refs = [Ref.model_validate(ref) for obj in objects for ref in obj.get("refs", [])
+            if ref["kind"] == "PACK"]
+    return tuple({ref_key(ref): ref for ref in refs}.values())
+
+
+def verify_store_files(store: Path, objects: list[dict], plan_ref: Ref | None = None) -> Pack:
+    """Check canonical files and return the exact selected PLAN's stored pack."""
     store = Path(store)
     _directory(store)
     if not isinstance(objects, list) or any(not isinstance(obj, dict) for obj in objects):
@@ -84,29 +114,33 @@ def verify_store_files(store: Path, objects: list[dict]) -> Pack:
         _unlinked(path)
         if not path.is_file() or _DIGEST.fullmatch(path.name) is None or file_sha256(path) != path.name:
             raise ValueError("stored content-address file missing or changed")
-    plans = [obj for obj in objects if obj.get("kind") == "PLAN"]
+    plans = [obj for obj in objects if obj.get("kind") == "PLAN"
+             and (plan_ref is None or _object_ref(obj) == plan_ref)]
     if len(plans) != 1:
-        raise ValueError("one original PLAN is required")
+        raise ValueError("one exact original PLAN is required")
     inputs = plans[0].get("inputs")
-    ref = Ref.model_validate(inputs.get("pack") if isinstance(inputs, dict) else None)
-    if ref.kind != "PACK" or _DIGEST.fullmatch(ref.sha256) is None:
-        raise ValueError("noncanonical stored pack reference")
-    manifest_path = artifacts / ref.sha256
-    if not manifest_path.is_file():
-        raise ValueError("original stored pack manifest missing")
-    manifest = json.loads(manifest_path.read_bytes())
-    files = manifest.get("files_sha256") if isinstance(manifest, dict) else None
-    if not isinstance(files, list) or any(
-        not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str)
-        or _DIGEST.fullmatch(entry["sha256"]) is None for entry in files
-    ):
-        raise ValueError("noncanonical stored pack file reference")
-    pack = get_pack(SimpleNamespace(root=store), ref)
+    selected = Ref.model_validate(inputs.get("pack") if isinstance(inputs, dict) else None)
+    packs = {}
+    for ref in {ref_key(item): item for item in (selected, *stored_pack_refs(objects))}.values():
+        if ref.kind != "PACK" or _DIGEST.fullmatch(ref.sha256) is None:
+            raise ValueError("noncanonical stored pack reference")
+        manifest_path = artifacts / ref.sha256
+        if not manifest_path.is_file():
+            raise ValueError("original stored pack manifest missing")
+        manifest = json.loads(manifest_path.read_bytes())
+        files = manifest.get("files_sha256") if isinstance(manifest, dict) else None
+        if not isinstance(files, list) or any(
+            not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str)
+            or _DIGEST.fullmatch(entry["sha256"]) is None for entry in files
+        ):
+            raise ValueError("noncanonical stored pack file reference")
+        packs[ref_key(ref)] = get_pack(SimpleNamespace(root=store), ref)
     for obj in objects:
-        entries = obj.get("artifacts", [])
-        if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
+        ordinary, diagnostics = obj.get("artifacts", []), obj.get("diagnostic_artifacts", [])
+        if (not isinstance(ordinary, list) or not isinstance(diagnostics, list)
+                or any(not isinstance(entry, dict) for entry in [*ordinary, *diagnostics])):
             raise ValueError("saved artifacts must be a list of artifact mappings")
-        for artifact in entries:
+        for artifact in [*ordinary, *diagnostics]:
             name, digest, size = artifact.get("path"), artifact.get("sha256"), artifact.get("bytes")
             if (not isinstance(digest, str) or _DIGEST.fullmatch(digest) is None
                     or name != f"artifacts/{digest}" or type(size) is not int or size < 0):
@@ -116,7 +150,7 @@ def verify_store_files(store: Path, objects: list[dict]) -> Pack:
             if not path.is_file() or path.stat().st_size != size or file_sha256(path) != digest:
                 raise ValueError("original evidence artifact missing or changed")
         _verify_fixed_route_fixture(store, obj)
-    return pack
+    return packs[ref_key(selected)]
 
 
 def _verify_fixed_route_fixture(store: Path, obj: dict) -> None:

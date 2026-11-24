@@ -755,6 +755,26 @@
       "manifest_sha256": "78b88709dba4f2fae2471107063bad5e3bac92cd028f67e56f55a89c35ac3ada",
       "reviewed_by": "Codex / combined lifecycle and update preparation sources; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T06:42:54+00:00"
+    },
+    {
+      "manifest_sha256": "64a51b5e696477a5e6d76e390c0c34b13522ec178a431023f3aaaf2705d34533",
+      "reviewed_by": "Codex / preparation input consolidation; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T07:26:58+00:00"
+    },
+    {
+      "manifest_sha256": "49e22edf14565ca377ae51cce33baedba74c9872fd02339879d1b0a0d0af5de9",
+      "reviewed_by": "Codex / customer handoff and scoped collection reuse / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:47:10.991Z"
+    },
+    {
+      "manifest_sha256": "a54124c70be27948c147ba4f5bf44185486da1571b553fef92d9235ab6a27bcf",
+      "reviewed_by": "Codex / exact report replay refs / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T10:11:15.352Z"
+    },
+    {
+      "manifest_sha256": "78506292a2c36694ff67130f3f41f3adf82c2f384669709248f87929e9db4c0c",
+      "reviewed_by": "Codex / Linux CI handoff regression fixes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T10:21:35.366Z"
     }
   ]
 }

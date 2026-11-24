@@ -82,7 +82,7 @@ def test_common_input_survives_registered_run_stored_pack_judge_and_report(
     result, = judge_plan(store, stored_pack, plan, utcnow())
     assert result.verdicts.security.value == expected
     assert result.data_origin == DataOrigin.EXAMPLE
-    report = build_report(store, stored_pack, plan, utcnow())
+    report = build_report(store, stored_pack, plan, result.as_of)
     store.put(report)
     assert not report.official
     row, = [row for row in report.by_check if row.check_id == cid]

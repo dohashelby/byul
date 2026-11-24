@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import tomllib
 from datetime import datetime, timezone
+import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Optional
 
 import typer
@@ -17,16 +19,19 @@ from guard.collectors.updates import update_object
 from guard.core.change_selection import build_context
 from guard.collectors.manual import ManualEvidenceError, build_template, dump_template, import_evidence, read_document
 from guard.collectors.policy_template import write_policy_template
+from guard.configuration import validate_requested_config
+from guard.core.execution_recipe import execution_lock, validate_policy_time
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.core.run import RunConfig, run_plan
+from guard.core.run import recover_pending_locked, run_plan
 from guard.core.select import select as select_plan
-from guard.models import Pack, Plan, load_pack, utcnow
+from guard.models import Mode, Pack, Plan, load_pack, utcnow
+from guard.models.objects import Report
 from guard.store import Store
 from guard.store import IntegrityError
 from guard.store.packs import PackNotStoredError, get_pack, put_pack
-from guard.application import execute_update, execute_validation, run_config, update_readiness, validation_readiness
-from guard.store.bundle import export_bundle, restore_bundle, DEFAULT_MAX_BYTES
+from guard.application import execute_saved_update, execute_update, execute_validation, run_config, update_readiness, validation_readiness
+from guard.store.bundle import export_bundle, restore_bundle, verify_complete, DEFAULT_MAX_BYTES
 from guard.core.preflight import validate_pack
 from guard.models import new_id
 from guard.preparation_guidance import annotate, input_failure, read_inputs
@@ -46,7 +51,11 @@ StoreOpt = typer.Option(None, "--store", help="저장소 경로 (기본: guard.t
 
 
 def _config(path: Path) -> dict:
-    return tomllib.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if not path.exists() and path == Path("guard.toml"):
+        return {}
+    config = tomllib.loads(path.read_text(encoding="utf-8"))
+    validate_requested_config(config)
+    return config
 
 
 def _store(store: Optional[Path], cfg: dict) -> Store:
@@ -89,7 +98,41 @@ def _as_of(value: Optional[str]) -> datetime:
     if not value:
         return utcnow()
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    if dt.utcoffset() is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _publish_report(path: Path, report) -> None:
+    temporary = None
+    try:
+        with NamedTemporaryFile(dir=path.parent, suffix=".tmp", delete=False, mode="w", encoding="utf-8") as stream:
+            temporary = Path(stream.name)
+            json.dump(report.to_dict(), stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _replay_inputs(store, plan, source, attempt, as_of):
+    if source is None:
+        return attempt, _as_of(as_of) if as_of else None, None, None
+    report = Report.model_validate_json(source.read_bytes())
+    report = store.resolve(report.ref())
+    store.validate_object(report)
+    plans = [store.resolve(ref) for ref in report.inputs_manifest if ref.kind == "PLAN"]
+    predecessors = [item.inputs.previous_plan for item in plans]
+    primary_plans = [item.ref() for item in plans if item.ref() not in predecessors]
+    if primary_plans != [plan.ref()] or (attempt is not None and attempt != report.execution_attempt_id):
+        raise typer.BadParameter("선택한 PLAN 또는 시도가 원본 보고서와 다릅니다")
+    requested_time = _as_of(as_of) if as_of else report.as_of
+    if requested_time is None or (report.as_of is not None and requested_time != report.as_of):
+        raise typer.BadParameter("원본 보고서의 판정 시각을 확인할 수 없습니다")
+    evds = [store.resolve(ref) for ref in report.inputs_manifest if ref.kind == "EVD"]
+    return report.execution_attempt_id, requested_time, [evd for evd in evds if evd.plan == plan.ref()], report
 
 
 @policy_app.command("template")
@@ -182,15 +225,19 @@ def select(
     p = load_pack(pack)
     validate_pack(p)
     e, pol = load_environment(env), load_policy(policy, p)
+    validate_policy_time(pol)
     change_input, previous, source = _change_inputs(change, previous_plan, p, cfg, store)
+    preview = None
     if change_input is not None or previous is not None:
-        build_context(source, previous, p, [e], pol, cfg, change_input.change if change_input else None, read_only=True)
+        preview = build_context(source, previous, p, [e], pol, cfg, change_input.change if change_input else None, read_only=True)
     st = _store(store, cfg)
     put_pack(st, pack)  # select 시점 팩 보존본
     st.put(e)
     st.put(pol)
     chg = save_change(st, change_input) if change_input is not None else None
     context = build_context(st, previous, p, [e], pol, cfg, chg) if chg is not None or previous is not None else None
+    if preview and context and preview.execution_recipe_sha256 != context.execution_recipe_sha256:
+        raise ValueError("EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED")
     plan = select_plan(p, [e], pol, change=chg, context=context) if context is not None else select_plan(p, [e], pol)
     from guard.core.execution_recipe import bind_recipe
     plan = bind_recipe(plan, cfg, [e])
@@ -216,9 +263,20 @@ def run(
         cfg.setdefault("fake", {})["scenario"] = fake_scenario
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack)
-    rc = run_config(cfg)
-    rc.replace_manual = replace_manual
-    evds = run_plan(st, pk, pl, rc)
+    try:
+        get_pack(st, pl.inputs.pack)
+    except PackNotStoredError:
+        if pk.path is None:
+            raise
+        put_pack(st, pk.path, expected_ref=pl.inputs.pack)
+    failed = False
+    if pl.mode == Mode.update:
+        evds, failed = execute_saved_update(st, pk, pl, cfg, st.root / "runs" / new_id("UPDATE"),
+                                            replace_manual=replace_manual)
+    else:
+        rc = run_config(cfg)
+        rc.replace_manual = replace_manual
+        evds = run_plan(st, pk, pl, rc)
     counts: dict[str, int] = {}
     for e in evds:
         counts[e.execution.status.value] = counts.get(e.execution.status.value, 0) + 1
@@ -229,6 +287,8 @@ def run(
     if any(e.execution.cleanup_errors for e in evds):
         typer.echo("probe cleanup incomplete; inspect execution.cleanup_errors and labelled resources")
         raise typer.Exit(1)
+    if failed:
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -236,6 +296,8 @@ def judge(
     plan: str = typer.Option(..., "--plan"),
     pack: Optional[Path] = typer.Option(None, "--pack"),
     as_of: Optional[str] = typer.Option(None, "--as-of", help="예외 만료 판단 시각 (RFC3339, 기본 현재)"),
+    attempt: Optional[str] = typer.Option(None, "--attempt", help="판정할 정확한 실행 시도 ID"),
+    from_report: Optional[Path] = typer.Option(None, "--from-report", help="저장된 원본 RPT의 증거와 시각으로 재판정"),
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
@@ -243,7 +305,8 @@ def judge(
     cfg = _config(config)
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
-    results = judge_plan(st, pk, pl, _as_of(as_of))
+    attempt, judgment_time, evds, _ = _replay_inputs(st, pl, from_report, attempt, as_of)
+    results = judge_plan(st, pk, pl, judgment_time or utcnow(), attempt_id=attempt, evidence=evds)
     counts: dict[str, int] = {}
     for r in results:
         counts[r.verdicts.security.value] = counts.get(r.verdicts.security.value, 0) + 1
@@ -260,6 +323,8 @@ def report(
     pack: Optional[Path] = typer.Option(None, "--pack"),
     json_out: Path = typer.Option(Path("report.json"), "--json"),
     as_of: Optional[str] = typer.Option(None, "--as-of"),
+    attempt: Optional[str] = typer.Option(None, "--attempt", help="보고할 정확한 실행 시도 ID"),
+    from_report: Optional[Path] = typer.Option(None, "--from-report", help="저장된 원본 RPT의 증거와 시각으로 보고"),
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
@@ -267,10 +332,17 @@ def report(
     cfg = _config(config)
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
-    rpt = build_report(st, pk, pl, _as_of(as_of))
-    st.put(rpt)
-    data = rpt.to_dict()
-    json_out.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    with execution_lock(st.root, pl.id):
+        attempt, judgment_time, evds, original = _replay_inputs(st, pl, from_report, attempt, as_of)
+        judged = None if original is None else [
+            st.resolve(side.result)
+            for row in original.by_check if row.selected
+            for side in (row.single, row.baseline, row.candidate)
+            if side is not None and side.result is not None
+        ]
+        rpt = build_report(st, pk, pl, judgment_time, attempt_id=attempt, evidence=evds, judged=judged)
+        st.put(rpt)
+    _publish_report(json_out, rpt)
     typer.echo(f"{rpt.id}@{rpt.revision} official={rpt.official} → {json_out}")
 
 
@@ -340,8 +412,7 @@ def update(
     judged_at = _as_of(as_of)
     extra = {"change": change_input, "previous_plan": previous} if change_input is not None or previous is not None else {}
     rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, judged_at, **extra)
-    data = rpt.to_dict()
-    (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _publish_report(folder / "report.json", rpt)
     typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
     raise typer.Exit(1 if failed else 0)
 
@@ -378,8 +449,7 @@ def validate(
     pol = load_policy(policy, pk)
     folder = output / new_id("VALIDATE")
     rpt, failed = execute_validation(_store(store, cfg), pk, environment, pol, cfg, folder, utcnow())
-    data = rpt.to_dict()
-    (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _publish_report(folder / "report.json", rpt)
     typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
     raise typer.Exit(1 if failed else 0)
 
@@ -434,10 +504,15 @@ def prepare_update(
 
 
 @evidence_app.command("export")
-def evidence_export(store: Path = typer.Option(..., "--store"), output: Path = typer.Option(..., "--output")) -> None:
+def evidence_export(store: Path = typer.Option(..., "--store"), output: Path = typer.Option(..., "--output"),
+                    from_report: Optional[Path] = typer.Option(None, "--from-report", help="이 RPT의 정확한 증거만 반출")) -> None:
     """원본을 변경하지 않고 DB·artifacts·팩 보존본만 검증해 zip으로 반출."""
     try:
-        manifest = export_bundle(store, output)
+        if from_report is None:
+            manifest = export_bundle(store, output)
+        else:
+            report = Report.model_validate_json(from_report.read_bytes())
+            manifest = export_bundle(store, output, report_ref=report.ref())
     except Exception as exc:
         typer.echo(f"export failed ({type(exc).__name__}): {exc}")
         raise typer.Exit(1)
@@ -459,12 +534,28 @@ def evidence_restore(bundle: Path = typer.Option(..., "--bundle"), destination: 
 @app.command()
 def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
     """저장소 해시·참조·증거 파일 일괄 검증"""
-    st = _store(store, _config(config))
-    problems = st.verify()
-    for p in problems:
-        typer.echo(p)
-    typer.echo("OK" if not problems else f"{len(problems)} problem(s)")
-    raise typer.Exit(1 if problems else 0)
+    try:
+        root = store or Path(_config(config).get("store", ".guard"))
+        verify_complete(Store.read_only(root))
+    except (IntegrityError, OSError, ValueError) as error:
+        typer.echo(f"verify failed: {error}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo("OK")
+
+
+@evidence_app.command("recover")
+def evidence_recover(
+    plan: str = typer.Option(..., "--plan"),
+    attempt: str = typer.Option(..., "--attempt"),
+    store: Path = typer.Option(..., "--store"),
+) -> None:
+    """중단된 시도의 봉인 증거를 시험 재실행 없이 저장소에 복구한다."""
+    Store.read_only(store)
+    st = Store(store)
+    pl = resolve_plan(st, plan)
+    with execution_lock(st.root, pl.id):
+        recovered = recover_pending_locked(st, pl, attempt)
+    typer.echo(f"{attempt}: {len(recovered)} sealed evidence fragment(s) recovered")
 
 
 @app.command("prepare-model-read-scope")

@@ -400,6 +400,40 @@
               "type": "string",
               "title": "Report Id"
             }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision"
+            }
+          },
+          {
+            "name": "sha256",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sha256"
+            }
           }
         ],
         "responses": {
@@ -4517,29 +4551,34 @@
             "type": "array",
             "title": "Reasons"
           },
-          "missing_observations": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Missing Observations"
-          },
-          "unverified_observations": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Unverified Observations"
-          },
-          "evidence_ref": {
+          "result_sha256": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ManifestRef"
+                "type": "string"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Result Sha256"
+          },
+          "execution_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "RUNNING",
+                  "COMPLETED",
+                  "ABORTED",
+                  "NOT_RUN"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Status"
           },
           "data_origin": {
             "anyOf": [
@@ -4556,6 +4595,30 @@
               }
             ],
             "title": "Data Origin"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManifestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing_observations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Observations"
+          },
+          "unverified_observations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unverified Observations"
           },
           "finding": {
             "anyOf": [
@@ -4791,6 +4854,31 @@
             },
             "type": "array",
             "title": "Checks"
+          },
+          "execution_attempt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Attempt Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "byul_policy_ref": {
+            "$ref": "#/components/schemas/Common_nullable_policy_ref"
           }
         },
         "type": "object",
@@ -8075,6 +8163,17 @@
             },
             "type": "array",
             "title": "Limitations"
+          },
+          "execution_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Ready"
           }
         },
         "additionalProperties": true,
@@ -8083,6 +8182,37 @@
           "ready"
         ],
         "title": "UpdatePreparation"
+      },
+      "UpdateReportRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "RPT",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "revision",
+          "sha256"
+        ],
+        "title": "UpdateReportRef"
       },
       "UpdateRun": {
         "properties": {
@@ -8226,6 +8356,20 @@
               }
             ],
             "title": "Pack"
+          },
+          "report_refs": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateReportRef"
+            },
+            "type": "array",
+            "title": "Report Refs"
+          },
+          "required_checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Checks"
           }
         },
         "type": "object",

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 from guard.models import (
+    Comparison,
     Applicability,
     DataOrigin,
     Evidence,
@@ -23,6 +24,7 @@ from guard.models import (
     Side,
     Verdict,
     new_id,
+    utcnow,
     weakest_origin,
 )
 from guard.models.objects import (
@@ -42,6 +44,7 @@ from guard.report.change import summarize_change
 
 from .aggregate import aggregate
 from .compare import compare_results, comparison_differences
+from .judge import plan_evidence, result_for_policy
 
 _IMPACT_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, None: 3}
 _REVIEW_ORDER_RANK = {"reference_baseline_first": 0, "implementation_path_first": 1, "conditional_when_selected": 2}
@@ -52,11 +55,14 @@ def _exception_display(check_id: str, policy: Policy, as_of: datetime) -> tuple[
     for exc in policy.exceptions:
         if exc.check_id != check_id:
             continue
-        if not (exc.approved_by and exc.approved_at):
+        reason = exc.unavailable_reason(as_of)
+        if reason == "unapproved":
             notes.append(f"{check_id}: 정책 예외 미승인 — 표시하지 않음 ({exc.reason})")
-        elif exc.expires_at is None or exc.expires_at <= as_of:
+        elif reason in {"expired", "no expiry"}:
             notes.append(f"{check_id}: 정책 예외 만료 — 표시하지 않음 ({exc.reason})")
-        else:
+        elif reason is not None:
+            notes.append(f"{check_id}: 정책 예외 적용 시점 미확인 ({reason})")
+        elif exc.expires_at is not None:
             shown = ExceptionDisplay(status=ExceptionStatus.APPROVED, reason=exc.reason, expires_at=exc.expires_at)
     return shown, notes
 
@@ -79,9 +85,12 @@ def _verdict_reasons(res: Result) -> list[str] | None:
     return kept or None
 
 
-def _side(res: Result | None) -> SideResult:
+def _side(res: Result | None, evidence: Evidence | None = None) -> SideResult:
+    source = {} if evidence is None else {
+        "evidence_ref": evidence.ref(), "execution_status": evidence.execution.status, "data_origin": evidence.data_origin,
+    }
     if res is None:
-        return SideResult(result=None, security=Verdict.UNKNOWN)
+        return SideResult(result=None, security=Verdict.UNKNOWN, **source)
     return SideResult(
         result=res.ref(),
         security=res.verdicts.security,
@@ -89,6 +98,7 @@ def _side(res: Result | None) -> SideResult:
         performance=res.verdicts.performance,
         verification_level=res.verification_level,
         reasons=_verdict_reasons(res),
+        **source,
     )
 
 
@@ -151,8 +161,9 @@ def _previous_results(store: Store, plan: Plan) -> tuple[dict[str, Result], list
     side = Side.single if previous.mode == Mode.audit else Side.candidate
     evidence = {e.check_id: e for e in store.find_latest("EVD", lambda e: e.plan == previous_ref and e.side == side)}
     keys = {(e.id, e.revision, e.content_sha256) for e in evidence.values()}
-    results = {r.check_id: r for r in store.find_latest(
-        "RES", lambda r: (r.evidence.id, r.evidence.revision, r.evidence.sha256) in keys)}
+    results = {r.check_id: r for r in store.find_latest("RES", lambda r:
+        (r.evidence.id, r.evidence.revision, r.evidence.sha256) in keys
+        and result_for_policy(r, previous.inputs.policy))}
     for item in previous.items:
         carried = getattr(item, "carried_over", None)
         if carried is not None:
@@ -164,20 +175,45 @@ def _previous_results(store: Store, plan: Plan) -> tuple[dict[str, Result], list
     return results, list(evidence.values())
 
 
-def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Report:
+def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *,
+                 attempt_id: str | None = None, evidence: list[Evidence] | None = None,
+                 judged: list[Result] | None = None) -> Report:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     policy: Policy = store.resolve(plan.inputs.policy)
     envs = [store.resolve(r) for r in plan.inputs.environments]
     plan_ref = plan.ref()
 
-    evds: dict[tuple[str, Side], Evidence] = {
-        (e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)
-    }
-    evd_keys = {(e.id, e.revision, e.content_sha256) for e in evds.values()}
+    if evidence is None:
+        attempt_id, evidence = plan_evidence(store, plan, attempt_id)
+    evds = {(e.check_id, e.side): e for e in evidence}
+    if len(evds) != len(evidence):
+        raise ValueError("EVIDENCE_SLOT_AMBIGUOUS")
+    for e in evidence:
+        if e.plan != plan_ref or not plan.item(e.check_id).selected:
+            raise ValueError("EVIDENCE_PLAN_SCOPE_MISMATCH")
+        store.validate_object(e)
+    evd_refs = {(e.id, e.revision, e.content_sha256) for e in evidence}
     results: dict[tuple[str, Side], Result] = {}
-    for r in store.find_latest("RES", lambda r: (r.evidence.id, r.evidence.revision, r.evidence.sha256) in evd_keys):
-        results[(r.check_id, r.side)] = r  # 최신 EVD revision을 가리키는 최신 RES
+    def matches(r):
+        return ((r.evidence.id, r.evidence.revision, r.evidence.sha256) in evd_refs
+                and result_for_policy(r, plan.inputs.policy)
+                and (as_of is None or r.as_of is None or r.as_of == as_of))
+
+    for r in judged if judged is not None else store.find_latest("RES", matches):
+        if not matches(r) or (r.check_id, r.side) not in evds or evds[r.check_id, r.side].ref() != r.evidence:
+            raise ValueError("RESULT_EVIDENCE_SCOPE_MISMATCH")
+        if (r.check_id, r.side) in results:
+            raise ValueError("RESULT_SLOT_AMBIGUOUS")
+        store.validate_object(r)
+        results[(r.check_id, r.side)] = r
+    times = {r.as_of for r in results.values() if r.as_of is not None}
+    if as_of is None and len(times) > 1:
+        raise ValueError("REPORT_REQUIRES_ONE_JUDGMENT_TIME")
+    as_of = as_of or next(iter(times), None) or utcnow()
+    if as_of.utcoffset() is None:
+        raise ValueError("JUDGMENT_TIMEZONE_REQUIRED")
+    as_of = as_of.astimezone(timezone.utc)
 
     sides = [Side.single] if plan.mode == Mode.audit else [Side.baseline, Side.candidate]
     previous_results, previous_evidence = _previous_results(store, plan)
@@ -212,12 +248,14 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             if carried is not None:
                 result = store.resolve(carried.result)
                 evidence = store.resolve(carried.evidence)
+                store.validate_object(evidence)
+                store.validate_object(result)
                 if result.evidence != carried.evidence or result.check_id != check.id or evidence.check_id != check.id:
                     raise ValueError("carried-over result/evidence references do not match")
                 if result.verdicts.security != Verdict.PASS:
                     raise ValueError("carried-over security result must be PASS")
                 row["carried_over"] = carried
-                row["single"] = _side(result)
+                row["single"] = _side(result, evidence)
                 carried_results.append(result)
                 carried_evidence.append(evidence)
                 carried_times.append(dict(check_id=check.id, result=carried.result.model_dump(mode="json"),
@@ -239,7 +277,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             row["tested_while_undetermined"] = item.applicability in (Applicability.UNDETERMINED, Applicability.CONFLICT)
             side_results = {s: results.get((check.id, s)) for s in sides}
             for s, res in side_results.items():
-                row[s.value] = _side(res)
+                row[s.value] = _side(res, evds.get((check.id, s)))
                 if res and res.judge.name == "declared":
                     limitations.extend(f"{check.id}/{s.value}: {reason}" for reason in res.reasons
                                        if reason.startswith(("POLICY_ITEMS:", "POLICY_CONTEXT:", "AUDIT_COLLECTION:")))
@@ -249,11 +287,16 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             if plan.mode == Mode.update:
                 b, c = evds.get((check.id, Side.baseline)), evds.get((check.id, Side.candidate))
                 rb, rc = row["baseline"], row["candidate"]
-                if b and c:
+                if b and c and b.execution.attempt_id == c.execution.attempt_id and (
+                        attempt_id is None or b.execution.attempt_id == attempt_id):
                     row["comparison"] = compare_results(rb.security, b.comparability, rc.security, c.comparability)
                     row["functional_comparison"] = compare_results(rb.functional or Verdict.UNKNOWN, b.comparability,
                                                                    rc.functional or Verdict.UNKNOWN, c.comparability)
                     row["comparison_reasons"] = comparison_differences(b.comparability, c.comparability)
+                elif b or c:
+                    row["comparison"] = Comparison.NOT_COMPARABLE
+                    row["functional_comparison"] = Comparison.NOT_COMPARABLE
+                    row["comparison_reasons"] = ["EXECUTION_ATTEMPT_INCOMPLETE_OR_DIFFERENT"]
             exc, notes = _exception_display(check.id, policy, as_of)
             row["exception"] = exc
             limitations.extend(notes)
@@ -403,4 +446,6 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
         evidence_counts={a: EvidenceCount(**c) for a, c in sorted(counts.items())},
         change_summary=change_summary,
         carry_counts=carry_counts,
+        execution_attempt_id=attempt_id,
+        as_of=as_of,
     ).seal()

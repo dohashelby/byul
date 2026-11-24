@@ -197,3 +197,33 @@ def test_read_only_copy_profile_never_loads_role_keys(tmp_path):
     draft=executor.run(pack.checks['PLT-12'],environment,values,VllmAdapter(),tmp_path/'work')
     assert draft.normal_control.attempted is False and world.sent==[]
     assert draft.observations['copy_producer_authenticated'].value is False
+
+
+def test_copy_collection_reuses_bound_file_digest(tmp_path, monkeypatch):
+    from guard.adapters.vllm import VllmAdapter
+
+    environment, world, values, pack, _, inventory = inputs(tmp_path)
+    target = tmp_path / 'target.json'
+    target.write_bytes(canonical_json(world.target))
+    file_bytes = []
+
+    def runner(argv, **kwargs):
+        response = world.runner(argv, **kwargs)
+        if 'exec' in argv:
+            packet = json.loads(response['stdout_bytes'])
+            file_bytes.append(base64.b64decode(packet['raw_base64'], validate=True))
+        return response
+
+    def hash_without_rehashing_captured_files(raw):
+        assert raw not in file_bytes, 'PLT-12 hashed bytes already bound by the file reader'
+        return sha256_hex(raw)
+
+    monkeypatch.setattr(copy_executor, 'sha256_hex', hash_without_rehashing_captured_files)
+    executor = copy_executor.KubernetesCredentialCopyRecordExecutor(
+        {'target': str(target), 'copy_inventory': str(inventory)}, runner=runner, environ={})
+    draft = executor.run(pack.checks['PLT-12'], environment, values, VllmAdapter(), tmp_path / 'work')
+    rows = draft.observations['copy_collection'].value
+    assert len(rows) == len(file_bytes) == 2
+    assert [row['file_bytes_sha256'] for row in rows] == [sha256_hex(raw) for raw in file_bytes]
+    assert [row['file_bytes'] for row in rows] == [len(raw) for raw in file_bytes]
+    assert all(row['owner_binding_verified'] for row in rows)

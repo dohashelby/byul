@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
+import re
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 from guard.executors import registry
@@ -25,6 +28,7 @@ from guard.models import (
     Mode,
     Pack,
     Plan,
+    Policy,
     Side,
     canonical_json,
     new_id,
@@ -106,42 +110,65 @@ def validate_update_run_config(cfg: RunConfig) -> None:
 
 
 def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
-    from .execution_recipe import execution_lock, configuration_sha256, validate_policy_time
-    validate_policy_time(store.resolve(plan.inputs.policy))
+    from .execution_recipe import execution_lock
+    if plan.mode == Mode.update:
+        validate_update_run_config(cfg)
+        effective = cfg.side_configs.values() if cfg.side_configs else (cfg,)
+        if only_side is not None or any({"real", "kubernetes"} & set(c.executors.values()) for c in effective):
+            raise ValueError("PAIRED_EXECUTION_REQUIRES_COORDINATOR")
+    with execution_lock(store.root, plan.id):
+        return run_plan_locked(store, pack, plan, cfg, only_side=only_side)
+
+
+def run_plan_locked(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
+                    only_side: Side | None = None) -> list[Evidence]:
+    """Dispatch under the PLAN lock held by the caller across lifecycle transitions."""
+    from .execution_recipe import configuration_sha256, validate_policy_time
+    policy = store.resolve(plan.inputs.policy)
+    validate_policy_time(policy)
     environments = [store.resolve(r) for r in plan.inputs.environments]
     expected_recipe = plan.inputs.execution_recipe_sha256
     software_digests: dict[Path, tuple[bytes, str]] = {}
 
-    def verify_recipe(envs):
+    def verify_recipe():
         if expected_recipe is None:
             return
         requested = cfg.requested if cfg.requested is not None else cfg.raw
-        if configuration_sha256(requested, envs, software_digests=software_digests) != expected_recipe:
+        if configuration_sha256(requested, environments, software_digests=software_digests) != expected_recipe:
             raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
 
-    verify_recipe(environments)
-    with execution_lock(store.root, plan.id):
-        cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
-        return _run_plan(store, pack, plan, cfg, verify_recipe=verify_recipe, only_side=only_side)
+    verify_recipe()
+    cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
+    return _run_plan(store, pack, plan, cfg, environments, policy, verify_recipe=verify_recipe, only_side=only_side)
 
 
-def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
-              verify_recipe: Callable[[list[Environment]], None], only_side: Side | None = None) -> list[Evidence]:
+def recover_pending_locked(store: Store, plan: Plan, attempt_id: str) -> list[Evidence]:
+    if re.fullmatch(r"ATTEMPT-[A-Za-z0-9][A-Za-z0-9-]{0,95}", attempt_id) is None:
+        raise ValueError("ATTEMPT_ID_INVALID")
+    pending = store.root / 'pending-evidence' / attempt_id
+    if pending.is_symlink():
+        raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
+    recovered = []
+    for path in sorted(pending.glob('*.json')):
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
+        saved = Evidence.model_validate_json(path.read_bytes())
+        if saved.plan != plan.ref() or saved.execution.attempt_id != attempt_id or not saved.hash_ok() or path.stem != saved.content_sha256:
+            raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
+        recovered.append(saved)
+    store.put_many(recovered)
+    return recovered
+
+
+def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[Environment], policy: Policy, *,
+              verify_recipe: Callable[[], None], only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
-    envs = [store.resolve(r) for r in plan.inputs.environments]
-    policy = store.resolve(plan.inputs.policy)
     if plan.mode == Mode.update:
         validate_update_run_config(cfg)
 
     plan_ref = plan.ref()
-    pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
-    if pending.is_dir():
-        for path in sorted(pending.glob('*.json')):
-            saved = Evidence.model_validate_json(path.read_bytes())
-            if saved.plan != plan_ref or saved.execution.attempt_id != cfg.attempt_id or not saved.hash_ok() or path.stem != saved.content_sha256:
-                raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
-            store.put(saved)  # Idempotent commit of the exact sealed fragment.
+    recover_pending_locked(store, plan, cfg.attempt_id)
     existing = {
         (e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)
     }
@@ -154,7 +181,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
         for side, env in _sides(plan, envs):
             if only_side is not None and side != only_side:
                 continue
-            verify_recipe(envs)
+            verify_recipe()
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
             adapter = adapter_factory() if adapter_factory else None
@@ -168,13 +195,14 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
                 out.append(prev)  # 사람이 입력한 증거를 말 없이 덮지 않는다(SPEC §4.5 증거 대체 규칙)
                 continue
             ident = {"id": prev.id, "revision": prev.revision + 1} if prev else {"id": new_id("EVD"), "revision": 1}
+            environment_ref = env.ref()
             common = dict(
                 **ident,
                 plan=plan_ref,
                 check_id=check.id,
                 side=side,
-                environment=env.ref(),
-                refs=[plan_ref, env.ref()],
+                environment=environment_ref,
+                refs=[plan_ref, environment_ref],
             )
             side_cfg.attempt_id = cfg.attempt_id
             evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,
@@ -186,10 +214,15 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
                 # accept it. Recovery never fabricates an empty replacement.
                 pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
                 pending.mkdir(parents=True, exist_ok=True)
-                with (pending / (evd.content_sha256 + '.json')).open('xb') as stream:
+                with NamedTemporaryFile(dir=pending, delete=False) as stream:
+                    temporary = Path(stream.name)
                     stream.write(canonical_json(evd.to_dict()))
-                    import os
-                    stream.flush(); os.fsync(stream.fileno())
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                try:
+                    os.link(temporary, pending / (evd.content_sha256 + '.json'))
+                finally:
+                    temporary.unlink()
                 raise
             out.append(evd)
     return out

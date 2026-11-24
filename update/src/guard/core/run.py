@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -108,14 +109,24 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
     from .execution_recipe import execution_lock, configuration_sha256, validate_policy_time
     validate_policy_time(store.resolve(plan.inputs.policy))
     environments = [store.resolve(r) for r in plan.inputs.environments]
-    if plan.inputs.execution_recipe_sha256 is not None and configuration_sha256(cfg.requested if cfg.requested is not None else cfg.raw, environments) != plan.inputs.execution_recipe_sha256:
-        raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
+    expected_recipe = plan.inputs.execution_recipe_sha256
+    software_digests: dict[Path, tuple[bytes, str]] = {}
+
+    def verify_recipe(envs):
+        if expected_recipe is None:
+            return
+        requested = cfg.requested if cfg.requested is not None else cfg.raw
+        if configuration_sha256(requested, envs, software_digests=software_digests) != expected_recipe:
+            raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
+
+    verify_recipe(environments)
     with execution_lock(store.root, plan.id):
         cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
-        return _run_plan(store, pack, plan, cfg, only_side=only_side)
+        return _run_plan(store, pack, plan, cfg, verify_recipe=verify_recipe, only_side=only_side)
 
 
-def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
+def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
+              verify_recipe: Callable[[list[Environment]], None], only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
@@ -143,10 +154,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
         for side, env in _sides(plan, envs):
             if only_side is not None and side != only_side:
                 continue
-            if plan.inputs.execution_recipe_sha256 is not None:
-                from .execution_recipe import configuration_sha256
-                if configuration_sha256(cfg.requested if cfg.requested is not None else cfg.raw, envs) != plan.inputs.execution_recipe_sha256:
-                    raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
+            verify_recipe(envs)
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
             adapter = adapter_factory() if adapter_factory else None

@@ -337,12 +337,12 @@ def test_platform_agent_apply_temporary_gateway_verified(ops, tmp_path, monkeypa
     from urllib.parse import urlsplit
 
     from test_bundle_export import _inputs, _save, RUNTIME
-    from serving_runtime import bundle_tools
+    from serving_runtime.operations import bundle_tools
     from serving_runtime.enforcement.intent import load_intent
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.policy import load_policy
-    from serving_runtime.mvp.policy_bundle import verify_policy_bundle
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.policy.policy import load_policy
+    from serving_runtime.policy.policy_bundle import verify_policy_bundle
     from serving_runtime.operations.agent import Agent, Config
 
     if http_gateway:

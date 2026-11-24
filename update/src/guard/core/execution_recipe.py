@@ -6,12 +6,30 @@ import inspect
 from guard.models import canonical_json, sha256_hex, utcnow
 
 
-def configuration_sha256(cfg, environments=()):
+def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, tuple[bytes, str]] | None = None):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
     paths added after selection are absent from the original requested config.
+    An execution can reuse software digests after comparing fresh file bytes.
     """
+    file_digests: dict[Path, str] = {}
+
+    def digest_file(path: Path, *, software=False):
+        if path in file_digests:
+            return file_digests[path]
+        raw = path.read_bytes()
+        cache = software_digests if software else None
+        previous = cache.get(path) if cache is not None else None
+        if previous is not None and raw == previous[0]:
+            digest = previous[1]
+        else:
+            digest = sha256_hex(raw)
+            if cache is not None:
+                cache[path] = (raw, digest)
+        file_digests[path] = digest
+        return digest
+
     def normalize(value):
         if isinstance(value, dict):
             return {k: normalize(v) for k, v in value.items() if not k.startswith('_')}
@@ -30,7 +48,7 @@ def configuration_sha256(cfg, environments=()):
                     # Its derivation and ENV are committed now; the owned Pod
                     # generation is observed/sealed by the transition at run time.
                     inputs[str(path)] = {'binding': 'owned-candidate-after-baseline/1'}
-                else: inputs[str(path)] = sha256_hex(path.read_bytes()) if path.is_file() else None
+                else: inputs[str(path)] = digest_file(path) if path.is_file() else None
             elif isinstance(item, dict): files(item, (*location, key))
     files(cfg)
     implementations = {}
@@ -43,14 +61,14 @@ def configuration_sha256(cfg, environments=()):
             except (TypeError, OSError): source = None
             implementations[side + ':' + name] = {'implementation': impl,
                 'factory': getattr(factory, '__qualname__', None),
-                'source_sha256': sha256_hex(source.read_bytes()) if source is not None and source.is_file() else None}
+                'source_sha256': digest_file(source) if source is not None and source.is_file() else None}
             if engine is not None:
                 from guard.adapters.engine_provider import PROVIDERS, get_provider, load_installed_providers
                 load_installed_providers()
                 if engine in PROVIDERS:
                     closure = get_provider(engine).execution_recipe_files(factory)
                     implementations[side + ':' + name]['provider_sources'] = sorted(
-                        ({'name': Path(path).name, 'sha256': sha256_hex(Path(path).read_bytes())} for path in closure),
+                        ({'name': Path(path).name, 'sha256': digest_file(Path(path))} for path in closure),
                         key=lambda item: (item['name'], item['sha256']))
     factories(cfg, 'root', environments[0] if len(environments) == 1 else None)
     from guard.configuration import merge_config
@@ -61,7 +79,7 @@ def configuration_sha256(cfg, environments=()):
     # Commit the actual installed common implementation, not a manifest's
     # assertion about its own bytes. This is outside the measured trial.
     package = Path(__file__).parents[1]
-    software = {p.relative_to(package).as_posix(): sha256_hex(p.read_bytes())
+    software = {p.relative_to(package).as_posix(): digest_file(p, software=True)
         for p in sorted(package.rglob('*')) if p.is_file() and p.suffix in {'.py', '.json', '.yaml', '.txt'}}
     return sha256_hex(canonical_json({'schema': 'guard-execution-recipe/1', 'requested': normalize(cfg),
         'inputs': inputs, 'implementations': implementations, 'software_sha256': sha256_hex(canonical_json(software))}))

@@ -42,6 +42,11 @@ def test_cli_uses_original_exact_evidence_and_decision_time(tmp_path):
     store, pack, plan, original = _saved_run(tmp_path)
     later = judge_plan(store, pack, plan, T0 + timedelta(hours=1))
     assert all(result.as_of != original.as_of for result in later)
+    row = next(row for row in original.by_check if row.check_id == "REQ-01")
+    prior = store.resolve(row.baseline.result)
+    newer = prior.model_copy(update={"revision": store.latest(prior.id).revision + 1,
+        "judge": prior.judge.model_copy(update={"version": "different-evaluation"})}).seal()
+    store.put(newer)
     source = tmp_path / "original.json"
     source.write_bytes(canonical_json(original.to_dict()))
     common = ["--store", str(store.root), "--plan", plan.id, "--from-report", str(source)]
@@ -53,6 +58,7 @@ def test_cli_uses_original_exact_evidence_and_decision_time(tmp_path):
     assert result.exit_code == 0, result.output + repr(result.exception)
     replayed = Report.model_validate(json.loads(output.read_bytes()))
     assert replayed.as_of == original.as_of
+    assert newer.ref() not in replayed.inputs_manifest
     assert replayed.by_check == original.by_check
 
 

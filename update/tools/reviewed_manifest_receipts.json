@@ -765,6 +765,11 @@
       "manifest_sha256": "49e22edf14565ca377ae51cce33baedba74c9872fd02339879d1b0a0d0af5de9",
       "reviewed_by": "Codex / customer handoff and scoped collection reuse / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T09:47:10.991Z"
+    },
+    {
+      "manifest_sha256": "a54124c70be27948c147ba4f5bf44185486da1571b553fef92d9235ab6a27bcf",
+      "reviewed_by": "Codex / exact report replay refs / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T10:11:15.352Z"
     }
   ]
 }

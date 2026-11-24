@@ -119,7 +119,7 @@ def _publish_report(path: Path, report) -> None:
 
 def _replay_inputs(store, plan, source, attempt, as_of):
     if source is None:
-        return attempt, _as_of(as_of) if as_of else None, None
+        return attempt, _as_of(as_of) if as_of else None, None, None
     report = Report.model_validate_json(source.read_bytes())
     report = store.resolve(report.ref())
     store.validate_object(report)
@@ -132,7 +132,7 @@ def _replay_inputs(store, plan, source, attempt, as_of):
     if requested_time is None or (report.as_of is not None and requested_time != report.as_of):
         raise typer.BadParameter("원본 보고서의 판정 시각을 확인할 수 없습니다")
     evds = [store.resolve(ref) for ref in report.inputs_manifest if ref.kind == "EVD"]
-    return report.execution_attempt_id, requested_time, [evd for evd in evds if evd.plan == plan.ref()]
+    return report.execution_attempt_id, requested_time, [evd for evd in evds if evd.plan == plan.ref()], report
 
 
 @policy_app.command("template")
@@ -299,7 +299,7 @@ def judge(
     cfg = _config(config)
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
-    attempt, judgment_time, evds = _replay_inputs(st, pl, from_report, attempt, as_of)
+    attempt, judgment_time, evds, _ = _replay_inputs(st, pl, from_report, attempt, as_of)
     results = judge_plan(st, pk, pl, judgment_time or utcnow(), attempt_id=attempt, evidence=evds)
     counts: dict[str, int] = {}
     for r in results:
@@ -327,8 +327,14 @@ def report(
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
     with execution_lock(st.root, pl.id):
-        attempt, judgment_time, evds = _replay_inputs(st, pl, from_report, attempt, as_of)
-        rpt = build_report(st, pk, pl, judgment_time, attempt_id=attempt, evidence=evds)
+        attempt, judgment_time, evds, original = _replay_inputs(st, pl, from_report, attempt, as_of)
+        judged = None if original is None else [
+            st.resolve(side.result)
+            for row in original.by_check if row.selected
+            for side in (row.single, row.baseline, row.candidate)
+            if side is not None and side.result is not None
+        ]
+        rpt = build_report(st, pk, pl, judgment_time, attempt_id=attempt, evidence=evds, judged=judged)
         st.put(rpt)
     _publish_report(json_out, rpt)
     typer.echo(f"{rpt.id}@{rpt.revision} official={rpt.official} → {json_out}")

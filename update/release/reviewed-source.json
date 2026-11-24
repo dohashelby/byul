@@ -277,7 +277,7 @@
   "update/src/guard/adapters/vllm_worker_startup_sensor.py": "7515a6d023db8056524220ee61fbfbb82fd9cc92520f605d511bfdc04283aae5",
   "update/src/guard/application.py": "60bc705fccc76959b8da7e7e191b55e242d84bc4326e52ebcf5ace397ad52e53",
   "update/src/guard/automation_policy.py": "5c4a3a939806b917633354b61e51633a8a87f0a911764b93c96aa44f63a0b9f4",
-  "update/src/guard/cli.py": "dd84484e6c6d05c112081c9536ee69f9e9f7e02e93300a4c5ca8a043ccd99611",
+  "update/src/guard/cli.py": "3166e3c268c761eebd2649622d37f5bfbcd9c301c38272833f71848a1da3da9c",
   "update/src/guard/collectors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "update/src/guard/collectors/actor_consumption.py": "0140d1d325731906aff3ae954a8de961c71ddbd5bb6bbb52c0b042610c4d63e6",
   "update/src/guard/collectors/auxiliary_supply_producer.py": "f7ea7ee8be4bfa2cff8b7a2ba40e2eca1bacb9ed0af5f7ca70eea9b162bf2795",

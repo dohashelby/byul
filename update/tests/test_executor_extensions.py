@@ -251,9 +251,26 @@ def test_obs05_fields_and_sinks_are_compared_to_the_approved_lists(tmp_path, mon
     assert result.verdicts.security.value == security
 
 
-def test_obs05_no_report_observed_never_passes(tmp_path, monkeypatch):
-    _, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), usage_snapshot()]), ALLOWED, monkeypatch, [[START], [START]])
+@pytest.mark.parametrize("after", [usage_snapshot(), usage_snapshot(sha="b" * 64)])
+def test_obs05_no_sink_arrival_never_passes(tmp_path, monkeypatch, after):
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), after]),
+                            ALLOWED, monkeypatch, [[START], [START]])
+    assert evd.observations["usage_send_sensor_available"].value is True
+    assert evd.observations["usage_report_observed"].collected is True
+    assert evd.observations["usage_report_observed"].value is False
     assert result.verdicts.security.value == "UNKNOWN"
+
+
+@pytest.mark.parametrize("local_fields,security", [(("event",), "UNKNOWN"), (("event", "extra"), "FAIL")])
+def test_obs05_changed_sink_prefix_keeps_only_qualified_local_fields(tmp_path, monkeypatch, local_fields, security):
+    after = usage_snapshot(sha="b" * 64, fields=local_fields)
+    sink = [[START, receipt(["event"])], [START, receipt(["changed"]), receipt(["unverified"], "other")]]
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), after]), ALLOWED, monkeypatch, sink)
+    assert evd.observations["usage_send_sensor_available"].value is False
+    assert evd.observations["usage_sink_receipts"].collected is False
+    assert evd.observations["usage_report_observed"].collected is False
+    assert evd.observations["usage_fields_seen"].value == list(local_fields)
+    assert result.verdicts.security.value == security
 
 
 def test_usage_sink_rejects_open_records():

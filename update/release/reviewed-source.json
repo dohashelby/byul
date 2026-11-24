@@ -527,7 +527,7 @@
   "update/src/guard/executors/template_supply_approval.py": "c09db572cf5d083b354076d686154a78109cc9fba648398872d25bc2dfa0d88d",
   "update/src/guard/executors/template_validation.py": "4e7df5927b86b3eb6f6a2369a9fe5b9a78ff03bd30abb8d097a87f952f7e8419",
   "update/src/guard/executors/unix_ipc.py": "fc3e8d1cde96899c89547397e9c457ca2b56312dc5585d3c8f028af0d3e1fa56",
-  "update/src/guard/executors/usage_report.py": "8f26615dd07db2dc1d8f4c23abf9fbaf3226a7a72876b5845fd95934cf37b4db",
+  "update/src/guard/executors/usage_report.py": "4f522a0335ad7633dd7a046c852988f9829b9128415effcfab917c4e3ec4cfdb",
   "update/src/guard/executors/weight_file_capture.py": "b6b7c190e76edd96cf3b7e5559a7bef30e81211c1fae720ebb9210011b07f7fb",
   "update/src/guard/executors/worker_security_projection.py": "5a57f87149e125e7e83dc5a44f37c898cbb71e572467b2238939b4676874c577",
   "update/src/guard/gpu18_prototype/__init__.py": "fa18248d111b26cd5a0a70cfb94dd70ca30dd0afc489cde9f934003acae0062f",

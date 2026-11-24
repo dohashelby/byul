@@ -1255,6 +1255,11 @@
       "manifest_sha256": "ff6ca7e70698e068ddae7fa1560077205dd00933d385265b118c56c9c05d1f41",
       "reviewed_by": "Codex / LIF-01 and OBS-06 stable input reads; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T09:00:12+00:00"
+    },
+    {
+      "manifest_sha256": "316d32a064fecffa5731c6021dec5bef7d116fdcf193f8d27d07fe16965926df",
+      "reviewed_by": "Codex / OBS-05 verified sink arrival; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:18:09+00:00"
     }
   ]
 }

@@ -26,10 +26,9 @@ from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture_module
 from guard.executors.kubernetes_profiler_control import project_captures
 from guard.executors.registry import resolve_executor
-from tests.test_lifecycle_capture import external, case, revised  # noqa: F401
+from tests.lifecycle_fixtures import CONTEXT, revised
 from tests.test_a1_profiler_sensor import make_world, invoke, Router, Response, PRIVATE
 from tests.test_a1_rank_failure_sensor import codes, QuietLogger
-from tests.test_lifecycle_sensor import CONTEXT, writer_factory  # noqa: F401
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -40,26 +39,26 @@ REPO = Path(__file__).resolve().parents[2]
     ('rank', variant.RANK_PROFILE, rank, variant.RANK_SHA256, variant.RANK_ROWS),
 ])
 def test_candidate_variant_prepares_exact_private_dependencies_and_rejects_changes(
-        external, kind, profile, extension, sha, added):
+        lifecycle_external, kind, profile, extension, sha, added):
     assert hashlib.sha256(Path(base.__file__).read_bytes()).hexdigest() == variant.BASE_SHA256
     assert hashlib.sha256(Path(release.__file__).read_bytes()).hexdigest() == variant.RELEASE_SHA256
     assert hashlib.sha256(Path(extension.__file__).read_bytes()).hexdigest() == sha
-    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=profile)
-    assert lifecycle.load_prepared(external / 'assets/manifest.json') == prepared
+    prepared = lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=profile)
+    assert lifecycle.load_prepared(lifecycle_external / 'assets/manifest.json') == prepared
     assert prepared['profile'] == profile and prepared['public_commit'] == release.COMMIT
     assert prepared['source_sha256'] == {**release.source_rows(base.SOURCE_SHA), **added}
     assert set(prepared['assets']) == {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py',
         'guard_lifecycle_release.py', 'guard_lifecycle_extension.py', 'guard_request_binding.py',
         'request-binding-key.json', 'sitecustomize.py', 'settings.json'}
-    assert (external / 'assets/guard_lifecycle_sensor.py').read_bytes() == variant.render_source(kind,
+    assert (lifecycle_external / 'assets/guard_lifecycle_sensor.py').read_bytes() == variant.render_source(kind,
         request_key_sha256=prepared['assets']['request-binding-key.json']['sha256'])
     assert profiles.point_sources(profile) == profiles.point_sources(release.PROFILE)
     assert resolve_executor({'stream':'stream_buffer','profiler':'profiler_observation','rank':'rank_failure'}[kind],
         'kubernetes', engine='vllm', version='0.30.0') is not None
-    changed = external / 'assets/guard_lifecycle_extension.py'
+    changed = lifecycle_external / 'assets/guard_lifecycle_extension.py'
     changed.write_bytes(changed.read_bytes() + b'# modified\n')
     with pytest.raises(ValueError):
-        lifecycle.load_prepared(external / 'assets/manifest.json')
+        lifecycle.load_prepared(lifecycle_external / 'assets/manifest.json')
 
 
 def test_profiler_candidate_sources_and_generation_are_separate_from_old_profile():
@@ -77,15 +76,15 @@ def test_profiler_candidate_sources_and_generation_are_separate_from_old_profile
     ('rank', variant.RANK_PROFILE, rank),
 ])
 def test_private_composition_selects_candidate_profile_and_exact_rows(
-        external, monkeypatch, kind, profile, extension):
+        lifecycle_external, monkeypatch, kind, profile, extension):
     runtime = 'cpython-' + '.'.join(map(str, sys.version_info[:3]))
-    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=profile)
+    prepared = lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=profile)
     module = types.ModuleType('_candidate_observation_fixture')
-    module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
-    exec(compile((external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
+    module.__file__ = str(lifecycle_external / 'assets/guard_lifecycle_sensor.py')
+    exec(compile((lifecycle_external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
                  dont_inherit=True, optimize=0), module.__dict__)
     def exact_dependency(name, digest):
-        raw = (external / 'assets' / name).read_bytes()
+        raw = (lifecycle_external / 'assets' / name).read_bytes()
         assert hashlib.sha256(raw).hexdigest() == digest
         return raw
     monkeypatch.setattr(module, '_read', exact_dependency)
@@ -146,13 +145,13 @@ def test_private_composition_selects_candidate_profile_and_exact_rows(
             {'type': 'http', 'path': '/v1/completions', 'headers': []}) is None
 
 
-def test_candidate_key_failure_leaves_no_observer_installed(external, monkeypatch):
-    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=variant.STREAM_PROFILE)
+def test_candidate_key_failure_leaves_no_observer_installed(lifecycle_external, monkeypatch):
+    prepared = lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=variant.STREAM_PROFILE)
     module = types.ModuleType('_candidate_key_failure_fixture')
-    module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
-    exec(compile((external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
+    module.__file__ = str(lifecycle_external / 'assets/guard_lifecycle_sensor.py')
+    exec(compile((lifecycle_external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
                  dont_inherit=True, optimize=0), module.__dict__)
-    monkeypatch.setattr(module, '_read', lambda name, digest: (external / 'assets' / name).read_bytes())
+    monkeypatch.setattr(module, '_read', lambda name, digest: (lifecycle_external / 'assets' / name).read_bytes())
     monkeypatch.setattr(module, '_request_key', lambda binding: (_ for _ in ()).throw(ValueError('bad key')))
     assert module.install() is False and module._BASE is None
     called = []
@@ -163,14 +162,14 @@ def test_candidate_key_failure_leaves_no_observer_installed(external, monkeypatc
     assert prepared['assets']['request-binding-key.json']['bytes'] > 0
 
 
-def test_profiler_control_route_hmac_reaches_original_producer_and_validator(external, monkeypatch):
+def test_profiler_control_route_hmac_reaches_original_producer_and_validator(lifecycle_external, monkeypatch):
     runtime = 'cpython-' + '.'.join(map(str, sys.version_info[:3]))
-    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=variant.PROFILER_PROFILE)
+    prepared = lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=variant.PROFILER_PROFILE)
     module = types.ModuleType('_candidate_profiler_route_fixture')
-    module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
-    exec(compile((external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
+    module.__file__ = str(lifecycle_external / 'assets/guard_lifecycle_sensor.py')
+    exec(compile((lifecycle_external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
                  dont_inherit=True, optimize=0), module.__dict__)
-    monkeypatch.setattr(module, '_read', lambda name, digest: (external / 'assets' / name).read_bytes())
+    monkeypatch.setattr(module, '_read', lambda name, digest: (lifecycle_external / 'assets' / name).read_bytes())
     monkeypatch.setattr(module, '_request_key', lambda binding: (prepared['session'], b'k' * 32))
     if (runtime not in profiler.RUNTIME_CODE_CONTRACTS or
             runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix'
@@ -206,21 +205,21 @@ def test_profiler_control_route_hmac_reaches_original_producer_and_validator(ext
         and row['asgi_invocation_sha256'] == context['invocation'] for row in samples)
 
 
-def test_candidate_key_permissions_and_header_fingerprint(external):
-    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=variant.STREAM_PROFILE)
+def test_candidate_key_permissions_and_header_fingerprint(lifecycle_external):
+    prepared = lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=variant.STREAM_PROFILE)
     header = 'byul-lif04-' + 'b' * 32 + '-normal'
-    digest = lifecycle.request_header_fingerprint(external / 'assets/manifest.json', prepared, header)
+    digest = lifecycle.request_header_fingerprint(lifecycle_external / 'assets/manifest.json', prepared, header)
     assert digest != hashlib.sha256(header.encode()).hexdigest()
-    key = external / 'assets/request-binding-key.json'
+    key = lifecycle_external / 'assets/request-binding-key.json'
     key.chmod(0o644)
     with pytest.raises(ValueError):
-        lifecycle.load_prepared(external / 'assets/manifest.json')
+        lifecycle.load_prepared(lifecycle_external / 'assets/manifest.json')
     with pytest.raises(ValueError):
-        lifecycle.request_header_fingerprint(external / 'assets/manifest.json', prepared, header)
+        lifecycle.request_header_fingerprint(lifecycle_external / 'assets/manifest.json', prepared, header)
 
 
-def test_composed_profiler_api_producer_parses_and_joins_exact_hmac(case, monkeypatch):
-    root = case.root
+def test_composed_profiler_api_producer_parses_and_joins_exact_hmac(lifecycle_capture_case, monkeypatch):
+    root = lifecycle_capture_case.root
     prepared = lifecycle.prepare_assets(root / 'candidate-assets', REPO, profile=variant.PROFILER_PROFILE)
     module = types.ModuleType('_candidate_profiler_producer_fixture')
     module.__file__ = str(root / 'candidate-assets/guard_lifecycle_sensor.py')
@@ -289,7 +288,7 @@ def test_composed_profiler_api_producer_parses_and_joins_exact_hmac(case, monkey
             settings_sha256=prepared['assets']['settings.json']['sha256'])
         end['monotonic_ns'] = events[-1]['monotonic_ns'] + 1
         rows[:] = [start, *events, end]
-    rows, summary = capture_module.parse_recording(revised(case.raw, insert), prepared)
+    rows, summary = capture_module.parse_recording(revised(lifecycle_capture_case.raw, insert), prepared)
     assert summary['recording_closed'] is True
     assert len([row for row in rows if row['event'] == 'PROFILER']) == 4
     packet = {'recordings': [{'capture': {'records': rows, 'summary': summary,
@@ -311,13 +310,13 @@ def test_composed_profiler_api_producer_parses_and_joins_exact_hmac(case, monkey
 @pytest.mark.parametrize('mode', ['normal', 'backend-stop-failure',
                                  'post-stop-output-failure', 'start-failure'])
 def test_exact_candidate_worker_and_wrapper_reuse_backend_without_certifying_it(
-        external, monkeypatch, mode):
-    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=variant.PROFILER_PROFILE)
+        lifecycle_external, monkeypatch, mode):
+    prepared = lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=variant.PROFILER_PROFILE)
     module = types.ModuleType('_candidate_profiler_worker_fixture')
-    module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
-    exec(compile((external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__,
+    module.__file__ = str(lifecycle_external / 'assets/guard_lifecycle_sensor.py')
+    exec(compile((lifecycle_external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__,
                  'exec', dont_inherit=True, optimize=0), module.__dict__)
-    monkeypatch.setattr(module, '_read', lambda name, digest: (external / 'assets' / name).read_bytes())
+    monkeypatch.setattr(module, '_read', lambda name, digest: (lifecycle_external / 'assets' / name).read_bytes())
     monkeypatch.setattr(module, '_request_key', lambda binding: (prepared['session'], b'k' * 32))
     runtime = 'cpython-' + '.'.join(map(str, sys.version_info[:3]))
     if (runtime not in profiler.RUNTIME_CODE_CONTRACTS or

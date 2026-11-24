@@ -9,14 +9,16 @@ from typer.testing import CliRunner
 
 from guard import application
 from guard.cli import app
+from guard.configuration import merge_config
 from guard.executors import registry
 from guard.executors.kubernetes_request_binding import KubernetesRequestBindingExecutor
-from guard.models import canonical_json
+from guard.models import canonical_json, load_pack
 from guard.runtime.kubernetes_http import KubernetesBindingError
 from guard.runtime.kubernetes_transition import KubernetesTransition
 from guard.store import Store
 from tests.builders import baseline_pack, policy, T0
 from tests.test_kubernetes_request_binding import World, env, target, VALUES
+from tools.j02_run_config import ROOT as UPDATE_ROOT, _row as j02_row
 from tools.j02_run_config import build_config, dumps_toml, j02_checks
 
 
@@ -187,3 +189,49 @@ def test_prepare_update_static_kube_path_does_not_require_docker_or_claim_actual
     assert any(row["check"]=="kubernetes-static-binding" and row["ok"] for row in result["checks"])
     assert not result["ready"]  # Same image is a CPU transition contract, not a two-image validation.
     assert any(row["check"]=="image-pair" and not row["ok"] for row in result["checks"])
+
+
+@pytest.mark.parametrize("candidate_budget, candidate_ok", [(64, False), (128, True)])
+def test_prepare_update_and_j02_use_side_specific_check_budgets(tmp_path, monkeypatch, candidate_budget, candidate_ok):
+    pair = Pair()
+    configs = pair.configs(tmp_path)
+    pack = load_pack(UPDATE_ROOT / "packs/PACK-BASELINE")
+    values = {"max_input_tokens": 127, "rejection_codes": ["400", "422"],
+              "allowed_endpoints": ["POST /v1/completions", "POST /v1/chat/completions"],
+              "allowed_input_formats": ["token_ids", "text"],
+              "allowed_input_pairs": ["POST /v1/completions|token_ids", "POST /v1/chat/completions|text"]}
+    pol = policy(pack.ref(), scope={"include": ["REQ-09"]}, values={"REQ-09": values})
+    budgets = {"baseline": 128, "candidate": candidate_budget}
+    config = build_config({
+        "executors": {"request_binding": "kubernetes", "input_validation": "kubernetes"},
+        "shared": {"input_validation": {"vocab_size": 100, "vocab_source": "EXAMPLE", "max_probe_tokens": 1,
+                                        "native_input_capture": {"prepared_dir": "EXAMPLE-private-fixture",
+                                                                 "prepared_sha256": "a" * 64}}},
+        "sides": {
+            side: {"executors": {name: {"target": side_config["request_binding"]["target"]}
+                                  for name in ("request_binding", "input_validation")},
+                   "checks": {"REQ-09": {"executor": {"max_probe_tokens": budgets[side]}}}}
+            for side, side_config in configs.items()
+        },
+    })
+    def unexpected_docker(*args):
+        raise AssertionError("static Kubernetes preparation must not use Docker")
+    monkeypatch.setattr(application, "Docker", unexpected_docker)
+
+    result = application.update_readiness(pack, pair.envs, pol, config)
+    support = {row["side"]: row["policy_supported"] for row in result["check_support"]}
+    assert support == {"baseline": True, "candidate": candidate_ok}
+    inputs = next(row for row in result["checks"] if row["check"] == "inputs")
+    assert inputs["ok"] is candidate_ok
+    if not candidate_ok:
+        assert inputs["detail"] == "INPUT_MATRIX_CONFIGURATION_INVALID"
+
+    statuses = {}
+    for side, env in zip(configs, pair.envs):
+        side_cfg = merge_config(config, config["sides"][side])
+        row = j02_row(pack, "REQ-09", side, side_cfg, env, values)
+        statuses[side] = row["status"]
+        assert row["policy_keys_missing"] == []
+        if side == "candidate" and not candidate_ok:
+            assert row["reasons"] == ["INPUT_MATRIX_CONFIGURATION_INVALID"]
+    assert statuses == {"baseline": "READY_STATIC", "candidate": "READY_STATIC" if candidate_ok else "MISSING_INPUT"}

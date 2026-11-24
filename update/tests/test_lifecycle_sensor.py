@@ -10,55 +10,13 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 import types
-import threading
 import weakref
 
 import pytest
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
-
-CANARY="EXAMPLE_LIFECYCLE_PRIVATE_6FB53A"
-CONTEXT={"pid":42,"start_ticks":99,"uid":1000,"boot_sha256":"1"*64,
-         "pid_namespace":23,"time_namespace":24,"time_offsets_sha256":"2"*64}
-
-
-class FakeOS:
-    O_WRONLY=1;O_CREAT=2;O_EXCL=4;O_NOFOLLOW=8
-    def __init__(self):
-        self.data=bytearray();self.writes=[];self.closed=[];self.failure=False;self.names=set();self.next_fd=11
-    def getpid(self):return 42
-    def geteuid(self):return 1000
-    def fstat(self,fd):return SimpleNamespace(st_uid=1000,st_mode=0o40700)
-    def open(self,name,flags,mode,*,dir_fd):
-        assert flags==self.O_WRONLY|self.O_CREAT|self.O_EXCL|self.O_NOFOLLOW
-        assert mode==0o600 and dir_fd==10
-        if name in self.names:raise FileExistsError(CANARY)
-        self.names.add(name);self.name=name
-        descriptor=self.next_fd;self.next_fd+=1
-        return descriptor
-    def close(self,fd):self.closed.append(fd)
-    def write(self,fd,data):
-        if self.failure:raise OSError(CANARY)
-        self.writes.append(bytes(data));self.data.extend(data);return len(data)
-
-
-class SilentThread:
-    def __init__(self,**kwargs):pass
-    def start(self):pass
-
-
-@pytest.fixture
-def writer_factory(monkeypatch):
-    def build(*,session="a"*32,settings_sha="b"*64):
-        fake=FakeOS()
-        monkeypatch.setattr(sensor,"os",fake)
-        monkeypatch.setattr(sensor,"_open_directory",lambda p:10)
-        monkeypatch.setattr(sensor,"threading",SimpleNamespace(RLock=threading.RLock,Thread=SilentThread,Event=threading.Event))
-        config={"session":session,"output_dir":"/guard-lifecycle/data/"+session,
-                "control_path":"/guard-lifecycle/data/"+session+"/SEALED"}
-        writer=sensor.Writer(config,settings_sha,dict(CONTEXT))
-        return writer,fake
-    return build
+from tests.lifecycle_fixtures import CANARY, CONTEXT, SilentThread
+from tests.lifecycle_fixtures import FakeOS, writer_factory  # noqa: F401 (legacy imports)
 
 
 class RecordingObserver(sensor.Observer):

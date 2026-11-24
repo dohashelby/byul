@@ -1,4 +1,4 @@
-"""Temporary legacy-path contract; remove together with LEGACY_SHIMS.md."""
+"""Current imports resolve directly; removed legacy aliases cannot return."""
 
 from __future__ import annotations
 
@@ -23,60 +23,54 @@ def is_legacy(name: str) -> bool:
     return any(name == prefix or name.startswith(prefix + ".") for prefix in LEGACY_PREFIXES)
 
 
-class LegacyImportShimTests(unittest.TestCase):
-    def test_all_legacy_imports_return_the_same_module(self):
+class ImportPathTests(unittest.TestCase):
+    def test_all_new_modules_resolve_without_legacy_imports(self):
         for old, new in MODULES.items():
             with self.subTest(old=old, new=new):
-                self.assertIs(importlib.import_module(old), importlib.import_module(new))
+                module = importlib.import_module(new)
+                self.assertEqual(module.__name__, new)
+                self.assertTrue(Path(module.__file__).resolve().is_relative_to(RUNTIME / "src"))
+                with self.assertRaises(ModuleNotFoundError):
+                    importlib.import_module(old)
 
     def test_package_export_uses_the_new_config_module(self):
-        from serving_runtime.mvp import MVPConfig
+        from serving_runtime.config.config import MVPConfig
 
         self.assertEqual(MVPConfig.__module__, "serving_runtime.config.config")
 
-    def test_patch_through_the_legacy_path_reaches_the_new_module(self):
+    def test_patch_through_the_current_path_reaches_the_actual_module(self):
         new = importlib.import_module("serving_runtime.bridge_update.deployment_guard")
         original = new.verify_deployment_guard
         replacement = object()
-        with patch("serving_runtime.mvp.deployment_guard.verify_deployment_guard", replacement):
+        with patch("serving_runtime.bridge_update.deployment_guard.verify_deployment_guard", replacement):
             self.assertIs(new.verify_deployment_guard, replacement)
         self.assertIs(new.verify_deployment_guard, original)
 
-    def test_private_name_remains_available_at_the_legacy_path(self):
-        old = importlib.import_module("serving_runtime.mvp.target")
+    def test_private_name_remains_available_at_the_current_path(self):
+        from serving_runtime.target.target import _parse
+
         new = importlib.import_module("serving_runtime.target.target")
-        self.assertTrue(callable(old._parse))
-        self.assertIs(old._parse, new._parse)
+        self.assertTrue(callable(_parse))
+        self.assertIs(_parse, new._parse)
 
-    def test_module_shims_contain_only_alias_boilerplate(self):
-        for old, new in MODULES.items():
+    def test_legacy_module_files_and_package_are_absent(self):
+        for old in MODULES:
             path = RUNTIME / "src" / Path(*old.split(".")).with_suffix(".py")
-            body = ast.parse(path.read_text(encoding="utf-8")).body
             with self.subTest(module=old):
-                self.assertEqual(len(body), 4)
-                self.assertIsInstance(body[0], ast.Expr)
-                self.assertIsInstance(body[0].value, ast.Constant)
-                self.assertIsInstance(body[0].value.value, str)
-                expected = ast.parse(
-                    f'import sys\nfrom importlib import import_module\nsys.modules[__name__] = import_module("{new}")\n'
-                )
-                actual = ast.Module(body=body[1:], type_ignores=[])
-                self.assertEqual(
-                    ast.dump(actual, include_attributes=False),
-                    ast.dump(expected, include_attributes=False),
-                )
+                self.assertFalse(path.exists())
+        self.assertFalse((RUNTIME / "src/serving_runtime/mvp").exists())
 
-    def test_runtime_does_not_use_legacy_imports_or_module_strings(self):
-        shims = {RUNTIME / "src" / Path(*old.split(".")).with_suffix(".py") for old in MODULES}
-        shims.add(RUNTIME / "src/serving_runtime/mvp/__init__.py")
+    def test_runtime_platform_and_update_do_not_use_legacy_imports_or_strings(self):
         findings = []
-        for directory in ("src", "tools", "labtools", "tests"):
-            for path in sorted((RUNTIME / directory).rglob("*.py")):
-                if path in shims or path == Path(__file__).resolve() or "__pycache__" in path.parts:
+        roots = [RUNTIME / directory for directory in ("src", "tools", "labtools", "tests")]
+        roots.extend((RUNTIME.parent / "platform/api/tests", RUNTIME.parent / "update/tests"))
+        for root in roots:
+            for path in sorted(root.rglob("*.py")):
+                if path == Path(__file__).resolve() or "__pycache__" in path.parts:
                     continue
                 tree = ast.parse(path.read_text(encoding="utf-8"))
                 package = None
-                if directory == "src":
+                if root == RUNTIME / "src":
                     parts = list(path.relative_to(RUNTIME / "src").with_suffix("").parts)
                     package = ".".join(parts[:-1])
                 for node in ast.walk(tree):
@@ -90,10 +84,10 @@ class LegacyImportShimTests(unittest.TestCase):
                         names = [module, *(module + "." + alias.name for alias in node.names)]
                     elif isinstance(node, ast.Constant) and isinstance(node.value, str):
                         if any(prefix in node.value for prefix in LEGACY_PREFIXES):
-                            findings.append(f"{path.relative_to(RUNTIME)}:{node.lineno}: legacy string")
+                            findings.append(f"{path.relative_to(RUNTIME.parent)}:{node.lineno}: legacy string")
                     for name in names:
                         if is_legacy(name):
-                            findings.append(f"{path.relative_to(RUNTIME)}:{node.lineno}: {name}")
+                            findings.append(f"{path.relative_to(RUNTIME.parent)}:{node.lineno}: {name}")
         self.assertEqual(findings, [])
 
 

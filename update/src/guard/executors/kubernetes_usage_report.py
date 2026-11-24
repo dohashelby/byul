@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from posixpath import normpath
 import re
 import time
 
@@ -16,6 +17,7 @@ from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import validate_capture_target
 from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesBindingError, KubernetesHTTP, USAGE_CONTROL_PROFILE
+from guard.runtime.kubernetes_process import _mounts
 from .content_common import bounded_probe, control_state
 from .http_common import Ctx, functional_requests
 from .kubernetes_lifecycle_capture import (
@@ -269,7 +271,10 @@ class _UsageReader(KubernetesLifecycleReader):
         if self._local and args[1:3] == ["get", "pod"]:
             pod = strict_json(raw, limit=cap)
             spec = pod.get("spec", {})
-            if any(spec.get(key, False) is not False for key in ("hostPID", "shareProcessNamespace")):
+            mounts = _mounts(pod, self.binding["engine"])
+            proc_view = (normpath("/" + row["mount_path"].lstrip("/")) for row in mounts)
+            if (spec.get("hostPID", False) is not False
+                    or any(path in {"/", "/proc"} or path.startswith("/proc/") for path in proc_view)):
                 self.gap = True
                 raise KubernetesCaptureError()
         return raw

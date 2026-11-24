@@ -276,6 +276,9 @@ class LocalUsageWorld(FullWorld):
                 pod = json.loads(result['stdout_bytes'])
                 if self.mode in ('shared-pid', 'host-pid'):
                     pod['spec']['shareProcessNamespace' if self.mode == 'shared-pid' else 'hostPID'] = True
+                if self.mode == 'proc-mount':
+                    container, = pod['spec']['containers']
+                    container['volumeMounts'].append({'name': 'proc-view', 'mountPath': '/proc/1'})
                 if self.mode == 'local-owner-changed' and self.snapshots:
                     pod['metadata']['uid'] = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
                 if self.mode.startswith('cache') and pod['metadata']['name'] == self.target['kubernetes']['engine']['pod']:
@@ -343,7 +346,7 @@ def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path
     ('absent', True, True, 'UNKNOWN'), ('new', True, True, 'FAIL'), ('one-unreadable', True, False, 'UNKNOWN'),
     ('all-unreadable', False, False, 'UNKNOWN'), ('optout-missing', False, False, 'UNKNOWN'),
     ('process-changed', False, False, 'UNKNOWN'), ('partial-control', False, False, 'UNKNOWN'),
-    ('shared-pid', False, False, 'UNKNOWN'), ('host-pid', False, False, 'UNKNOWN'),
+    ('shared-pid', False, False, 'UNKNOWN'), ('host-pid', False, False, 'UNKNOWN'), ('proc-mount', False, False, 'UNKNOWN'),
     ('cache-absent', True, True, 'UNKNOWN'), ('cache-new', True, True, 'FAIL'),
     ('cache-folder-changed', False, False, 'UNKNOWN'), ('cache-source-change', False, False, 'UNKNOWN'),
     ('cache-source-change-legacy-new', False, True, 'FAIL'),
@@ -378,12 +381,13 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monk
     pre_control_failures = {
         'shared-pid': 'USAGE_LOCAL_PRE_READ_UNVERIFIED',
         'host-pid': 'USAGE_LOCAL_PRE_READ_UNVERIFIED',
+        'proc-mount': 'USAGE_LOCAL_PRE_READ_UNVERIFIED',
         'local-transport-timed-out': 'USAGE_LOCAL_TRANSPORT_UNAVAILABLE',
         'local-transport-failed': 'USAGE_LOCAL_TRANSPORT_UNAVAILABLE',
         'local-owner-changed': 'USAGE_LOCAL_OWNER_AFTER_UNVERIFIED',
         'local-projection-invalid': 'USAGE_LOCAL_PROJECTION_INVALID',
     }
-    assert world.snapshots == {'optout-missing': 1, 'shared-pid': 0, 'host-pid': 0,
+    assert world.snapshots == {'optout-missing': 1, 'shared-pid': 0, 'host-pid': 0, 'proc-mount': 0,
                                'all-unreadable': 1, 'cache-unqualified': 1, 'cache-launch-override': 1,
                                'local-transport-timed-out': 1,
                                'local-transport-failed': 1, 'local-owner-changed': 1,

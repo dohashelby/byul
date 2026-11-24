@@ -1,7 +1,7 @@
 """Common live input for A-2 permission/credential consumers, not a new judge."""
 from pathlib import Path
 
-from guard.runtime.transport_options import valid_kubectl_options
+from guard.transport_options import valid_kubectl_options
 from guard.collectors.file import load_bounded_json, load_environment
 from guard.executors.owned_capture import strict_json
 from guard.executors.kubernetes_container_config import (

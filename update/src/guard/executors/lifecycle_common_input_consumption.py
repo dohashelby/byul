@@ -40,7 +40,7 @@ def _read(path, *, reads=None):
             return record
     recipe_record = check_observations.recipe_record(path)
     if recipe_record is not None:
-        verified = check_observations.load_verified(path, before, recipe_record)
+        verified = check_observations.load_verified(path, before, recipe_record, decode=strict_json)
         if verified is not None:
             return verified
     with path.open("rb") as stream:

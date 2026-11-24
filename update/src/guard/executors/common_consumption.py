@@ -48,7 +48,7 @@ def load_input(config, *, environment_ref, target_sha256, prepared_sha256=None):
         if source is not None:
             if source.sha256 is None or source.sha256 != config["sha256"]:
                 raise ValueError("B_COMMON_INPUT_BYTES_MISMATCH")
-            verified = check_observations.load_verified(path, before, source)
+            verified = check_observations.load_verified(path, before, source, decode=strict_json)
             if verified is not None:
                 return verified[0], scope
         raw = stream.read(MAX_INPUT_BYTES + 1)

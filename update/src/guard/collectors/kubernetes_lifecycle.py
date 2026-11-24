@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from guard.runtime.transport_options import valid_kubectl_options
+from guard.transport_options import valid_kubectl_options
 from guard.collectors.file import load_bounded_json, load_environment
 from guard.collectors.lifecycle import load_prepared
 from guard.models import DataOrigin

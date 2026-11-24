@@ -1,4 +1,4 @@
-"""Common validation for bounded transport options."""
+"""Validate transport options without initializing a runtime."""
 
 import math
 

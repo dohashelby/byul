@@ -294,9 +294,8 @@ def test_submitted_process_record_read_counts_and_per_check_evidence(
 
     monkeypatch.setattr(Path, "open", counted_open)
     monkeypatch.setattr(consumer, "strict_json", counted_decode)
-    monkeypatch.setattr(check_observations, "strict_json", counted_decode)
     if mode == "separate":
-        monkeypatch.setattr(check_observations, "load_verified", lambda *_: None)
+        monkeypatch.setattr(check_observations, "load_verified", lambda *_, **_options: None)
     cfg = RunConfig(executors=config["executors"], raw=config)
     if mode == "changed_between_checks":
         with pytest.raises(ValueError, match="EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED"):

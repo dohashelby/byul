@@ -8,9 +8,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
-from guard.runtime.bounded import strict_json
-
-
 MAX_RECORD_BYTES = 8 * 1024**2
 _active = ContextVar("guard_verified_observations", default=None)
 
@@ -50,7 +47,7 @@ def recipe_record(path: Path) -> VerifiedRecord | None:
     return scope[0].get(path) if scope is not None else None
 
 
-def load_verified(path: Path, before, source: VerifiedRecord):
+def load_verified(path: Path, before, source: VerifiedRecord, *, decode):
     if (source.raw is None or len(source.raw) != before.st_size
             or identity(before) != source.identity or path_identity(path) != source.identity):
         return None
@@ -58,7 +55,7 @@ def load_verified(path: Path, before, source: VerifiedRecord):
     # Cache parsing separately from admission. Every check must supply the
     # exact bytes that passed its own recipe and file identity checks.
     previous = decoded.get(path)
-    if previous is None or previous[0] != source.raw:
-        previous = (source.raw, strict_json(source.raw, limit=MAX_RECORD_BYTES))
+    if previous is None or previous[0] != source.raw or previous[1] is not decode:
+        previous = (source.raw, decode, decode(source.raw, limit=MAX_RECORD_BYTES))
         decoded[path] = previous
-    return deepcopy(previous[1]), source.sha256
+    return deepcopy(previous[2]), source.sha256

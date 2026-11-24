@@ -138,6 +138,8 @@ def test_update_compares_two_exact_partial_inputs_without_starting_an_engine(tmp
     evidence = list(store.iter_kind('EVD')); results = list(store.iter_kind('RES')); report, = store.iter_kind('RPT')
     assert len(evidence) == len(results) == 2 and not report.official
     assert {e.side.value for e in evidence} == {'baseline', 'candidate'}
+    assert report.execution_attempt_id and {e.execution.attempt_id for e in evidence} == {report.execution_attempt_id}
+    assert len({e.environment.id for e in evidence}) == 2
     for evd in evidence:
         assert evd.execution.status.value == 'ABORTED' and evd.data_origin.value == 'EXAMPLE'
         assert evd.execution.abort_reason == 'RANK_RECORD_INPUT_QUESTION_SCOPE_INCOMPLETE' and not evd.execution.cleanup_errors

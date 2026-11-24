@@ -17,6 +17,7 @@ from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.runtime import kubernetes_http as kube
 from guard.runtime.bounded import capture_pipes
 from guard.store import Store
+from guard.store.packs import PackNotStoredError, get_pack
 from tests.builders import baseline_pack, environment, policy
 from tests.test_sampling_validation import cfg, check, judge, summary, VALUES
 
@@ -251,11 +252,15 @@ def test_product_cli_stores_exact_binding_judges_reports_and_verifies(tmp_path, 
         '[sampling_validation]\n' + '\n'.join(f'{k} = {json.dumps(v)}' for k, v in {**cfg(), "target": str(path)}.items()), encoding="utf-8")
     cli = CliRunner()
     pack_path = Path(__file__).resolve().parents[1] / "reference/pack-seeds/PACK-BASELINE-31"
+    with pytest.raises(PackNotStoredError):
+        get_pack(store, plan.inputs.pack)
     for command in (["run", "--plan", plan.id, "--pack", str(pack_path)],
                     ["judge", "--plan", plan.id, "--pack", str(pack_path)],
                     ["report", "--plan", plan.id, "--pack", str(pack_path), "--json", str(tmp_path / "report.json")], ["verify"]):
         result = cli.invoke(app, [*command, "--config", str(config), "--store", str(store_path)])
         assert result.exit_code == 0, result.output + repr(result.exception)
+        if command[0] == "run":
+            assert get_pack(store, plan.inputs.pack).ref() == plan.inputs.pack
     row, = [r for r in json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["by_check"] if r["check_id"] == "REQ-10"]
     assert {axis: row["single"][axis] for axis in ("security", "functional", "performance")} == {
         "security": "UNKNOWN", "functional": "PASS", "performance": "UNKNOWN"}

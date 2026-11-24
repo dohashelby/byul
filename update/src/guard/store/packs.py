@@ -21,10 +21,12 @@ class PackNotStoredError(LookupError):
     pass
 
 
-def put_pack(store: Store, pack_dir: Path) -> Ref:
+def put_pack(store: Store, pack_dir: Path, *, expected_ref: Ref | None = None) -> Ref:
     """팩 폴더를 검증한 뒤 보존본으로 저장한다. 같은 내용은 한 번만 저장된다."""
     pack = load_pack(pack_dir)  # 폴더 해시 검증
     ref = pack.ref()
+    if expected_ref is not None and ref != expected_ref:
+        raise PackIntegrityError("pack source changed before storing the PLAN's snapshot")
     manifest_bytes = canonical_json(pack.manifest.model_dump(mode="json"))
     assert sha256_hex(manifest_bytes) == ref.sha256
     for f in pack.manifest.files_sha256:

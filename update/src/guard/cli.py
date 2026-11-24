@@ -99,7 +99,7 @@ def _as_of(value: Optional[str]) -> datetime:
         return utcnow()
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if dt.utcoffset() is None:
-        raise typer.BadParameter("판정 시각에 UTC 오프셋이 필요합니다")
+        dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
 
 
@@ -263,6 +263,12 @@ def run(
         cfg.setdefault("fake", {})["scenario"] = fake_scenario
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack)
+    try:
+        get_pack(st, pl.inputs.pack)
+    except PackNotStoredError:
+        if pk.path is None:
+            raise
+        put_pack(st, pk.path, expected_ref=pl.inputs.pack)
     failed = False
     if pl.mode == Mode.update:
         evds, failed = execute_saved_update(st, pk, pl, cfg, st.root / "runs" / new_id("UPDATE"),

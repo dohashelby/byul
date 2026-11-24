@@ -160,7 +160,7 @@ def test_engine_extension_runs_actual_common_select_run_judge_report_without_cor
                 challenges=[{'step': s, 'attempted': True} for s in check.challenge_steps], observations=req01_obs(), config={'EXAMPLE': True})
     profile = engine_profiles.EngineProfile('EXAMPLE-' + engine, engine, ('EXAMPLE-next',), frozenset({'direct_route'}))
     monkeypatch.setattr(engine_profiles, 'PROFILES', (*engine_profiles.PROFILES, profile))
-    provider.bind_executor('direct_route', 'kubernetes', lambda cfg: ExampleExecutor(), profile=profile.id)
+    provider.bind_executor('direct_route', 'example-chain', lambda cfg: ExampleExecutor(), profile=profile.id)
     monkeypatch.setitem(engine_provider.PROVIDERS, engine, provider)
     assert registry.resolve_executor('direct_route', 'kubernetes', engine=engine, version='EXAMPLE-next') is not None
     # No fallback to a frozen vendor implementation for another release.
@@ -207,7 +207,9 @@ def test_continuous_example_releases_preserve_prior_evidence_and_results(tmp_pat
     store = Store(tmp_path / 'store'); store.put_many([*envs, pol]); preserved = []
     for index, expected in enumerate(('REGRESSED', 'FIXED')):
         plan = select(pack, envs[index:index + 2], pol, mode='update'); store.put(plan)
-        run_plan(store, pack, plan, RunConfig(adapter='sglang', executors={'direct_route': 'kubernetes'}))
+        with pytest.raises(ValueError, match='^PAIRED_EXECUTION_REQUIRES_COORDINATOR$'):
+            run_plan(store, pack, plan, RunConfig(adapter='sglang', executors={'direct_route': 'kubernetes'}))
+        run_plan(store, pack, plan, RunConfig(adapter='sglang', executors={'direct_route': 'example-chain'}))
         judge_plan(store, pack, plan, T0); report = build_report(store, pack, plan, T0); store.put(report)
         row = next(r for r in report.by_check if r.check_id == 'REQ-01')
         assert row.comparison.value == expected and not report.official

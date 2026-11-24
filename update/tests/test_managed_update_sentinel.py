@@ -190,21 +190,16 @@ def test_managed_update_sentinel_failures_preserve_completed_violations_and_clea
     report, failed = application.execute_update(store, pack, envs, pol, cfg, run_dir, T0)
 
     assert failed is True
-    blocked = failure in {'cleanup', 'startup_cleanup'}
-    assert [side for side, _ in launches] == (['baseline'] if blocked else ['baseline', 'candidate'])
+    cleanup_unverified = failure in {'cleanup', 'startup_cleanup'}
+    assert [side for side, _ in launches] == ['baseline']
     evds = {e.side.value: e for e in store.iter_kind("EVD")}
     results = {r.side.value: r for r in store.iter_kind("RES")}
-    if blocked:
-        assert evds['candidate'].execution.status.value == 'ABORTED'
-        assert evds['candidate'].execution.abort_reason == 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
-        assert results['candidate'].verdicts.security.value == 'UNKNOWN'
-        assert ('candidate', 'cleanup') not in events
-        assert not (run_dir / 'candidate-sentinel').exists()
-    else:
-        assert evds['candidate'].execution.status.value == 'COMPLETED'
-        assert results['candidate'].verdicts.security.value == 'FAIL'
-        assert ('candidate', 'cleanup') in events
-        assert (run_dir / 'candidate-sentinel' / 'synthetic-write.txt').exists()
+    reason = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED' if cleanup_unverified else 'BASELINE_EXECUTION_FAILED'
+    assert evds['candidate'].execution.status.value == 'ABORTED'
+    assert evds['candidate'].execution.abort_reason == reason
+    assert results['candidate'].verdicts.security.value == 'UNKNOWN'
+    assert not any(side == 'candidate' for side, _ in events)
+    assert not (run_dir / 'candidate-sentinel').exists()
     if failure == 'cleanup':
         assert evds['baseline'].execution.status.value == 'COMPLETED'
         assert results['baseline'].verdicts.security.value == 'FAIL'
@@ -213,12 +208,12 @@ def test_managed_update_sentinel_failures_preserve_completed_violations_and_clea
         assert results['baseline'].verdicts.security.value == 'UNKNOWN'
     assert ('baseline', 'cleanup') in events
     assert (run_dir / 'baseline-sentinel' / 'synthetic-write.txt').exists()
-    if blocked: assert any('cleanup incomplete' in note for note in report.limitations)
+    if cleanup_unverified: assert any('cleanup incomplete' in note for note in report.limitations)
     assert "private" not in json.dumps(report.to_dict())
     assert not store.verify()
 
 
-def test_existing_sentinel_directory_is_preserved_and_that_side_aborts(tmp_path, monkeypatch):
+def test_existing_baseline_sentinel_is_preserved_and_blocks_candidate(tmp_path, monkeypatch):
     pack, envs, pol, cfg = _inputs(tmp_path, ("overprivileged", "overprivileged"))
     run_dir = tmp_path / "run"
     events, launches = _memory_runtime(monkeypatch, run_dir, conflict=True)
@@ -228,11 +223,13 @@ def test_existing_sentinel_directory_is_preserved_and_that_side_aborts(tmp_path,
 
     assert failed is True
     assert (run_dir / "baseline-sentinel" / "existing.txt").read_bytes() == b"EXAMPLE previous bytes"
-    assert [side for side, _ in launches] == ["candidate"]
+    assert not launches
     evds = {e.side.value: e for e in store.iter_kind("EVD")}
     assert evds["baseline"].execution.status.value == "ABORTED"
-    assert evds["candidate"].execution.status.value == "COMPLETED"
-    assert ("baseline", "cleanup") in events and ("candidate", "cleanup") in events
+    assert evds["candidate"].execution.status.value == "ABORTED"
+    assert evds["candidate"].execution.abort_reason == "BASELINE_EXECUTION_FAILED"
+    assert ("baseline", "cleanup") in events
+    assert not any(side == "candidate" for side, _ in events)
     assert not report.official and not store.verify()
 
 

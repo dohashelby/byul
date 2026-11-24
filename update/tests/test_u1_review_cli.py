@@ -21,10 +21,12 @@ def _tree(root):
 
 def _inputs(tmp_path, renamed_source):
     root = tmp_path / "store"
+    config = tmp_path / "offline.toml"
+    config.write_text("", encoding="utf-8")
     result = CliRunner().invoke(app, ["diff", "--from", "v1.0.0", "--to", "v1.0.1",
         "--repository", str(renamed_source), "--pack", str(PACK_DIR), "--store", str(root),
-        "--config", str(tmp_path / "absent.toml")])
-    assert result.exit_code == 0, result.output
+        "--config", str(config)])
+    assert result.exit_code == 0, f"{result.output}\n{result.exception!r}"
     store = Store.read_only(root)
     change, = store.iter_kind("CHG")
     artifact = store.root / change.artifacts[0].path

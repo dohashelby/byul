@@ -217,6 +217,11 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
             for name in c.get("executors", {}):
                 c.setdefault(name, {})["target"] = str(run_dir / side / "target.json")
         rc.side_configs[side] = RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
+    # The common-input implementation only reads saved records. Its partial
+    # baseline scope is independent of the candidate's separately bound input.
+    offline_comparison = mode == "external" and all(
+        set(c.executors.values()) == {"common-input"} for c in rc.side_configs.values()
+    )
     lifecycle_errors = []
     diagnostic_refs = []
     diagnostics = []
@@ -255,8 +260,10 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
             dispatch(side)
-            if side == Side.baseline and any(e.execution.status == ExecStatus.ABORTED or e.execution.cleanup_errors
-                                             for e in evidence):
+            if side == Side.baseline and any(
+                e.execution.cleanup_errors or
+                (e.execution.status == ExecStatus.ABORTED and not offline_comparison) for e in evidence
+            ):
                 candidate_blocked = 'BASELINE_EXECUTION_FAILED'
             continue
         c = side_cfg.raw
@@ -309,8 +316,7 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
                     for lease in leases: lease.mark_uncertain(run_id)
                 side_cfg.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
                 dispatch(side)
-        if side == Side.baseline and candidate_blocked is None and any(
-                e.execution.status == ExecStatus.ABORTED or e.execution.cleanup_errors for e in evidence):
+        if side == Side.baseline and candidate_blocked is None and _execution_failed(pack, evidence, ()):
             candidate_blocked = 'BASELINE_EXECUTION_FAILED'
     if kube_transition is not None:
         from guard.models import canonical_json

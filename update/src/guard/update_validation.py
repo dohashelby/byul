@@ -373,7 +373,7 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
             summary["problems"].append("saved PLAN selection differs from the prepared scope")
         summary["target_identity"] = _target_proof(output, report_path)
         before = inventory_tree(store)
-        verified, _ = invoke("verify-original", ["verify", "--store", str(store), "--config", str(inputs["config"])])
+        verified, _ = invoke("verify-original", ["verify", "--store", str(store)])
         exported, _ = invoke("export", ["evidence", "export", "--store", str(store), "--output", str(output / "evidence.zip")])
         restored = False
         if exported:
@@ -397,10 +397,9 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
             # pack rather than a same-revision folder in the current checkout.
             absent_pack = output / "no-current-pack-use-saved-snapshot"
             judged, _ = invoke("judge-restored", ["judge", *replay_inputs, "--pack", str(absent_pack),
-                "--store", str(output / "replay-store"), "--config", str(inputs["config"])])
+                "--store", str(output / "replay-store")])
             reported, _ = invoke("report-restored", ["report", *replay_inputs, "--pack", str(absent_pack),
-                "--store", str(output / "replay-store"), "--config", str(inputs["config"]),
-                "--json", str(output / "replay-report.json")])
+                "--store", str(output / "replay-store"), "--json", str(output / "replay-report.json")])
             replayed = judged and reported
             if replayed:
                 summary["replay_acceptance"] = _assess_store(output / "replay-store", output / "replay-report.json")

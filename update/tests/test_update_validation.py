@@ -257,6 +257,7 @@ def test_execute_uses_actual_scope_and_original_decision_for_replay(tmp_path, mo
         assert argv[argv.index("--attempt") + 1] == original["execution_attempt_id"]
         assert argv[argv.index("--as-of") + 1] == original["as_of"]
         assert argv[argv.index("--from-report") + 1] == str(output / "updates/UPDATE-EXAMPLE/report.json")
+        assert "--config" not in argv
 
 
 @pytest.mark.parametrize("update_code,replay_accepted", [(1, True), (0, False)])

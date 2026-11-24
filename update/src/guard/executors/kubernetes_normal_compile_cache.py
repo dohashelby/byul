@@ -60,7 +60,10 @@ def snapshot(parts):
             if mark(os.fstat(fd)) != mark(info):
                 raise ValueError()
             chain.append(mark(info))
-        artifact = os.stat(ARTIFACT_NAME, dir_fd=fd, follow_symlinks=False)
+        try:
+            artifact = os.stat(ARTIFACT_NAME, dir_fd=fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return chain, None
         if not stat.S_ISREG(artifact.st_mode):
             raise ValueError()
         return chain, mark(artifact)
@@ -193,14 +196,20 @@ def _cache_metadata(transport, folder, profile, mount, window):
             or type(result["reader_uid"]) is not int or not 0 < result["reader_uid"] <= 2**32 - 1):
         raise ValueError("SUP07_COMPILE_METADATA_UNVERIFIED")
     directory_meta, file_meta = result["directory"], result["artifact"]
-    for metadata in (directory_meta, file_meta):
+    for metadata in ((directory_meta,) if file_meta is None else (directory_meta, file_meta)):
         if (type(metadata) is not dict or set(metadata) != _METADATA_KEYS
                 or any(type(value) is not int or not 0 <= value < 2**64 for value in metadata.values())
                 or not 0 <= metadata["mode"] <= 65535 or not 0 <= metadata["uid"] <= 2**32 - 1
                 or not 0 <= metadata["gid"] <= 2**32 - 1):
             raise ValueError("SUP07_COMPILE_METADATA_UNVERIFIED")
+    if not stat.S_ISDIR(directory_meta["mode"]):
+        raise ValueError("SUP07_COMPILE_GENERATION_UNVERIFIED")
+    source = {"metadata_program_sha256": _METADATA_PROGRAM_SHA256,
+              "metadata_snapshot_sha256": sha256_hex(canonical_json(result))}
+    if file_meta is None:
+        return None, {"artifact_absent_at_capture": True, **source}
     started, ready = (_ns(_stamp(window[key])) for key in ("container_started_at", "ready_at"))
-    if (not stat.S_ISDIR(directory_meta["mode"]) or not stat.S_ISREG(file_meta["mode"]) or file_meta["size"] <= 0
+    if (not stat.S_ISREG(file_meta["mode"]) or file_meta["size"] <= 0
             or directory_meta["device"] != file_meta["device"]
             or not started <= file_meta["mtime_ns"] <= file_meta["ctime_ns"] <= ready):
         raise ValueError("SUP07_COMPILE_GENERATION_UNVERIFIED")
@@ -211,8 +220,7 @@ def _cache_metadata(transport, folder, profile, mount, window):
             "directory_owner_uid": directory_meta["uid"], "directory_owner_gid": directory_meta["gid"],
             "reader_uid": result["reader_uid"], "file_bytes": file_meta["size"],
             "boot_file_mtime_ns": file_meta["mtime_ns"], "boot_file_ctime_ns": file_meta["ctime_ns"],
-            "metadata_program_sha256": _METADATA_PROGRAM_SHA256,
-            "metadata_snapshot_sha256": sha256_hex(canonical_json(result))}
+            **source}, None
 
 
 class KubernetesNormalCompileCacheExecutor:
@@ -292,9 +300,9 @@ class KubernetesNormalCompileCacheExecutor:
             failure = "SUP07_COMPILE_REPORT_UNVERIFIED"
             folder, compilation = _compile_observation(raw, window, compile_profile)
             try:
-                metadata = _cache_metadata(metadata_reader, folder, compile_profile, mount, window)
+                metadata, absence = _cache_metadata(metadata_reader, folder, compile_profile, mount, window)
             except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
-                metadata = None
+                metadata = absence = None
             failure = ("SUP07_COMPILE_FILE_METADATA_UNVERIFIED" if metadata is None
                        else "SUP07_COMPILE_OWNER_AFTER_UNVERIFIED")
             final_window, container = _ready_window(logs)
@@ -308,6 +316,8 @@ class KubernetesNormalCompileCacheExecutor:
                         **compilation,
                         "reported_directory_sha256": sha256_hex(folder.as_posix().encode()),
                     }
+                    if absence is not None:
+                        retained_compile_report["cache_file_absence"] = absence
                 else:
                     observed = {"role": "normal", "profile": PROFILE, "compilation": compilation,
                                 "cache_file_metadata": metadata}

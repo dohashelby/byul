@@ -81,7 +81,8 @@ class CompileWorld(StartupWorld):
             files = [{**row, "sha256": sha256_hex(row["relative"].encode()), "state": "hashed"}
                      for row in request["files"]]
             if self.fault == "wrong-installed-source" or (
-                    self.fault == "metadata-unavailable-source-changed" and len(self.hash_calls) == 2):
+                    self.fault in {"metadata-unavailable-source-changed", "metadata-absent-source-changed"}
+                    and len(self.hash_calls) == 2):
                 files[0]["sha256"] = "0" * 64
             source = {"files": files}
         else:
@@ -103,6 +104,10 @@ class CompileWorld(StartupWorld):
             source = {"reader_uid": 2000, "directory": directory, "artifact": artifact}
             if self.fault in {"metadata-unavailable", "metadata-unavailable-source-changed"}:
                 source = {}
+            elif self.fault in {"metadata-absent", "metadata-absent-source-changed", "metadata-absent-invalid-parent"}:
+                source["artifact"] = None
+                if self.fault == "metadata-absent-invalid-parent":
+                    directory["mode"] = stat.S_IFREG | 0o600
         return {"returncode": 0, "stdout_bytes": canonical_json(source), "capture": {"complete": True}}
 
 
@@ -213,18 +218,34 @@ def test_retains_verified_native_compile_report_when_file_metadata_is_unavailabl
     assert "ordinary_compile_cache_file_metadata" in artifact["missing"]
 
 
-@pytest.mark.parametrize("leaf_type", ["unreadable", "symbolic-link"])
-def test_native_reader_lstats_only_fixed_leaf_and_rejects_link(tmp_path, leaf_type):
+@pytest.mark.parametrize("fault", ["metadata-absent", "metadata-absent-source-changed", "metadata-absent-invalid-parent"])
+def test_retains_only_same_owner_and_source_bound_cache_file_absence(tmp_path, fault):
+    draft, artifact, _, world = _run(tmp_path, "0.31.0", fault)
+    assert len(world.metadata_reads) == 1
+    assert draft.status == ExecStatus.ABORTED and draft.abort_reason == "SUP07_COMPILE_FILE_METADATA_UNVERIFIED"
+    assert artifact["observation"] is None and not draft.observations["supply_boot_sessions"].collected
+    absence = (artifact["retained_compile_report"] or {}).get("cache_file_absence")
+    if fault == "metadata-absent":
+        assert absence["artifact_absent_at_capture"] is True
+        assert absence["metadata_program_sha256"] == compile_cache._METADATA_PROGRAM_SHA256
+        assert len(absence["metadata_snapshot_sha256"]) == 64
+    else:
+        assert absence is None
+
+
+@pytest.mark.parametrize("leaf_type", ["unreadable", "symbolic-link", "absent", "missing-parent"])
+def test_native_reader_lstats_only_fixed_leaf(tmp_path, leaf_type):
     # Relocate the shell's fixture root in a test copy. The production child
     # receives only the checked compile ID and cannot choose a root.
     source = compile_cache._METADATA_SOURCE.replace("CACHE_ROOT = '/cache/vllm'", f"CACHE_ROOT = {str(tmp_path)!r}", 1)
     folder = tmp_path / "torch_compile_cache" / CACHE_ID / "rank_0_0" / "backbone"
-    folder.mkdir(parents=True)
+    if leaf_type != "missing-parent":
+        folder.mkdir(parents=True)
     leaf = folder / ARTIFACT
     if leaf_type == "unreadable":
         leaf.write_bytes(PRIVATE.encode())
         leaf.chmod(0)
-    else:
+    elif leaf_type == "symbolic-link":
         leaf.symlink_to(tmp_path / "unreadable-elsewhere")
     actual = capture_pipes([sys.executable, "-I", "-S", "-B", "-c", supervised_source(source), "3", CACHE_ID],
                            timeout=5, env_extra={}, max_stdout_bytes=4096, max_stderr_bytes=1024)
@@ -233,5 +254,7 @@ def test_native_reader_lstats_only_fixed_leaf_and_rejects_link(tmp_path, leaf_ty
     projected = json.loads(actual["stdout_bytes"])
     if leaf_type == "unreadable":
         assert projected["artifact"]["size"] == len(PRIVATE) and stat.S_IMODE(projected["artifact"]["mode"]) == 0
+    elif leaf_type == "absent":
+        assert projected["artifact"] is None and stat.S_ISDIR(projected["directory"]["mode"])
     else:
         assert projected == {}

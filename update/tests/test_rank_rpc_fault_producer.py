@@ -263,3 +263,32 @@ def test_source_identity_includes_rpc_sdk_capture_projection_and_common_wrapper(
     before = producer.producer(); read = Path.read_bytes
     monkeypatch.setattr(Path, 'read_bytes', lambda p: read(p) + (b'\n' if p.name == 'vllm_rank_ipc_capture.py' else b''))
     assert producer.producer()['source_sha256'] != before['source_sha256']
+
+
+def test_delay_target_exit_keeps_original_applied_and_client_facts_without_resume(tmp_path,monkeypatch):
+    # The test owns the worker and kills it only after the real pidfd STOP has
+    # taken effect. No mock target state, generation bypass or recovery claim.
+    injection='''
+original_sleep=actor.time.sleep
+def exit_while_stopped(seconds):
+ if seconds==.01 and actor._state(pid)[0]=='T':
+  os.kill(pid,signal.SIGKILL)
+  deadline=time.monotonic()+3
+  while actor._state(pid)[0]!='Z' and time.monotonic()<deadline:original_sleep(.001)
+  assert actor._state(pid)[0]=='Z'
+ original_sleep(seconds)
+actor.time.sleep=exit_while_stopped
+'''
+    marker=" result=actor.exercise(controller,calibration,'EXAMPLE-model'"
+    assert SCRIPT.count(marker)==1
+    changed=SCRIPT.replace(marker,'\n'+injection+'try:\n'+marker)
+    # Preserve the existing parent cleanup while closing its new setup try.
+    changed=changed.replace(" owner=dict(pod_uid=binding['pod_uid'],model_receipt_sha256='9'*64)\n\n",
+        " owner=dict(pod_uid=binding['pod_uid'],model_receipt_sha256='9'*64)\nfinally:pass\n\n")
+    monkeypatch.setattr(sys.modules[__name__],'SCRIPT',changed)
+    value,validation,projection=make(capture_example(tmp_path,'delay'))
+    assert [event['event']for event in value['events']]==['fault_applied']
+    assert value['events'][0]['ack']is True
+    assert 'RANK_RPC_RELEASE_UNOBSERVED'in projection['diagnostic_codes']
+    assert projection['client_observation']['complete']is False
+    assert projection['scope_complete']is projection['engine_group_verified']is validation['complete']is False

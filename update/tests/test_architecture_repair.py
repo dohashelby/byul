@@ -1,8 +1,10 @@
 """CPU architecture regressions. No engine, daemon, GPU, or production receipt."""
+from collections import Counter
 from copy import deepcopy
 from datetime import timedelta
 import hashlib
 import json
+import os
 from pathlib import Path
 import runpy
 import threading
@@ -15,6 +17,7 @@ from guard.adapters.fake import FakeAdapter
 from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
 from guard.collectors import actor_consumption as actors, producer_approvals, scoped_consumption as scoped
+from guard.core import execution_recipe
 from guard.core.execution_recipe import bind_recipe, execution_lock
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
@@ -257,6 +260,118 @@ def test_deferred_target_derivation_preserves_recipe_but_baseline_tampering_does
     assert configuration_sha256(cfg) == before
     baseline.write_text('{"EXAMPLE":"changed-baseline"}')
     assert configuration_sha256(cfg) != before
+
+
+def test_recipe_reuses_overlapping_source_digest_and_preserves_wire_hash(tmp_path, monkeypatch):
+    source = tmp_path / 'factory.py'
+    raw_source = b'# EXAMPLE executor source\n'
+    source.write_bytes(raw_source)
+    monkeypatch.setattr(execution_recipe, '__file__', str(tmp_path / 'core' / 'execution_recipe.py'))
+
+    def factory(_):
+        pytest.fail('recipe must only inspect the factory')
+
+    provider = engine_provider.EngineProvider('example-recipe', FakeAdapter)
+    monkeypatch.setitem(engine_provider.PROVIDERS, provider.name, provider)
+    monkeypatch.setattr(provider, 'execution_recipe_files', lambda _: (source,))
+    monkeypatch.setattr(registry, 'resolve_executor', lambda *args, **kwargs: factory)
+    getsourcefile = execution_recipe.inspect.getsourcefile
+    monkeypatch.setattr(execution_recipe.inspect, 'getsourcefile',
+                        lambda obj: str(source) if obj is factory else getsourcefile(obj))
+    cfg = {'adapter': {'name': provider.name}, 'executors': {'direct_route': 'example'},
+           'sides': {'baseline': {}, 'candidate': {}}}
+
+    hashed = Counter()
+    def record_hash(data):
+        hashed[data] += 1
+        return sha256_hex(data)
+    monkeypatch.setattr(execution_recipe, 'sha256_hex', record_hash)
+
+    source_sha256 = sha256_hex(raw_source)
+    implementation = {'implementation': 'example', 'factory': factory.__qualname__,
+                      'source_sha256': source_sha256,
+                      'provider_sources': [{'name': source.name, 'sha256': source_sha256}]}
+    expected = sha256_hex(canonical_json({
+        'schema': 'guard-execution-recipe/1', 'requested': cfg, 'inputs': {},
+        'implementations': {f'{side}:direct_route': implementation for side in ('root', 'baseline', 'candidate')},
+        'software_sha256': sha256_hex(canonical_json({source.name: source_sha256})),
+    }))
+    assert execution_recipe.configuration_sha256(cfg) == expected
+    assert hashed[raw_source] == 1
+
+
+@pytest.mark.parametrize('mutation', ['unchanged', 'target', 'software', 'added', 'removed'])
+def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path, monkeypatch, mutation):
+    package = tmp_path / 'installed'
+    package.mkdir()
+    source = package / 'fixed.py'
+    source_bytes = b'# EXAMPLE source A\n'
+    source.write_bytes(source_bytes)
+    target = tmp_path / 'target.json'
+    target.write_bytes(b'{"example":"A"}')
+    monkeypatch.setattr(execution_recipe, '__file__', str(package / 'core' / 'execution_recipe.py'))
+
+    def replace_bytes_preserving_mtime(path, raw):
+        before = path.stat()
+        assert len(raw) == before.st_size
+        path.write_bytes(raw)
+        os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+        assert path.stat().st_mtime_ns == before.st_mtime_ns
+
+    invoked = []
+    class ExampleExecutor:
+        name, version = 'example-recipe', '1'
+
+        def run(self, check, env, *args):
+            invoked.append(env.id)
+            if len(invoked) == 1:
+                if mutation == 'target':
+                    replace_bytes_preserving_mtime(target, b'{"example":"B"}')
+                elif mutation == 'software':
+                    replace_bytes_preserving_mtime(source, b'# EXAMPLE source B\n')
+                elif mutation == 'added':
+                    (package / 'new.txt').write_bytes(b'EXAMPLE added source')
+                elif mutation == 'removed':
+                    source.unlink()
+            return EvidenceDraft(status='COMPLETED', data_origin='EXAMPLE',
+                                 normal_control={'attempted': False}, challenges=[], observations={})
+
+    monkeypatch.setitem(registry.EXECUTORS, 'direct_route:example-recipe', lambda _: ExampleExecutor())
+    pack = baseline_pack()
+    pol = policy(pack.ref(), scope={'include': ['REQ-01']})
+    envs = [environment({'gateway': {'value': True, 'origin': 'EXAMPLE', 'source': 'EXAMPLE'}},
+                        id=f'ENV-EXAMPLE-{side}') for side in ('baseline', 'candidate')]
+    cfg = {'executors': {'direct_route': 'example-recipe'},
+           'direct_route': {'target': str(target), 'manifest': str(target)}}
+    store = Store(tmp_path / 'store')
+    plan = bind_recipe(select(pack, envs, pol, mode='update'), cfg, envs)
+    store.put_many([*envs, pol, plan])
+
+    reads, hashes = Counter(), Counter()
+    read_bytes = Path.read_bytes
+    def record_read(path):
+        reads[path] += 1
+        return read_bytes(path)
+    def record_hash(data):
+        hashes[data] += 1
+        return sha256_hex(data)
+    monkeypatch.setattr(Path, 'read_bytes', record_read)
+    monkeypatch.setattr(execution_recipe, 'sha256_hex', record_hash)
+
+    run_cfg = RunConfig(raw=cfg, executors=cfg['executors'])
+    if mutation == 'unchanged':
+        assert len(run_plan(store, pack, plan, run_cfg)) == 2
+        assert invoked == [env.id for env in envs]
+    else:
+        with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+            run_plan(store, pack, plan, run_cfg)
+        assert invoked == [envs[0].id]
+        evidence, = store.iter_kind('EVD')
+        assert evidence.execution.status.value == 'COMPLETED' and evidence.side.value == 'baseline'
+
+    assert reads[target] == 3
+    assert reads[source] == (2 if mutation == 'removed' else 3)
+    assert hashes[source_bytes] == 1
 
 
 @pytest.mark.parametrize('adapter', [VllmAdapter(), SGLangAdapter(), TensorRTAdapter()])

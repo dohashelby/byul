@@ -67,7 +67,7 @@ describe("관측 범위와 증거 연결", () => {
     expect(within(row).getByText("미관측")).toBeTruthy();
     expect(row.textContent).toContain("관리 JSONL 범위");
     expect(screen.getByRole("link", { name: "ev1" }).getAttribute("href")).toContain("sha256=" + "b".repeat(64));
-    expect(screen.getByText(/최근 사건 일부를 조회/)).toBeTruthy();
+    expect(screen.getByText(/일부 기록만 표시합니다/)).toBeTruthy();
   });
 
   it("원증거의 ID와 해시를 함께 대조해 다른 사본을 제외한다", async () => {

@@ -1,0 +1,31 @@
+{
+  "schema": "guard-native-input-original-rejection-sites/1",
+  "profiles": [
+    {
+      "engine": "vllm",
+      "version": "0.30.0",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "runtime": "cpython-3.12.3",
+      "cases": {
+        "token_id": {
+          "source_module": "vllm.v1.engine.input_processor",
+          "point": "InputProcessor._validate_model_input",
+          "source_sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+          "body_code_sha256": "3deebfa7c8563d3ba50e5174f71aa0402178fbcecd878901207d92526fea4510",
+          "source_line": 547,
+          "code_offset": 604,
+          "meaning": "positive-token-id-above-model-and-tokenizer-vocabulary"
+        },
+        "length": {
+          "source_module": "vllm.renderers.params",
+          "point": "TokenizeParams._token_len_check",
+          "source_sha256": "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5",
+          "body_code_sha256": "b791fef79e66534adafb8e7fdc35fe77374253386fd6d7bd0b5cd4598feab5cf",
+          "source_line": 507,
+          "code_offset": 238,
+          "meaning": "tokenized-prompt-length-above-selected-input-limit"
+        }
+      }
+    }
+  ]
+}

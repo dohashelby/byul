@@ -1671,6 +1671,16 @@ class KubernetesHTTP:
         from .kubernetes_functional import capture
         return capture(self,network,requests,timeout)
 
+    def process_mount_snapshot(self, record, forbidden_mount_paths):
+        """Kernel-observed mount bans, without credential contents or worker access."""
+        from .kubernetes_process_mounts import capture
+        return capture(self,record,forbidden_mount_paths)
+
+    def worker_security_snapshot(self, prepared_path):
+        """Source-qualified worker probes, bound to this owned Pod generation."""
+        from .kubernetes_worker_security import capture
+        return capture(self,prepared_path)
+
     def ipc_snapshot(self, policy_values, *, actor_specs, connect_timeout, total_timeout):
         """Explicit lab IPC actor snapshot; dedicated PLT02 consumer is separate."""
         from .kubernetes_ipc import capture

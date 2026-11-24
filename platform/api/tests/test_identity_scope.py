@@ -2,8 +2,8 @@ import json
 from datetime import datetime, timezone
 
 from byul_platform.sources.runtime import observation_event
-from serving_runtime.mvp.identity_scope import identity_scope_ref
-from serving_runtime.mvp.phase_timeline import read_phase_timeline
+from serving_runtime.observation.identity_scope import identity_scope_ref
+from serving_runtime.observation.phase_timeline import read_phase_timeline
 
 
 def test_source_scope_is_shared_without_exposing_raw_timeline_identity(tmp_path):

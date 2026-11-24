@@ -22,14 +22,21 @@ def _json(path, bound=32768):
     return json.loads(raw, object_pairs_hook=control._pairs), raw
 
 
-def _prepared(path):
+def _prepared(path, *, expected_uid=None):
     """현재 검토 소스와 정확히 같은 새 준비물만 받는다. 과거 실측 자산은 수정하지 않는다."""
     path = Path(path)
     source = ipc.verify_source(ROOT.parent)['reviewed_common_commit']
     manifest, raw = _json(path / 'manifest.json')
+    expected_uid = os.geteuid() if expected_uid is None else expected_uid
+    if type(expected_uid) is not int or not 0 <= expected_uid < 2**31:
+        raise ValueError('RANK_RPC_BINDING_PRIVATE_SETTINGS')
+    before = (path / 'settings.json').stat(follow_symlinks=False)
     settings, settings_raw = _json(path / 'settings.json')
     private = (path / 'settings.json').stat(follow_symlinks=False)
-    if private.st_uid != os.geteuid() or stat.S_IMODE(private.st_mode) != 0o600:
+    identity = lambda value: (value.st_dev, value.st_ino, value.st_uid, value.st_mode,
+                              value.st_size, value.st_mtime_ns, value.st_ctime_ns)
+    if (private.st_uid != expected_uid or stat.S_IMODE(private.st_mode) != 0o600
+            or identity(before) != identity(private)):
         raise ValueError('RANK_RPC_BINDING_PRIVATE_SETTINGS')
     assets = {}
     for name in ipc.runtime.ASSETS:
@@ -54,8 +61,8 @@ def _prepared(path):
     return manifest, settings, sha256(raw).hexdigest()
 
 
-def binding_for(prepared, environment, target):
-    manifest, settings, prepared_sha = _prepared(prepared)
+def binding_for(prepared, environment, target, *, expected_uid=None):
+    manifest, settings, prepared_sha = _prepared(prepared, expected_uid=expected_uid)
     document, _ = _json(environment, 1048576)
     env = Environment.model_validate(document)
     if not env.hash_ok() or env.kind.value != 'ENV':
@@ -86,8 +93,8 @@ def binding_for(prepared, environment, target):
     return control.product_binding(value, settings['session']), settings, origin
 
 
-def prepare(prepared, environment, target, output):
-    value, settings, origin = binding_for(prepared, environment, target)
+def prepare(prepared, environment, target, output, *, expected_uid=None):
+    value, settings, origin = binding_for(prepared, environment, target, expected_uid=expected_uid)
     envelope = {'payload': value, 'hmac_sha256': hmac.new(bytes.fromhex(settings['key']),
         control.DOMAIN + control.canonical(value), sha256).hexdigest()}
     output = Path(output)
@@ -114,8 +121,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('prepared', 'environment', 'target', 'output'):
         parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--expected-uid', type=int)
     args = parser.parse_args()
-    result = prepare(args.prepared, args.environment, args.target, args.output)
+    result = prepare(args.prepared, args.environment, args.target, args.output, expected_uid=args.expected_uid)
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
 
 

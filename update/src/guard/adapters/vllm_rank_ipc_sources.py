@@ -130,6 +130,16 @@ def qualify_current_v1(module, *, image):
         if len(matches) != 1 or matches[0]['engine_mode'] != 'V1':
             raise ValueError
         result = _qualified(module, matches[0], 'sources')
+        # Keep the historical qualifier unchanged. Current V1 targets also
+        # include super(), whose class cell must refer to the selected owner.
+        for name, actual in result['functions'].items():
+            cells = actual.__closure__
+            if actual.__code__.co_freevars:
+                if (actual.__code__.co_freevars != ('__class__',) or cells is None or len(cells) != 1
+                        or cells[0].cell_contents is not vars(module)[name.split('.')[0]]):
+                    raise ValueError
+            elif cells is not None:
+                raise ValueError
         result.update(review_scope='offline_source_body_only', image_runtime_verified=False)
         return result
     except (OSError, ValueError, KeyError, TypeError, AttributeError, SyntaxError):

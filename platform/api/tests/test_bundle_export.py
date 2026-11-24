@@ -20,6 +20,7 @@ from urllib.request import urlopen
 import pytest
 
 from byul_platform.contracts import canonical_sha256
+from byul_platform.inputs import MVP_PACK
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNTIME = ROOT / "runtime"
@@ -133,7 +134,7 @@ def test_export_rejects_draft_hash_and_missing_fields(store_client):
 
 def test_saved_confirmed_export_starts_temporary_gateway(store_client, tmp_path):
     env, policy = _inputs()
-    policy["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 38}
+    policy["verification"]["pack"] = dict(MVP_PACK)
     saved_env = store_client.post("/api/environments", json=env)
     assert saved_env.status_code == 201, saved_env.text
     policy["status"] = "DRAFT"
@@ -198,7 +199,7 @@ def test_export_preserves_approved_launch_settings(store_client):
     with tarfile.open(fileobj=io.BytesIO(response.content), mode='r:gz') as archive:
         target = json.load(archive.extractfile('bundle-test/target.json'))
     assert target['launch_settings'] == env['deployment']['launch_settings']
-    from serving_runtime.mvp.target import _parse
+    from serving_runtime.target.target import _parse
     assert _parse(target)['launch_settings'] == env['deployment']['launch_settings']
 
 

@@ -191,10 +191,16 @@ try:
  assert all(value not in raw for key in spec['keys'].values() for value in (key,hashlib.sha256(key.encode()).hexdigest()))
  assert not packet['application_session_or_handle_verified'] and not packet['serving_session_receipt_verified']
  print(json.dumps({'actual_owned_CPU_keepalive_test':True,'mode':mode,'wire_requests':len(seen),'actual_serving_issuer_GPU':False}))
+except BaseException:
+ # Owned synthetic metadata only; preserve the original assertion and traceback.
+ if 'packet' in locals():print(json.dumps({'owned_keepalive_failure_packet':packet}),file=sys.stderr,flush=True)
+ raise
 finally:
  server.shutdown();server.server_close();thread.join(2);assert not thread.is_alive()
 '''
     argv=([sys.executable] if sys.platform!='win32' else ['wsl','-d','Ubuntu','--','python3'])+['-c',program,native_path(root/'stream_probe.py'),native_path(root/'persistent_session_probe.py'),mode]
     result=capture_pipes(argv,timeout=25,env_extra={},max_stdout_bytes=65536,max_stderr_bytes=65536)
+    if result['returncode']!=0 or not result['capture']['complete']:
+        print('OWNED_KEEPALIVE_CHILD_STDERR\n'+result['stderr_bytes'].decode('utf-8',errors='replace'))
     assert result['returncode']==0 and result['capture']['complete'],result
     value=json.loads(result['stdout_bytes']);assert value['actual_owned_CPU_keepalive_test'] and not value['actual_serving_issuer_GPU']

@@ -18,13 +18,16 @@ def producer():
 
 
 def record(prepared, capture, *, pod, environment_ref, target_sha256, prepared_sha256, session,
-           wire_schema=v4.SCHEMA):
+           wire_schema=v4.SCHEMA, allow_missing_stall_release=False):
+    if type(allow_missing_stall_release) is not bool:
+        raise common.GpuInputError('GPU_INPUT_SCOPE_MISMATCH')
     if type(pod) is not dict or set(pod) != {'pod_uid', 'container_id', 'restart_count'}:
         raise common.GpuInputError('GPU_INPUT_SCOPE_MISMATCH')
     expected = {'schema': 'guard-rank-rpc-product-binding/1', 'session': session,
         'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
         'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'], 'restart_count': pod['restart_count']}
-    projection = adapter.project(prepared, capture, expected)
+    project = adapter.project_stall_with_release_gap if allow_missing_stall_release else adapter.project
+    projection = project(prepared, capture, expected)
     bindings, events = [], []
     for row in projection['events']:
         context = row['context']

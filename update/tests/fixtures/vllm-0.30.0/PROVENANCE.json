@@ -25,7 +25,9 @@
     },
     "vllm/v1/engine/input_processor.py.txt": {
       "source": "vllm/v1/engine/input_processor.py",
-      "sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813"
+      "sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
     },
     "vllm/v1/executor/multiproc_executor.py.txt": {
       "source": "vllm/v1/executor/multiproc_executor.py",
@@ -65,7 +67,9 @@
     },
     "vllm/entrypoints/serve/exception_handling/error_response.py.txt": {
       "source": "vllm/entrypoints/serve/exception_handling/error_response.py",
-      "sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e"
+      "sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
     },
     "vllm/entrypoints/serve/exception_handling/handlers/http.py.txt": {
       "source": "vllm/entrypoints/serve/exception_handling/handlers/http.py",
@@ -73,15 +77,75 @@
     },
     "vllm/exceptions.py.txt": {
       "source": "vllm/exceptions.py",
-      "sha256": "06c77c8129ac024455ace7c89168cd8e2284d70e5d96b326782b5f110ff73e7a"
+      "sha256": "06c77c8129ac024455ace7c89168cd8e2284d70e5d96b326782b5f110ff73e7a",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
     },
     "vllm/renderers/params.py.txt": {
       "source": "vllm/renderers/params.py",
-      "sha256": "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5"
+      "sha256": "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
     },
     "vllm/renderers/online_renderer.py.txt": {
       "source": "vllm/renderers/online_renderer.py",
-      "sha256": "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e"
+      "sha256": "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "vllm/v1/engine/core.py.txt": {
+      "source": "vllm/v1/engine/core.py",
+      "sha256": "268bf40534a853812867ae8e80040f190983cb364b41182b55969aace20c93f5",
+      "installed_image": "sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "installed_bytes_compared": true,
+      "qualification_scope": "source/function body only; not hooks, faults or group qualification"
+    },
+    "vllm/entrypoints/openai/completion/protocol.py.txt": {
+      "source": "vllm/entrypoints/openai/completion/protocol.py",
+      "sha256": "5f7930635fd3924826015211032fb298206b27c7f04cd6cd2224bb128e4a3a50",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "vllm/v1/worker/gpu_worker.py.txt": {
+      "source": "vllm/v1/worker/gpu_worker.py",
+      "sha256": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+      "provenance": "J00 installed-source archive 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "vllm/distributed/device_communicators/shm_broadcast.py.txt": {
+      "source": "vllm/distributed/device_communicators/shm_broadcast.py",
+      "sha256": "f3e7a3f3ff713fccbd535e0d41650ee05bdf8677e83d4b90519910645022c30b",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "uvicorn/protocols/http/h11_impl.py.txt": {
+      "source": "uvicorn/protocols/http/h11_impl.py",
+      "sha256": "a3154a6c2cfaaaebe19ac7aa255dfe9b6b7b490de1da95274c033aa093e8c322",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed source archive SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "uvicorn/protocols/http/httptools_impl.py.txt": {
+      "source": "uvicorn/protocols/http/httptools_impl.py",
+      "sha256": "1d4e1c579df4168433a61a01f10c628b31c1790e72dd9769d2b8633b22214033",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed source archive SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "vllm/v1/core/sched/output.py.txt": {
+      "source": "vllm/v1/core/sched/output.py",
+      "sha256": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed source archive SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "vllm/entrypoints/openai/chat_completion/serving.py.txt": {
+      "source": "vllm/entrypoints/openai/chat_completion/serving.py",
+      "sha256": "ea1f76074a9587c8054f54d30a6ba748b6a5fc4d90dd82c801504505c1da1f92",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
+    },
+    "vllm/entrypoints/openai/completion/serving.py.txt": {
+      "source": "vllm/entrypoints/openai/completion/serving.py",
+      "sha256": "75d05ddddf303734a078a3e42fcb173fef58ea56da09bc0b5c7525cb9bbbf527",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "provenance": "J00 installed Python source archive; SHA256 0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

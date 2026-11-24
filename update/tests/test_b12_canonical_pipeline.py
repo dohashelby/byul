@@ -23,8 +23,8 @@ from tests.test_gpu_input_producers import SCOPE
 @pytest.mark.usefixtures("example_registered_callback_producers")
 def test_common_input_survives_registered_run_stored_pack_judge_and_report(
         tmp_path, monkeypatch, unsupported, consumed, expected):
-    pack_dir = Path(__file__).parents[1] / "packs/PACK-BASELINE"
-    pack = load_pack(pack_dir)
+    from tests.published_pack38 import original
+    pack=original();pack_dir=pack.path
     cid = "REQ-08"
     env = environment(model={"id": "test"})
     target = {"lab": False, "engine": {"trusted_url": "http://unused", "container": "engine"},

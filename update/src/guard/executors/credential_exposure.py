@@ -109,15 +109,29 @@ def collect_kubernetes_credential_exposure(ctx):
     observations.update(functional)
     from .kubernetes_gpu_process_observations import collect as collect_passive_gpu_process
     passive = collect_passive_gpu_process(record, ctx.cprobe)
+    mount_capture=getattr(ctx.cprobe,'process_mount_snapshot',None)
+    mount_observation={'available':False,'violations':[],'diagnostic_codes':['PROCESS_MOUNT_INTERFACE_UNAVAILABLE']}
+    if callable(mount_capture):
+        try:
+            mount_observation=mount_capture(record,ctx.policy_values.get('forbidden_mount_paths'))
+        except Exception:
+            mount_observation={'available':False,'violations':[],'diagnostic_codes':['PROCESS_MOUNT_CAPTURE_UNAVAILABLE']}
+    # A positive kernel mount-policy violation is independent of credential
+    # contents/use. Empty or partial samples never prove whole-worker absence.
+    if mount_observation['available'] and mount_observation['violations']:
+        observations['forbidden_mount_violations']={'value':mount_observation['violations'],'collected':True}
+    from .worker_security_projection import credentials
+    worker_probe,worker_scope=credentials(ctx,record,observations)
     try:
         transport_report = ctx.cprobe.report()
     except Exception:
         transport_report = {"diagnostic_codes": ["KUBERNETES_TRANSPORT_REPORT_UNAVAILABLE"]}
     summary = {"profile": "kubernetes-credential-metadata-consumer-v1", "process_observation": record,
-        "passive_gpu_process_observation": passive,
-        "container_environment_names_observed": names, "worker_subject_verified": False,
-        "worker_inventory_complete": False, "provider_scope_verified": False,
-        "candidate_access_verified": False, "kubernetes": transport_report,
+        "worker_security_probe":worker_probe,"worker_security_scope":worker_scope,
+        "passive_gpu_process_observation": passive,"actual_process_mount_observation":mount_observation,
+        "container_environment_names_observed": names, "worker_subject_verified": worker_scope['worker_probe_count']>0,
+        "worker_inventory_complete": worker_scope['selected_tp_worker_roster_verified'], "provider_scope_verified": False,
+        "candidate_access_verified": worker_scope['candidate_access_verified'], "kubernetes": transport_report,
         "candidate_request": "missing" if selected is None else "explicit_empty" if not selected else "explicit_paths",
         "fixture": {"process_profile": record["profile"], "program_sha256": record["program_sha256"],
                     "candidate_paths": selected,

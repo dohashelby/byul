@@ -23,9 +23,8 @@ from guard.adapters import vllm_observer_abi as abi
 from guard.collectors import lifecycle
 from guard.executors.registry import resolve_executor
 from guard.executors.lifecycle_capture import parse_recording
-from tests.test_lifecycle_capture import case, revised, external  # noqa: F401
 from tests import test_a1_stream_buffer_sensor as original
-from tests.test_lifecycle_sensor import CONTEXT, writer_factory  # noqa: F401
+from tests.lifecycle_fixtures import CONTEXT, revised
 
 
 FIXTURES = Path(__file__).parent / 'fixtures/uvicorn-034'
@@ -227,9 +226,9 @@ def test_exact_h11_producer_reaches_original_stream_projection_without_raw_id(tm
     assert stale_projection['cases'][0]['drain_intervals_ns'] == []
 
 
-def test_exact_stream_rows_parse_under_prepared_baseline_profile(case, monkeypatch):
+def test_exact_stream_rows_parse_under_prepared_baseline_profile(lifecycle_capture_case, monkeypatch):
     # The shared capture case owns root/assets already; preserve that evidence.
-    prepared, world = composed_world(case.root / 'baseline-stream', monkeypatch)
+    prepared, world = composed_world(lifecycle_capture_case.root / 'baseline-stream', monkeypatch)
     asyncio.run(original.invoke(world, 'byul-lif04-' + 'c' * 32 + '-normal'))
     produced = [row for row in world.observer.recorded if row['event'] in {'MODULE', 'STREAM_BUFFER', 'ASGI'}]
     def insert(rows):
@@ -241,7 +240,7 @@ def test_exact_stream_rows_parse_under_prepared_baseline_profile(case, monkeypat
         start['payload']['context']['pid'] = os.getpid()
         end['monotonic_ns'] = produced[-1]['monotonic_ns'] + 1
         rows[:] = [start, *produced, end]
-    rows, summary = parse_recording(revised(case.raw, insert), prepared)
+    rows, summary = parse_recording(revised(lifecycle_capture_case.raw, insert), prepared)
     assert summary['recording_closed'] is True and summary['stream_event_count'] > 0
     assert summary['stream_observer_code_sha256'] in baseline.RUNTIME_CODES.values()
     assert summary['fresh_request_binding']['question_scope_complete'] is False
@@ -257,7 +256,7 @@ def test_exact_stream_rows_parse_under_prepared_baseline_profile(case, monkeypat
         def replace(target):
             target[:] = changed
         with pytest.raises(ValueError):
-            parse_recording(revised(case.raw, replace), prepared)
+            parse_recording(revised(lifecycle_capture_case.raw, replace), prepared)
 
 
 def test_exact_httptools_send_and_close_produce_keyed_rows(tmp_path, monkeypatch):

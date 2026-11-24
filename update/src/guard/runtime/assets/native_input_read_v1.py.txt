@@ -1,0 +1,97 @@
+"""Bounded read of closed owned metadata; no engine import or request content."""
+from hashlib import sha256
+import json,os,re,stat,sys,time
+
+def read_at(directory,name,limit):
+    before=os.stat(name,dir_fd=directory,follow_symlinks=False)
+    fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=directory)
+    try:
+        opened=os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode)or not 0<opened.st_size<=limit:raise ValueError()
+        raw=b''
+        while len(raw)<=limit:
+            chunk=os.read(fd,min(65536,limit+1-len(raw)))
+            if not chunk:break
+            raw+=chunk
+        after=os.fstat(fd);current=os.stat(name,dir_fd=directory,follow_symlinks=False)
+        identity=lambda s:(s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+        if len(raw)!=opened.st_size or len({identity(s)for s in(before,opened,after,current)})!=1:raise ValueError()
+        return raw,opened
+    finally:os.close(fd)
+
+def context(pid):
+    base='/proc/'+str(pid)
+    with open(base+'/stat','rb')as stream:raw=stream.read(8193)
+    if len(raw)>8192:raise ValueError()
+    with open(base+'/status')as stream:
+        uid=next(int(line.split()[2])for line in stream if line.startswith('Uid:'))
+    with open('/proc/sys/kernel/random/boot_id','rb')as stream:boot=sha256(stream.read(4096)).hexdigest()
+    with open(base+'/timens_offsets','rb')as stream:offsets=sha256(stream.read(4096)).hexdigest()
+    return {'pid':pid,'start_ticks':int(raw[raw.rfind(b')')+2:].split()[19]),'uid':uid,
+        'boot_sha256':boot,'pid_namespace':os.stat(base+'/ns/pid').st_ino,
+        'time_namespace':os.stat(base+'/ns/time').st_ino,'time_offsets_sha256':offsets}
+
+def run(spec):
+    if(type(spec)is not dict or set(spec)!={'session','settings_sha256','assets'}
+        or type(spec['session'])is not str or not re.fullmatch('[0-9a-f]{32}',spec['session'])
+        or type(spec['settings_sha256'])is not str or not re.fullmatch('[0-9a-f]{64}',spec['settings_sha256'])
+        or type(spec['assets'])is not dict or not 1<=len(spec['assets'])<=32):raise ValueError()
+    start=time.monotonic_ns();wall=time.time_ns();own=context(os.getpid())
+    root=os.open('/guard-native-input',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    directory=data=None
+    try:
+        raw,_=read_at(root,'settings.json',32768)
+        if sha256(raw).hexdigest()!=spec['settings_sha256']:raise ValueError()
+        settings=json.loads(raw)
+        if settings['session']!=spec['session']or settings['assets']!=spec['assets']:raise ValueError()
+        for name,pin in spec['assets'].items():
+            parts=name.split('/')
+            if any(not re.fullmatch('[A-Za-z0-9_.-]+',part)or part in{'.','..'}for part in parts):raise ValueError()
+            opened=os.dup(root)
+            try:
+                for part in parts[:-1]:
+                    child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=opened)
+                    os.close(opened);opened=child
+                if pin['bytes']==0:
+                    fd=os.open(parts[-1],os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=opened)
+                    try:
+                        info=os.fstat(fd)
+                        if not stat.S_ISREG(info.st_mode)or info.st_size!=0 or os.read(fd,1):raise ValueError()
+                        value=b''
+                    finally:os.close(fd)
+                else:value,_=read_at(opened,parts[-1],262144)
+                if len(value)!=pin['bytes']or sha256(value).hexdigest()!=pin['sha256']:raise ValueError()
+            finally:os.close(opened)
+        data=os.open('data',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=root)
+        directory=os.open(spec['session'],os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=data)
+        owner=os.fstat(directory)
+        if stat.S_IMODE(owner.st_mode)!=0o700:raise ValueError()
+        names=[name for name in os.listdir(directory)if re.fullmatch('pid-[0-9]+-[0-9]+-[0-9]+\\.json',name)]
+        if len(names)>4096:raise ValueError()
+        rows=[];total=0
+        for name in sorted(names):
+            raw,info=read_at(directory,name,131072);total+=len(raw)
+            if total>3*1024**2 or stat.S_IMODE(info.st_mode)!=0o600:raise ValueError()
+            value=json.loads(raw);snapshot=value['snapshot'];original=snapshot['context'];live=context(original['pid'])
+            if(original!=live or info.st_uid!=owner.st_uid or owner.st_uid!=live['uid']
+                or live['boot_sha256']!=own['boot_sha256']or live['pid_namespace']!=own['pid_namespace']
+                or live['time_namespace']!=own['time_namespace']or live['time_offsets_sha256']!=own['time_offsets_sha256']):raise ValueError()
+            rows.append({'name':name,'raw_hex':raw.hex(),'sha256':sha256(raw).hexdigest(),'context_live':live})
+            if context(original['pid'])!=live:raise ValueError()
+        end=time.monotonic_ns();wall_end=time.time_ns()
+        if context(os.getpid())!=own or end<start or abs((wall_end-wall)-(end-start))>100_000_000:raise ValueError()
+        return {'schema':'guard-native-input-owned-read/1','session':spec['session'],'settings_sha256':spec['settings_sha256'],
+            'reader_context':own,'started_ns':start,'finished_ns':end,'clock_wall_started_ns':wall,
+            'clock_wall_finished_ns':wall_end,'files':rows,'complete':True}
+    finally:
+        if directory is not None:os.close(directory)
+        if data is not None:os.close(data)
+        os.close(root)
+
+if __name__=='__main__':
+    try:
+        raw=sys.stdin.buffer.read(32769)
+        if len(raw)>32768:raise ValueError()
+        result=run(json.loads(raw))
+    except Exception:raise SystemExit('NATIVE_INPUT_OWNED_READ_UNAVAILABLE')from None
+    print(json.dumps(result,separators=(',',':')))

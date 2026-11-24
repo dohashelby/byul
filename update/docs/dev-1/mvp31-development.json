@@ -1,0 +1,726 @@
+{
+  "schema": "byul-mvp-development-target/1",
+  "status": "IN_PROGRESS",
+  "authority": "2026-11-16 user requested actual all69 verification on 0.31.0, observer implementation/qualification/registration, UNKNOWN root-cause fixes and real execution/report footage",
+  "primary_audit_side": "baseline",
+  "current_scope_override": {
+    "instruction": "0.30.0 69개 실제 검증하고 보고서 생성 까지만 해줘",
+    "primary": "0.30.0 single-environment all69 actual verification and native EVD/RES/RPT",
+    "comparison_deferred": true,
+    "video_recording_in_current_scope": false,
+    "automatic_031_execution_in_current_scope": false,
+    "previous_031_changes_and_original_evidence_preserved": true,
+    "cost_authority": "Subsequent explicit user approval: fresh $20 / maximum two hours for 0.30.0 only",
+    "historical_new_cost_approval_used_for_j01": true,
+    "new_gpu_session_currently_authorized": false
+  },
+  "version_pair": {
+    "baseline": {
+      "engine": "vllm",
+      "version": "0.30.0",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
+    },
+    "candidate": {
+      "engine": "vllm",
+      "version": "0.31.0",
+      "image": "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
+    }
+  },
+  "candidate_image_provenance": {
+    "registry": "registry-1.docker.io/vllm/vllm-openai",
+    "tag_checked": "v0.31.0",
+    "tag_index_digest": "sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3",
+    "platform": "linux/amd64",
+    "manifest_bytes": 8685,
+    "manifest_digest_matches_downloaded_bytes": true,
+    "engine_layers_pulled_in_this_development_turn": false
+  },
+  "comparison_semantics": {
+    "force_sup08_regressed": false,
+    "note": "0.7.0->0.30.0 historical SUP08 regression is not evidence for this pair. Preserve actual NO_CHANGE, REGRESSED, IMPROVED, NOT_COMPARABLE or UNKNOWN outcomes."
+  },
+  "current_catalog_inventory": {
+    "active_checks": 69,
+    "sides": 138,
+    "registry_gap_sides": [
+      "baseline:LIF-08",
+      "baseline:LIF-11"
+    ],
+    "additional_feature_gap_sides": [
+      "baseline:REQ-08",
+      "baseline:REQ-09"
+    ],
+    "runtime_qualification_completed": false,
+    "wire4_producers_registered": false
+  },
+  "remediation": {
+    "SUP-04": {
+      "implemented": "Opt-in local-containerd-v1 binds live image content/snapshot/kernel root mount; normal inference requires this relation and stable API generation",
+      "remaining": "Full package/entrypoint/mounted-code approval, mutation and deployment-gate challenge coverage. Approved image identity alone cannot produce PASS."
+    },
+    "PLT-01": {
+      "implemented": "Exact worker observer GPU-qualified and registered in J01; actual exec-writable mount violation retained as FAIL",
+      "remaining": "Whole declared permission/device/access-denial scope and fresh engine configuration remediation; no PASS promotion"
+    },
+    "PLT-04": {
+      "implemented": "J01 original product report PASS for explicit forbidden names/mounts and two declared candidate paths across selected TP workers",
+      "remaining": "Broader provider credential scope is not claimed; new sessions need fresh generation/target/TTL binding"
+    }
+  },
+  "activation": {
+    "canonical_work_order_pair_replaced": false,
+    "historical_evidence_reused_as_new_measurement": false,
+    "required_before_full_execution": [
+      "Finish remaining SUP04/PLT01/LIF08/LIF11/REQ08/REQ09 scope implementation",
+      "Freeze final source and complete final regression/review",
+      "New source-bound native qualification and exact producer registration where missing",
+      "Fresh approved GPU session and per-check current policy/environment/target/prepared/run binding",
+      "All69 actual EVD/RES/RPT and verified export; retain true FAIL/UNKNOWN/unexecuted causes"
+    ],
+    "full69_completed": false,
+    "new_gpu_session_approved": false,
+    "last_approved_session": {
+      "session": "J01",
+      "approved_usd": 20,
+      "max_hours": 2,
+      "closed": true,
+      "terminated_at": "2026-11-16T11:28:20.865697+00:00",
+      "new_ebs_and_security_group_deleted": true
+    }
+  },
+  "current_development": {
+    "source": {
+      "base_commit": "a4c994f6f127e2f9593a1d41244d1535fa9b7126",
+      "manifest_sha256": "f34902445c22ccae7c69cc5de27bf8d26f98b65c70fd6ecbb898b70991a31269",
+      "reviewed_at": "2026-11-17T06:20:25.148712+00:00",
+      "gpu_executed_for_this_manifest": false,
+      "whole69_gpu_qualified": false,
+      "scope_note": "The preserved worker-security producer registration is independently tied to cf9474e6 source and J01 actual evidence; it is not qualification of this entire manifest."
+    },
+    "last_gpu_session": "J01",
+    "last_actual_report_id": "RPT-01M7J081BJFVQJHR4S9SYYBP7C",
+    "last_selected_checks": 3,
+    "last_unselected_checks": 66,
+    "all69_complete": false,
+    "rank_normal_rpc_returns": "Current code correlates original CALL/RETURN pairs for each declared broadcast worker; not GPU completion or all-fault recovery",
+    "whole_regression": {
+      "latest_counts": {
+        "passed": 14243,
+        "failed": 0,
+        "skipped": 34,
+        "pytest_seconds": 1021.56,
+        "parent_seconds": 1022.848
+      },
+      "status": "PASSED_F349_NATIVE_INPUT_PRODUCT; ACTUAL_GPU_QUALIFICATION_INCOMPLETE",
+      "clock_guard_rejection_reason_proven": true,
+      "tsc_root_cause_proven": false,
+      "previous_counts": {
+        "passed": 14186,
+        "failed": 0,
+        "skipped": 34,
+        "pytest_seconds": 1347.48,
+        "parent_seconds": 1349.143
+      },
+      "original_summary": "regression-native-input-f349/summary.json"
+    },
+    "namespace_resources": "Bounded socket/SHM FD+mapping census and native EVD/RPT artifact/export path; whole GPU/group recovery unverified",
+    "native_deferred_rpc": "Weak actual Future/request binding and unchanged exception observation; not fault detection or recovery qualification",
+    "native_http_delivery": "Exact installed ASGI source pins; source send/actor EOF pairing; no response body read or causal/group promotion",
+    "core_source_graph": "Core requires exact MP+SchedulerOutput only; deferred result requires exact MP; worker graph and fault eligibility unchanged",
+    "next_session_preparation": {
+      "id": "mvp030-j02-20261117",
+      "authorized": false,
+      "created": false,
+      "exact_source_manifest": "590126b33e311f6bb336b2d2f2090b9c2b9dd3dcde0a35acd53bcfc0c964e54e",
+      "all69_inputs_ready": false,
+      "controller_or_scripts_gpu_executed": false,
+      "drafts": [
+        "next-four-case-atomic-draft",
+        "next-session-j02-draft"
+      ],
+      "remaining": [
+        "Finish external guard tests and exact bundle/review",
+        "Fresh source/cost/account/AMI/quota preflight and new explicit GPU approval",
+        "Actual source qualification, exact missing producer registration and full per-check all69 bindings/scopes"
+      ],
+      "external_guard_tests": {
+        "source_manifest_sha256": "590126b33e311f6bb336b2d2f2090b9c2b9dd3dcde0a35acd53bcfc0c964e54e",
+        "isolated_source_copy": "/home/youngjo/.cache/byul-j02-prep-tests-20261117-atomic-rerun",
+        "isolated_source_unchanged": true,
+        "shared_full_suite_source_or_environment_modified": false,
+        "started_at": "2026-11-16T15:37:51.096255+00:00",
+        "finished_at": "2026-11-16T15:37:52.872233+00:00",
+        "parent_seconds": 1.776,
+        "exit_code": 0,
+        "gpu_or_kubernetes_or_aws_executed": false,
+        "summary_lines": [
+          "..............................................................           [100%]",
+          "62 passed in 1.34s"
+        ]
+      },
+      "offline_inventory": {
+        "file": "check-input-inventory-590.json",
+        "factories_present": 69,
+        "current_actual_check_bindings": 0,
+        "known_scope_blocker_checks": [
+          "LIF-08",
+          "LIF-11",
+          "PLT-01",
+          "PLT-04",
+          "REQ-08",
+          "REQ-09",
+          "SUP-04"
+        ],
+        "empty_blocker_list_proves_ready": false
+      }
+    },
+    "native_input_external_draft": {
+      "status": "EXTERNAL_DRAFT_NOT_PRODUCT_INTEGRATED_OR_REGISTERED",
+      "file": "native-input-observer-draft.py",
+      "reviewed_actual_source_points": 13,
+      "tests": {
+        "source_manifest_sha256": "590126b33e311f6bb336b2d2f2090b9c2b9dd3dcde0a35acd53bcfc0c964e54e",
+        "isolated_source_copy": "/home/youngjo/.cache/byul-j02-prep-tests-20261117-input-rejection-site",
+        "isolated_source_unchanged": true,
+        "shared_full_suite_source_or_environment_modified": false,
+        "started_at": "2026-11-17T04:34:10.516456+00:00",
+        "finished_at": "2026-11-17T04:34:13.231767+00:00",
+        "parent_seconds": 2.715,
+        "exit_code": 0,
+        "gpu_or_kubernetes_or_aws_executed": false,
+        "summary_lines": [
+          "........................................................................ [ 76%]",
+          "......................                                                   [100%]",
+          "94 passed in 1.99s"
+        ]
+      },
+      "engine_imported_or_executed": false,
+      "raw_request_body_tokens_or_exception_text_read": false,
+      "whole69_claimed": false
+    },
+    "temporary_clocksource_trial": {
+      "proposal": "clocksource-trial-proposal.json",
+      "approval_receipt": "clocksource-trial-approved.json",
+      "approved": true,
+      "applied": true,
+      "completed": true,
+      "question_pending": false,
+      "scope": "Temporary WSL shared kernel clocksource only; no new GPU spending",
+      "focused_result": {
+        "source_manifest_sha256": "590126b33e311f6bb336b2d2f2090b9c2b9dd3dcde0a35acd53bcfc0c964e54e",
+        "source_manifest_unchanged": true,
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "started_at": "2026-11-17T04:12:21.265209+00:00",
+        "finished_at": "2026-11-17T04:12:56.673926+00:00",
+        "parent_wall_seconds": 35.409,
+        "exit_code": 0,
+        "summary_lines": [
+          "........................                                                 [100%]",
+          "24 passed in 34.87s"
+        ],
+        "gpu_executed": false
+      },
+      "whole_regression": {
+        "source_manifest_sha256": "590126b33e311f6bb336b2d2f2090b9c2b9dd3dcde0a35acd53bcfc0c964e54e",
+        "source_manifest_unchanged": true,
+        "all_pinned_source_bytes_unchanged": true,
+        "test_and_dependency_sources_unchanged": true,
+        "base_commit": "a4c994f6f127e2f9593a1d41244d1535fa9b7126",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "started_at": "2026-11-17T04:12:59.854906+00:00",
+        "finished_at": "2026-11-17T04:35:29.305337+00:00",
+        "parent_wall_seconds": 1349.143,
+        "exit_code": 0,
+        "summary_lines": [
+          "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:136: DeprecationWarning: This process (pid=984) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+          "    expected=identity.process_context(child.pid);read_fd,write_fd=os.pipe();worker=os.fork()",
+          "",
+          "tests/test_rank_rpc_actor.py::test_actor_exit_without_finally_still_resumes_target",
+          "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:159: DeprecationWarning: This process (pid=984) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+          "    worker = os.fork()",
+          "",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-delay]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-death]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-exception]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-delay]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-death]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-exception]",
+          "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:214: DeprecationWarning: This process (pid=984) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+          "    worker = os.fork()",
+          "",
+          "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+          "14186 passed, 34 skipped, 14 warnings in 1347.48s (0:22:27)"
+        ],
+        "gpu_executed": false,
+        "timeout_used": false,
+        "new_test_exclusions": false,
+        "source_gate": {
+          "reviewed_common_commit": "590126b33e311f6bb336b2d2f2090b9c2b9dd3dcde0a35acd53bcfc0c964e54e",
+          "B_source_commit": "57a7537968c0c09a7aab8f741965d64a7eb0f0d5",
+          "fixed_B_helper_sha256": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+          "pinned_paths": [
+            "update/src/guard",
+            "update/packs",
+            "update/uv.lock",
+            "update/pyproject.toml",
+            "update/reference/framework"
+          ],
+          "files_verified": 588,
+          "verified_manifest_sha256": "f251102b2dc9b00a0a3b10bc26bf5696601d13a4e3aff3ed37d7954e29afc72d",
+          "pack_ref": {
+            "id": "PACK-BASELINE",
+            "kind": "PACK",
+            "revision": 38,
+            "sha256": "22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80"
+          },
+          "paths_excluded": [],
+          "runtime_hash_approval": false,
+          "original_B_default_pin_changed": false,
+          "actual_CPU_execution": false
+        }
+      },
+      "cleanup": {
+        "parent_restore": "restored",
+        "guardian": {
+          "reason": "parent-eof",
+          "restore": "already-original"
+        }
+      },
+      "monitor": {
+        "samples": 25118,
+        "largest_adjacent_nonoverlap_offset_ns": 0,
+        "trial_guardian_completed": true,
+        "final_clocksource": "tsc",
+        "monitor_modified_clock": false
+      },
+      "restored_clocksource": "tsc",
+      "new_gpu_created": false,
+      "tsc_root_cause_proven": false
+    },
+    "native_input_product": {
+      "status": "PRODUCT_IMPLEMENTED_CPU_VERIFIED_NOT_GPU_QUALIFIED_OR_REGISTERED",
+      "source_manifest_sha256": "f34902445c22ccae7c69cc5de27bf8d26f98b65c70fd6ecbb898b70991a31269",
+      "source_files": 8,
+      "source_points": 15,
+      "focused": {
+        "source_manifest_sha256": "f34902445c22ccae7c69cc5de27bf8d26f98b65c70fd6ecbb898b70991a31269",
+        "source_manifest_unchanged": true,
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "started_at": "2026-11-17T06:20:25.968699+00:00",
+        "finished_at": "2026-11-17T06:20:28.421573+00:00",
+        "parent_wall_seconds": 2.453,
+        "exit_code": 0,
+        "summary_lines": [
+          ".........................................................                [100%]",
+          "57 passed in 2.18s"
+        ],
+        "gpu_executed": false
+      },
+      "related_previous_snapshot": {
+        "source_manifest_sha256": "298f217b5c7a54b13a61a60c1fc11b824910690d5d345b960cf159d33358c540",
+        "source_manifest_unchanged": true,
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "started_at": "2026-11-17T06:18:55.957140+00:00",
+        "finished_at": "2026-11-17T06:19:02.918616+00:00",
+        "parent_wall_seconds": 6.961,
+        "exit_code": 0,
+        "summary_lines": [
+          "........................................................................ [ 25%]",
+          "........................................................................ [ 50%]",
+          "........................................................................ [ 75%]",
+          "........................................................................ [100%]",
+          "288 passed, 1 deselected in 6.64s"
+        ],
+        "gpu_executed": false
+      },
+      "implemented": [
+        "Exact source/body/closure and request-root CALL/RETURN/RAISE observation",
+        "Private source package with pinned helper identity and preserved sitecustomize",
+        "Atomic closed HMAC snapshots; original exception identity and source raise-site metadata",
+        "Fresh explicit request headers over the unchanged original owned body/path/bounds gates",
+        "Fixed isolated reader verifies current source assets and live process generation",
+        "Before/after clock, target generation, source bytes and request-window joining",
+        "Invalid records refused before local persistence; failed capture preserves earlier facts and aborts completion"
+      ],
+      "runtime_qualified": false,
+      "producer_registered": false,
+      "actual_gpu_executed": false,
+      "whole69_complete": false,
+      "remaining": [
+        "Full declared text/chat/token collection and canonical scope coverage",
+        "Applicable embedding/mask/offset semantics and actual native consumer scope",
+        "Actual GPU positive/negative qualification, exact registration and fresh per-check live inputs"
+      ],
+      "whole_regression": {
+        "source_manifest_sha256": "f34902445c22ccae7c69cc5de27bf8d26f98b65c70fd6ecbb898b70991a31269",
+        "source_manifest_unchanged": true,
+        "all_pinned_source_bytes_unchanged": true,
+        "test_and_dependency_sources_unchanged": true,
+        "base_commit": "a4c994f6f127e2f9593a1d41244d1535fa9b7126",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "started_at": "2026-11-17T06:21:44.167220+00:00",
+        "finished_at": "2026-11-17T06:38:47.209798+00:00",
+        "parent_wall_seconds": 1022.848,
+        "exit_code": 0,
+        "summary_lines": [
+          "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:136: DeprecationWarning: This process (pid=771) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+          "    expected=identity.process_context(child.pid);read_fd,write_fd=os.pipe();worker=os.fork()",
+          "",
+          "tests/test_rank_rpc_actor.py::test_actor_exit_without_finally_still_resumes_target",
+          "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:159: DeprecationWarning: This process (pid=771) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+          "    worker = os.fork()",
+          "",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-delay]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-death]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-exception]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-delay]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-death]",
+          "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-exception]",
+          "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:214: DeprecationWarning: This process (pid=771) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+          "    worker = os.fork()",
+          "",
+          "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+          "14243 passed, 34 skipped, 14 warnings in 1021.56s (0:17:01)"
+        ],
+        "gpu_executed": false,
+        "timeout_used": false,
+        "new_test_exclusions": false,
+        "source_gate": {
+          "reviewed_common_commit": "f34902445c22ccae7c69cc5de27bf8d26f98b65c70fd6ecbb898b70991a31269",
+          "B_source_commit": "57a7537968c0c09a7aab8f741965d64a7eb0f0d5",
+          "fixed_B_helper_sha256": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+          "pinned_paths": [
+            "update/src/guard",
+            "update/packs",
+            "update/uv.lock",
+            "update/pyproject.toml",
+            "update/reference/framework"
+          ],
+          "files_verified": 596,
+          "verified_manifest_sha256": "e08ba9ef6901088fa4fa9d96e886962c1ba1b621774f1567119eae8ce9609fef",
+          "pack_ref": {
+            "id": "PACK-BASELINE",
+            "kind": "PACK",
+            "revision": 38,
+            "sha256": "22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80"
+          },
+          "paths_excluded": [],
+          "runtime_hash_approval": false,
+          "original_B_default_pin_changed": false,
+          "actual_CPU_execution": false
+        }
+      },
+      "producer": {
+        "name": "guard-vllm-native-input-observation",
+        "version": "1",
+        "source_sha256": "ce6dad3b52ab326979f4faf7964ed8accf98d42ebc7f4b4ad7589fff75b93e8c"
+      }
+    }
+  },
+  "j02_actual_qualification": {
+    "schema": "byul-j02-scoped-qualification-stage/1",
+    "checked_at": "2026-11-17T08:51:02.955328+00:00",
+    "status": "IN_PROGRESS",
+    "goal": "vLLM 0.30.0 actual all69 EVD/RES/RPT",
+    "video_in_current_scope": false,
+    "local_source_manifest_sha256": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+    "gpu_source_manifest_sha256": "e61ccf04be2b192883b1795dbeebcf3a4978830b5cf5b0474870902083fe10ab",
+    "native_input_scoped_registration": {
+      "schema": "byul-native-exact-source-registration/1",
+      "producer": {
+        "name": "guard-vllm-native-input-observation",
+        "source_sha256": "5c9e6a5c956b8f2ec0873e71941776eb7027b16b4fd185c4606dd2125938b5d6",
+        "version": "1"
+      },
+      "registered_scope": "selected-original-http-input-validation-source-calls",
+      "actual_gpu_receipt_sha256": "50c10499e53f5d46669f031f0bbadab17dfce5ee0b9789a4a6516c26ce01edf2",
+      "verified_export_sha256": "c87b4c96efb1881c2f5cffe3b369f08dfd0ce0a4679e272cc524ad88085654d1",
+      "fresh_full69_bindings": false,
+      "whole69_complete": false
+    },
+    "four_faults_physically_injected": true,
+    "rank_scoped_registration_completed": false,
+    "rank_full_detection_delivery_recovery_completed": false,
+    "delay_retest": {
+      "normal_and_case_exit_codes": [
+        0,
+        0
+      ],
+      "client_status": 500,
+      "original_timeout_and_http_eof_observed": true,
+      "causal_detection_qualified": false,
+      "same_selected_pod_uids_absent": true
+    },
+    "final_export": {
+      "schema": "byul-j02-verified-export/1",
+      "bundle": "j02-qualification-fe84fb51a0b64efeb659647d0d8c1921.zip",
+      "sha256": "e3864ce6bc78c985d8df526b321a6bd81daa9b2a8332fee58dc76e9cc0b8dc8e",
+      "files_verified": 1379,
+      "all_member_hashes_match": true,
+      "private_settings_or_key_files_included": false,
+      "all69_complete": false
+    },
+    "cleanup_confirmed": true,
+    "new_resources_only": true,
+    "total_budget_cap_usd": 20,
+    "max_session_hours": 2,
+    "actual_aws_invoice_available": false,
+    "latest_native_related_tests": {
+      "source_manifest_sha256": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+      "source_manifest_unchanged": true,
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "started_at": "2026-11-17T08:15:47.994088+00:00",
+      "finished_at": "2026-11-17T08:15:58.970788+00:00",
+      "parent_wall_seconds": 10.977,
+      "exit_code": 0,
+      "summary_lines": [
+        "........................................................................ [ 32%]",
+        "........................................................................ [ 65%]",
+        "........................................................................ [ 97%]",
+        ".....                                                                    [100%]",
+        "221 passed, 1 deselected in 10.29s"
+      ],
+      "gpu_executed": false
+    },
+    "latest_rank_related_tests": {
+      "source_manifest_sha256": "e61ccf04be2b192883b1795dbeebcf3a4978830b5cf5b0474870902083fe10ab",
+      "source_manifest_unchanged": true,
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "started_at": "2026-11-17T08:08:15.386406+00:00",
+      "finished_at": "2026-11-17T08:08:28.850491+00:00",
+      "parent_wall_seconds": 14.016,
+      "exit_code": 0,
+      "summary_lines": [
+        "........................................................................ [ 28%]",
+        "........................................................................ [ 57%]",
+        "........................................................................ [ 86%]",
+        "..................................                                       [100%]",
+        "250 passed, 1 deselected in 13.64s"
+      ],
+      "gpu_executed": false
+    },
+    "whole_regression": {
+      "source_manifest_sha256": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+      "source_manifest_unchanged": true,
+      "all_pinned_source_bytes_unchanged": true,
+      "test_and_dependency_sources_unchanged": true,
+      "base_commit": "a4c994f6f127e2f9593a1d41244d1535fa9b7126",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "started_at": "2026-11-17T08:16:37.934710+00:00",
+      "finished_at": "2026-11-17T08:48:09.519595+00:00",
+      "parent_wall_seconds": 1925.084,
+      "exit_code": 0,
+      "summary_lines": [
+        "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:136: DeprecationWarning: This process (pid=13709) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+        "    expected=identity.process_context(child.pid);read_fd,write_fd=os.pipe();worker=os.fork()",
+        "",
+        "tests/test_rank_rpc_actor.py::test_actor_exit_without_finally_still_resumes_target",
+        "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:159: DeprecationWarning: This process (pid=13709) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+        "    worker = os.fork()",
+        "",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-delay]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-death]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[False-exception]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-delay]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-death]",
+        "tests/test_rank_rpc_actor.py::test_full_actor_uses_real_source_barrier_and_owned_child_pidfd[True-exception]",
+        "  /home/youngjo/.cache/byul-mvp31-4f60-20261116/update/tests/test_rank_rpc_actor.py:214: DeprecationWarning: This process (pid=13709) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+        "    worker = os.fork()",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "14265 passed, 34 skipped, 14 warnings in 1921.76s (0:32:01)"
+      ],
+      "gpu_executed": false,
+      "timeout_used": false,
+      "new_test_exclusions": false,
+      "source_gate": {
+        "reviewed_common_commit": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+        "B_source_commit": "57a7537968c0c09a7aab8f741965d64a7eb0f0d5",
+        "fixed_B_helper_sha256": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+        "pinned_paths": [
+          "update/src/guard",
+          "update/packs",
+          "update/uv.lock",
+          "update/pyproject.toml",
+          "update/reference/framework"
+        ],
+        "files_verified": 600,
+        "verified_manifest_sha256": "170ea3d987fb0652cb759f90bb3577c14b3eb954f8637e4eeacc948f4327316c",
+        "pack_ref": {
+          "id": "PACK-BASELINE",
+          "kind": "PACK",
+          "revision": 38,
+          "sha256": "22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80"
+        },
+        "paths_excluded": [],
+        "runtime_hash_approval": false,
+        "original_B_default_pin_changed": false,
+        "actual_CPU_execution": false
+      }
+    },
+    "all69_executed": false,
+    "native_all69_report_created": false,
+    "completion_pr_created": false,
+    "remaining": [
+      "SUP-04 full package/entrypoint/mounted-code approval and deployment mutation challenge",
+      "PLT-01 full declared permission/device/denial scope; retain observed exec-writable mount FAIL",
+      "PLT-04 whole-worker environment and credential candidate access scope",
+      "LIF-08 native failure causality, all-rank detection and upper delivery for four independent cases; stall source release missing",
+      "LIF-11 full kernel/GPU resource recovery and subsequent normal generation before operator cleanup",
+      "REQ-08 native consumption/nested token reuse and REQ-09 full text/chat/token and applicable embedding/mask/offset scope",
+      "Remaining exact qualifications, registrations, fresh per-check inputs, all69 actual EVD/RES/RPT and verified export"
+    ],
+    "implementation_inventory": {
+      "engine": {
+        "role": "후보 판본",
+        "engine": "vllm",
+        "version": "0.30.0",
+        "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
+      },
+      "active_checks": 69,
+      "checks_with_implementation": 69,
+      "checks_without_pass_rules": [
+        "SUP-03",
+        "SUP-04",
+        "SUP-13",
+        "PLT-02",
+        "PLT-07",
+        "PLT-08"
+      ],
+      "actual_execution_performed_by_this_inventory": false,
+      "all69_full_scope_inputs_confirmed": false
+    },
+    "implementation_inventory_file": "j02-final-implementation-inventory-actual030.json",
+    "clocksource_readback": {
+      "checked_at": "2026-11-17T08:44:41.288911+00:00",
+      "clocksource": "tsc",
+      "kernel_clock_setting_changed_by_agent_for_this_run": false,
+      "observation_scope": "Final portion of the ongoing full suite; no assertion of external changes throughout the run"
+    },
+    "timing_review": {
+      "schema": "byul-full-regression-two-timing-review/1",
+      "source_manifest": "4708b9dd409d896b36609925a834fb8d4a0be06afef2b2ad30a3d3e2e3ec5011",
+      "pytest_reported_seconds": 1921.76,
+      "parent_monotonic_seconds": 1925.084,
+      "utc_label_difference_seconds": 1891.584885,
+      "parent_monotonic_minus_utc_seconds": 33.499115,
+      "cause_confirmed": false,
+      "whole_run_clock_stability_claimed": false,
+      "kernel_clocksource_modified_for_this_run": false,
+      "original_log_junit_summary_retained": true,
+      "test_or_deadline_relaxed": false,
+      "scope": "Recorded duration values are preserved separately. The positive source-integrity and default-suite checks are not a whole-run clock stability qualification."
+    }
+  },
+  "post_j02_remaining_implementation": {
+    "status": "IN_PROGRESS",
+    "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+    "strict_default_release_ack_required": true,
+    "explicit_stall_application_with_release_gap_supported": true,
+    "malformed_release_and_nonstall_scope_rejected": true,
+    "selected_declared_side_all69_offline_inventory": true,
+    "default_138_side_inventory_preserved": true,
+    "native_input_sdk_source_changed": false,
+    "native_input_registered_source_sha256": "5c9e6a5c956b8f2ec0873e71941776eb7027b16b4fd185c4606dd2125938b5d6",
+    "rank_producer_registered": false,
+    "new_gpu_executed": false,
+    "all69_actual_execution_complete": false,
+    "tests": {
+      "side-stall-release-gap-final": {
+        "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+        "exit_code": 0,
+        "parent_wall_seconds": 29.666,
+        "summary_lines": [
+          "........................................................................ [ 24%]",
+          "........................................................................ [ 49%]",
+          "........................................................................ [ 73%]",
+          "........................................................................ [ 98%]",
+          "....                                                                     [100%]",
+          "292 passed, 1 deselected in 28.63s"
+        ]
+      },
+      "side-stall-release-gap-negative": {
+        "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+        "exit_code": 0,
+        "parent_wall_seconds": 7.583,
+        "summary_lines": [
+          ".............................                                            [100%]",
+          "29 passed in 6.66s"
+        ]
+      },
+      "side-single-environment-b894": {
+        "source_manifest_sha256": "b894002ba1d2a5cf05429aa364ea954ba6c148fb811c1c910f7fa4bdf87c177f",
+        "exit_code": 0,
+        "parent_wall_seconds": 26.196,
+        "summary_lines": [
+          "........................................................................ [ 32%]",
+          "........................................................................ [ 65%]",
+          "........................................................................ [ 98%]",
+          "...                                                                      [100%]",
+          "219 passed, 1 deselected in 24.86s"
+        ]
+      }
+    }
+  },
+  "main_continuation_node_gpu_references": {
+    "status": "IMPLEMENTED_CPU_VERIFIED_GPU_UNQUALIFIED",
+    "source_manifest_sha256": "8dfa30ddc14cadb7aa455d9cfd74d96a905af2261c6520391ab394c72de5db7c",
+    "source_checkout": "pr-snapshots/mvp030-j02-checkpoint-20261117",
+    "linux_checkout": "/home/youngjo/.cache/byul-mvp030-main-remaining-20261117",
+    "kernel_node_task_anchor_required": true,
+    "node_gpu_processes_opt_in": true,
+    "all_host_pid_fd_scan_bounded": true,
+    "nvml_confirmed_before_after": true,
+    "previous_raw_facts_preserved_on_later_failure": true,
+    "native_evidence_report_export_restore_connected": true,
+    "native_input_sdk_source_changed": false,
+    "native_input_registered_source_sha256": "5c9e6a5c956b8f2ec0873e71941776eb7027b16b4fd185c4606dd2125938b5d6",
+    "gpu_source_qualified": false,
+    "gpu_producer_registered": false,
+    "whole_gpu_release_verified": false,
+    "whole_group_recovery_verified": false,
+    "actual_gpu_executed": false,
+    "new_aws_resources_created": false,
+    "all69_complete": false,
+    "tests": {
+      "main-node-gpu-product-7b37-rerun": {
+        "source_manifest_sha256": "7b37d06f8632158bef86eb05894368e71371a5adeb1f3ca7c8ff1c67bd6908ce",
+        "exit_code": 0,
+        "parent_wall_seconds": 116.317,
+        "summary_lines": [
+          "........................................................................ [ 18%]",
+          "........................................................................ [ 37%]",
+          "........................................................................ [ 55%]",
+          "........................................................................ [ 74%]",
+          "........................................................................ [ 93%]",
+          "..........................                                               [100%]",
+          "386 passed, 1 deselected in 115.53s (0:01:55)"
+        ]
+      },
+      "main-node-gpu-final-boundaries-7b37": {
+        "source_manifest_sha256": "7b37d06f8632158bef86eb05894368e71371a5adeb1f3ca7c8ff1c67bd6908ce",
+        "exit_code": 0,
+        "parent_wall_seconds": 15.142,
+        "summary_lines": [
+          "........................................................................ [ 78%]",
+          "....................                                                     [100%]",
+          "92 passed in 14.44s"
+        ]
+      }
+    },
+    "final_lf_verification": {
+      "source_manifest_sha256": "8dfa30ddc14cadb7aa455d9cfd74d96a905af2261c6520391ab394c72de5db7c",
+      "exit_code": 0,
+      "parent_wall_seconds": 21.577,
+      "summary_lines": [
+        "........................................................................ [ 24%]",
+        "........................................................................ [ 49%]",
+        "........................................................................ [ 74%]",
+        "........................................................................ [ 99%]",
+        ".                                                                        [100%]",
+        "289 passed, 1 deselected in 20.76s"
+      ]
+    },
+    "prior_7b37_tests_are_pre_lf_history": true
+  }
+}

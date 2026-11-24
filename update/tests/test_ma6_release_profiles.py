@@ -61,7 +61,10 @@ def test_candidate_http_rows_cannot_enable_safe_mutating_probes_or_rejection_pro
             case='length', method='POST', path='/v1/completions',
             request_body={'model': 'EXAMPLE', 'prompt': [0] * 5, 'max_tokens': 1},
             response_status=400, response_body={'error': {'message': 'EXAMPLE'}})
-        assert proof == {'state': 'unverified', 'reason': 'INPUT_REJECTION_CANDIDATE_PIN_NOT_IMAGE_VERIFIED', 'sources': []}
+        # .30 has an independently reviewed installed-GPU-source rejection
+        # row now. A malformed response remains unverified and has no proof.
+        reason='REJECTION_CAUSE_UNVERIFIED' if version=='0.30.0' else 'INPUT_REJECTION_CANDIDATE_PIN_NOT_IMAGE_VERIFIED'
+        assert proof == {'state': 'unverified', 'reason': reason, 'sources': []}
         if role == '기준 판본':
             assert row['safe_probe_candidates'] == []
             assert not engine_profiles.supports('vllm', version, 'native_lifecycle')

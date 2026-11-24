@@ -2,6 +2,7 @@
 from pathlib import Path
 import uuid
 from guard.adapters import vllm_rank_failure_sensor as sensor,vllm_rank_failure_metadata as metadata
+from guard.adapters import vllm_release_observation_sensor as release_observation,vllm_lifecycle_profiles as profiles
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_rank_failure import KubernetesRankFailureHTTP,PROFILE as HTTP_PROFILE,SLOTS
@@ -36,7 +37,7 @@ class KubernetesRankFailureExecutor(HttpCheckExecutor):
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end=normalize_policy(policy_values)
             if (target_hash!=policy_values['rank_target_sha256'] or env.ref().sha256!=policy_values['rank_environment_sha256']
-                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile']!=sensor.PROFILE
+                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile'] not in {sensor.PROFILE,release_observation.RANK_PROFILE}
                     or sha256_hex(canonical_json(prepared))!=policy_values['rank_prepared_sha256'] or not start<=utcnow()<=end):raise ValueError
         except (KeyError,ValueError,TypeError,RuntimeError,OSError):raise ValueError('RANK_FAILURE_CONFIGURATION_INVALID') from None
         transport=KubernetesRankFailureHTTP(target,env,runner=self.runner,duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))
@@ -78,7 +79,9 @@ class KubernetesRankFailureExecutor(HttpCheckExecutor):
                         prepared=ctx._rank_prepared,owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
                     if not packet.get('recorded_files_covered'):diagnostics.append('RANK_FAILURE_NATIVE_COVERAGE_UNAVAILABLE')
                 except Exception:diagnostics.append('RANK_FAILURE_CAPTURE_UNAVAILABLE')
-        projection=metadata.project(packet,ctx.policy_values);http=ctx.cprobe.report();read_report=reader.report() if reader else None
+        projection=metadata.project(packet,ctx.policy_values,source_contracts=profiles.source_hashes(ctx._rank_prepared['profile']),
+            runtime_contracts=release_observation.RANK_RUNTIME_CODE_CONTRACTS
+                if ctx._rank_prepared['profile']==release_observation.RANK_PROFILE else None);http=ctx.cprobe.report();read_report=reader.report() if reader else None
         if not any(c['point']=='MultiprocExecutor.execute_model' and c['source_process_binding_observed'] for c in projection['calls']):
             diagnostics.append('SELECTED_MP_NATIVE_EXECUTION_UNOBSERVED')
         ctx._rank_cleanup=list(http['cleanup_errors'])

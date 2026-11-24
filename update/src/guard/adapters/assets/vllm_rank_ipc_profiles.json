@@ -623,7 +623,10 @@
       "rpc_sources": {
         "vllm.v1.executor.multiproc_executor": {
           "functions": [
-            "WorkerProc._execute_worker_rpc"
+            "WorkerProc._execute_worker_rpc",
+            "WorkerProc.enqueue_output",
+            "MultiprocExecutor.execute_model",
+            "FutureWrapper.result"
           ],
           "hooks": {
             "WorkerProc._execute_worker_rpc": {
@@ -659,13 +662,90 @@
               "no_scheduled_work": {
                 "total_field": "total_num_scheduled_tokens"
               }
+            },
+            "WorkerProc.enqueue_output": {
+              "kind": "rpc-reply",
+              "phase": "around-original",
+              "role": "worker-response-publication",
+              "source_modules": [
+                "vllm.v1.worker.worker_base",
+                "vllm.v1.worker.gpu_worker",
+                "vllm.v1.core.sched.output",
+                "vllm.v1.executor.multiproc_executor"
+              ],
+              "parent": {
+                "point": "WorkerProc._execute_worker_rpc",
+                "worker_path": []
+              },
+              "synchronous_false_path": [
+                "use_async_scheduling"
+              ],
+              "scalars": {
+                "gpu_rank": {
+                  "root": "self",
+                  "path": [
+                    "rank"
+                  ]
+                },
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "worker",
+                    "worker",
+                    "vllm_config",
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "fault_eligible": false
+            },
+            "MultiprocExecutor.execute_model": {
+              "phase": "around-original",
+              "source_modules": [
+                "vllm.v1.executor.multiproc_executor",
+                "vllm.v1.core.sched.output"
+              ],
+              "kind": "rpc",
+              "role": "executor-model-rpc",
+              "requests": {
+                "root": "scheduler_output",
+                "layout": "scheduled"
+              },
+              "no_scheduled_work": {
+                "total_field": "total_num_scheduled_tokens"
+              },
+              "scalars": {
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "deferred_result": {
+                "class": "FutureWrapper",
+                "point": "FutureWrapper.result"
+              }
+            },
+            "FutureWrapper.result": {
+              "phase": "around-original",
+              "source_modules": [
+                "vllm.v1.executor.multiproc_executor"
+              ],
+              "kind": "deferred-result",
+              "role": "executor-deferred-response"
             }
           },
           "path": "vllm/v1/executor/multiproc_executor.py",
           "bytes": 45225,
           "sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
           "body_code_sha256": {
-            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a"
+            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+            "WorkerProc.enqueue_output": "61359f6ea4c58136a5f91faf189641003727c71de8e9856773dc7c39483fd695",
+            "MultiprocExecutor.execute_model": "32e57835747c2e4c856851cdb393e4d991952cc4db35a3f656b35059c8af6a92",
+            "FutureWrapper.result": "751dfb421f6ce00aaf95fc00a023ead171c79dafde017762bd1271856451fd3a"
           },
           "pin_status": "candidate_pin"
         },
@@ -811,6 +891,134 @@
           "bytes": 30431,
           "sha256": "75d05ddddf303734a078a3e42fcb173fef58ea56da09bc0b5c7525cb9bbbf527",
           "body_code_sha256": {},
+          "pin_status": "candidate_pin"
+        },
+        "vllm.distributed.device_communicators.shm_broadcast": {
+          "path": "vllm/distributed/device_communicators/shm_broadcast.py",
+          "bytes": 45067,
+          "sha256": "f3e7a3f3ff713fccbd535e0d41650ee05bdf8677e83d4b90519910645022c30b",
+          "functions": [
+            "MessageQueue.enqueue"
+          ],
+          "function_lines": {
+            "MessageQueue.export_handle": [
+              556,
+              557
+            ],
+            "MessageQueue.create_from_handle": [
+              560,
+              605
+            ]
+          },
+          "body_code_sha256": {
+            "MessageQueue.enqueue": "b4812befe761fb4d6231a03af87d134fe94391c09172ae3d1952dfc498c232ca"
+          },
+          "hooks": {
+            "MessageQueue.enqueue": {
+              "kind": "rpc-reply",
+              "phase": "around-original",
+              "role": "worker-response-queue-publication",
+              "source_modules": [
+                "vllm.v1.worker.worker_base",
+                "vllm.v1.worker.gpu_worker",
+                "vllm.v1.core.sched.output",
+                "vllm.v1.executor.multiproc_executor",
+                "vllm.distributed.device_communicators.shm_broadcast"
+              ],
+              "parent": {
+                "point": "WorkerProc.enqueue_output",
+                "worker_path": [
+                  "worker_response_mq"
+                ]
+              },
+              "synchronous_false_root": "rpc_parent",
+              "synchronous_false_path": [
+                "use_async_scheduling"
+              ],
+              "scalars": {
+                "gpu_rank": {
+                  "root": "rpc_parent",
+                  "path": [
+                    "rank"
+                  ]
+                },
+                "configured_tp_size": {
+                  "root": "rpc_parent",
+                  "path": [
+                    "worker",
+                    "worker",
+                    "vllm_config",
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "endpoints": {
+                "response": {
+                  "kind": "shared-memory",
+                  "root": "self",
+                  "path": [
+                    "buffer",
+                    "shared_memory"
+                  ]
+                }
+              },
+              "fault_eligible": true,
+              "fault_kinds": [
+                "communication-stall"
+              ],
+              "required_initial_endpoint": "response"
+            }
+          }
+        },
+        "uvicorn.protocols.http.h11_impl": {
+          "path": "uvicorn/protocols/http/h11_impl.py",
+          "sha256": "a3154a6c2cfaaaebe19ac7aa255dfe9b6b7b490de1da95274c033aa093e8c322",
+          "bytes": 20886,
+          "functions": [
+            "RequestResponseCycle.send"
+          ],
+          "body_code_sha256": {
+            "RequestResponseCycle.send": "1b5bd28b80a1450391652f1219e46cf973ea93a22814c98c8ee994bb409ad7f0"
+          },
+          "hooks": {
+            "RequestResponseCycle.send": {
+              "kind": "asgi-send",
+              "phase": "around-original",
+              "role": "native-http-response-send",
+              "source_modules": [
+                "uvicorn.protocols.http.h11_impl"
+              ],
+              "paths": [
+                "/v1/completions"
+              ]
+            }
+          },
+          "pin_status": "candidate_pin"
+        },
+        "uvicorn.protocols.http.httptools_impl": {
+          "path": "uvicorn/protocols/http/httptools_impl.py",
+          "sha256": "1d4e1c579df4168433a61a01f10c628b31c1790e72dd9769d2b8633b22214033",
+          "bytes": 22564,
+          "functions": [
+            "RequestResponseCycle.send"
+          ],
+          "body_code_sha256": {
+            "RequestResponseCycle.send": "df4be4d45bbdeec73640b68130c1e72271bfe7acdd4570dc053eeaaf4c91db71"
+          },
+          "hooks": {
+            "RequestResponseCycle.send": {
+              "kind": "asgi-send",
+              "phase": "around-original",
+              "role": "native-http-response-send",
+              "source_modules": [
+                "uvicorn.protocols.http.httptools_impl"
+              ],
+              "paths": [
+                "/v1/completions"
+              ]
+            }
+          },
           "pin_status": "candidate_pin"
         }
       },

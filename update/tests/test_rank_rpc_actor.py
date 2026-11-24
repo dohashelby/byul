@@ -34,6 +34,17 @@ def wait_state(target, predicate):
     pytest.fail('시험 소유 자식의 실제 상태가 확인되지 않았다')
 
 
+@pytest.fixture
+def lease_clock(monkeypatch):
+    # The lease's 200 ms starts before fork. Keep setup scheduling independent
+    # of that semantic deadline; both real processes share the controlled clock.
+    # pidfd signals, /proc state checks and the outer wait bound remain real.
+    from multiprocessing import Value
+    clock = Value('q', time.monotonic_ns())
+    monkeypatch.setattr(actor.time, 'monotonic_ns', lambda: clock.value)
+    return clock
+
+
 def test_pidfd_stop_and_same_generation_resume_are_real(child):
     expected = identity.process_context(child.pid)
     target = actor.SignalTarget(expected)
@@ -57,15 +68,89 @@ def test_wrong_generation_and_self_signal_are_denied(child):
     assert actor._state(child.pid)[0] != 'T' and child.poll() is None
 
 
-def test_lease_expiry_resumes_exact_owned_target(child):
+def test_lease_expiry_resumes_exact_owned_target(child, lease_clock):
     target = actor.SignalTarget(identity.process_context(child.pid))
     lease = actor.ResumeLease(target, time.monotonic_ns() + 200_000_000)
     try:
         lease.before_stop(); target.send(signal.SIGSTOP)
         assert wait_state(target, lambda state: state == 'T') == 'T'
+        lease_clock.value = lease.expires_ns
         assert wait_state(target, lambda state: state in {'R', 'S', 'D', 'I'}) != 'T'
     finally:
         target.resume_cleanup(); lease.finish(); target.close()
+
+
+def test_guard_scheduled_after_expiry_drains_buffered_stop_intent(child,monkeypatch,lease_clock):
+    fork=os.fork
+    read_fd,write_fd=os.pipe()
+    def delayed_fork():
+        pid=fork()
+        if pid==0:
+            os.close(write_fd)
+            assert os.read(read_fd,1)==b'R'
+            os.close(read_fd)
+        return pid
+    monkeypatch.setattr(actor.os,'fork',delayed_fork)
+    target=actor.SignalTarget(identity.process_context(child.pid))
+    lease=actor.ResumeLease(target,time.monotonic_ns()+200_000_000)
+    os.close(read_fd)
+    try:
+        lease.before_stop();target.send(signal.SIGSTOP)
+        assert wait_state(target,lambda state:state=='T')=='T'
+        lease_clock.value=lease.expires_ns
+        os.write(write_fd,b'R');os.close(write_fd);write_fd=None
+        assert wait_state(target,lambda state:state in {'R','S','D','I'})!='T'
+    finally:
+        if write_fd is not None:os.write(write_fd,b'R');os.close(write_fd)
+        target.resume_cleanup();lease.finish();target.close()
+
+
+def test_stop_dispatch_and_expiry_cleanup_are_serialized(child,monkeypatch,lease_clock):
+    target=actor.SignalTarget(identity.process_context(child.pid))
+    lease=actor.ResumeLease(target,time.monotonic_ns()+200_000_000)
+    original=target.current
+    def delayed_current():
+        value=original();lease_clock.value=lease.expires_ns;return value
+    try:
+        lease.before_stop()
+        monkeypatch.setattr(target,'current',delayed_current)
+        target.send(signal.SIGSTOP)
+        assert wait_state(target,lambda state:state in {'R','S','D','I'})!='T'
+    finally:
+        monkeypatch.setattr(target,'current',original)
+        target.resume_cleanup();lease.finish();target.close()
+
+
+def test_expired_lease_cannot_dispatch_a_new_stop(child):
+    target=actor.SignalTarget(identity.process_context(child.pid))
+    lease=actor.ResumeLease(target,time.monotonic_ns()+50_000_000)
+    try:
+        time.sleep(.08)
+        with pytest.raises(ValueError,match='STOP_LEASE_EXPIRED'):lease.before_stop()
+        with pytest.raises(ValueError,match='STOP_LEASE_EXPIRED'):target.send(signal.SIGSTOP)
+        assert target.current()[0]!='T' and child.poll() is None
+    finally:target.resume_cleanup();lease.finish();target.close()
+
+
+def test_actor_death_while_holding_dispatch_lock_releases_kernel_lock(child):
+    expected=identity.process_context(child.pid);read_fd,write_fd=os.pipe();worker=os.fork()
+    if worker==0:
+        os.close(read_fd)
+        try:
+            target=actor.SignalTarget(expected)
+            lease=actor.ResumeLease(target,time.monotonic_ns()+2_000_000_000)
+            lease.before_stop()
+            with target.stop_guard():
+                signal.pidfd_send_signal(target.fd,signal.SIGSTOP)
+                os.write(write_fd,b'T');os._exit(77)
+        except BaseException:os.write(write_fd,b'E');os._exit(78)
+    os.close(write_fd)
+    target=actor.SignalTarget(expected)
+    try:
+        assert os.read(read_fd,1)==b'T'
+        _,status=os.waitpid(worker,0);assert os.waitstatus_to_exitcode(status)==77
+        assert wait_state(target,lambda state:state in {'R','S','D','I'})!='T'
+    finally:os.close(read_fd);target.resume_cleanup();target.close()
 
 
 def test_actor_exit_without_finally_still_resumes_target(child):

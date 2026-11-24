@@ -167,7 +167,14 @@
           "functions": [
             "MultiprocExecutor.collective_rpc",
             "WorkerProc.worker_busy_loop",
-            "WorkerProc._execute_worker_rpc"
+            "WorkerProc._execute_worker_rpc",
+            "MultiprocExecutor.execute_model",
+            "MultiprocExecutor.shutdown",
+            "FutureWrapper.__init__",
+            "FutureWrapper.result",
+            "FutureWrapper._wait_for_response",
+            "WorkerProc.handle_output",
+            "WorkerProc.enqueue_output"
           ],
           "function_lines": {
             "MultiprocExecutor.collective_rpc": [
@@ -181,12 +188,70 @@
             "WorkerProc._execute_worker_rpc": [
               1035,
               1059
+            ],
+            "MultiprocExecutor.execute_model": [
+              340,
+              351
+            ],
+            "MultiprocExecutor.shutdown": [
+              502,
+              535
+            ],
+            "FutureWrapper.__init__": [
+              79,
+              89
+            ],
+            "FutureWrapper.result": [
+              91,
+              99
+            ],
+            "FutureWrapper._wait_for_response": [
+              101,
+              108
+            ],
+            "WorkerProc.handle_output": [
+              1001,
+              1009
+            ],
+            "WorkerProc.enqueue_output": [
+              982,
+              999
             ]
           },
           "body_code_sha256": {
             "MultiprocExecutor.collective_rpc": "6fb69072683ce0b8074dc3f749a8e7dc75f36ba6a4a78768c13ebb3fbf1dcbf8",
             "WorkerProc.worker_busy_loop": "81e826b282db8411880447927c946d83fdf7b448ffe64f6acb5d1b43bb9fae52",
-            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a"
+            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+            "MultiprocExecutor.execute_model": "32e57835747c2e4c856851cdb393e4d991952cc4db35a3f656b35059c8af6a92",
+            "MultiprocExecutor.shutdown": "f059b064192f00b94074099c7fb57da5c177a0eb5d6b4177543c4fcb5a659b44",
+            "FutureWrapper.__init__": "03cd24080028d912e068634c372c59a69ca91dcd6efc98218c04631d36b4e70b",
+            "FutureWrapper.result": "751dfb421f6ce00aaf95fc00a023ead171c79dafde017762bd1271856451fd3a",
+            "FutureWrapper._wait_for_response": "8bd13f16fa0048e274d03f8fe224dee0182b0690bc4a7c72edb9c36cae16da0f",
+            "WorkerProc.handle_output": "ea0df8a08e35043f6564bd3a294e8b93c8c9d1969d550bdbf8142b24a20171e5",
+            "WorkerProc.enqueue_output": "61359f6ea4c58136a5f91faf189641003727c71de8e9856773dc7c39483fd695"
+          }
+        },
+        "vllm.v1.engine.core": {
+          "path": "vllm/v1/engine/core.py",
+          "bytes": 106584,
+          "sha256": "268bf40534a853812867ae8e80040f190983cb364b41182b55969aace20c93f5",
+          "functions": [
+            "EngineCoreProc._handle_client_request",
+            "EngineCoreProc._send_engine_dead"
+          ],
+          "function_lines": {
+            "EngineCoreProc._handle_client_request": [
+              1532,
+              1565
+            ],
+            "EngineCoreProc._send_engine_dead": [
+              1630,
+              1642
+            ]
+          },
+          "body_code_sha256": {
+            "EngineCoreProc._handle_client_request": "b86e5f0b31bbef0f0f61479d9fe0ac5589696061b9ff42f1f8478be30355e417",
+            "EngineCoreProc._send_engine_dead": "e6f8b6841b6a680f61b3f8ceb734b8912e522491651cbfb6a8cecfff69041588"
           }
         }
       }
@@ -356,7 +421,14 @@
           "functions": [
             "MultiprocExecutor.collective_rpc",
             "WorkerProc.worker_busy_loop",
-            "WorkerProc._execute_worker_rpc"
+            "WorkerProc._execute_worker_rpc",
+            "MultiprocExecutor.execute_model",
+            "MultiprocExecutor.shutdown",
+            "FutureWrapper.__init__",
+            "FutureWrapper.result",
+            "FutureWrapper._wait_for_response",
+            "WorkerProc.handle_output",
+            "WorkerProc.enqueue_output"
           ],
           "function_lines": {
             "MultiprocExecutor.collective_rpc": [
@@ -370,12 +442,70 @@
             "WorkerProc._execute_worker_rpc": [
               1035,
               1059
+            ],
+            "MultiprocExecutor.execute_model": [
+              340,
+              351
+            ],
+            "MultiprocExecutor.shutdown": [
+              502,
+              535
+            ],
+            "FutureWrapper.__init__": [
+              79,
+              89
+            ],
+            "FutureWrapper.result": [
+              91,
+              99
+            ],
+            "FutureWrapper._wait_for_response": [
+              101,
+              108
+            ],
+            "WorkerProc.handle_output": [
+              1001,
+              1009
+            ],
+            "WorkerProc.enqueue_output": [
+              982,
+              999
             ]
           },
           "body_code_sha256": {
             "MultiprocExecutor.collective_rpc": "83af48277e9c49a040a5187e127684abc84a9aace36cbdeea58ac822f1a8271a",
             "WorkerProc.worker_busy_loop": "81e826b282db8411880447927c946d83fdf7b448ffe64f6acb5d1b43bb9fae52",
-            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a"
+            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a",
+            "MultiprocExecutor.execute_model": "32e57835747c2e4c856851cdb393e4d991952cc4db35a3f656b35059c8af6a92",
+            "MultiprocExecutor.shutdown": "78745d9ea5a1da5af129386e426d7d1cce1a1479afdf1a1e11394fc117c151fc",
+            "FutureWrapper.__init__": "03cd24080028d912e068634c372c59a69ca91dcd6efc98218c04631d36b4e70b",
+            "FutureWrapper.result": "751dfb421f6ce00aaf95fc00a023ead171c79dafde017762bd1271856451fd3a",
+            "FutureWrapper._wait_for_response": "5c3f9c36c403d2c1253180eecf42a9ef26faad87fa9d868e9d41188dee8ce122",
+            "WorkerProc.handle_output": "ea0df8a08e35043f6564bd3a294e8b93c8c9d1969d550bdbf8142b24a20171e5",
+            "WorkerProc.enqueue_output": "61359f6ea4c58136a5f91faf189641003727c71de8e9856773dc7c39483fd695"
+          }
+        },
+        "vllm.v1.engine.core": {
+          "path": "vllm/v1/engine/core.py",
+          "bytes": 106584,
+          "sha256": "268bf40534a853812867ae8e80040f190983cb364b41182b55969aace20c93f5",
+          "functions": [
+            "EngineCoreProc._handle_client_request",
+            "EngineCoreProc._send_engine_dead"
+          ],
+          "function_lines": {
+            "EngineCoreProc._handle_client_request": [
+              1532,
+              1565
+            ],
+            "EngineCoreProc._send_engine_dead": [
+              1630,
+              1642
+            ]
+          },
+          "body_code_sha256": {
+            "EngineCoreProc._handle_client_request": "58819dca38d2916d84bdb223e88ef556f9d626adcceeb41f6cebcbfd8d1e69c7",
+            "EngineCoreProc._send_engine_dead": "e6f8b6841b6a680f61b3f8ceb734b8912e522491651cbfb6a8cecfff69041588"
           }
         }
       }

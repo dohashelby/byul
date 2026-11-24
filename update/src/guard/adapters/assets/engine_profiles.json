@@ -149,6 +149,32 @@
       ],
       "pin_status": "image_pin",
       "qualification": "정확 설치 bytes와 /28의 fresh ASGI→native 입력 HMAC 연결로 LIF-10·12, REQ-12, OBS-02의 제한된 제품 관측을 허용한다. request_attempts 전송은 기존 소유 HTTP 시도만 허용하며 /28은 native 시도/출력/KV를 증명하지 않는다. 전체 종료·GPU 등록도 미검증이다. ma6-version-applicability.md 25·28절."
+    },
+    {
+      "id": "vllm-rank-release-source/1",
+      "engine": "vllm",
+      "versions": [
+        "0.30.0"
+      ],
+      "features": [
+        "rank_release_rows",
+        "rank_failure",
+        "resource_recovery"
+      ],
+      "pin_status": "image_pin",
+      "qualification": "Exact installed MP/core source and original callable review for the bounded /34 rank observer and /26 initialization reader. No producer registration, independent four-fault activation, whole-group resource release or recovery-completion claim. Actual GPU qualification and full challenge closure remain required."
+    },
+    {
+      "id": "vllm-request-input-release-source/1",
+      "engine": "vllm",
+      "versions": [
+        "0.30.0"
+      ],
+      "features": [
+        "request_input_checks"
+      ],
+      "pin_status": "image_pin",
+      "qualification": "J00 고정 GPU 이미지 설치 소스의 토큰 범위·길이 거부 형식과 재사용 kv_transfer_params.prompt_token_ids 경로를 검토했다. HTTP 실행 경로만 열며 실행 시 정확 ENV·이미지·요청·응답을 다시 대조한다. 네이티브 관측기 자격·등록이나 모든 입력 형식/경로 완료를 뜻하지 않는다."
     }
   ],
   "implementations": []

@@ -6,17 +6,25 @@ data_origin: EXAMPLE
 status: DRAFT
 pack:
   id: PACK-BASELINE
-  revision: 38  # 2026-11-15 RB3-Q3/Q4 분리.  2026-11-15 생산자 소스·시험 주체·발급자 사건 분리(RB3). 36은 실행 준비값 분리(RB2). 35는 실행 결합값 분리(RB). 34는 2026-11-06 REQ-11 rev7, 11-05 실행 기록은 당시 32를 썼다.
+  revision: 39  # 2026-11-18 입력 matrix 정의 추가. 과거 실측은 당시 팩 Ref를 보존한다.
 values:
   REQ-08:
     reused_token_field: prompt_token_ids
     reused_token_allowed: false
     rejection_codes: ['400', '422']
+    reused_token_fields: [prompt_token_ids, kv_transfer_params.prompt_token_ids]
+    reused_field_endpoints:
+      prompt_token_ids: POST /v1/chat/completions
+      kv_transfer_params.prompt_token_ids: POST /v1/chat/completions
   REQ-09:
     max_input_tokens: 127
     rejection_codes: ['400', '413', '422']
-    allowed_endpoints: ['POST /v1/completions']
-    allowed_input_formats: [token_ids]
+    allowed_endpoints: ['POST /v1/completions', 'POST /v1/chat/completions']
+    allowed_input_formats: [token_ids, text]
+    allowed_input_pairs:
+    - POST /v1/completions|token_ids
+    - POST /v1/completions|text
+    - POST /v1/chat/completions|text
   REQ-10:
     allowed_sampling_options: [temperature, top_p, min_tokens]
     rejection_codes: ['400', '422']

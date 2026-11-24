@@ -15,12 +15,13 @@ POINT_MODULES={cls+'.'+method:module for module,classes in sensor.TARGETS.items(
 def fingerprint(value):return type(value) is str and re.fullmatch('[0-9a-f]{64}',value) is not None
 
 
-def validate_sample(v, *, runtime_contracts=None):
+def validate_sample(v, *, runtime_contracts=None, source_contracts=None):
     contracts=sensor.RUNTIME_CODE_CONTRACTS if runtime_contracts is None else runtime_contracts
+    sources=sensor.SOURCES if source_contracts is None else source_contracts
     try:
         if (type(v) is not dict or set(v)!=FIELDS or v['schema']!=sensor.EVENT_SCHEMA or type(v['point']) is not str
                 or v['point'] not in POINT_MODULES or v['source_module']!=POINT_MODULES[v['point']]
-                or v['source_sha256']!=sensor.SOURCES[v['source_module']] or v['phase'] not in {'CALL','RETURN','RAISE'}
+                or v['source_sha256']!=sources[v['source_module']] or v['phase'] not in {'CALL','RETURN','RAISE'}
                 or type(v['observer_runtime']) is not str or v['observer_runtime'] not in contracts
                 or v['observer_code_sha256']!=contracts[v['observer_runtime']]):raise ValueError
         role={'MultiprocExecutor':'executor','FutureWrapper':'future','WorkerProc':'worker','EngineCoreProc':'core'}[v['point'].split('.')[0]]
@@ -61,7 +62,7 @@ def validate_sample(v, *, runtime_contracts=None):
     except (KeyError,TypeError,ValueError):raise ValueError('RANK_FAILURE_SAMPLE_INVALID') from None
 
 
-def project(packet,limits):
+def project(packet,limits,*,source_contracts=None,runtime_contracts=None):
     result={'samples':[],'calls':[],'source_failure_candidates':[],'fault_cases':[],'missing':[],
         'producer_authenticated':False,'whole_scope_complete':False,'all_required_ranks_completed':False,'upper_client_receipt_verified':False}
     for index,recording in enumerate([] if not packet else packet.get('recordings',[])):
@@ -70,7 +71,7 @@ def project(packet,limits):
         context=capture['records'][0]['payload']['context']
         for row in capture['records']:
             if row['event']!='RANK_FAILURE':continue
-            value=row['payload'];validate_sample(value)
+            value=row['payload'];validate_sample(value,source_contracts=source_contracts,runtime_contracts=runtime_contracts)
             result['samples'].append({'recording':index,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],'pid':context['pid'],
                 'start_ticks':context['start_ticks'],'boot_sha256':context['boot_sha256'],'pid_namespace':context['pid_namespace'],
                 'time_namespace':context['time_namespace'],'time_offsets_sha256':context['time_offsets_sha256'],

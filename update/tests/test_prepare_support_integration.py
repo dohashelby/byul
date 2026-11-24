@@ -6,6 +6,8 @@ import socket
 import subprocess
 import tomllib
 
+import pytest
+
 from guard import application
 from guard.adapters.vllm import CHAT_REVIEWED_IMAGE
 from guard.cli import app
@@ -86,6 +88,29 @@ def test_valid_unsupported_policy_is_advisory_but_invalid_launch_budget_still_fa
     data = application.validation_readiness(pack, env, pol, bad)
     assert data["ready"] is False
     assert any(row["check"] == "inputs" and not row["ok"] for row in data["checks"])
+
+
+@pytest.mark.parametrize("override, reason, supported", [
+    ({"max_probe_tokens": 64}, None, False),
+    ({"max_probe_tokens": 1}, "max_probe_tokens must be an integer of at least two tokens", False),
+    ("malformed", "CHECK_CONFIG_INVALID", None),
+])
+def test_prepare_validation_uses_the_check_budget_for_support_and_admission(
+        tmp_path, monkeypatch, override, reason, supported):
+    pack, env, pol, cfg = setup_inputs(tmp_path)
+    _local(monkeypatch)
+    cfg["check_config"] = {"REQ-09": override}
+
+    data = application.validation_readiness(pack, env, pol, cfg)
+
+    support, = data["check_support"]
+    assert support["policy_supported"] is supported
+    inputs = next(row for row in data["checks"] if row["check"] == "inputs")
+    assert inputs["ok"] is (reason is None)
+    if reason is not None:
+        assert inputs["detail"] == reason
+    if supported is None:
+        assert "CHECK_CONFIG_INVALID" in support["reasons"]
 
 
 def test_prepare_cli_exposes_support_without_creating_store(tmp_path, monkeypatch):

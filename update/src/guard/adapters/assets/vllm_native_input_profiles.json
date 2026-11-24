@@ -1,0 +1,177 @@
+{
+  "schema": "guard-native-input-source-candidates/1",
+  "profiles": [
+    {
+      "id": "vllm-native-input-observation/1",
+      "runtime": "cpython-3.12.3",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "archive_sha256": "0633dcccf2606bc680ef635a2b507bc373dcf038cb2d34052afbe48d5d65c73c",
+      "runtime_qualified": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.entrypoints.openai.completion.serving": {
+          "path": "vllm/entrypoints/openai/completion/serving.py",
+          "bytes": 30431,
+          "sha256": "75d05ddddf303734a078a3e42fcb173fef58ea56da09bc0b5c7525cb9bbbf527",
+          "functions": [
+            "OpenAIServingCompletion.create_completion",
+            "OpenAIServingCompletion.render_completion_request"
+          ],
+          "body_code_sha256": {
+            "OpenAIServingCompletion.create_completion": "076f72b210acb703997cbb8d770e5fdb1931c8671fb8e0e9b8af2cb5a569da7e",
+            "OpenAIServingCompletion.render_completion_request": "2bde289124a2233a62998726c268d810bb5d553a37c0ee389a6588e30721030b"
+          },
+          "hooks": {
+            "OpenAIServingCompletion.create_completion": {
+              "kind": "http-handler",
+              "raw_request_argument": "raw_request",
+              "paths": [
+                "/v1/completions"
+              ]
+            }
+          }
+        },
+        "vllm.entrypoints.openai.chat_completion.serving": {
+          "path": "vllm/entrypoints/openai/chat_completion/serving.py",
+          "bytes": 56242,
+          "sha256": "ea1f76074a9587c8054f54d30a6ba748b6a5fc4d90dd82c801504505c1da1f92",
+          "functions": [
+            "OpenAIServingChat.create_chat_completion",
+            "OpenAIServingChat.render_chat_request"
+          ],
+          "body_code_sha256": {
+            "OpenAIServingChat.create_chat_completion": "a44afbe8aaaf9fd702a920048d4263dc500a7cc44aaeb2549e5d77d151ac3df2",
+            "OpenAIServingChat.render_chat_request": "85ab2be3540edc3e3d5befb1c063ac675e9c6e563e0a5022bd4a63039f271993"
+          },
+          "hooks": {
+            "OpenAIServingChat.create_chat_completion": {
+              "kind": "http-handler",
+              "raw_request_argument": "raw_request",
+              "paths": [
+                "/v1/chat/completions"
+              ]
+            }
+          }
+        },
+        "vllm.renderers.params": {
+          "path": "vllm/renderers/params.py",
+          "bytes": 21340,
+          "sha256": "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5",
+          "functions": [
+            "TokenizeParams._token_len_check",
+            "TokenizeParams._validate_tokens"
+          ],
+          "body_code_sha256": {
+            "TokenizeParams._token_len_check": "b791fef79e66534adafb8e7fdc35fe77374253386fd6d7bd0b5cd4598feab5cf",
+            "TokenizeParams._validate_tokens": "31737a769b30903e501f056931fb6e4dd13081f9703c0f5be4ee47f1ef5579d4"
+          },
+          "hooks": {
+            "TokenizeParams._token_len_check": {
+              "kind": "input-validator"
+            },
+            "TokenizeParams._validate_tokens": {
+              "kind": "input-validator"
+            }
+          }
+        },
+        "vllm.renderers.online_renderer": {
+          "path": "vllm/renderers/online_renderer.py",
+          "bytes": 29296,
+          "sha256": "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e",
+          "functions": [
+            "_reused_prompt_token_ids",
+            "OnlineRenderer.render_completion",
+            "OnlineRenderer.render_chat"
+          ],
+          "body_code_sha256": {
+            "_reused_prompt_token_ids": "4fcdc6d37d2a1ad47c85101b174cd460949b099af3c731e6178fdf5b9c7a6999",
+            "OnlineRenderer.render_completion": "7690c2114d4854c9b2b2cf61868c06aebafe1e40df06b564150db45d8ab7583f",
+            "OnlineRenderer.render_chat": "b7e2beec999c11679c24435e12e9e25ebf12c977cd901b0e74996e3d084393bd"
+          },
+          "hooks": {}
+        },
+        "vllm.v1.engine.input_processor": {
+          "path": "vllm/v1/engine/input_processor.py",
+          "bytes": 23935,
+          "sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+          "functions": [
+            "InputProcessor.process_inputs",
+            "InputProcessor._validate_model_input",
+            "InputProcessor._validate_prompt_len"
+          ],
+          "body_code_sha256": {
+            "InputProcessor.process_inputs": "eaf57574aca3565ca67b9b94da3604992b085f33a4cf278820f21ff071169d52",
+            "InputProcessor._validate_model_input": "3deebfa7c8563d3ba50e5174f71aa0402178fbcecd878901207d92526fea4510",
+            "InputProcessor._validate_prompt_len": "f0b3a0985f8a91ca48b07da2fee850d28b7fb421cfa60f6edd746a8d2fd0d37b"
+          },
+          "hooks": {
+            "InputProcessor._validate_model_input": {
+              "kind": "input-validator"
+            },
+            "InputProcessor._validate_prompt_len": {
+              "kind": "input-validator"
+            }
+          }
+        },
+        "vllm.exceptions": {
+          "path": "vllm/exceptions.py",
+          "bytes": 5312,
+          "sha256": "06c77c8129ac024455ace7c89168cd8e2284d70e5d96b326782b5f110ff73e7a",
+          "functions": [
+            "VLLMValidationError.__init__"
+          ],
+          "body_code_sha256": {
+            "VLLMValidationError.__init__": "0a98baec593c74f4d47a83f6e27789ba893bb7e74a0d03d091a63c52a3daf1c4"
+          },
+          "hooks": {}
+        },
+        "uvicorn.protocols.http.h11_impl": {
+          "path": "uvicorn/protocols/http/h11_impl.py",
+          "bytes": 20886,
+          "sha256": "a3154a6c2cfaaaebe19ac7aa255dfe9b6b7b490de1da95274c033aa093e8c322",
+          "functions": [
+            "RequestResponseCycle.run_asgi"
+          ],
+          "body_code_sha256": {
+            "RequestResponseCycle.run_asgi": "15783f925f2afc405a64fe338739925bd6a76b97a0bf160fbeb21e859fdd3192"
+          },
+          "hooks": {
+            "RequestResponseCycle.run_asgi": {
+              "kind": "http-handler",
+              "scope_owner_argument": "self",
+              "paths": [
+                "/v1/completions",
+                "/v1/chat/completions"
+              ]
+            }
+          }
+        },
+        "uvicorn.protocols.http.httptools_impl": {
+          "path": "uvicorn/protocols/http/httptools_impl.py",
+          "bytes": 22564,
+          "sha256": "1d4e1c579df4168433a61a01f10c628b31c1790e72dd9769d2b8633b22214033",
+          "functions": [
+            "RequestResponseCycle.run_asgi"
+          ],
+          "body_code_sha256": {
+            "RequestResponseCycle.run_asgi": "2a72e2e0b2138c8637f27606405453b8a9aed9c1703213030f71fb23a418f33f"
+          },
+          "hooks": {
+            "RequestResponseCycle.run_asgi": {
+              "kind": "http-handler",
+              "scope_owner_argument": "self",
+              "paths": [
+                "/v1/completions",
+                "/v1/chat/completions"
+              ]
+            }
+          }
+        }
+      },
+      "validation_exception": {
+        "module": "vllm.exceptions",
+        "class": "VLLMValidationError"
+      }
+    }
+  ]
+}

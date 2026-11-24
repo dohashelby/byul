@@ -183,19 +183,31 @@ class SnapshotWriter:
             if len(raw) > 131072:
                 raise ValueError('RANK_IPC_SNAPSHOT_BOUND')
             directory = base._open_directory(self.settings['output_dir'])
-            fd = None
+            fd, backing, backing_owned, published = None, None, False, False
             try:
                 status = os.fstat(directory)
                 if status.st_uid != os.geteuid() or stat.S_IMODE(status.st_mode) != 0o700:
                     raise ValueError('RANK_IPC_SINK_UNAVAILABLE')
                 name = 'pid-{}-{}-{}.json'.format(context['pid'], context['start_ticks'], self.serial)
-                fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+                backing = '.sealed-snapshot-' + os.urandom(16).hex() + '.bin'
+                fd = os.open(backing, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+                backing_owned = True
                 if os.write(fd, raw) != len(raw):
                     raise OSError('RANK_IPC_PARTIAL_SNAPSHOT')
+                os.fsync(fd)
+                os.close(fd); fd = None
+                os.link(backing, name, src_dir_fd=directory, dst_dir_fd=directory, follow_symlinks=False)
+                published = True
+                # Keep the closed backing link for the session: removing it
+                # after publication would change the reader-bound ctime.
             finally:
                 if fd is not None:
                     os.close(fd)
-                os.close(directory)
+                try:
+                    if backing_owned and not published:
+                        os.unlink(backing, dir_fd=directory)
+                finally:
+                    os.close(directory)
 
 
 class IPCSourceLoader:

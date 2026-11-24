@@ -10,7 +10,7 @@ from guard.adapters.vllm_lifecycle_catalog import asset_names
 from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES, dependency, fingerprint, validate_scope
 from guard.collectors.lifecycle import load_prepared, prepare_assets
 from guard.collectors.model_read_scope import build_scope, deploy_scope
-from guard.executors.kubernetes_supply_boot import _approved_reference, _model_mount
+from guard.executors.kubernetes_supply_boot import _approved_reference, _model_mount, _model_mount_sha256
 from guard.models import Environment, canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import project_owned_snapshot, validate_capture_target
@@ -77,6 +77,7 @@ def read_normal_preparation(path, env, *, expected_sha256):
         raise ValueError("SUP05_PREPARATION_RECEIPT_INVALID") from None
 
     return {"normal": normal, "target_sha256": receipt["target_sha256"], "target_file_sha256": hashes["target"],
+            "model_mount_projection_sha256": receipt["model_mount_projection_sha256"],
             "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
                                             "reference_manifest": hashes["reference_manifest"]}}
 
@@ -94,7 +95,7 @@ def _owned_snapshot(snapshot, binding):
         mount, volume = _model_mount(owned)
     except (AttributeError, KeyError, TypeError):
         raise ValueError("SUP05_PREPARATION_OWNER_SNAPSHOT_INVALID") from None
-    return sha256_hex(canonical_json({"mount": mount, "volume": volume}))
+    return _model_mount_sha256(mount, volume)
 
 
 def prepare(

@@ -1,5 +1,6 @@
 """Offline source-pinned inputs for the registered SUP-05 normal reader."""
 
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 import json
@@ -15,7 +16,7 @@ from guard.cli import app
 from guard.collectors.lifecycle import load_prepared
 from guard.executors import registry, run_binding
 from guard.executors.kubernetes_sup05_normal_preparation import prepare, read_normal_preparation
-from guard.models import canonical_json, load_pack, sha256_hex, utcnow
+from guard.models import ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from tests.builders import environment
 from tests.test_kubernetes_sampling import inputs as sampling_inputs
 from tests.test_lifecycle_capture import REPOSITORY, external
@@ -97,6 +98,7 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     assert read_normal_preparation(receipt_path, case.env, expected_sha256=sha256_hex(receipt_path.read_bytes())) == {
         "normal": normal, "target_sha256": receipt["target_sha256"],
         "target_file_sha256": sha256_hex(args["target"].read_bytes()),
+        "model_mount_projection_sha256": receipt["model_mount_projection_sha256"],
         "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
                                         "reference_manifest": args["model_manifest_sha256"]}}
     assert all(receipt[key] is False for key in ("approval_verified", "live_owner_verified", "pre_import_verified",
@@ -114,6 +116,61 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     factory.validate_policy(check, values)
     _, reloaded, target_hash, prepared_hash = factory.normal_file_read_inputs(case.env, values)
     assert (reloaded, target_hash, prepared_hash) == (prepared, receipt["target_sha256"], receipt["prepared_sha256"])
+
+
+@pytest.mark.parametrize("changed", (False, True))
+def test_receipt_requires_the_prepared_mount_before_native_record_reads(external, monkeypatch, changed):
+    from guard.executors import kubernetes_supply_boot as boot
+
+    case = _case(external, "0.30.0")
+    receipt = prepare(case.output, REPOSITORY, **case.args)
+    receipt_path = case.output / "preparation.json"
+    pin = sha256_hex(receipt_path.read_bytes())
+    settings = {"normal_file_reads_only": True, "normal": receipt["normal"], "preparation_receipt": {
+        "path": str(receipt_path), "sha256": pin}}
+    check = load_pack(REPOSITORY / "update" / "packs" / "PACK-BASELINE").checks["SUP-05"]
+    _, values = run_binding.effective_values(check, settings, case.env, {}, side="baseline",
+                                               attempt_id=None, issued_at=utcnow())
+
+    current = deepcopy(case.snapshot)
+    pod = current["pod"]
+    pod["status"]["containerStatuses"][0]["ready"] = True
+    pod["status"]["conditions"][0]["status"] = "True"
+    if changed:
+        pod["spec"]["volumes"][0]["hostPath"]["path"] = "/different-private-model-location"
+
+    def runner(argv, **kwargs):
+        argv = argv[3:]
+        ns = current["namespace"]
+        if argv == ["get", "namespace", ns["metadata"]["name"], "-o", "json"]:
+            document = ns
+        elif argv == ["--namespace=" + ns["metadata"]["name"], "get", "pod", pod["metadata"]["name"], "-o", "json"]:
+            document = pod
+        else:
+            pytest.fail("Only the existing owner snapshot may be read")
+        return {"returncode": 0, "stdout_bytes": canonical_json(document),
+                "capture": {"complete": True, "bounded_at_source": True, "timed_out": False, "truncated": False}}
+
+    reads = []
+
+    def unavailable_native(reader, target, *, prepared, **kwargs):
+        reads.append(prepared["session"])
+        raise ValueError("FIXTURE_NATIVE_RECORD_UNAVAILABLE")
+
+    monkeypatch.setattr(boot, "capture_session", unavailable_native)
+    executor = boot.KubernetesSupplyBootExecutor(settings, runner=runner)
+    draft = executor.run(check, case.env, values, None, external / "work")
+    assert reads == ([] if changed else [receipt["session"]])
+    assert draft.status == ExecStatus.ABORTED
+    assert draft.abort_reason == ("SUPPLY_BOOT_NORMAL_PREPARED_MOUNT_MISMATCH" if changed
+                                  else "SUPPLY_BOOT_NORMAL_SEALED_CAPTURE_UNAVAILABLE")
+    assert not draft.observations["supply_boot_native_consumption"].collected
+    artifact, = draft.artifacts
+    raw = artifact.path.read_bytes()
+    summary = json.loads(raw)
+    assert summary["preparation_receipt_sha256"] == pin
+    assert summary["prepared_model_mount_matches_before_capture"] is (not changed)
+    assert b"/private-model-location" not in raw and b"/different-private-model-location" not in raw
 
 
 @pytest.mark.parametrize("key", ("target", "prepared", "reference_manifest"))

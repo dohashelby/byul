@@ -140,6 +140,10 @@ def _model_mount(snapshot):
     return mount, volume
 
 
+def _model_mount_sha256(mount, volume):
+    return sha256_hex(canonical_json({"mount": mount, "volume": volume}))
+
+
 class SupplyBootReader(KubernetesLifecycleReader):
     """기존 native 수집에 이 세션의 boot-record.json 읽기 한 개만 더한다."""
 
@@ -452,10 +456,9 @@ class KubernetesSupplyBootExecutor:
 
     def normal_file_read_inputs(self, env, values):
         """Validate the local files and reader settings without contacting the workload."""
-        inputs = self._read_normal_file_inputs(env, values)
-        target, prepared, _, _ = inputs
+        target, prepared, target_sha256, prepared_sha256, _ = self._read_normal_file_inputs(env, values)
         self._normal_reader(target, env, prepared)
-        return inputs
+        return target, prepared, target_sha256, prepared_sha256
 
     def _read_normal_file_inputs(self, env, values):
         from guard.adapters import vllm_file_read_sensor as sensor
@@ -466,6 +469,7 @@ class KubernetesSupplyBootExecutor:
         if env.ref().sha256 != values["supply_environment_sha256"]:
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
         section = self.cfg["normal"]
+        preparation = None
         if _PREPARATION_RECEIPT in self.cfg:
             from guard.configuration import validate_sup05_preparation_receipt
             from .kubernetes_sup05_normal_preparation import read_normal_preparation
@@ -478,6 +482,8 @@ class KubernetesSupplyBootExecutor:
                 raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
             raw_target = sensor.dependency(section["target"], receipt["target_file_sha256"])
             expected_prepared = file_hashes["prepared"]
+            preparation = {"receipt_sha256": ref["sha256"],
+                           "model_mount_projection_sha256": receipt["model_mount_projection_sha256"]}
         else:
             with Path(section["target"]).open("rb") as stream:
                 raw_target = stream.read(65537)
@@ -500,7 +506,7 @@ class KubernetesSupplyBootExecutor:
                 or self.expected_target is not None and self.expected_target != target_sha256):
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
         _approved_reference(section["reference_manifest"], values[_REFERENCE_KEY], env, target, prepared)
-        return target, prepared, target_sha256, prepared_sha256
+        return target, prepared, target_sha256, prepared_sha256, preparation
 
     def _normal_reader(self, target, env, prepared):
         return KubernetesLifecycleReader(target, env, prepared, runner=self.runner,
@@ -514,7 +520,7 @@ class KubernetesSupplyBootExecutor:
         start, end = _normal_validity(values)
         if not start <= started <= end:
             raise ValueError("SUPPLY_BOOT_NORMAL_BINDING_INVALID")
-        target, prepared, target_sha256, prepared_sha256 = self._read_normal_file_inputs(env, values)
+        target, prepared, target_sha256, prepared_sha256, preparation = self._read_normal_file_inputs(env, values)
         if prepared["profile"] == sensor.PROFILE:
             from guard.collectors import native_model_file_reads as model_reads
         else:
@@ -524,9 +530,15 @@ class KubernetesSupplyBootExecutor:
         native = None
         diagnostics = []
         cleanup = []
+        prepared_mount_matches = None
         gap = "SUPPLY_BOOT_NORMAL_SEALED_CAPTURE_UNAVAILABLE"
         try:
             mount = _model_mount(reader.snapshot())
+            if preparation is not None:
+                prepared_mount_matches = _model_mount_sha256(*mount) == preparation["model_mount_projection_sha256"]
+                if not prepared_mount_matches:
+                    gap = "SUPPLY_BOOT_NORMAL_PREPARED_MOUNT_MISMATCH"
+                    raise ValueError(gap)
             captured = capture_session(reader, target, container=engine["container"], image=engine["image"], prepared=prepared,
                 owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)
             if (captured["session"] != prepared["session"] or not captured["recorded_files_covered"]
@@ -582,6 +594,9 @@ class KubernetesSupplyBootExecutor:
         rows = [{"role": "normal", **native}] if native is not None else []
         summary = {"profile": NORMAL_FILE_READS_PROFILE, "sessions": [session], "native": rows, "gap": gap,
                    "missing": sorted(set(missing + cleanup + source_errors))}
+        if preparation is not None:
+            summary["preparation_receipt_sha256"] = preparation["receipt_sha256"]
+            summary["prepared_model_mount_matches_before_capture"] = prepared_mount_matches
         if diagnostics and not cleanup:
             summary["normal_read_gap_recordings"] = diagnostics
         summary_artifacts, errors = persist(workdir, summary, {"normal": {}, "challenge": {}}, collector)

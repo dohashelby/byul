@@ -45,13 +45,18 @@ def _closed_list(value,allowed):
         and len(set(value))==len(value))
 
 
-def normalize_policy(values):
+def normalize_policy(values, *, allow_missing_denied_actor=False):
     """Explicit caller inputs; no policy, actor, or source approval is invented."""
     try:
-        if type(values) is not dict or set(values)!=set(POLICY_TYPES):raise ValueError
-        if any(not fingerprint(values[k]) for k in POLICY_TYPES if k.endswith('_sha256')):raise ValueError
+        if type(values) is not dict:raise ValueError
+        expected=set(POLICY_TYPES)
+        denied_key='observation_denied_actor_sha256'
+        if allow_missing_denied_actor and denied_key not in values:
+            expected.remove(denied_key)
+        if set(values)!=expected:raise ValueError
+        if any(not fingerprint(values[k]) for k in expected if k.endswith('_sha256')):raise ValueError
         if (type(values['observation_session']) is not str or re.fullmatch(r'[0-9a-f]{32}',values['observation_session']) is None
-                or values['observation_allowed_actor_sha256']==values['observation_denied_actor_sha256']):raise ValueError
+                or values['observation_allowed_actor_sha256']==values.get(denied_key)):raise ValueError
         start,end=(_time(values[k]) for k in ('observation_validity_start','observation_validity_end'))
         delay=values['observation_max_delay_ms'];events=values['observation_required_events'];fields=values['observation_required_fields']
         if (not 0<(end-start).total_seconds()<=600 or type(delay) is not int or not 0<=delay<=300000

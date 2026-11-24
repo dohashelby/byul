@@ -1203,7 +1203,8 @@ def test_lif03_scope_rejects_combined_or_incomplete_flags_before_preparation(tmp
     assert not (tmp_path / 'run').exists()
 
 
-def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_requests(tmp_path, sources, monkeypatch):
+@pytest.mark.parametrize("include_denied", [True, False])
+def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_requests(tmp_path, sources, monkeypatch, include_denied):
     from tools import mvp_gateway_preparation as preparation
 
     pack, sides, policy_path = sources
@@ -1217,6 +1218,9 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
     producer_bytes = b'# fixture producer\n'
     monkeypatch.setattr(preparation, 'PRODUCER_SHA256', sha256_hex(producer_bytes))
     gateway_inputs = {}
+    actors = {'allowed': 'a' * 64}
+    if include_denied:
+        actors['denied'] = 'b' * 64
     for number, (side, paths) in enumerate(sides.items(), 1):
         producer = tmp_path / f'{side}-selected-producer.py'
         producer.write_bytes(producer_bytes)
@@ -1228,7 +1232,7 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
             'pod_ip': f'10.2.3.{number}', 'image': preparation.GATEWAY_IMAGE, 'image_id': preparation.GATEWAY_IMAGE}
         _write(paths['target'], target_doc)
         gateway_inputs[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
-            'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64},
+            'test_actors': dict(actors),
             'gateway_record_source': {'environment': preparation.GATEWAY_ENV, 'target_id': 'fixture-target',
                 'runtime_policy_sha256': 'f' * 64, 'request_sha256': f'{number:064x}'}}
     cfg, bindings, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
@@ -1271,9 +1275,19 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
             'target_file_sha256': sha256_hex(sides[side]['target'].read_bytes()),
             'record_session_sha256': sha256_hex(gateway_inputs[side]['record_session'].encode('ascii')),
             'observation_expected_source_sha256': preparation.PRODUCER_SHA256,
-            'observation_allowed_actor_sha256': 'a' * 64,
-            'observation_denied_actor_sha256': 'b' * 64,
+            **{f'observation_{role}_actor_sha256': digest for role, digest in actors.items()},
         }
+        assert cfg['sides'][side]['run_binding']['OBS-01']['test_actors'] == actors
+
+    changed_actor_pins = deepcopy(bindings)
+    candidate_pins = next(row['record_inputs'] for row in changed_actor_pins if row['side'] == 'candidate')
+    if include_denied:
+        candidate_pins.pop('observation_denied_actor_sha256')
+    else:
+        candidate_pins['observation_denied_actor_sha256'] = 'b' * 64
+    rejected = gateway_rows(index_bindings=changed_actor_pins)
+    assert rejected['baseline']['file_binding_valid']
+    assert rejected['candidate']['blocking_codes'] == ['MVP_INPUT_FILE_CHANGED']
 
     def publish(output):
         output.mkdir()

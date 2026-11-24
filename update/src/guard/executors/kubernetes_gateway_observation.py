@@ -180,6 +180,8 @@ class KubernetesGatewayRecordSnapshotExecutor:
         self.cfg, self.runner, self.expected_target = cfg, runner, expected_target_sha256
 
     def validate_policy(self, check, values):
+        from .run_binding import stages_for
+
         if type(self.cfg) is not dict:
             raise ValueError("GATEWAY_AUDIT_CONFIGURATION_INVALID")
         source = self.cfg.get(SNAPSHOT_SOURCE)
@@ -190,15 +192,16 @@ class KubernetesGatewayRecordSnapshotExecutor:
                 or any(type(source[key]) is not str or _ID.fullmatch(source[key]) is None for key in ("environment", "target_id"))
                 or any(not base.fingerprint(source[key]) for key in ("runtime_policy_sha256", "request_sha256"))):
             raise ValueError("GATEWAY_AUDIT_CONFIGURATION_INVALID")
-        base.normalize_policy(values)
+        window = base.normalize_policy(values, allow_missing_denied_actor=(
+            check.executor == self.name and stages_for(check) == (1, 2, 3, 4)))
         if "ACCESS_ALLOWED" not in values["observation_required_events"]:
             raise ValueError("GATEWAY_AUDIT_POLICY_SCOPE_UNSUPPORTED")
+        return window
 
     def run(self, check, env, policy_values, adapter, workdir):
-        self.validate_policy(check, policy_values)
+        start, end = self.validate_policy(check, policy_values)
         values = policy_values
         started = utcnow()
-        start, end = base.normalize_policy(values)
         try:
             with Path(self.cfg["target"]).open("rb") as stream:
                 target = strict_json(stream.read(65537), limit=65536)

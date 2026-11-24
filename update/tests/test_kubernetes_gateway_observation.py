@@ -167,9 +167,12 @@ def test_archived_gateway_final_without_selected_run_cannot_be_adopted():
 
 @pytest.mark.parametrize("ordinary_gateway_record,line_ending", [(False, b"\n"), (True, b"\n"), (True, b"\r\n")],
                          indirect=["ordinary_gateway_record"], ids=["ascii", "unicode", "unicode-crlf"])
-def test_canonical_snapshot_reads_one_owned_file_without_http(tmp_path, monkeypatch, ordinary_gateway_record, line_ending):
+@pytest.mark.parametrize("include_denied_actor", [True, False], ids=["both-actors", "allowed-only"])
+def test_canonical_snapshot_reads_one_owned_file_without_http(
+        tmp_path, monkeypatch, ordinary_gateway_record, line_ending, include_denied_actor):
     from datetime import timedelta
     from guard.core.run import _normalize
+    from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
     from guard.models import DataOrigin, ExecStatus, utcnow
     from tests.test_kubernetes_request_binding import env, target
     from tests.test_supply_boot_record_access import PACK
@@ -199,8 +202,9 @@ def test_canonical_snapshot_reads_one_owned_file_without_http(tmp_path, monkeypa
               "observation_required_fields": ["actor_sha256", "target_sha256", "run_sha256", "policy_sha256", "source_sha256"],
               "observation_session": "b" * 32, "observation_expected_source_sha256": "d" * 64,
               "observation_event_policy_sha256": "e" * 64,
-              "observation_allowed_actor_sha256": module.principal_sha256("fixture-principal"),
-              "observation_denied_actor_sha256": "f" * 64}
+              "observation_allowed_actor_sha256": module.principal_sha256("fixture-principal")}
+    if include_denied_actor:
+        values["observation_denied_actor_sha256"] = "f" * 64
     calls = []
     monkeypatch.setattr(KubernetesHTTP, "_verify", lambda self: calls.append("verify-engine-and-probe"))
 
@@ -218,6 +222,13 @@ def test_canonical_snapshot_reads_one_owned_file_without_http(tmp_path, monkeypa
         {"target": str(target_file), module.SNAPSHOT_OPTION: True, module.SNAPSHOT_SOURCE: source},
         runner=unexpected, expected_target_sha256=digest)
     check = PACK.checks["OBS-01"]
+    if not include_denied_actor:
+        with pytest.raises(ValueError, match="^OBSERVATION_POLICY_INVALID$"):
+            KubernetesRequiredEventExecutor({"target": str(target_file)}).validate_policy(check, values)
+        with pytest.raises(ValueError, match="^GATEWAY_OBSERVATION_POLICY_INVALID$"):
+            module.normalize_policy({**values, "observation_gateway_target_id": source["target_id"]})
+        with pytest.raises(ValueError, match="^OBSERVATION_POLICY_INVALID$"):
+            executor.validate_policy(check, {**values, "observation_denied_actor_sha256": values["observation_allowed_actor_sha256"]})
     draft = executor.run(check, environment, values, object(), tmp_path / "evidence")
     assert calls == ["verify-engine-and-probe", module.RECORD_PATH, "verify-engine-and-probe"]
     assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
@@ -229,6 +240,12 @@ def test_canonical_snapshot_reads_one_owned_file_without_http(tmp_path, monkeypa
     assert capture["target_sha256"] == digest and capture["environment_sha256"] == environment.ref().sha256
     assert capture["declared_producer_sha256"] == values["observation_expected_source_sha256"]
     assert not capture["event_policy_matches"] and not capture["event_arrival_time_verified"]
+    record, = observed["required_event_records"]["value"]
+    assert record["actor_sha256"] == values["observation_allowed_actor_sha256"]
+    assert {item["event"]: item["reason"] for item in observed["required_event_missing"]["value"]} == {
+        "ACCESS_ALLOWED": "independent_trigger_and_collection_time_unverified",
+        "ACCESS_DENIED": "no_selected_gateway_final_record",
+    }
     assert not observed["required_event_producer_authenticated"]["value"]
     assert not observed["required_event_independent_trigger_verified"]["value"]
     assert not observed["required_event_scope_complete"]["value"]

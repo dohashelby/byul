@@ -1265,6 +1265,11 @@
       "manifest_sha256": "eea55b3b92326ee8c86562ddde84ceb93e4f02739a369acdf6dc13fe49e12d64",
       "reviewed_by": "Codex / scoped preparation and original Gateway route rows; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T09:29:09+00:00"
+    },
+    {
+      "manifest_sha256": "47bef0cce1641b3a794eddbef48a92f6f0367a736bca1c7f037b1bfdd0f37244",
+      "reviewed_by": "Codex / canonical Gateway snapshot actor binding; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:59:24+00:00"
     }
   ]
 }

@@ -508,7 +508,8 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
         record_pins[side] = {
             'target_file_sha256': target_pointer['sha256'],
             'record_session_sha256': sha256(values['observation_session'].encode('ascii')).hexdigest(),
-            **{key: values[key] for key in run_binding.KEYS_BY_CHECK_3['OBS-01']},
+            'observation_expected_source_sha256': values['observation_expected_source_sha256'],
+            **readiness._observation_actor_digests(values, gateway_snapshot=True),
         }
     if check.id == 'OBS-04' and registry.resolve_executor(check.executor, 'kubernetes', engine=env.engine.name,
             version=env.engine.version) is not registry.EXECUTORS.get('boundary_egress:kubernetes'):

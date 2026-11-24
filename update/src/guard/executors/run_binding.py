@@ -42,8 +42,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, INSTALLED_PLUGIN_INVENTORY_OPTION,
-                                 KUBERNETES_BOUND_CHECK_OPTIONS,
+from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNAPSHOT_OPTION,
+                                 INSTALLED_PLUGIN_INVENTORY_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_FILE_READS_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
@@ -484,16 +484,22 @@ def _issuer_event(check_id, path):
     return digest, {f'{_EVENT_PREFIX[check_id]}_{k}': v for k, v in event.items()}
 
 
-def _stage_3(check, run_cfg, issued_at, valid_from=None, valid_until=None):
+def _stage_3(check, executor_cfg, run_cfg, issued_at, valid_from=None, valid_until=None):
     """Return (file hashes, values, validity) for the stage-3 keys of this check."""
     cid, files, values, validity = check.id, {}, {}, None
     for entry, key in PRODUCERS_3.get(cid, {}).items():
         files[entry + '_sha256'] = values[key] = producer_sha256(run_cfg[entry])
     if cid == 'OBS-01':
         actors = run_cfg['test_actors']
-        if type(actors) is not dict or set(actors) != {'allowed', 'denied'} or actors['allowed'] == actors['denied']:
+        gateway_snapshot = (check.executor == 'required_event_record' and stages_for(check) == (1, 2, 3, 4)
+                            and executor_cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-01']) is True
+                            and executor_cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True
+                            and KUBERNETES_BOUND_CHECK_OPTIONS['PLT-12'] not in executor_cfg)
+        if (type(actors) is not dict or (actors.keys() != {'allowed', 'denied'}
+                                        and not (gateway_snapshot and actors.keys() == {'allowed'}))
+                or actors['allowed'] == actors.get('denied')):
             raise RunBindingUnavailable('RUN_BINDING_CONFIG_INVALID')
-        values.update({f'observation_{role}_actor_sha256': _hex(actors[role]) for role in ('allowed', 'denied')})
+        values.update({f'observation_{role}_actor_sha256': _hex(digest) for role, digest in actors.items()})
     elif cid == 'REQ-06':
         from guard.executors.stored_response_contract import REVIEWED_SOURCES
         values.update({f'stored_{name}_source_sha256': REVIEWED_SOURCES[name] for name in _STORED_SOURCES})
@@ -667,7 +673,7 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                     raise RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_INVALID') from None
             files.update(stage_files)
         if 3 in stages:
-            stage_files, stage_values, validity = _stage_3(check, run_cfg or {}, issued_at, valid_from, valid_until)
+            stage_files, stage_values, validity = _stage_3(check, executor_cfg, run_cfg or {}, issued_at, valid_from, valid_until)
             if (supply_digests is not None
                     and stage_values['supply_record_source_sha256'] != supply_digests['record_producer']):
                 raise RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_PRODUCER_CHANGED')

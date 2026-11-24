@@ -82,12 +82,21 @@ _INITIALIZATION_PREPARED_PROFILES = {
 }
 _COLLECTION_STATUS_DIGESTS = {'target_file_sha256', 'record_session_sha256'}
 OBSERVATION_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | set(run_binding.KEYS_BY_CHECK_3['OBS-01'])
+_OBSERVATION_DENIED_ACTOR = 'observation_denied_actor_sha256'
+_GATEWAY_ALLOWED_RECORD_DIGESTS = OBSERVATION_RECORD_DIGESTS - {_OBSERVATION_DENIED_ACTOR}
 _RETRY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'retry_scope_sha256', 'retry_record_source_sha256'}
 _COPY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'copy_inventory_sha256', 'copy_record_source_sha256'}
 STARTUP_OBSERVERS = {
     'LIF-01': ('startup_load_source', normal_startup_load_transport, 'NORMAL_STARTUP_LOAD'),
     'SUP-07': ('compile_cache_source', normal_compile_cache_transport, 'NORMAL_COMPILE_CACHE'),
 }
+
+
+def _observation_actor_digests(effective, *, gateway_snapshot=False):
+    actors = {'observation_allowed_actor_sha256': effective['observation_allowed_actor_sha256']}
+    if not gateway_snapshot or _OBSERVATION_DENIED_ACTOR in effective:
+        actors[_OBSERVATION_DENIED_ACTOR] = effective[_OBSERVATION_DENIED_ACTOR]
+    return actors
 
 
 def template(pack):
@@ -364,7 +373,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         else:
             raise ValueError('MVP_RECORD_INPUT_SCOPE_INVALID')
         record_inputs = source['record_inputs']
-        if (type(record_inputs) is not dict or record_inputs.keys() != digests
+        if (type(record_inputs) is not dict
+                or (record_inputs.keys() != digests and not (
+                    prebound_gateway_snapshot and record_inputs.keys() == _GATEWAY_ALLOWED_RECORD_DIGESTS))
                 or not all(_is_sha256(digest) for digest in record_inputs.values())):
             raise ValueError('MVP_RECORD_INPUT_REFERENCE_INVALID')
         if expected_record_inputs is not None and record_inputs != expected_record_inputs:
@@ -577,8 +588,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         if expected_record_inputs is not None:
             if observation_record_binding:
                 session_key = 'observation_session'
-                record_digests.update({key: effective[key] for key in run_binding.KEYS_BY_CHECK_3['OBS-01']
-                                       if key != record_source_key})
+                record_digests.update(_observation_actor_digests(effective, gateway_snapshot=prebound_gateway_snapshot))
             elif copy_snapshot:
                 session_key = 'copy_record_session'
             elif check.id == 'LIF-12' and retry_records:

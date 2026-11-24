@@ -296,7 +296,7 @@
   "update/src/guard/collectors/ipc_ownership_producer.py": "1088873f17b6d5a5974b965a84ef29321912d3e577fc121a67b8bbdaeebefcae",
   "update/src/guard/collectors/kubernetes_lifecycle.py": "4d14147cbda6a2945c073a02e3ccb25a277a8b5219cbc7449e4ef9840f98c21a",
   "update/src/guard/collectors/kubernetes_process.py": "a041a6f69457d4cb676245c9e1df75c0334e725ef5d45ee4dac42a788daabf10",
-  "update/src/guard/collectors/lifecycle.py": "4a31803cfeee7e3dd5311d21a8e2f0207e6d97a0c4b1fe3af67be3c2b42884cb",
+  "update/src/guard/collectors/lifecycle.py": "024720102f1fd80628258bb407479815e9a305d0a850e1a782d27ac8a5e73c5a",
   "update/src/guard/collectors/manual.py": "73decf953dae6a72c24dfb9d1dff7faff6f8bd2b5da5751bf63951853d731fb1",
   "update/src/guard/collectors/model_authorization.py": "ed406e7fec590003497b090b9c3c1663b051dd9d66ae29b74fa724d999095a01",
   "update/src/guard/collectors/model_manifest.py": "0d1270566c7350b272efc47f1ca8168fc01672fa8590e686a3108fb0ec6b137e",

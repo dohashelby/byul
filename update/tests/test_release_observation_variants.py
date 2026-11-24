@@ -43,22 +43,53 @@ def test_candidate_variant_prepares_exact_private_dependencies_and_rejects_chang
     assert hashlib.sha256(Path(base.__file__).read_bytes()).hexdigest() == variant.BASE_SHA256
     assert hashlib.sha256(Path(release.__file__).read_bytes()).hexdigest() == variant.RELEASE_SHA256
     assert hashlib.sha256(Path(extension.__file__).read_bytes()).hexdigest() == sha
-    prepared = lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=profile)
-    assert lifecycle.load_prepared(lifecycle_external / 'assets/manifest.json') == prepared
+    assets = lifecycle_external / 'assets'
+    manifest_path = assets / 'manifest.json'
+    prepared = lifecycle.prepare_assets(assets, REPO, profile=profile)
+    assert lifecycle.load_prepared(manifest_path) == prepared
     assert prepared['profile'] == profile and prepared['public_commit'] == release.COMMIT
     assert prepared['source_sha256'] == {**release.source_rows(base.SOURCE_SHA), **added}
     assert set(prepared['assets']) == {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py',
         'guard_lifecycle_release.py', 'guard_lifecycle_extension.py', 'guard_request_binding.py',
         'request-binding-key.json', 'sitecustomize.py', 'settings.json'}
-    assert (lifecycle_external / 'assets/guard_lifecycle_sensor.py').read_bytes() == variant.render_source(kind,
+    assert (assets / 'guard_lifecycle_sensor.py').read_bytes() == variant.render_source(kind,
         request_key_sha256=prepared['assets']['request-binding-key.json']['sha256'])
     assert profiles.point_sources(profile) == profiles.point_sources(release.PROFILE)
     assert resolve_executor({'stream':'stream_buffer','profiler':'profiler_observation','rank':'rank_failure'}[kind],
         'kubernetes', engine='vllm', version='0.30.0') is not None
-    changed = lifecycle_external / 'assets/guard_lifecycle_extension.py'
-    changed.write_bytes(changed.read_bytes() + b'# modified\n')
-    with pytest.raises(ValueError):
-        lifecycle.load_prepared(lifecycle_external / 'assets/manifest.json')
+    missing_asset = deepcopy(prepared)
+    del missing_asset['assets']['guard_lifecycle_extension.py']
+    extra_asset = deepcopy(prepared)
+    extra_asset['assets']['unexpected.py'] = prepared['assets']['guard_lifecycle_extension.py']
+    for manifest in (missing_asset, extra_asset):
+        manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+        with pytest.raises(ValueError, match='^LIFECYCLE_ASSETS_INVALID$'):
+            lifecycle.load_prepared(manifest_path)
+
+    changed = assets / 'guard_lifecycle_extension.py'
+    changed_bytes = changed.read_bytes() + b'# modified\n'
+    changed.write_bytes(changed_bytes)
+    manifest_path.write_text(json.dumps(prepared), encoding='utf-8')
+    with pytest.raises(ValueError, match='^LIFECYCLE_ASSET_BYTES_INVALID$'):
+        lifecycle.load_prepared(manifest_path)
+
+    recomputed = deepcopy(prepared)
+    recomputed['assets'][changed.name] = {
+        'sha256': hashlib.sha256(changed_bytes).hexdigest(), 'bytes': len(changed_bytes),
+    }
+    manifest_path.write_text(json.dumps(recomputed), encoding='utf-8')
+    with pytest.raises(ValueError, match='^LIFECYCLE_OBSERVATION_DEPENDENCY_UNAVAILABLE$'):
+        lifecycle.load_prepared(manifest_path)
+
+
+@pytest.mark.parametrize('pin,reason', [
+    ('STREAM_SHA256', 'LIFECYCLE_OBSERVATION_DEPENDENCY_UNAVAILABLE'),
+    ('BINDING_SHA256', 'LIFECYCLE_OBSERVATION_KEY_READER_UNAVAILABLE'),
+])
+def test_candidate_preparation_preserves_dependency_errors(lifecycle_external, monkeypatch, pin, reason):
+    monkeypatch.setattr(variant, pin, '0' * 64)
+    with pytest.raises(ValueError, match=f'^{reason}$'):
+        lifecycle.prepare_assets(lifecycle_external / 'assets', REPO, profile=variant.STREAM_PROFILE)
 
 
 def test_profiler_candidate_sources_and_generation_are_separate_from_old_profile():

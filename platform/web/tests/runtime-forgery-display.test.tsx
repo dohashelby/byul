@@ -22,7 +22,7 @@ it("예약필드 유사 여러줄 문자열을 텍스트로 표시하고 서버I
   expect(view.container.textContent).toContain(forged);
   expect(view.container.querySelector("[data-forged]")).toBeNull();
   expect(view.container.querySelectorAll("ol li")).toHaveLength(2);
-  const download = screen.getByRole("link", { name: "증거 JSON 내려받기" });
+  const download = screen.getByRole("link", { name: "증거 파일 내려받기" });
   expect(download.getAttribute("href")).toBe(`/api/runtime/requests/${id}/evidence`);
   expect(download.getAttribute("download")).toBe(`evidence-${id}.json`);
   fireEvent.click(screen.getByRole("tab", { name: "원본 기록" }));

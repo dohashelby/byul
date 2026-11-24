@@ -640,3 +640,34 @@
 @media (max-width: 600px) {
   .fiveCards { grid-template-columns: minmax(0, 1fr); }
 }
+section.attentionPanel {
+  border: 1px solid var(--error);
+}
+.attentionPanel h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 12px;
+  color: var(--error);
+  font-size: 16px;
+  font-weight: 700;
+}
+.attentionPanel li,
+.attentionPanel a {
+  color: var(--error);
+  font-weight: 600;
+}
+.attentionPanel a:hover {
+  text-decoration: underline;
+}
+.attentionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--error);
+  color: var(--surface);
+  font-size: 16px;
+}

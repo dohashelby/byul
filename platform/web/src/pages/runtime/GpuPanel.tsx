@@ -1,5 +1,6 @@
 // 현황 화면의 GPU 지표. 수집 중단(stale)·오류는 0이 아니라 관측 불가로 보인다.
 import { useGpuStatus } from "../../api/hooks";
+import { Link } from "react-router-dom";
 import { Dot } from "../../components/Misc";
 import { fmt, gpuChipState } from "../../lib/gpu";
 import p from "../pages.module.css";
@@ -45,7 +46,10 @@ export function GpuPanel() {
         </table>
       ) : (
         <p className="small muted" style={{ margin: 0 }}>
-          {!gpu || gpu.state === "not_configured" ? "GPU 수집기가 연결되지 않았습니다(Gateway --gpu-state)." : "표시할 GPU 값이 없습니다."}
+          {q.isError ? <>GPU 상태를 불러오지 못했습니다. <Link to="/runtime/observe/collectors">수집 상태 보기</Link></>
+            : q.isPending ? "GPU 상태를 불러오는 중입니다."
+            : !gpu || gpu.state === "not_configured" ? <>GPU 수집이 설정되지 않았습니다. <Link to="/runtime/observe/collectors">수집 상태 보기</Link></>
+            : "표시할 GPU 값이 없습니다."}
         </p>
       )}
     </section>

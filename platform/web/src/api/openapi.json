@@ -409,7 +409,7 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "minimum": 1.0
+                  "minimum": 1
                 },
                 {
                   "type": "null"

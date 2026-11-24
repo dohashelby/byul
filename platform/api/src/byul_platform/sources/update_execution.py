@@ -439,7 +439,13 @@ class UpdateExecutionService:
                 raise ExecutionError("PREPARATION_CHANGED", "필수 점검 범위가 바뀌었습니다. 다시 준비 점검하세요", 409)
             self._check_registered(record)
             files = LegacyUpdateRunRequest.model_validate(record["file_inputs"])
-            if self._fingerprint(files) != record["input_sha256"]:
+            try:
+                same_inputs = self._fingerprint(files) == record["input_sha256"]
+            except ExecutionError as error:
+                if error.code != "INPUT_FILES_INVALID":
+                    raise
+                same_inputs = False
+            if not same_inputs:
                 raise ExecutionError("INPUT_CHANGED", "준비 점검 후 입력 파일이 바뀌었습니다. 다시 준비 점검하세요", 409)
             record.update(status="running", started_at=_now(), finished_at=None, executed_by=actor,
                           error=None, exit_code=None)

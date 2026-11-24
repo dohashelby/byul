@@ -20,7 +20,7 @@ from guard.executors import kubernetes_log_analysis, passive_api_hop, run_bindin
 from guard.executors.kubernetes_log_integrity import SOURCE_PROFILE as K8S_NATIVE_SOURCE_PROFILE
 from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, analyze_log_captures, strict_json_loads
 from guard.executors.log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
-from guard.executors.log_integrity_parser import PROFILE, TRUSTED_FIELDS
+from guard.executors.log_integrity_parser import MAX_CAPTURE_BYTES, PROFILE, TRUSTED_FIELDS
 from guard.executors.log_projection import PROFILE as LOG_PROJECTION_PROFILE, validate_projection
 from guard.executors.native_projection import (SCHEMA as NATIVE_SCHEMA, PROFILE as NATIVE_PROJECTION_PROFILE,
     ENCODING as NATIVE_ENCODING, replay_native, render_projection)
@@ -239,6 +239,10 @@ def _kubernetes_obs09_source_pins(store, evd, sample):
     stdout = sample["source_summary"]["stdout"]
     if decoded != (stdout["decoded_bytes"], stdout["decoded_sha256"]):
         raise ValueError("saved Kubernetes log decoded stdout differs from projection source")
+    cri_bytes, cri_sha256 = source.get("cri_raw_bytes"), source.get("cri_raw_sha256")
+    if (type(cri_bytes) is not int or not 0 <= cri_bytes <= MAX_CAPTURE_BYTES
+            or type(cri_sha256) is not str or _DIGEST.fullmatch(cri_sha256) is None):
+        raise ValueError("saved Kubernetes log CRI receipt is invalid")
     raw = transport["raw_retained_bytes"], transport["raw_retained_sha256"]
     if alignment["aligned"]:
         attach = source.get("attach_capture")
@@ -249,10 +253,11 @@ def _kubernetes_obs09_source_pins(store, evd, sample):
     else:
         if sample["capture"]["source_complete"]:
             raise ValueError("saved Kubernetes log CRI-only source cannot have complete native boundaries")
-        expected_raw = source.get("cri_raw_bytes"), source.get("cri_raw_sha256")
+        expected_raw = cri_bytes, cri_sha256
     if (type(expected_raw[0]) is not int or type(expected_raw[1]) is not str or raw != expected_raw):
         raise ValueError("saved Kubernetes log retained source differs from projection transport")
     return {"attachments": {name: {"sha256": item.sha256, "bytes": item.bytes} for name, item in artifacts.items()},
+            "recorded_cri_raw": {"bytes": cri_bytes, "sha256": cri_sha256},
             "recorded_raw_retained": {"bytes": raw[0], "sha256": raw[1]},
             "recorded_decoded_stdout": {"bytes": decoded[0], "sha256": decoded[1]}}
 

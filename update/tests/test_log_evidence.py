@@ -520,15 +520,18 @@ def test_native_kubernetes_transcript_replays_partial_cri_evidence(tmp_path, mon
         assert detail["raw_source_replayed"] is False
         assert detail["original_native_parser_replayed"] is False
     if version == "0.3.1+k8s.2" and source_available:
-        assert set(detail["native_source_pins"]["attachments"]) == {
+        pins = detail["native_source_pins"]
+        assert set(pins["attachments"]) == {
             "probe_log.jsonl", "log_integrity_samples.json", "log_integrity_events.json", "log_integrity_display.html"}
+        assert pins["recorded_cri_raw"] == pins["recorded_raw_retained"]
     else:
         assert "native_source_pins" not in detail
     assert result["original_inventory_preserved"] and inventory_tree(source) == before
 
 
-@pytest.mark.parametrize("aligned", [True, False], ids=["attach", "cri-only"])
-def test_native_kubernetes_writer_joins_sealed_receipt_without_recovering_stdout(tmp_path, aligned):
+@pytest.mark.parametrize("aligned,omit_cri_digest", [(True, False), (False, False), (True, True)],
+                         ids=["attach", "cri-only", "attach-without-cri-digest"])
+def test_native_kubernetes_writer_joins_sealed_receipt_without_recovering_stdout(tmp_path, aligned, omit_cri_digest):
     from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
     from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
     from guard.log_evidence import _kubernetes_obs09_source_pins
@@ -555,7 +558,10 @@ def test_native_kubernetes_writer_joins_sealed_receipt_without_recovering_stdout
     collection.update(capture_window=sample["capture"]["window"], redaction=PROFILE)
     display = render_projection(collection)
     sample["display_sha256"] = sha256_hex(display.encode())
-    files = {"probe_log.jsonl": json.dumps({"summary": True, "kubernetes_source": executor._source}) + "\n",
+    source = executor._source.copy()
+    if omit_cri_digest:
+        del source["cri_raw_sha256"]
+    files = {"probe_log.jsonl": json.dumps({"summary": True, "kubernetes_source": source}) + "\n",
              "log_integrity_samples.json": json.dumps(envelope(sample)),
              "log_integrity_events.json": json.dumps(envelope(collection)), "log_integrity_display.html": display}
     store = Store(tmp_path / "native-pins")
@@ -566,8 +572,15 @@ def test_native_kubernetes_writer_joins_sealed_receipt_without_recovering_stdout
                                          collector=f"{executor.name}/{executor.version}"))
     evd = SimpleNamespace(artifacts=artifacts)
     before = inventory_tree(store.root)
+    if omit_cri_digest:
+        with pytest.raises(ValueError, match="saved Kubernetes log CRI receipt is invalid"):
+            _kubernetes_obs09_source_pins(store.root, evd, sample)
+        assert inventory_tree(store.root) == before
+        return
     pins = _kubernetes_obs09_source_pins(store.root, evd, sample)
     assert pins["attachments"] == {item.name: {"sha256": item.sha256, "bytes": item.bytes} for item in artifacts}
+    assert pins["recorded_cri_raw"] == {"sha256": source["cri_raw_sha256"], "bytes": source["cri_raw_bytes"]}
+    assert (pins["recorded_cri_raw"]["sha256"] != pins["recorded_raw_retained"]["sha256"]) is aligned
     transport = sample["source_transport"]
     for output, prefix in (("recorded_raw_retained", "raw_retained"), ("recorded_decoded_stdout", "decoded_stdout")):
         assert pins[output] == {"sha256": transport[f"{prefix}_sha256"], "bytes": transport[f"{prefix}_bytes"]}

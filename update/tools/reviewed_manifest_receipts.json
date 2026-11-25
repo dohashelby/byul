@@ -810,6 +810,11 @@
       "manifest_sha256": "c04ff2d60b8c306f6d621e7a6b003aee547f9b1792355c2025ed48ab38210d24",
       "reviewed_by": "Codex / PR302·303 통합 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-25T07:53:01.061Z"
+    },
+    {
+      "manifest_sha256": "19be228d67e649e93461b2827d7733522453c618a5de160deda2bf12b472d069",
+      "reviewed_by": "Claude / PR304 엔진 센서 keys() / 사용자 지시로 기록 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T10:28:33.000Z"
     }
   ]
 }

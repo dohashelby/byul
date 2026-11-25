@@ -1,3 +1,14 @@
+## 2026-11-25 — 엔진 센서 6개 점검의 두 판본 입력 결합
+
+- 한 일: 공식 원본(PACK-BASELINE@39)에서 REQ-14·15·16·18·19·21이 양쪽 `UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE`로 NOT_RUN이었다. 원인을 확인했다. 실행기(`engine_sensor` kubernetes)와 0.30.0·0.31.0 관측 고정값은 이미 있다. 빠진 것은 쪽마다 실제 ENV·target·설치 콜백 세션에 묶은 사례 manifest와 J02 점검별 설정이었다. `tools/engine_sensor_pair_inputs.py`를 더했다.
+  - 두 판본이 같은 사례 bytes를 쓰고, manifest는 쪽마다 자기 세션·target·ENV에 묶는다.
+  - REQ-19 경계(1024 token 이하·초과)와 REQ-21 재기동 사례를 더했다.
+  - J02 선언 조각(`sides.<side>.checks.<점검>.executor`)과 정적 보고서를 쓴다.
+  - 판정 방식: `run_binding.effective_values`로 `READY_STATIC`·`MISSING_INPUT`을 판정한다. 기업 정책 값(REQ-16 `required_cache_contexts`)은 채우지 않는다. REQ-15는 Gateway 입력이 필요해 `REQ15_GATEWAY_INPUTS_REQUIRED`로 남긴다.
+- 테스트 결과: `tests/test_engine_sensor_pair_inputs.py` 7건을 추가했다. 로컬 실행 금지 규칙에 따라 PR Linux CI 결과로 확인한다(미확인).
+- 다음 단계: AWS TP2 양쪽 기동에서 콜백 세션 하나씩 설치(`guard prepare-engine-callbacks --lab-kernel-checks`), target 발견 → 이 도구 → J02 설정 → `prepare-update` → `guard update` 실측. GPU 사용 순서는 Codex 순차 실측과 맞춘다.
+- 막힌 것: REQ-15 Gateway 입력. REQ-16 정책 값(기업 또는 EXAMPLE 모의 입력). REQ-21 L4 P2P 부재 시 통신기 비활성 UNKNOWN 가능성(`docs/dev-1/tp2-run-plan.md`).
+
 ## 2026-11-25 — 적용 점검의 보안 판정 통일
 
 - 새 적용 점검의 보안 RES와 RPT는 PASS 또는 사유 태그가 있는 FAIL로 기록한다. API와 화면은 각 측의 태그를 표시한다. 위반 근거가 없는 FAIL은 버전 비교의 회귀 수에서 제외한다.

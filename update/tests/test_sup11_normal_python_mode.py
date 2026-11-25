@@ -16,7 +16,7 @@ from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha2
 from guard.store import Store
 from tests.builders import T0, assert_unconfirmed_security_failure, environment, policy
 from tests.test_kubernetes_sampling import World, inputs
-from tests.test_sup11_general_observer import INTERPRETER_CONTEXT, PATH_ENTRIES
+from tests.test_sup11_general_observer import INTERPRETER_CONTEXT, ROLE_PATHS, ROLE_PATH_PINS
 
 READY = "2026-10-26T00:00:01Z"
 PACK = Path(__file__).resolve().parents[1] / "packs" / "PACK-BASELINE"
@@ -60,11 +60,13 @@ def capsule(folder, side, version, *, general=False):
             "module_sha256": origin if rank is None else profile["model_source_sha256"],
             "producer_sha256": producer})
         if general:
-            path = {**INTERPRETER_CONTEXT, "entries": PATH_ENTRIES}
+            label = role if rank is None else f"worker-{rank}"
+            paths = {stage: {**INTERPRETER_CONTEXT, "entries": entries}
+                     for stage, entries in ROLE_PATHS[label].items()}
             processes[-1].update(activation_sha256=qualification[f"{role}_activation_sha256"],
                                  sitecustomize_sha256=qualification["sitecustomize_sha256"],
                                  general_plugins=list(stock_adapter.GENERAL_PLUGIN_NAMES),
-                                 ordinary_import_path={"activation": deepcopy(path), "anchor": deepcopy(path)})
+                                 ordinary_import_path=paths)
     readback = {"profile_sha256": profile_sha, "producer_sha256": producer, "processes": processes}
     if general:
         readback["plugin_metadata"] = {name: sha256_hex(raw) for name, raw in stock_adapter.GENERAL_METADATA.items()}
@@ -130,8 +132,7 @@ def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypa
         pins = {
             "oci_source_qualification_sha256": "1" * 64, "plugin_discovery_sha256": "2" * 64,
             "site_roster_sha256": "3" * 64,
-            "ordinary_import_path_sha256": {
-                role: sha256_hex(canonical_json(PATH_ENTRIES)) for role in stock_adapter.GENERAL_PATH_ROLES},
+            "ordinary_import_path_sha256": deepcopy(ROLE_PATH_PINS),
             "ordinary_interpreter_context_sha256": sha256_hex(canonical_json(INTERPRETER_CONTEXT)),
         }
         monkeypatch.setattr(stock_adapter, "_GENERAL_QUALIFICATIONS", {version: pins for version in SOURCES})
@@ -140,7 +141,7 @@ def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypa
     if general:
         env = rows["baseline"][0]
         exported = stock_adapter.general_observer_profile(env)
-        exported["qualification"]["ordinary_import_path_sha256"]["service"] = "f" * 64
+        exported["qualification"]["ordinary_import_path_sha256"]["service"]["activation"] = "f" * 64
         with pytest.raises(ValueError, match="SUP11_INSTALLED_SOURCE_PROFILE_INVALID"):
             stock_adapter.validate_observer_profile(exported, env)
     worlds = {}

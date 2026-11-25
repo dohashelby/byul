@@ -19,7 +19,7 @@ PLUGIN = "vllm.plugins"
 MODULE_PATH = ROOT / "guard_sup11_lifecycle_observer.py"
 OBSERVATION_PLUGIN = "guard_sup11_lifecycle_observer"
 PROFILE_SECONDS = 540
-GENERAL_PROFILE = "guard-sup11-vllm-general-observer/2"
+GENERAL_PROFILE = "guard-sup11-vllm-general-observer/3"
 DIAGNOSTIC_PROFILE = "guard-sup11-vllm-general-path-qualification/1"
 CUTLASS = "/usr/local/lib/python3.12/dist-packages/nvidia_cutlass_dsl"
 HOME = "/cache/home"
@@ -194,21 +194,21 @@ def observe(frame, event, profile, role, startup):
             role, module = "worker", MODEL
         label = role if rank is None else f"worker-{rank}"
         anchor_path = ordinary_path()
-        discovered_path = startup["activation_path"]
+        path = {"activation": startup["activation_path"], "anchor": anchor_path}
         if profile["schema"] == GENERAL_PROFILE:
             qualification = profile["qualification"]
             expected = qualification["ordinary_import_path_sha256"][label]
             context_digest = qualification["ordinary_interpreter_context_sha256"]
-            if any(canonical_digest(state["entries"]) != expected or canonical_digest({
+            if any(canonical_digest(state["entries"]) != expected[stage] or canonical_digest({
                     key: value for key, value in state.items() if key != "entries"}) != context_digest
-                    for state in (discovered_path, anchor_path)):
+                    for stage, state in path.items()):
                 return
         row = {"role": role, "rank": rank, "pid": os.getpid(), "start_ticks": start_ticks(),
                "python_optimize": sys.flags.optimize, "anchor_module": name, "anchor_sha256": anchor_digest,
                "module": module, "module_sha256": module_digest,
                "general_plugins": startup["general_plugins"], "activation_sha256": startup["activation_sha256"],
                "sitecustomize_sha256": startup["sitecustomize_sha256"], "producer_sha256": startup["producer_sha256"],
-               "ordinary_import_path": {"activation": discovered_path, "anchor": anchor_path}}
+               "ordinary_import_path": path}
         path = DESTINATION / (label + ".json")
         flags = os.O_WRONLY | os.O_NOFOLLOW | os.O_CREAT | os.O_EXCL
         with os.fdopen(os.open(path, flags, 0o600), "wb") as stream:

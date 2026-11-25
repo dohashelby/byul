@@ -23,6 +23,15 @@ SERVICE_ACTIVATION = ("vllm.engine.arg_utils", "AsyncEngineArgs.add_cli_args")
 WORKER_ACTIVATION = ("vllm.v1.worker.worker_base", "WorkerWrapperBase.init_worker")
 CUTLASS = adapter.INSTALLED_ROOT + "/nvidia_cutlass_dsl"
 PATH_ENTRIES = ["/usr/local/bin", CUTLASS + "/dsl_packages", str(MOUNT), adapter.INSTALLED_ROOT]
+WORKER_ANCHOR_PATH_ENTRIES = [*PATH_ENTRIES, "/fixture/worker-loader-root"]
+ROLE_PATHS = {
+    role: {"activation": PATH_ENTRIES, "anchor": PATH_ENTRIES if role == "service" else WORKER_ANCHOR_PATH_ENTRIES}
+    for role in adapter.GENERAL_PATH_ROLES
+}
+ROLE_PATH_PINS = {
+    role: {stage: sha256_hex(canonical_json(paths)) for stage, paths in stages.items()}
+    for role, stages in ROLE_PATHS.items()
+}
 INTERPRETER_CONTEXT = {
     "cwd": "/cache", "home": "/cache/home", "uid": 2000, "gid": 0, "executable": "/usr/bin/python3",
     "executable_realpath": "/usr/bin/python3.12", "prefix": "/usr", "exec_prefix": "/usr",
@@ -79,8 +88,7 @@ class Process:
             "plugin_loader_sha256": self.module_digest(PLUGIN_LOADER),
             "sitecustomize_origin": str(SITE_ORIGIN), "sitecustomize_target": str(SITE_TARGET),
             "sitecustomize_sha256": sha256_hex(self.files[SITE_TARGET]),
-            "ordinary_import_path_sha256": {
-                role: sha256_hex(canonical_json(PATH_ENTRIES)) for role in adapter.GENERAL_PATH_ROLES},
+            "ordinary_import_path_sha256": ROLE_PATH_PINS,
             "ordinary_interpreter_context_sha256": sha256_hex(canonical_json(INTERPRETER_CONTEXT)),
         }
         self.profile = {
@@ -181,6 +189,8 @@ def test_fixed_observer_records_are_accepted_by_the_product(tmp_path):
         process.plugin_frame = accepted
         process.observer["activate"]()
         assert process.profile_callback is not None and not process.receipt.exists()
+        if process.rank is not None:
+            process.paths[:] = WORKER_ANCHOR_PATH_ENTRIES
         process.profile_callback(process.anchor, "call", None)
         assert process.profile_callback is None
 
@@ -191,6 +201,10 @@ def test_fixed_observer_records_are_accepted_by_the_product(tmp_path):
                 "plugin_metadata": {name: sha256_hex(raw) for name, raw in adapter.GENERAL_METADATA.items()},
                 "processes": rows}
     assert consumer._processes(readback, profile, profile_digest) == rows
+    paths = rows[1]["ordinary_import_path"]
+    paths["activation"], paths["anchor"] = paths["anchor"], paths["activation"]
+    with pytest.raises(ValueError, match="SUP11_STOCK_MODE_PROOF_UNAVAILABLE"):
+        consumer._processes(readback, profile, profile_digest)
 
 
 @pytest.mark.parametrize("failure", ["digest", "expiry", "path"])

@@ -6,8 +6,9 @@ import re
 
 from guard.adapters.vllm_file_read_sensor import dependency
 from guard.adapters.vllm_stock_python_mode import (
-    CONFIG_SHA256, FILE_SIZES, GENERAL_HOME, GENERAL_METADATA, GENERAL_PLUGIN_NAMES, GENERAL_PROFILE_SCHEMA,
-    GENERAL_WORKDIR, LOADER, MODEL, STOCK_MODEL, is_sha256, launch_command, validate_observer_profile,
+    CONFIG_SHA256, FILE_SIZES, GENERAL_HOME, GENERAL_METADATA, GENERAL_PATH_STAGES, GENERAL_PLUGIN_NAMES,
+    GENERAL_PROFILE_SCHEMA, GENERAL_WORKDIR, LOADER, MODEL, STOCK_MODEL, is_sha256, launch_command,
+    validate_observer_profile,
 )
 from guard.configuration import NORMAL_PYTHON_MODE_OPTION, NORMAL_PYTHON_MODE_SCOPE_ERROR
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
@@ -176,13 +177,13 @@ def _load(path):
 
 def _qualified_import_path(row, qualification, role):
     path = row["ordinary_import_path"]
-    if type(path) is not dict or set(path) != {"activation", "anchor"}:
+    if type(path) is not dict or set(path) != set(GENERAL_PATH_STAGES):
         raise ValueError(_PROOF_ERROR)
     expected = qualification["ordinary_import_path_sha256"][role]
-    for snapshot in path.values():
+    for stage, snapshot in path.items():
         if (type(snapshot) is not dict or set(snapshot) != _PATH_CONTEXT | {"entries"}
                 or type(snapshot["entries"]) is not list
-                or sha256_hex(canonical_json(snapshot["entries"])) != expected
+                or sha256_hex(canonical_json(snapshot["entries"])) != expected[stage]
                 or sha256_hex(canonical_json({key: snapshot[key] for key in _PATH_CONTEXT}))
                 != qualification["ordinary_interpreter_context_sha256"]):
             raise ValueError(_PROOF_ERROR)

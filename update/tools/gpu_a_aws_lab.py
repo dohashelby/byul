@@ -24,7 +24,11 @@ PROFILES = {'dev': ('2', '4', '8Gi', '16Gi'), 'reference': ('4', '8', '12Gi', '2
 CALLBACKS, DATA = '/guard-lifecycle/engine-callbacks', '/guard-lifecycle/data'
 MP = ('--distributed-executor-backend', 'mp')
 GPU_RESOURCE = 'nvidia.com/gpu'
-NORMAL_TP2_GENERATIONS = frozenset({'v2-default', 'v2-template'})
+NORMAL_TP2_V1_EAGER_GENERATION = 'v1-eager-template'
+NORMAL_TP2_TEMPLATE_GENERATIONS = frozenset({'v2-template', NORMAL_TP2_V1_EAGER_GENERATION})
+NORMAL_TP2_GENERATIONS = NORMAL_TP2_TEMPLATE_GENERATIONS | {'v2-default'}
+EAGER_WEIGHT_READ_ARG = '--safetensors-load-strategy=eager'
+V2_MODEL_RUNNER_ENV = 'VLLM_USE_V2_MODEL_RUNNER'
 NORMAL_TP2 = {'gpu_count': 2, 'tp_size': 2, 'pp_size': 1, 'dp_size': 1}
 NORMAL_TP2_ARGS = ('--tensor-parallel-size', '2', '--pipeline-parallel-size', '1',
                    '--data-parallel-size', '1', *MP)
@@ -51,6 +55,9 @@ GENERATIONS = {
     'v2-code-selection-notrust': {'sensor': False, 'args': [], 'env': {}},
     # SUP-03. guard 고정 템플릿 파일을 읽기 전용으로 마운트하고 --chat-template으로 고른다.
     'v2-template': {'sensor': False, 'template': True, 'args': ['--chat-template', CHAT_TEMPLATE_PATH], 'env': {}},
+    # This selects the normal reader launch settings. Lifecycle preparation is separate.
+    NORMAL_TP2_V1_EAGER_GENERATION: {'sensor': False, 'template': True,
+        'args': ['--chat-template', CHAT_TEMPLATE_PATH, EAGER_WEIGHT_READ_ARG], 'env': {V2_MODEL_RUNNER_ENV: '0'}},
     # 2단계 P1·P2 생산자 GPU 확인. 콜백 센서의 선택 관측(prepare-engine-callbacks 플래그)을 한 엔진에서 함께 켠다.
     # 세대 전환을 직접 일으키는 개발 경로와 torch profiler를 켠다. 시험 예외로만 닿는 lab 엔진이다.
     'v1-producers': {'sensor': True, 'profiles': True,
@@ -106,6 +113,8 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
             or not _IMAGE.fullmatch(engine_image or '') or not re.fullmatch(r'[0-9a-f]{40}', model_revision or '')
             or not _HOST_PATH.fullmatch(host_root or '')):
         raise ValueError('AWS_RENDER_INPUT_INVALID')
+    if generation == NORMAL_TP2_V1_EAGER_GENERATION and (normal_tp2 is not True or extra_engine_args):
+        raise ValueError('AWS_NORMAL_TP2_V1_EAGER_LAUNCH_UNAVAILABLE')
     code_selection = generation in {'v2-code-selection-trust', 'v2-code-selection-notrust'}
     if code_selection and (engine_version is None or model_id is None or code_revision is None):
         raise ValueError('AWS_CODE_SELECTION_IDENTITY_REQUIRED')
@@ -152,7 +161,7 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
             generation not in NORMAL_TP2_GENERATIONS or not release_launch or release['launch']['engine'] != 'V1'
             or not normal_tp2_release(engine_version, engine_image)
             or check_id is not None or code_revision is not None or enforce_eager
-            or tuple(extra_engine_args) not in ((), ('--safetensors-load-strategy=eager',))):
+            or tuple(extra_engine_args) not in ((), (EAGER_WEIGHT_READ_ARG,))):
         raise ValueError('AWS_NORMAL_TP2_LAUNCH_UNAVAILABLE')
     check_args = []
     if check_id is not None:
@@ -239,7 +248,7 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
         'code_revision': code_revision, 'code_marker_root': marker_root,
         'launch': {'command': list(engine['command']), 'argv': list(engine['args']),
             'engine': launch_profile.get('engine'), 'env': release_env,
-            'runner': {'0': 'v1', '1': 'v2'}.get(spec['env'].get('VLLM_USE_V2_MODEL_RUNNER'), 'engine-default'),
+            'runner': {'0': 'v1', '1': 'v2'}.get(spec['env'].get(V2_MODEL_RUNNER_ENV), 'engine-default'),
             'async_requested': False if '--no-async-scheduling' in engine['args'] else None,
             'prefix_cache': True if '--enable-prefix-caching' in engine['args'] else None},
         'lab_namespace_owner_label_required': bool(spec.get('lab')),

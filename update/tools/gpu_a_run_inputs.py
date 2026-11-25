@@ -168,7 +168,9 @@ def _binding(pod, namespace, container, role_label=None):
 
 
 def _normal_tp2_topology(render, namespace, pod):
-    from tools.gpu_a_aws_lab import GPU_RESOURCE, NORMAL_TP2, NORMAL_TP2_ARGS, NORMAL_TP2_GENERATIONS, normal_tp2_release
+    from tools.gpu_a_aws_lab import (EAGER_WEIGHT_READ_ARG, GPU_RESOURCE, NORMAL_TP2, NORMAL_TP2_ARGS,
+                                    NORMAL_TP2_GENERATIONS, NORMAL_TP2_TEMPLATE_GENERATIONS,
+                                    NORMAL_TP2_V1_EAGER_GENERATION, V2_MODEL_RUNNER_ENV, normal_tp2_release)
 
     try:
         layout = render['normal_tp2']
@@ -195,7 +197,14 @@ def _normal_tp2_topology(render, namespace, pod):
                 or model_lengths != [str(max_model_len)]
                 or any(type(quantity) not in (int, str) or str(quantity) != '2' for quantity in quantities)):
             raise ValueError
-        if render['generation'] == 'v2-template':
+        if render['generation'] == NORMAL_TP2_V1_EAGER_GENERATION:
+            runner_env = [item for item in engine.get('env', []) if item.get('name') == V2_MODEL_RUNNER_ENV]
+            load_option = EAGER_WEIGHT_READ_ARG.partition('=')[0]
+            if (launch['runner'] != 'v1' or runner_env != [{'name': V2_MODEL_RUNNER_ENV, 'value': '0'}]
+                    or selectors.count(load_option) != 1 or EAGER_WEIGHT_READ_ARG not in argv
+                    or render['enforce_eager'] is not False or '--enforce-eager' in selectors):
+                raise ValueError
+        if render['generation'] in NORMAL_TP2_TEMPLATE_GENERATIONS:
             template = render['chat_template']
             host_file = Path(template['host_file'])
             template_args = [value for option, value in zip(argv, argv[1:]) if option == '--chat-template']
@@ -235,7 +244,14 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
     if env.engine.version != render.get('engine_version', '0.31.0'):
         raise ValueError('RUN_INPUTS_ENGINE_VERSION_MISMATCH')
     if 'normal_tp2' in render:
+        from tools.gpu_a_aws_lab import NORMAL_TP2_V1_EAGER_GENERATION
+
         topology = _normal_tp2_topology(render, namespace, engine_pod)
+        if render['generation'] == NORMAL_TP2_V1_EAGER_GENERATION:
+            platform = (env.runtime.platform or '').split('; ')
+            launch_fields = [field for field in platform if field.startswith(('generation=', 'runner='))]
+            if launch_fields != [f'generation={NORMAL_TP2_V1_EAGER_GENERATION}', 'runner=v1']:
+                raise ValueError('RUN_INPUTS_NORMAL_TP2_POD_MISMATCH')
         if observed_engine_version is None or any(getattr(env.runtime, key) != value for key, value in topology.items()):
             raise ValueError('RUN_INPUTS_NORMAL_TP2_OBSERVATION_REQUIRED')
         argv = render['launch']['argv']

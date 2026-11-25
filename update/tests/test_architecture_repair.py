@@ -225,12 +225,17 @@ def test_candidate_procedure_must_also_match_before_reusing_pass(reuse_case, mon
     candidate = baseline.model_copy(update={'id': 'ENV-CANDIDATE', 'engine': baseline.engine.model_copy(update={
         'version': '1.0.1', 'source_commit': 'b' * 40, 'image_digest': 'image@sha256:' + 'b' * 64})}).seal()
     original = case['preview']
-    monkeypatch.setattr(case['module'], 'preview_inputs', lambda check, env, values, cfg:
-        replace(original, fixture_sha256='f' * 64) if env.id == candidate.id else original)
+    previews = []
+    def preview(check, env, values, cfg):
+        previews.append((check.id, env.id))
+        return replace(original, fixture_sha256='f' * 64) if env.id == candidate.id else original
+
+    monkeypatch.setattr(case['module'], 'preview_inputs', preview)
     context = case['module'].build_context(case['store'], case['previous'], case['pack'], [baseline, candidate],
         case['policy'], {}, change=_change(['AUTH']), mode='update', as_of=T0)
     assert 'PLT-04' not in context.carried_over
     assert context.triggers['PLT-04'][0].refs == ['CANDIDATE_PROCEDURE_OR_FIXTURE_CHANGED_OR_UNCONFIRMED']
+    assert [env_id for check_id, env_id in previews if check_id == 'PLT-04'] == [baseline.id, candidate.id]
 
 
 def test_plan_lock_and_attempt_path_prevent_evidence_mixing(tmp_path):

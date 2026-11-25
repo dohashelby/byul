@@ -45,7 +45,7 @@ from guard.report.change import summarize_change
 
 from .aggregate import aggregate
 from .compare import compare_results, comparison_differences, security_comparison_verdict
-from .judge import plan_evidence, result_for_policy
+from .judge import _policy_exception_statuses, plan_evidence, result_for_policy
 
 _IMPACT_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, None: 3}
 _REVIEW_ORDER_RANK = {"reference_baseline_first": 0, "implementation_path_first": 1, "conditional_when_selected": 2}
@@ -53,10 +53,7 @@ _REVIEW_ORDER_RANK = {"reference_baseline_first": 0, "implementation_path_first"
 
 def _exception_display(check_id: str, policy: Policy, as_of: datetime) -> tuple[ExceptionDisplay | None, list[str]]:
     shown, notes = None, []
-    for exc in policy.exceptions:
-        if exc.check_id != check_id:
-            continue
-        reason = exc.unavailable_reason(as_of)
+    for exc, reason in _policy_exception_statuses(check_id, policy, as_of):
         if reason == "unapproved":
             notes.append(f"{check_id}: 정책 예외 미승인 — 표시하지 않음 ({exc.reason})")
         elif reason in {"expired", "no expiry"}:

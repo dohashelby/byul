@@ -4,6 +4,7 @@ from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import re,threading
 from guard.models import canonical_json,sha256_hex
+from .response_evidence import complete_body
 from .bounded import strict_json
 from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
 from guard.executors.credential_revocation_contract import SLOTS
@@ -47,12 +48,11 @@ class KubernetesCredentialRevocationHTTP:
                 if (value.get('id'),value.get('method'),value.get('mode'))!=(request['id'],'GET','json'):raise ValueError
                 status=value.get('outcome')
                 if not(type(status) is int and 100<=status<=599 or type(status) is str and status in {'refused','timeout','unreachable','dns_error','error','probe_error'}):raise ValueError
-                text=value.get('body');complete=bool(type(text) is str and len(text.encode())<=131072 and value.get('capture_complete') is True
-                    and value.get('eof') is True and value.get('utf8_valid') is True and value.get('body_truncated') is False
-                    and type(value.get('body_bytes')) is int and value['body_bytes']==len(text.encode()) and value.get('body_sha256')==sha256_hex(text.encode()))
+                body_bytes = complete_body(value)
+                complete = body_bytes is not None
                 shape=False
                 if complete and status==200:
-                    body=strict_json(text.encode(),limit=131072);models=body.get('data') if type(body) is dict else None
+                    body=strict_json(body_bytes,limit=131072);models=body.get('data') if type(body) is dict else None
                     shape=bool(type(body) is dict and body.get('object')=='list' and type(models) is list and 1<=len(models)<=128
                         and all(type(c) is dict and type(c.get('id')) is str for c in models) and any(c['id']==self.api_model for c in models))
                 row={'case_id':'plt10-'+slot,'request_id_sha256':sha256_hex(request_id.encode()),'credential_label':role,

@@ -176,6 +176,30 @@ def test_unbound_record_configuration_is_rejected_or_captured_as_gap_before_io(t
         assert any('B_COMMON_INPUT_' in r for r in draft.observations['activation_missing'].value)
 
 
+def test_record_only_run_reads_each_submitted_file_once(tmp_path, monkeypatch):
+    env, _, cfg, values, _ = world(tmp_path)
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    check = pack.checks["LIF-08"]
+    _, effective = run_binding.effective_values(check, cfg, env, values,
+        side="baseline", attempt_id="EXAMPLE", issued_at=utcnow())
+    originals = {Path(cfg["target"]), Path(cfg["prepared"]),
+                 Path(cfg["common_inputs"]["records"]["rank-fault"])}
+    reads = []
+    original_open = Path.open
+
+    def trace_open(path, *args, **kwargs):
+        if path in originals and kwargs.get("mode", args[0] if args else "r") == "rb":
+            reads.append(path)
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", trace_open)
+    draft = KubernetesRankFailureExecutor(cfg, common_records=True).run(check, env, effective, None, tmp_path / "evd")
+    assert len(reads) == len(originals) and set(reads) == originals
+    report = draft.observations["activation_steps"].value[-1]
+    assert len(report["records"]) == 1
+    assert "B_COMMON_INPUT_PREPARED_RUNTIME_UNVERIFIED" in report["gaps"]
+
+
 def test_existing_native_configuration_does_not_accept_record_mode(tmp_path):
     env, _, cfg, values, _ = world(tmp_path)
     pack = load_pack(ROOT / 'packs/PACK-BASELINE'); check = pack.checks['LIF-08']

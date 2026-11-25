@@ -3,7 +3,7 @@ import math
 from pathlib import Path
 import time
 
-from .bounded import strict_json
+from guard.collectors.file import load_bounded_json
 from .kubernetes_binding import verify_owned_pod
 from .kubernetes_http import KubernetesHTTP, INPUT_VALIDATION_PROFILE, REQUEST_BINDING_PROFILE
 
@@ -42,7 +42,7 @@ class KubernetesTransition:
         transports=[]
         for name in self.executors:
             cfg=self.side_configs[side][name]
-            with Path(cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537))
+            target=load_bounded_json(cfg["target"])
             transport=KubernetesHTTP(target,self.envs[side],duration=self.duration,
                 binary=cfg.get("kubectl_binary","kubectl"),runner=self.runner,profile=self.profiles[name],clock=self.clock)
             transport.deadline=self.deadline

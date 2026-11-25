@@ -133,7 +133,10 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
         row["policy_valid"] = True
         implementation = cfg.get("executors", {}).get(executor)
         kube = implementation == "kubernetes" and not managed
-        if (implementation != "real" and not kube) or registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version) is None:
+        selected_factory = None
+        if implementation == "real" or kube:
+            selected_factory = registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
+        if selected_factory is None:
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
@@ -145,7 +148,6 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             continue
         executor_cfg = check_cfg.get(executor, {})
         if executor == 'engine_sensor':
-            selected_factory = registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
             selected_executor = selected_factory(check_cfg)
             describe = getattr(selected_executor, 'support', None)
             state = describe(check.id, check.collection_profile, env) if callable(describe) else {'implemented': False, 'reason': 'PLUGIN_SUPPORT_CONTRACT_UNAVAILABLE'}

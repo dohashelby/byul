@@ -15,7 +15,11 @@ import re
 from guard.collectors.manual import build_template, dump_template, import_evidence
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.models import Mode, canonical_json, load_pack, sha256_hex
+from guard.executors.evidence_storage import canonical_digest as _digest
+from guard.executors.evidence_storage import exact_refs as _refs
+from guard.executors.evidence_storage import file_inventory as _inventory
+from guard.executors.evidence_storage import write_evidence_json as _write_json
+from guard.models import Mode, load_pack
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import validate_capture_target
 from guard.store import Store
@@ -37,26 +41,12 @@ LIMITATIONS = [
 ]
 
 
-def _digest(value):
-    return sha256_hex(canonical_json(value))
-
-
 def _read(path):
     path = Path(path)
     if path.is_symlink():
         raise ValueError('RECORD_ACCESS_INPUT_SYMLINK')
     with path.open('rb') as stream:
         return strict_json(stream.read(262145), limit=262144)
-
-
-def _inventory(path):
-    return {str(p.relative_to(path)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(Path(path).rglob('*')) if p.is_file()}
-
-
-def _write_json(path, value):
-    with Path(path).open('xb') as stream:
-        stream.write(canonical_json(value))
 
 
 def _time(value):
@@ -213,11 +203,6 @@ def manual_document(store, pack, plan, capture, *, entered_by, attachment):
     entry['started_at'], entry['finished_at'] = capture['started_at'], capture['finished_at']
     entry['attachments'] = [attachment] if attachment else []
     return doc
-
-
-def _refs(store):
-    return sorted((obj.kind.value, obj.id, obj.revision, obj.content_sha256)
-                  for kind in ('ENV', 'POL', 'CHG', 'PLAN', 'EVD', 'RES', 'RPT') for obj in store.iter_kind(kind))
 
 
 def run(*, store, plan_id, pack, target, subjects, output, entered_by, execute=False,

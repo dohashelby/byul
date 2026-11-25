@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from .base import EvidenceDraft
@@ -55,8 +56,7 @@ class KubernetesSupplyBootExecutor:
         if (type(section) is not dict or set(section) - {"target", "prepared", "worker_shard_input"}
                 or not {"target", "prepared"} <= set(section)):
             raise ValueError
-        with Path(section["target"]).open("rb") as stream:
-            target = strict_json(stream.read(65537), limit=65536)
+        target = load_bounded_json(section["target"])
         prepared = load_prepared(section["prepared"])
         digest = sha256_hex(canonical_json(target))
         if (digest != values[f"supply_{role}_target_sha256"] or target.get("lab") is not True

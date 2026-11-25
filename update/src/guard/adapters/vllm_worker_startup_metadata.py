@@ -182,30 +182,7 @@ def project_iterations(packet):
 
 
 def _project_iterations(packet,profile,*,upper_anchors=False):
-    samples=[];models=[];missing=[]
-    for number,recording in enumerate((packet or {}).get('recordings',[])):
-        capture=recording.get('capture') or {};records=capture.get('records',[])
-        if not records or records[0]['payload'].get('profile')!=profile:continue
-        data=weights.journal([row for row in records if row['event']=='WEIGHT_ITERATION'])
-        context=records[0]['payload']['context'];bound=bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match'))
-        samples.extend({'recording':number,'pid':context['pid'],'start_ticks':context['start_ticks'],'process_binding_verified':bound,**fact} for fact in data['facts'])
-        for root in data['roots']:
-            facts=[fact for fact in data['facts'] if fact['root_load_sha256']==root['call_sha256'] and fact['model_object_sha256']==root['model_object_sha256']
-                and fact['factory_present'] and fact['source_pair_verified'] and fact['root_load_active_observed'] and root['factory_seq']<fact['end_seq']]
-            callbacks=[fact for fact in facts if fact['parameter_callback_returned_observed']]
-            models.append({'recording':number,**root,'pid':context['pid'],'start_ticks':context['start_ticks'],'process_binding_verified':bound,
-                'loader_call_model_link_observed':bool(bound and root['loader_call_sha256'] and root['loader_model_sha256']==root['model_object_sha256'] and root['model_object_sha256']),
-                'same_process_iteration_observed':bool(bound and root['source_verified'] and facts and root['model_object_sha256']),
-                'step_yields_observed':len(facts),'parameter_callback_returns_observed':len(callbacks),'source_events':[[number,fact['end_seq']] for fact in facts[:64]],
-                'source_event_locators_complete':len(facts)<=64,'recording_closed':capture.get('summary',{}).get('recording_closed') is True,
-                **{key:False for key in weights.TRUTH},'scope_complete':False})
-            if upper_anchors:
-                models[-1]['first_source_event']=[number,min(fact['end_seq'] for fact in facts)] if facts else None
-                models[-1]['last_source_event']=[number,max(fact['end_seq'] for fact in facts)] if facts else None
-        missing+=data['missing']
-    missing+=['worker_FD_read_and_range_unverified','tensor_storage_and_backend_apply_completion_unverified','worker_assignment_and_rank_shard_inventory_unverified','approval_and_inspection_authority_unverified']
-    if not samples:missing.append('source_bound_weight_iteration_unavailable')
-    return {'schema':'guard-weight-iteration-projection/1','samples':samples,'model_candidates':models,'missing':sorted(set(missing)),**{key:False for key in weights.TRUTH},'scope_complete':False}
+    return weights.project_for_profile(packet, profile, upper_anchors=upper_anchors)
 
 
 def project_mappings(packet,prepared):
@@ -213,19 +190,7 @@ def project_mappings(packet,prepared):
 
 
 def _project_mappings(packet,prepared,profile):
-    samples=[];contexts=[];missing=[]
-    for number,recording in enumerate((packet or {}).get('recordings',[])):
-        capture=recording.get('capture') or {};records=capture.get('records',[])
-        if not records or records[0]['payload'].get('profile')!=profile:continue
-        data=mapping.journal([row for row in records if row['event']=='SAFE_OPEN_MAPPING'],prepared,[row for row in records if row['event']=='WEIGHT_ITERATION'])
-        context=records[0]['payload']['context'];bound=bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match'))
-        samples.extend({'recording':number,'pid':context['pid'],'start_ticks':context['start_ticks'],'process_binding_verified':bound,
-            'same_loader_model_candidate':bool(bound and row['loader_model_candidate_observed'] and row['iterator_pair_verified'] and row['library_files_verified_at_open']),**row} for row in data['samples'])
-        contexts.extend({'recording':number,**row} for row in data['contexts']);missing+=data['missing']
-    missing+=['mapped_file_does_not_prove_read_or_tensor_use','native_loaded_memory_and_worker_assignment_unverified','approval_and_inspection_authority_unverified']
-    if not samples:missing.append('safe_open_mapping_observation_unavailable')
-    return {'schema':'guard-safe-open-mapping-projection/1','samples':samples,'contexts':contexts,'missing':sorted(set(missing)),**{key:False for key in mapping.sensor.TRUTH}}
-
+    return mapping.project_for_profile(packet, prepared, profile)
 
 
 def validate_limit(value):

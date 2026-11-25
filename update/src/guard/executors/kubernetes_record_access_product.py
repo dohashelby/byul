@@ -10,12 +10,13 @@ import json
 from pathlib import Path
 import re
 
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from .base import DraftArtifact, EvidenceDraft
-from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
+from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
 from .kubernetes_record_access import capture_record_access, _policy_ref
-from .owned_capture import _FILE_READER, MAX_BYTES
+from .owned_capture import MAX_BYTES
 from .rank_failure_contract import stamp
 
 PROFILE = "kubernetes-record-access-scope-v1"
@@ -98,18 +99,16 @@ def evaluate_inventory(packet):
     return violations, sorted(set(missing))
 
 
-class InventoryReader(KubernetesLifecycleReader):
+_RECORD_PROFILE = FixedRecordProfile(
+    inventory_path("{session}"), program_error_code="RECORD_ACCESS_INVENTORY_PROGRAM_INVALID",
+)
+
+
+def InventoryReader(target, env, session, *, binary, duration, runner=None):
     """사본 기록 한 개만 읽는다. native 세션 읽기는 허용하지 않는다."""
-
-    def __init__(self, target, env, session, *, binary, duration, runner=None):
-        from .kubernetes_lifecycle_capture import validate_target
-        self._initialize(validate_target(target, env), target, {"session": session}, binary=binary, duration=duration, runner=runner)
-
-    def _program(self, container, argv, max_bytes):
-        if (container != self.binding["engine"]["container"] or max_bytes != 2 * MAX_BYTES
-                or argv != ["python3", "-c", _FILE_READER, inventory_path(self.session), str(MAX_BYTES)]):
-            raise ValueError("RECORD_ACCESS_INVENTORY_PROGRAM_INVALID")
-        return "file"
+    from .kubernetes_lifecycle_capture import validate_target
+    return FixedRecordReader(validate_target(target, env), target, session, profile=_RECORD_PROFILE,
+                             binary=binary, duration=duration, runner=runner)
 
 
 class KubernetesRecordAccessExecutor:
@@ -130,9 +129,7 @@ class KubernetesRecordAccessExecutor:
     def _inventory(self, env, target, values, digest):
         reader = InventoryReader(target, env, values["record_inventory_session"], binary=self.cfg.get("kubectl_binary", "kubectl"),
                                  duration=self.cfg.get("max_duration_seconds", 60), runner=self.runner)
-        engine = reader.binding["engine"]
-        raw, provenance = reader.read_file(reader, target, container=engine["container"], image=engine["image"],
-                                           path=inventory_path(values["record_inventory_session"]))
+        raw, provenance = reader.read_record(target)
         if provenance.get("owner_binding_verified") is not True:
             raise ValueError("RECORD_ACCESS_INVENTORY_OWNER_CHANGED")
         return validate_inventory(strict_json(raw, limit=MAX_BYTES), environment_ref=env.ref().model_dump(mode="json"),
@@ -145,8 +142,7 @@ class KubernetesRecordAccessExecutor:
         try:
             if set(self.cfg) - {"target", "subjects", "kubectl_binary", "max_duration_seconds"}:
                 raise ValueError
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg["target"])
             with Path(self.cfg["subjects"]).open("rb") as stream:
                 subjects = strict_json(stream.read(262145), limit=262144)
             digest = sha256_hex(canonical_json(target))

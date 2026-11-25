@@ -14,11 +14,29 @@ from guard.executors import registry
 from guard.executors.kubernetes_container_config import KubernetesContainerConfigExecutor
 from guard.executors.kubernetes_credential_exposure import KubernetesCredentialExposureExecutor
 from guard.models import canonical_json, sha256_hex
-from guard.runtime import kubernetes_http
+from guard.runtime import kubernetes_http, kubernetes_process, kubernetes_process_mounts
 from guard.store import Store
 from tests.builders import baseline_pack, policy, T0
 from tests.test_kubernetes_process_consumers import (ProcessWorld, PERMISSION_VALUES, CREDENTIAL_VALUES, PRIVATE)
 from tests.test_model_preparation_integration import full_inputs
+
+
+@pytest.mark.parametrize(("module", "asset", "diagnostic"), [
+    (kubernetes_process, "process_observations_v1.py.txt", "KUBERNETES_PROCESS_SOURCE_UNAVAILABLE"),
+    (kubernetes_process_mounts, "process_mount_observations_v1.py.txt", "PROCESS_MOUNT_SOURCE_UNAVAILABLE"),
+])
+def test_process_source_assets_keep_exact_bytes_and_reject_changes(monkeypatch, module, asset, diagnostic):
+    path = Path(module.__file__).parent / "assets" / asset
+    read_bytes = Path.read_bytes
+    assert module.source().encode("utf-8") == read_bytes(path)
+
+    def changed(source_path):
+        raw = read_bytes(source_path)
+        return raw + b"\n" if source_path == path else raw
+
+    monkeypatch.setattr(Path, "read_bytes", changed)
+    with pytest.raises(ValueError, match=f"^{diagnostic}$"):
+        module.source()
 
 
 @pytest.mark.parametrize('check_id,kind,normal_mode,attachment_failure',[

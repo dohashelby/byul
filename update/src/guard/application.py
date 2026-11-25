@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cache, partial
 import json
@@ -12,7 +13,7 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import for_check, validate_requested_config
+from guard.configuration import for_check, for_side, merge_config, validate_requested_config
 from guard.core.judge import judge_plan_locked
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan_locked, validate_update_run_config
@@ -21,7 +22,7 @@ from guard.core.select import select
 from guard.collectors.change import read_change, resolve_plan, save_change
 from guard.core.change_selection import build_context
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX_PROFILE
-from guard.models import ExecStatus, Mode, Side, new_id, sha256_hex, utcnow
+from guard.models import Evidence, ExecStatus, Mode, Side, new_id, sha256_hex, utcnow
 from guard.models.objects import Artifact
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
@@ -29,19 +30,19 @@ from guard.runtime import generation_readiness, sandbox
 from guard.runtime.kubernetes_transition import KubernetesTransition
 
 
-def merge_config(base: dict, override: dict) -> dict:
-    from guard.configuration import merge_config as merge
-    return merge(base, override)
+def _executor_config(effective: dict) -> RunConfig:
+    return RunConfig(executors=effective.get("executors", {}),
+                     adapter=effective.get("adapter", {}).get("name"), raw=effective)
 
 
-def run_config(cfg: dict) -> RunConfig:
+def run_config(cfg: dict, *, side_settings: dict[str, dict] | None = None) -> RunConfig:
     validate_requested_config(cfg)
-    rc = RunConfig(executors=cfg.get("executors", {}), adapter=cfg.get("adapter", {}).get("name"), raw=cfg, requested=deepcopy(cfg))
-    rc.side_configs = {
-        side: RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
-        for side in ("baseline", "candidate")
-        for c in [merge_config(cfg, cfg.get("sides", {}).get(side, {}))]
-    } if cfg.get("sides") else {}
+    rc = _executor_config(cfg)
+    rc.requested = deepcopy(cfg)
+    if cfg.get("sides"):
+        if side_settings is None:
+            side_settings = {side: for_side(cfg, side) for side in ("baseline", "candidate")}
+        rc.side_configs = {side: _executor_config(effective) for side, effective in side_settings.items()}
     return rc
 
 
@@ -73,6 +74,25 @@ def _credentials(cfg, gateway_profile):
     return cfg, keys
 
 
+def _sandbox_profile_supported(options):
+    return (options.get("topology", "isolated") in {"isolated", "exposed"}
+            and options.get("gateway_profile", "single") in sandbox.GATEWAY_PROFILES
+            and options.get("engine_profile", "default") in sandbox.ENGINE_PROFILES)
+
+
+def _transition_executor(side_configs):
+    return next((name for name in ("request_binding", "input_validation")
+                 if any(side.get("executors", {}).get(name) == "kubernetes" for side in side_configs.values())), None)
+
+
+def _kubernetes_transition(envs, side_configs, options):
+    return KubernetesTransition(
+        envs, side_configs, timeout=options.get("transition_timeout", 300),
+        poll_interval=options.get("transition_poll_interval", 0.25),
+        candidate_binding=options.get("kubernetes_candidate_binding", "prebound"),
+    )
+
+
 def update_inputs(envs, cfg: dict):
     """Shared input checks; no containers, stores or output directories are created."""
     validate_requested_config(cfg)
@@ -81,15 +101,13 @@ def update_inputs(envs, cfg: dict):
     mode = cfg.get("update", {}).get("mode", "external")
     if mode not in {"external", "managed"}:
         raise ValueError("update.mode must be external or managed")
-    side_cfgs = {s: merge_config(cfg, cfg.get("sides", {}).get(s, {})) for s in ("baseline", "candidate")}
+    side_cfgs = {side: for_side(cfg, side) for side in ("baseline", "candidate")}
     managed = {}
     for side, env in zip(("baseline", "candidate"), envs):
         c = side_cfgs[side]
         if mode == "managed":
             options = c.get("update", {})
-            if (options.get("topology", "isolated") not in {"isolated", "exposed"}
-                    or options.get("gateway_profile", "single") not in {"single", "role_open", "role_enforced"}
-                    or options.get("engine_profile", "default") not in sandbox.ENGINE_PROFILES):
+            if not _sandbox_profile_supported(options):
                 raise ValueError(f"{side}: unsupported sandbox profile")
             if c.get("adapter", {}).get("name") != env.engine.name or not c.get("executors") or any(v != "real" for v in c["executors"].values()):
                 raise ValueError("managed update requires the matching engine adapter and real executors")
@@ -97,7 +115,7 @@ def update_inputs(envs, cfg: dict):
                 raise ValueError("credential_canary must be a boolean")
             managed[side] = _managed_config(env, c)
     if mode == "external" and any("real" in c.get("executors", {}).values() for c in side_cfgs.values()):
-        validate_update_run_config(run_config(cfg))
+        validate_update_run_config(run_config(cfg, side_settings=side_cfgs))
         for side, env in zip(("baseline", "candidate"), envs):
             c = side_cfgs[side]
             targets = {c.get(name, {}).get("target") for name, impl in c.get("executors", {}).items() if impl == "real"}
@@ -108,19 +126,16 @@ def update_inputs(envs, cfg: dict):
                         or not actual or actual.split("@")[-1] != (env.engine.image_digest or "").split("@")[-1]):
                     raise ValueError(f"{side}: target identity differs from ENV; regenerate/verify target metadata")
 
-    if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()
-           for name in ("request_binding","input_validation")):
-        if mode!="external" or cfg.get("update",{}).get("kubernetes_transition",True) is not True:
+    transition_executor = _transition_executor(side_cfgs)
+    if transition_executor is not None:
+        options = cfg.get("update", {})
+        if mode != "external" or options.get("kubernetes_transition", True) is not True:
             raise ValueError("KUBERNETES_TRANSITION_REQUIRED")
-        name=next(name for name in ("request_binding","input_validation")
-                  if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()))
-        paths=[c.get(name,{}).get("target") for c in side_cfgs.values()]
+        paths = [c.get(transition_executor, {}).get("target") for c in side_cfgs.values()]
         if not all(paths) or Path(paths[0]).resolve()==Path(paths[1]).resolve():
             raise ValueError("KUBERNETES_TRANSITION_TARGETS_UNVERIFIED")
         try:
-            KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
-                poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
-                candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
+            _kubernetes_transition(envs, side_cfgs, options)
         except Exception:
             raise ValueError("KUBERNETES_TRANSITION_CONFIGURATION_INVALID") from None
     return mode, side_cfgs, managed
@@ -139,7 +154,7 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     if change_input is not None or previous is not None:
         preview = build_context(store, previous, pack, envs, policy, cfg,
                                 change_input.change if change_input else None, mode=Mode.update, as_of=as_of, read_only=True)
-    _validate_update_policy(prepared[1], policy)
+    _validate_canary_policy(prepared[1].values(), policy, "update")
     # No input or historical evidence is overwritten.
     run_dir.mkdir(parents=True, exist_ok=False)
     put_pack(store, pack.path)
@@ -155,14 +170,14 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
             if context is not None else select(pack, envs, policy, mode=Mode.update))
     plan = bind_recipe(plan, cfg, envs)
     store.put(plan)
-    (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
+    _record_plan(run_dir, plan.id)
     with execution_lock(store.root, plan.id):
         execution = _run_update_trial(store, pack, plan, envs, cfg, run_dir, prepared)
         return _finish_run(store, pack, plan, as_of, *execution)
 
 
-def _validate_update_policy(side_cfgs, policy):
-    if any(c.get("update", {}).get("credential_canary", False) for c in side_cfgs.values()) and policy.status.value != "DRAFT":
+def _validate_canary_policy(configs, policy, section):
+    if any(c.get(section, {}).get("credential_canary", False) for c in configs) and policy.status.value != "DRAFT":
         raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
 
 
@@ -176,10 +191,10 @@ def execute_saved_update(store, pack, plan, cfg: dict, run_dir: Path, *, replace
     envs = [store.resolve(ref) for ref in plan.inputs.environments]
     cfg = deepcopy(cfg)
     prepared = update_inputs(envs, cfg)
-    _validate_update_policy(prepared[1], policy)
+    _validate_canary_policy(prepared[1].values(), policy, "update")
     with execution_lock(store.root, plan.id):
         run_dir.mkdir(parents=True, exist_ok=False)
-        (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
+        _record_plan(run_dir, plan.id)
         evidence, _, errors, _, _ = _run_update_trial(
             store, pack, plan, envs, cfg, run_dir, prepared, replace_manual=replace_manual)
         return evidence, _execution_failed(pack, evidence, errors)
@@ -200,6 +215,10 @@ def _run_update_trial(store, pack, plan, envs, cfg, run_dir, prepared, *, replac
         return _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, replace_manual)
 
 
+def _record_plan(run_dir: Path, plan_id: str):
+    (run_dir / "plan.txt").write_text(plan_id + "\n", encoding="utf-8")
+
+
 def _record_attempt(run_dir: Path, attempt_id: str):
     with (run_dir / "attempt.txt").open("x", encoding="utf-8") as stream:
         stream.write(attempt_id + "\n")
@@ -216,25 +235,19 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
         if mode == "managed":
             for name in c.get("executors", {}):
                 c.setdefault(name, {})["target"] = str(run_dir / side / "target.json")
-        rc.side_configs[side] = RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
+        rc.side_configs[side] = _executor_config(c)
     # The common-input implementation only reads saved records. Its partial
     # baseline scope is independent of the candidate's separately bound input.
     offline_comparison = mode == "external" and all(
         set(c.executors.values()) == {"common-input"} for c in rc.side_configs.values()
     )
-    lifecycle_errors = []
-    diagnostic_refs = []
-    diagnostics = []
-    evidence = []
+    result = _TrialResult()
 
     def dispatch(side):
-        evidence.extend(run_plan_locked(store, pack, plan, rc, only_side=side))
-    kube_transition=None
-    if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()
-           for name in ("request_binding","input_validation")):
-        kube_transition=KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
-            poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
-                candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
+        result.evidence.extend(run_plan_locked(store, pack, plan, rc, only_side=side))
+    kube_transition = None
+    if _transition_executor(side_cfgs) is not None:
+        kube_transition = _kubernetes_transition(envs, side_cfgs, cfg.get("update", {}))
     candidate_blocked = None
     for side, env in zip((Side.baseline, Side.candidate), envs):
         side_cfg = rc.side_configs[side.value]
@@ -248,85 +261,111 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
                     if side==Side.baseline:
                         kube_transition.prepare_baseline()
                     else:
-                        previous_evidence = [e for e in evidence if e.side == Side.baseline
+                        previous_evidence = [e for e in result.evidence if e.side == Side.baseline
                                              and e.execution.attempt_id == rc.attempt_id]
                         if not _baseline_ran_without_abort(previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
-                    side_cfg.raw["_kubernetes_target_sha256_by_executor"]={
+                    side_cfg.kubernetes_target_pins = {
                         name:kube_transition.transports[side.value].target_sha256
                         for name in kube_transition.executors}
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
-                    lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
+                    result.errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
             dispatch(side)
             if side == Side.baseline and any(
                 e.execution.cleanup_errors or
-                (e.execution.status == ExecStatus.ABORTED and not offline_comparison) for e in evidence
+                (e.execution.status == ExecStatus.ABORTED and not offline_comparison) for e in result.evidence
             ):
                 candidate_blocked = 'BASELINE_EXECUTION_FAILED'
             continue
-        c = side_cfg.raw
-        options = c.get("update", {})
-        profile = options.get("gateway_profile", "single")
-        c, keys = _credentials(c, profile)
-        executed = False
-        run_id = "u" + secrets.token_hex(6)
-        for lease in leases: lease.note_owner(run_id)
-        try:
-            with Docker(run_id) as docker:
-                side_dir = run_dir / side.value
-                try:
-                    sentinel_dir = _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"), side.value)
-                    from guard.adapters.engine_provider import get_provider
-                    target = sandbox.up(docker, options.get("topology", "isolated"), side_dir,
-                                        keys.get("GUARD_ALLOWED_KEY"), engine=env.engine.name, **get_provider(env.engine.name).sandbox_arguments(managed[side.value]),
-                                        gateway_profile=profile, gateway_keys=keys,
-                                        engine_profile=options.get("engine_profile", "default"),
-                                        sentinel_dir=sentinel_dir,
-                                        credential_canary=options.get("credential_canary", False))
-                    if target.get("observed_version") != env.engine.version:
-                        raise ValueError("observed engine version differs from ENV")
-                    seen = target.get("images", {}).get(managed[side.value]["image"], "")
-                    if seen.split("@")[-1] != env.engine.image_digest.split("@")[-1]:
-                        raise ValueError("observed image digest differs from ENV")
-                    for name in side_cfg.executors:
-                        c.setdefault(name, {})["target"] = str(side_dir / "target.json")
-                    side_cfg.raw = c
-                    dispatch(side)
-                    executed = True
-                finally:
-                    diagnostic_refs.append(_managed_diagnostic_reference(
-                        docker, side_dir, keys, side.value, store=store, diagnostics=diagnostics))
-        except Exception as exc:
-            # Error messages may contain engine secrets; retain type, not raw daemon output.
-            if executed:
-                # Do not replace completed evidence (including confirmed violations)
-                # with empty ABORTED evidence because post-run teardown failed.
-                lifecycle_errors.append(f"{side.value}: cleanup incomplete ({type(exc).__name__}); guard.run={run_id}")
-                if side == Side.baseline:
-                    candidate_blocked = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
-                for lease in leases: lease.mark_uncertain(run_id)
-            else:
-                lifecycle_errors.append(f"{side.value}: startup/execution interrupted ({type(exc).__name__}); sealed evidence retained; guard.run={run_id}")
-                if _has_cleanup_note(exc, run_id):
-                    lifecycle_errors.append(f"{side.value}: cleanup incomplete after startup/execution failure ({type(exc).__name__}); guard.run={run_id}")
-                    if side == Side.baseline:
-                        candidate_blocked = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
-                    for lease in leases: lease.mark_uncertain(run_id)
-                side_cfg.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
-                dispatch(side)
-        if side == Side.baseline and candidate_blocked is None and _execution_failed(pack, evidence, ()):
+        options = side_cfg.raw.get("update", {})
+        effective, keys = _credentials(side_cfg.raw, options.get("gateway_profile", "single"))
+        side_cfg.runtime_environ = effective.pop("_runtime_environ", None)
+        side_cfg.raw = effective
+        release_unverified = _run_managed_side(
+            store, pack, plan, rc, env, options, managed[side.value], keys, run_dir / side.value,
+            "u" + secrets.token_hex(6), leases, result, only_side=side,
+            prepare_sentinel=lambda: _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"), side.value),
+        )
+        if side == Side.baseline and release_unverified:
+            candidate_blocked = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
+        if side == Side.baseline and candidate_blocked is None and _execution_failed(pack, result.evidence, ()):
             candidate_blocked = 'BASELINE_EXECUTION_FAILED'
     if kube_transition is not None:
         from guard.models import canonical_json
         try:
             artifact = _diagnostic_artifact(store, "kubernetes-transition.json", canonical_json(kube_transition.report()))
-            diagnostics.append(artifact)
-            diagnostic_refs.append(f"Kubernetes transition diagnostic (not EVD): {artifact.path}; GPU release unverified")
+            result.diagnostics.append(artifact)
+            result.diagnostic_refs.append(f"Kubernetes transition diagnostic (not EVD): {artifact.path}; GPU release unverified")
         except Exception:
-            lifecycle_errors.append("KUBERNETES_TRANSITION_DIAGNOSTIC_STORE_UNAVAILABLE")
-    return evidence, rc.attempt_id, lifecycle_errors, diagnostic_refs, diagnostics
+            result.errors.append("KUBERNETES_TRANSITION_DIAGNOSTIC_STORE_UNAVAILABLE")
+    return result.execution(rc.attempt_id)
+
+
+@dataclass
+class _TrialResult:
+    evidence: list[Evidence] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    diagnostic_refs: list[str] = field(default_factory=list)
+    diagnostics: list[Artifact] = field(default_factory=list)
+
+    def execution(self, attempt_id):
+        return self.evidence, attempt_id, self.errors, self.diagnostic_refs, self.diagnostics
+
+
+def _run_managed_side(store, pack, plan, rc, env, options, managed, keys, target_dir, run_id, leases,
+                      result, *, prepare_sentinel, only_side=None) -> bool:
+    """Launch and verify one owned environment, retaining evidence through cleanup."""
+    from guard.adapters.engine_provider import get_provider
+
+    side = only_side or Side.single
+    completed = False
+    engine_profile = options.get("engine_profile", "default")
+    for lease in leases:
+        lease.note_owner(run_id)
+    try:
+        with Docker(run_id) as docker:
+            try:
+                sentinel_dir = prepare_sentinel()
+                target = sandbox.up(
+                    docker, options.get("topology", "isolated"), target_dir, keys.get("GUARD_ALLOWED_KEY"),
+                    engine=env.engine.name, **get_provider(env.engine.name).sandbox_arguments(managed),
+                    gateway_profile=options.get("gateway_profile", "single"), gateway_keys=keys,
+                    engine_profile=engine_profile, sentinel_dir=sentinel_dir,
+                    credential_canary=options.get("credential_canary", False),
+                )
+                if target.get("observed_version") != env.engine.version:
+                    raise ValueError("observed engine version differs from ENV")
+                observed = target.get("images", {}).get(managed["image"], "")
+                if observed.split("@")[-1] != env.engine.image_digest.split("@")[-1]:
+                    raise ValueError("observed image digest differs from ENV")
+                result.evidence.extend(run_plan_locked(store, pack, plan, rc, only_side=only_side))
+                completed = True
+            finally:
+                result.diagnostic_refs.append(_managed_diagnostic_reference(
+                    docker, target_dir, keys, side.value, store=store, diagnostics=result.diagnostics))
+    except Exception as exc:
+        # Keep the exception type as detail so engine credentials cannot enter the report.
+        error_type = type(exc).__name__
+        release_unverified = completed or _has_cleanup_note(exc, run_id)
+        if completed:
+            result.errors.append(f"{side.value}: cleanup incomplete ({error_type}); guard.run={run_id}")
+        else:
+            result.errors.append(
+                f"{side.value}: startup/execution interrupted ({error_type}); sealed evidence retained; guard.run={run_id}")
+            if release_unverified:
+                result.errors.append(
+                    f"{side.value}: cleanup incomplete after startup/execution failure ({error_type}); guard.run={run_id}")
+        if release_unverified:
+            for lease in leases:
+                lease.mark_uncertain(run_id)
+        if not completed:
+            side_cfg = rc.side_configs[side.value] if only_side is not None else rc
+            side_cfg.abort_reason = f"managed startup/execution failed: {error_type}"
+            result.evidence.extend(run_plan_locked(store, pack, plan, rc, only_side=only_side))
+        return release_unverified
+    return False
 
 
 def _execution_failed(pack, evidence, lifecycle_errors):
@@ -413,9 +452,7 @@ def _validation_inputs(env, cfg: dict):
         raise ValueError("validation settings must be a table and credential_canary a boolean")
     if options.get("mode", "managed") != "managed" or effective.get("sides"):
         raise ValueError("validate supports one managed environment without side overrides")
-    if (options.get("topology", "isolated") not in {"isolated", "exposed"}
-            or options.get("gateway_profile", "single") not in sandbox.GATEWAY_PROFILES
-            or options.get("engine_profile", "default") not in sandbox.ENGINE_PROFILES):
+    if not _sandbox_profile_supported(options):
         raise ValueError("unsupported validation sandbox profile")
     if (effective.get("adapter", {}).get("name") != env.engine.name or not effective.get("executors")
             or any(value != "real" for value in effective["executors"].values())):
@@ -434,8 +471,7 @@ def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of
     cfg = deepcopy(cfg)
     effective, managed = _validation_inputs(env, cfg)
     options = effective.get("validation", {})
-    if options.get("credential_canary", False) and policy.status.value != "DRAFT":
-        raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
+    _validate_canary_policy((effective,), policy, "validation")
     profile = options.get("gateway_profile", "single")
     effective, keys = _credentials(effective, profile)
     plan = bind_recipe(select(pack, [env], policy, mode=Mode.audit), cfg, [env])
@@ -446,7 +482,7 @@ def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of
     store.put(env)
     store.put(policy)
     store.put(plan)
-    (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
+    _record_plan(run_dir, plan.id)
     with execution_lock(store.root, plan.id):
         with provider_leases([env], [managed]) as leases:
             execution = _run_validation_trial(store, pack, plan, env, cfg, run_dir, effective, managed, keys, leases)
@@ -455,52 +491,20 @@ def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of
 
 def _run_validation_trial(store, pack, plan, env, cfg, run_dir, effective, managed, keys, leases):
     options = effective.get("validation", {})
-    profile = options.get("gateway_profile", "single")
     target_dir = run_dir / "single"
     sentinel_dir = _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"))
     for name in effective["executors"]:
         effective.setdefault(name, {})["target"] = str(target_dir / "target.json")
     rc = RunConfig(executors=effective["executors"], adapter=env.engine.name, raw=effective, requested=deepcopy(cfg),
-                   attempt_id=new_id('ATTEMPT'))
+                   attempt_id=new_id("ATTEMPT"), runtime_environ=effective.pop("_runtime_environ", None))
     _record_attempt(run_dir, rc.attempt_id)
-    completed = False
-    evidence = []
-    lifecycle_errors = []
-    diagnostic_refs = []
-    diagnostics = []
-    run_id = "v" + secrets.token_hex(6)
-    for lease in leases: lease.note_owner(run_id)
-    try:
-        with Docker(run_id) as docker:
-            try:
-                from guard.adapters.engine_provider import get_provider
-                target = sandbox.up(docker, options.get("topology", "isolated"), target_dir,
-                                    keys.get("GUARD_ALLOWED_KEY"), engine=env.engine.name, **get_provider(env.engine.name).sandbox_arguments(managed),
-                                    gateway_profile=profile, gateway_keys=keys,
-                                    engine_profile=options.get("engine_profile", "default"), sentinel_dir=sentinel_dir,
-                                    credential_canary=options.get("credential_canary", False))
-                if target.get("observed_version") != env.engine.version:
-                    raise ValueError("observed engine version differs from ENV")
-                observed = target.get("images", {}).get(managed["image"], "")
-                if observed.split("@")[-1] != env.engine.image_digest.split("@")[-1]:
-                    raise ValueError("observed image digest differs from ENV")
-                evidence = run_plan_locked(store, pack, plan, rc)
-                completed = True
-            finally:
-                diagnostic_refs.append(_managed_diagnostic_reference(
-                    docker, target_dir, keys, "single", store=store, diagnostics=diagnostics))
-    except Exception as exc:
-        if completed:
-            lifecycle_errors.append(f"single: cleanup incomplete ({type(exc).__name__}); guard.run={run_id}")
-            for lease in leases: lease.mark_uncertain(run_id)
-        else:
-            lifecycle_errors.append(f"single: startup/execution interrupted ({type(exc).__name__}); sealed evidence retained; guard.run={run_id}")
-            if _has_cleanup_note(exc, run_id):
-                lifecycle_errors.append(f"single: cleanup incomplete after startup/execution failure ({type(exc).__name__}); guard.run={run_id}")
-                for lease in leases: lease.mark_uncertain(run_id)
-            rc.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
-            evidence = run_plan_locked(store, pack, plan, rc)
-    return evidence, rc.attempt_id, lifecycle_errors, diagnostic_refs, diagnostics
+
+    result = _TrialResult()
+    _run_managed_side(
+        store, pack, plan, rc, env, options, managed, keys, target_dir,
+        "v" + secrets.token_hex(6), leases, result, prepare_sentinel=lambda: sentinel_dir,
+    )
+    return result.execution(rc.attempt_id)
 
 
 def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
@@ -545,8 +549,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         else:
             prepared = update_inputs(envs, cfg)
         option_group = "validation" if single else "update"
-        if any(c.get(option_group, {}).get("credential_canary", False) for c in prepared[1].values()) and policy.status.value != "DRAFT":
-            raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
+        _validate_canary_policy(prepared[1].values(), policy, option_group)
         plan_mode = Mode.audit if single else Mode.update
         plan = (select(pack, envs, policy, change=change_input.change if change_input else None,
                        mode=plan_mode, context=context) if context is not None

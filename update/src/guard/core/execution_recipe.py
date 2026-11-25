@@ -3,25 +3,36 @@ from contextlib import contextmanager
 from pathlib import Path
 import os
 import inspect
-from guard.configuration import merge_config, requested_input_paths
+from guard.collectors.check_observations import MAX_RECORD_BYTES, VerifiedRecord, path_identity
+from guard.configuration import for_side, requested_input_paths
 from guard.models import canonical_json, sha256_hex, utcnow
 
 
-def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, tuple[bytes, str]] | None = None):
+def configuration_sha256(
+    cfg, environments=(), *, software_digests: dict[Path, tuple[bytes, str]] | None = None,
+    record_reads: dict[Path, VerifiedRecord] | None = None,
+):
     """Commit values and explicitly submitted input bytes, without saving secrets.
 
     Runtime injected fields are never requested configuration. Managed target
     paths added after selection are absent from the original requested config.
     An execution can reuse software digests after comparing fresh file bytes.
+    A requested observation can also use the exact file bytes verified here.
     """
     package = Path(__file__).parents[1]
     software_suffixes = {'.py', '.json', '.yaml', '.txt'}
     file_digests: dict[Path, str] = {}
     software_candidates: dict[Path, tuple[bytes, str]] = {}
+    remaining_record_bytes = MAX_RECORD_BYTES
 
-    def digest_file(path: Path):
+    def digest_file(path: Path, *, common_record=False):
+        nonlocal remaining_record_bytes
+        collect_record = record_reads is not None and common_record
         if path in file_digests:
+            if collect_record:
+                record_reads.setdefault(path, VerifiedRecord(file_digests[path]))
             return file_digests[path]
+        before = path_identity(path) if collect_record and remaining_record_bytes else None
         raw = path.read_bytes()
         cache = software_digests if path.is_relative_to(package) and path.suffix in software_suffixes else None
         previous = cache.get(path) if cache is not None else None
@@ -29,6 +40,12 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
         if cache is not None:
             software_candidates[path] = current
         file_digests[path] = current[1]
+        if collect_record:
+            if before is not None and 0 < len(raw) <= remaining_record_bytes and path_identity(path) == before:
+                record_reads[path] = VerifiedRecord(current[1], raw, before)
+                remaining_record_bytes -= len(raw)
+            else:
+                record_reads[path] = VerifiedRecord(current[1])
         return current[1]
 
     def normalize(value):
@@ -38,9 +55,16 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
         if isinstance(value, Path): return str(value)
         return value
     inputs = {}
-    for _, path, deferred in requested_input_paths(cfg):
+    for location, path, deferred in requested_input_paths(cfg):
         if not deferred:
-            inputs[str(path)] = digest_file(path) if path.is_file() else None
+            common_record = (location[-2:-1] == ("records",) and "common_inputs" in location
+                             or location[-2:] in {("runner_input", "path"), ("supply_reads_input", "path")})
+            if path.is_file():
+                inputs[str(path)] = digest_file(path, common_record=common_record)
+            else:
+                inputs[str(path)] = None
+                if record_reads is not None and common_record:
+                    record_reads[path] = VerifiedRecord(None)
         elif str(path) not in inputs:
             # Its derivation and ENV are committed now; the owned Pod
             # generation is observed/sealed by the transition at run time.
@@ -68,7 +92,7 @@ def configuration_sha256(cfg, environments=(), *, software_digests: dict[Path, t
     sides = {s: None for s in cfg.get('sides', {})}
     if len(environments) == 2: sides.update(zip(('baseline', 'candidate'), environments))
     for side, env in sides.items():
-        factories(merge_config(cfg, cfg.get('sides', {}).get(side, {})), side, env)
+        factories(for_side(cfg, side), side, env)
     # Commit the actual installed common implementation, not a manifest's
     # assertion about its own bytes. Cache only files in this fresh enumeration,
     # including any already read as factory or provider sources above.

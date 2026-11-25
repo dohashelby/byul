@@ -5,16 +5,17 @@ runtime 주장이나 mount/API 이름을 최종 모델 승인 증명으로 승�
 """
 from __future__ import annotations
 
-from datetime import datetime
+from guard.collectors.file import load_bounded_json
+from guard.executors.record_time import parse_record_time as _time
 import hashlib
-from pathlib import Path
 import re
 import uuid
 
 from guard.adapters.vllm_model_authorization import project_native
-from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.models import canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP, MODEL_AUTHORIZATION_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
@@ -35,15 +36,6 @@ OBSERVATIONS = {
 
 def _sha(value):
     return type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) is not None
-
-
-def _time(value):
-    if type(value) is not str or len(value) > 40:
-        raise ValueError
-    stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if stamp.tzinfo is None or stamp.utcoffset() is None:
-        raise ValueError
-    return stamp
 
 
 def normalize_policy(values):
@@ -115,8 +107,7 @@ class KubernetesModelAuthorizationExecutor(HttpCheckExecutor):
             if any(type(v) is not str or not v for v in (env.model.id, env.model.revision)):
                 raise ValueError
             keys = self.keys()
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg["target"])
             target_hash = sha256_hex(canonical_json(target))
             if (target_hash != policy_values["model_target_sha256"]
                     or policy_values["model_environment_sha256"] != env.ref().sha256
@@ -237,8 +228,5 @@ class KubernetesModelAuthorizationExecutor(HttpCheckExecutor):
 
     def _finish(self, ctx):
         draft = super()._finish(ctx)
-        ceiling = DataOrigin.EXAMPLE if self._kubectl_runner is not None or ctx.env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin = min(draft.data_origin, ceiling, key=lambda x: ORIGIN_STRENGTH[x])
-        if ctx._model_gap: draft.status = ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._model_cleanup)
-        return draft
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self._kubectl_runner is not None)
+        return draft.finish_collection(ceiling, ctx._model_gap, ctx._model_cleanup)

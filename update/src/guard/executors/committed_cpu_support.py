@@ -15,10 +15,12 @@ import stat
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 from .base import DraftArtifact
+from .pinned_input import read_pinned_bytes
 
 MAX_BYTES = 8 * 1024**2
 _SHA = re.compile('[0-9a-f]{64}')
 _SESSION = re.compile('[0-9a-f]{32}')
+_IDENTITY_FIELDS = ('dev', 'ino', 'mode', 'uid', 'gid', 'nlink', 'size', 'mtime_ns', 'ctime_ns')
 
 
 def _require(value, code):
@@ -26,9 +28,11 @@ def _require(value, code):
         raise ValueError(code)
 
 
-def _identity(value):
-    return {k: getattr(value, 'st_' + k) for k in
-            ('dev', 'ino', 'mode', 'uid', 'gid', 'nlink', 'size', 'mtime_ns', 'ctime_ns')}
+def _open_ordinary(path):
+    # A replacement FIFO must not block before fstat can reject its identity.
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
+                 | getattr(os, 'O_NONBLOCK', 0))
+    return os.fdopen(fd, 'rb')
 
 
 def _read(pointer):
@@ -41,20 +45,9 @@ def _read(pointer):
     before_path = path.lstat()
     _require(stat.S_ISREG(before_path.st_mode) and 0 < before_path.st_size <= MAX_BYTES,
              'B_CPU_SUPPORT_FILE_BOUND_OR_IDENTITY')
-    # A FIFO selected initially is rejected above; a replacement before open
-    # must not block the caller before fstat can reject the new identity.
-    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
-                 | getattr(os, 'O_NONBLOCK', 0))
-    with os.fdopen(fd, 'rb') as stream:
-        before = os.fstat(stream.fileno())
-        _require(stat.S_ISREG(before.st_mode) and 0 < before.st_size <= MAX_BYTES
-                 and _identity(before_path) == _identity(before), 'B_CPU_SUPPORT_FILE_BOUND_OR_IDENTITY')
-        raw = stream.read(MAX_BYTES + 1)
-        after = os.fstat(stream.fileno())
-    _require(_identity(before) == _identity(after) == _identity(path.lstat()) and
-             len(raw) == before.st_size and sha256_hex(raw) == pointer['file_sha256'],
-             'B_CPU_SUPPORT_BYTES_CHANGED')
-    return raw, _identity(after)
+    return read_pinned_bytes(path, before_path, limit=MAX_BYTES, expected_sha256=pointer['file_sha256'],
+        identity_fields=_IDENTITY_FIELDS, bound_error='B_CPU_SUPPORT_FILE_BOUND_OR_IDENTITY',
+        mismatch_error='B_CPU_SUPPORT_BYTES_CHANGED', open_file=_open_ordinary, match_before_read=True)
 
 
 def consume(check_id, descriptor):

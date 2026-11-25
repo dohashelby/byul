@@ -17,10 +17,10 @@ import sys
 import time
 import tomllib
 
-from guard.application import merge_config, update_readiness
+from guard.application import update_readiness
 from guard.collectors.file import load_environment, load_policy
 from guard.collectors.change import read_change, resolve_plan
-from guard.configuration import validate_requested_config
+from guard.configuration import for_side, validate_requested_config
 from guard.core.change_selection import build_context
 from guard.core.execution_recipe import validate_policy_time
 from guard.store import Store
@@ -77,7 +77,7 @@ def reserve_output(output: Path, *, protected: list[Path]) -> Path:
 
 
 def _conditions(cfg: dict, side: str, *, profile="execution-v1") -> dict:
-    value = merge_config(cfg, cfg.get("sides", {}).get(side, {}))
+    value = for_side(cfg, side)
     value.pop("sides", None)
     value.pop("store", None)
     launch = value.get("vllm", {})
@@ -100,10 +100,12 @@ def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1", s
     validate_policy_time(policy)
     if cfg.get("update", {}).get("mode") != "managed":
         raise ValueError("the harness requires update.mode=managed")
+    side_settings = {}
     for side in ("baseline", "candidate"):
-        settings = merge_config(cfg, cfg.get("sides", {}).get(side, {}))
+        settings = for_side(cfg, side)
         if settings.get("vllm", {}).get("launch_profile") != "gpu-bounded":
             raise ValueError("both sides require the explicit gpu-bounded launch profile")
+        side_settings[side] = settings
     selection = selection if selection is not None else select(pack, envs, policy, mode=Mode.update)
     selected = {item.check_id for item in selection.items if item.selected}
     carried = {item.check_id for item in selection.items if item.carried_over is not None}
@@ -128,7 +130,7 @@ def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1", s
             raise ValueError("both ENVs need an explicit GPU profile: gpu_count>=1, gpu_model, driver, tp_size and no CPU profile")
         if runtime.tp_size * (runtime.pp_size or 1) * (runtime.dp_size or 1) != runtime.gpu_count:
             raise ValueError("GPU parallel layout tp_size*pp_size*dp_size must equal gpu_count")
-        launch = merge_config(cfg, cfg.get("sides", {}).get(side, {})).get("vllm", {})
+        launch = side_settings[side].get("vllm", {})
         devices = launch.get("gpu_devices")
         if type(devices) is not list or len(devices) != runtime.gpu_count:
             raise ValueError("each side needs gpu_devices matching its ENV gpu_count")
@@ -484,7 +486,7 @@ def main(argv: list[str] | None = None) -> int:
                 inputs["change"] = Path(args.change).resolve()
                 protected.append(inputs["change"].parent)
             for side in ("baseline", "candidate"):
-                launch = merge_config(cfg, cfg.get("sides", {}).get(side, {})).get("vllm", {})
+                launch = for_side(cfg, side).get("vllm", {})
                 if launch.get("models_dir"):
                     protected.append(Path(launch["models_dir"]))
             output = reserve_output(args.output, protected=protected)

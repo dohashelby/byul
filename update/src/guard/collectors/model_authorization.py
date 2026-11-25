@@ -6,10 +6,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 import re
 
-from guard.executors.owned_capture import read_owned_jsonl, strict_json, validate_owned_source
+from guard.collectors.file import load_bounded_json
+from guard.executors.owned_capture import read_owned_jsonl, validate_owned_source
 from guard.models import Environment, Policy, canonical_json, load_pack, sha256_hex
 
 _SHA = re.compile(r"[0-9a-f]{64}")
@@ -18,12 +18,10 @@ _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
 
 
 def load_inputs(pack_path, env_path, policy_path, context_path, target_path, source):
-    def read(path):
-        with Path(path).open("rb") as stream:
-            return strict_json(stream.read(65537))
     pack = load_pack(pack_path)
-    env, policy = Environment.model_validate(read(env_path)), Policy.model_validate(read(policy_path))
-    context, target = read(context_path), read(target_path)
+    env = Environment.model_validate(load_bounded_json(env_path))
+    policy = Policy.model_validate(load_bounded_json(policy_path))
+    context, target = load_bounded_json(context_path), load_bounded_json(target_path)
     if policy.pack != pack.ref() or "REQ-05" not in pack.checks:
         raise ValueError("MODEL_AUTHORIZATION_PACK_MISMATCH")
     validate_inputs(env, policy, context, target, source)

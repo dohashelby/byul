@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import re
 
+from guard.configuration import for_side
 from guard.executors.reuse import ExecutionPreview, preview_inputs
 from guard.judges import registry as judges
 from guard.models import DataOrigin, ExecStatus, Mode, Side, Verdict, sha256_hex, utcnow
@@ -120,18 +121,13 @@ def selection_triggers(pack, change_type: str, change, diff: InputDiff, *, model
     return triggers, full
 
 
-def _merged(base, overlay):
-    from guard.configuration import merge_config
-    return merge_config(base, overlay)
-
-
 def _effective_config(cfg, mode):
     if hasattr(cfg, "raw"):
         if mode == Mode.update and getattr(cfg, "side_configs", None):
             return cfg.side_configs.get("baseline", cfg).raw
         return cfg.raw
     if mode == Mode.update:
-        return _merged(cfg, cfg.get("sides", {}).get("baseline", {}))
+        return for_side(cfg, "baseline")
     return cfg
 
 
@@ -229,45 +225,45 @@ def _eligible(store, previous, oldpack, pack, cid, env, policy, cfg, as_of, read
     check = pack.checks[cid]
     oldhash, newhash = _definition_hash(oldpack, cid), _definition_hash(pack, cid)
     if olditem is None or olditem.check_revision != check.revision or not oldhash or oldhash != newhash:
-        return None, "CHECK_DEFINITION_CHANGED"
+        return None, "CHECK_DEFINITION_CHANGED", None
     pair = _prior_pair(store, previous, cid)
     if pair is None:
-        return None, "NO_PRIOR_RESULT"
+        return None, "NO_PRIOR_RESULT", None
     evidence, result = pair
     if (result.evidence != evidence.ref() or result.check_id != cid or evidence.check_id != cid
             or result.side != evidence.side
             or evidence.data_origin == DataOrigin.EXAMPLE or result.data_origin == DataOrigin.EXAMPLE
             or evidence.execution.status != ExecStatus.COMPLETED):
-        return None, "PRIOR_EVIDENCE_INELIGIBLE"
+        return None, "PRIOR_EVIDENCE_INELIGIBLE", None
     for artifact in evidence.artifacts:
         if artifact.path != f"artifacts/{artifact.sha256}":
-            return None, "PRIOR_ARTIFACT_UNVERIFIED"
+            return None, "PRIOR_ARTIFACT_UNVERIFIED", None
         path = store.root / artifact.path
         if (not path.is_file() or path.stat().st_size != artifact.bytes
                 or sha256_hex(path.read_bytes()) != artifact.sha256):
-            return None, "PRIOR_ARTIFACT_MISSING_OR_CHANGED"
+            return None, "PRIOR_ARTIFACT_MISSING_OR_CHANGED", None
     oldenv = store.resolve(evidence.environment)
     if not env.engine.image_digest or oldenv.engine.image_digest != env.engine.image_digest:
-        return None, "IMAGE_DIGEST_CHANGED_OR_UNKNOWN"
+        return None, "IMAGE_DIGEST_CHANGED_OR_UNKNOWN", None
     if oldenv.engine.name != env.engine.name or oldenv.adapter != env.adapter:
-        return None, "ENGINE_OR_ENV_ADAPTER_CHANGED"
+        return None, "ENGINE_OR_ENV_ADAPTER_CHANGED", None
     preview: ExecutionPreview | None = preview_inputs(check, env, policy.values.get(cid, {}), cfg)
     if preview is None:
-        return None, "PROCEDURE_OR_FIXTURE_UNCONFIRMED"
+        return None, "PROCEDURE_OR_FIXTURE_UNCONFIRMED", None
     if evidence.execution.executor != preview.executor or evidence.execution.adapter != preview.adapter:
-        return None, "EXECUTOR_OR_ADAPTER_CHANGED"
+        return None, "EXECUTOR_OR_ADAPTER_CHANGED", None
     if not preview.fixture_sha256 or evidence.comparability.fixture_sha256 != preview.fixture_sha256:
-        return None, "FIXTURE_CHANGED_OR_UNKNOWN"
+        return None, "FIXTURE_CHANGED_OR_UNKNOWN", None
     if not preview.config_sha256 or evidence.comparability.config_sha256 != preview.config_sha256:
-        return None, "EXECUTION_CONFIG_CHANGED_OR_UNKNOWN"
+        return None, "EXECUTION_CONFIG_CHANGED_OR_UNKNOWN", None
     signature = _judge_signature(check, evidence)
     if signature is None:
-        return None, "JUDGE_UNAVAILABLE"
+        return None, "JUDGE_UNAVAILABLE", None
     if (result.judge.name, result.judge.params_sha256) != (signature[0], signature[2]):
-        return None, "JUDGE_CONTRACT_CHANGED"
+        return None, "JUDGE_CONTRACT_CHANGED", None
     if result.judge.version != signature[1]:
         if read_only:
-            return None, "READ_ONLY_REJUDGMENT_PENDING"
+            return None, "READ_ONLY_REJUDGMENT_PENDING", None
         from .judge import judge_evidence
         result = judge_evidence(check, evidence, policy, as_of,
                                 condition_origins=[condition.origin for condition in olditem.conditions],
@@ -281,9 +277,9 @@ def _eligible(store, previous, oldpack, pack, cid, env, policy, cfg, as_of, read
                 update={"id": prior_result.id, "revision": prior_result.revision + 1}).seal())
         store.put(result)
     if result.verdicts.security != Verdict.PASS:
-        return None, "PRIOR_SECURITY_NOT_PASS"
+        return None, "PRIOR_SECURITY_NOT_PASS", None
     return CarriedOver(result=result.ref(), evidence=evidence.ref(), image_digest=env.engine.image_digest,
-                       judged_at=result.created_at, reason="unchanged inputs and verified prior security PASS"), ""
+                       judged_at=result.created_at, reason="unchanged inputs and verified prior security PASS"), "", preview
 
 
 def build_context(store, previous_plan, pack, envs, policy, cfg, change=None, mode=Mode.audit,
@@ -330,6 +326,7 @@ def build_context(store, previous_plan, pack, envs, policy, cfg, change=None, mo
     oldpack = get_pack(store, previous.inputs.pack)
     effective = _effective_config(cfg, mode)
     target = envs[0] if mode == Mode.update else current
+    candidate_cfg = None
     now = as_of or utcnow()
     from .select import evaluate_check
     for cid in pack.manifest.checks:
@@ -338,12 +335,15 @@ def build_context(store, previous_plan, pack, envs, policy, cfg, change=None, mo
             continue
         if evaluate_check(check, envs)[0].value == "NOT_APPLICABLE":
             continue
-        carried, reason = _eligible(store, previous, oldpack, pack, cid, target, policy, effective, now, read_only)
+        carried, reason, baseline_inputs = _eligible(
+            store, previous, oldpack, pack, cid, target, policy, effective, now, read_only,
+        )
         if carried is not None and mode == Mode.update:
-            candidate_cfg = cfg.side_configs['candidate'].raw if getattr(cfg, 'side_configs', None) else _merged(requested, requested.get('sides', {}).get('candidate', {}))
-            baseline_inputs = preview_inputs(check, target, policy.values.get(cid, {}), effective)
+            if candidate_cfg is None:
+                candidate_cfg = (cfg.side_configs['candidate'].raw if getattr(cfg, 'side_configs', None)
+                                 else for_side(requested, 'candidate'))
             candidate_inputs = preview_inputs(check, current, policy.values.get(cid, {}), candidate_cfg)
-            if baseline_inputs is None or candidate_inputs != baseline_inputs:
+            if candidate_inputs != baseline_inputs:
                 carried, reason = None, 'CANDIDATE_PROCEDURE_OR_FIXTURE_CHANGED_OR_UNCONFIRMED'
         if carried is not None:
             context.carried_over[cid] = carried

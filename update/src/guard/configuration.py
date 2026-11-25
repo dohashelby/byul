@@ -29,6 +29,11 @@ def merge_config(base, override):
     return out
 
 
+def for_side(config, side):
+    """Resolve the requested settings for one side without mutating the request."""
+    return merge_config(config, config.get("sides", {}).get(side, {}))
+
+
 CHECK_CONFIG = "check_config"
 
 # Host inputs consumed by executors or run-binding validation. Remote paths
@@ -51,7 +56,7 @@ def requested_input_paths(config, *, base_dir=None):
     validate_requested_config(config)
     deferred_paths = set()
     if config.get("update", {}).get("kubernetes_candidate_binding") == "after_baseline":
-        candidate = merge_config(config, config.get("sides", {}).get("candidate", {}))
+        candidate = for_side(config, "candidate")
         implementations = candidate.get("executors", {})
         for executor in ("request_binding", "input_validation"):
             path = candidate.get(executor, {}).get("target")

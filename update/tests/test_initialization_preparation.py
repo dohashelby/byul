@@ -14,7 +14,6 @@ from guard.adapters.vllm_lifecycle_release_sensor import COMMIT
 from guard.adapters.vllm_release_profiles import release_profile
 from guard.collectors.lifecycle import load_initialization_prepared, prepare_assets
 from guard.core.execution_recipe import bind_recipe, configuration_sha256
-from guard.core.run import run_plan
 from guard.core.select import select
 from guard.executors import run_binding
 from guard.executors.kubernetes_initialization import KubernetesInitializationExecutor
@@ -22,6 +21,7 @@ from guard.models import ExecStatus, Side, canonical_json, load_pack, sha256_hex
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import environment, policy
+from tests.run_binding_support import run_locked_update_trial
 from tests.test_a1_file_read_sensor import scope_value
 from tests.test_kubernetes_sampling import inputs as owned_target
 from tests.test_lifecycle_capture import REPOSITORY, external  # noqa: F401
@@ -277,14 +277,14 @@ def test_recipe_rejects_a_valid_substitute_without_dispatch(external, tmp_path, 
             return original_run(*args, **kwargs)
 
         monkeypatch.setattr(core_run, '_run_one', replace_after_recipe)
-        evidence, = run_plan(store, pack, plan, application.run_config(cfg), only_side=side)
+        evidence, = run_locked_update_trial(store, pack, plan, application.run_config(cfg), only_side=side)
         assert evidence.execution.status == ExecStatus.NOT_RUN
         assert evidence.execution.abort_reason == f'RUN_BINDING_INITIALIZATION_{field.upper()}_CHANGED'
         assert evidence.execution.run_binding is None
     else:
         replace()
         with pytest.raises(ValueError, match='EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED'):
-            run_plan(store, pack, plan, application.run_config(cfg), only_side=side)
+            run_locked_update_trial(store, pack, plan, application.run_config(cfg), only_side=side)
         assert not store.find_latest('EVD', lambda row: row.plan == plan.ref())
 
 
@@ -297,7 +297,13 @@ def test_unselected_initialization_files_do_not_block_other_checks(external, tmp
     Path(cfg['run_binding']['LIF-07']['scenario']).unlink()
     Path(cfg['sides']['baseline']['initialization']['prepared']).unlink()
     monkeypatch.setattr(subprocess, 'Popen', _forbidden)
-    evidence, = run_plan(store, pack, plan, application.run_config(cfg), only_side=Side.baseline)
+    with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+        run_locked_update_trial(store, pack, plan, application.run_config(cfg), only_side=Side.baseline)
+    assert not store.find_latest('EVD', lambda row: row.plan == plan.ref())
+
+    # Selection with missing, unused files is valid; removing already committed inputs requires re-selection.
+    current = _sealed_plan(store, pack, envs, pol, cfg)
+    evidence, = run_locked_update_trial(store, pack, current, application.run_config(cfg), only_side=Side.baseline)
     assert evidence.check_id == 'SUP-10'
     assert evidence.execution.abort_reason == "executor 'supply_boot' not configured in guard.toml [executors]"
 
@@ -319,7 +325,7 @@ def test_executor_rejects_manifest_rewrite_after_run_binding(external, tmp_path,
 
     monkeypatch.setattr(run_binding, 'effective_values', rewrite_after_binding)
     monkeypatch.setattr('guard.executors.kubernetes_initialization.KubernetesInitializationHTTP', _forbidden)
-    evidence, = run_plan(store, pack, plan, application.run_config(cfg), only_side=Side.candidate)
+    evidence, = run_locked_update_trial(store, pack, plan, application.run_config(cfg), only_side=Side.candidate)
     assert evidence.execution.status == ExecStatus.ABORTED
     assert evidence.execution.abort_reason == 'EXECUTOR_FAILURE'
     assert evidence.execution.run_binding['files']['init_prepared_sha256'] == sha256_hex(canonical_json(declared))

@@ -21,6 +21,7 @@ from guard.models.objects import Execution
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import environment, policy
+from tests.run_binding_support import run_locked_update_trial
 from tests.test_kubernetes_gateway_observation import ordinary_gateway_record  # noqa: F401
 from tests.test_lifecycle_capture import external  # noqa: F401
 
@@ -322,11 +323,11 @@ def test_paired_req02_preserves_owned_record_for_recipe_bound_missing_native_pre
     run_settings = application.run_config(cfg)
     if change.endswith('-before-run'):
         with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
-            run_plan(store, PACK, plan, run_settings, only_side=Side.candidate)
+            run_locked_update_trial(store, PACK, plan, run_settings, only_side=Side.candidate)
         assert not list(store.iter_kind('EVD')) and world.reads == 0
         return
 
-    evd, = run_plan(store, PACK, plan, run_settings, only_side=Side.candidate)
+    evd, = run_locked_update_trial(store, PACK, plan, run_settings, only_side=Side.candidate)
     if change == 'delete-after-recipe':
         assert evd.execution.status == ExecStatus.NOT_RUN
         assert evd.execution.abort_reason == 'RUN_BINDING_UNAVAILABLE'
@@ -532,7 +533,7 @@ def test_paired_recipe_binds_raw_supply_role_files_until_consumed(
     if phase == 'before-recipe':
         rewrite()
         with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
-            run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+            run_locked_update_trial(store, PACK, plan, run_cfg, only_side=Side.candidate)
         assert seen == []
         return
     if phase == 'before-binding':
@@ -552,7 +553,7 @@ def test_paired_recipe_binds_raw_supply_role_files_until_consumed(
             return result
 
         monkeypatch.setattr(run_binding, 'effective_values', rewrite_after_binding)
-    evd, = run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+    evd, = run_locked_update_trial(store, PACK, plan, run_cfg, only_side=Side.candidate)
     if phase == 'before-binding':
         assert seen == []
         assert evd.execution.status == ExecStatus.NOT_RUN and evd.execution.abort_reason == reason

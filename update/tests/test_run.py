@@ -21,6 +21,7 @@ from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.models import DataOrigin, ExecStatus, Side, canonical_json, sha256_hex
 from guard.store import Store
 from tests.builders import T0, baseline_pack, environment, policy, req01_obs
+from tests.run_binding_support import run_locked_update_trial
 
 
 DIAGNOSTIC = "ARTIFACT_PERSISTENCE_INCOMPLETE"
@@ -96,7 +97,7 @@ def test_check_abort_preserves_completed_evidence_and_respects_update_scope(case
     case.store.put_many([candidate_env, pol, plan])
     assert plan.item(outside_recipe).selected and not plan.item(unselected).selected
 
-    first = run_plan(case.store, case.pack, plan, cfg, only_side=Side.baseline)
+    first = run_locked_update_trial(case.store, case.pack, plan, cfg, only_side=Side.baseline)
     original = next(evd for evd in first if evd.check_id == scoped)
     assert original.execution.status == ExecStatus.COMPLETED
     assert original.execution.attempt_id == cfg.attempt_id
@@ -105,7 +106,7 @@ def test_check_abort_preserves_completed_evidence_and_respects_update_scope(case
     reason = "EXAMPLE_SCOPED_PREFLIGHT_FAILED"
     for side_cfg in cfg.side_configs.values():
         side_cfg.check_abort_reasons = {check_id: reason for check_id in (scoped, outside_recipe, unselected)}
-    result = {(evd.check_id, evd.side): evd for evd in run_plan(case.store, case.pack, plan, cfg)}
+    result = {(evd.check_id, evd.side): evd for evd in run_locked_update_trial(case.store, case.pack, plan, cfg)}
 
     assert result[scoped, Side.baseline].ref() == original.ref()
     assert case.store.revisions(original.id) == [original.revision]

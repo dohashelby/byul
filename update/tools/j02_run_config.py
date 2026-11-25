@@ -468,7 +468,8 @@ def _row(pack, check_id, side, cfg, env, values, *, policy_ref=None):
                 issued_at=datetime.now(timezone.utc), run_cfg=run_binding.run_config(merged, check_id),
                 policy_ref=policy_ref)
         if not row['policy_keys_missing']:
-            factory(merged).validate_policy(check, effective)
+            executor = registry.build_executor(check.executor, row['implementation'], merged, factory=factory)
+            executor.validate_policy(check, effective)
     except ValueError as exc:
         code = str(exc)
         row['reasons'].append(code if re.fullmatch(r'[A-Z0-9_]{3,80}', code) else 'INPUT_INVALID')

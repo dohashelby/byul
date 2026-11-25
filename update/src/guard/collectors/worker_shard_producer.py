@@ -9,21 +9,18 @@ PID·시작 ticks를 읽지 못한 프로세스는 바인딩하지 않고 진단
 """
 from __future__ import annotations
 
-import hashlib
-from pathlib import Path
 
 from guard.adapters import vllm_worker_shard_callback as callback
 from . import gpu_common_inputs as contract
+from .source_pins import producer_source_sha256
 
 PRODUCER_NAME = 'guard-engine-callback-worker-shard-load'
 PRODUCER_VERSION = '1'
 
 
 def producer():
-    digest = hashlib.sha256()
-    for path in (Path(callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    source_sha256 = producer_source_sha256(callback.__file__, __file__)
+    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': source_sha256}
 
 
 def _ms(row):

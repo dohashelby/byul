@@ -3,17 +3,19 @@ from pathlib import Path
 from guard.adapters import vllm_worker_startup_metadata as common
 from guard.adapters import vllm_worker_startup_sensor as sensor
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping
-from guard.models import canonical_json,sha256_hex
+from guard.models import canonical_json
+from .model_read_references import index_declared_files
+from .source_pins import verify_adapter_source_pins
 
 VERSION='0.1.0'
 SCHEMA='guard-native-startup-file-context-candidates/1'
 SOURCE_PINS={
-    'vllm_worker_startup_metadata.py':'b5d0be2de94fe9453a5f68b58e019b62a2f454bd59718fb43512a321755e651a',
+    'vllm_worker_startup_metadata.py':'067851561d48c2dc98f855fb1bee2fc5acd2673f6ddb348e86c2e1cf708aaa91',
     'vllm_worker_startup_sensor.py':'7515a6d023db8056524220ee61fbfbb82fd9cc92520f605d511bfdc04283aae5',
     'vllm_worker_startup_contract.py':'6788df2f4c6f04f46e681eb5eab48631e2ba037754d26166bb02341e4b592950',
-    'vllm_safe_open_mapping_metadata.py':'833030d5d24aad97bc7ec0050ef105488daeb0f2023987d75bb1d8ffdbc0be29',
+    'vllm_safe_open_mapping_metadata.py':'6bd4661be066a128405dfca7a48bd4a8919830aeb7a40d9a01b889696b42527c',
     'vllm_safe_open_mapping_sensor.py':'8753a0d6cb06229ab0661e1e7548c6213c368a76243543851baf385cc207f3da',
-    'vllm_weight_iteration_metadata.py':'f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0',
+    'vllm_weight_iteration_metadata.py':'fb80e45de5355b038896a2aa66e60548e94649948762b7107b2d64eae5cb1489',
     'vllm_weight_iteration_sensor.py':'74d0b65aaf4b45185c3d53b520d0881ebe711950e89b17dd48b0a1ca10e1a87a',
     'vllm_file_read_sensor.py':'5542067206f0d92a68575f6fd9cfbaf1c85fa97c35a707f50d9cb1ee260a0b64',
 }
@@ -27,22 +29,12 @@ def _require(value):
     if not value:raise ValueError('NATIVE_WORKER_FILE_INPUT_INVALID')
 
 
-def _source_gate():
-    root=Path(__file__).resolve().parents[1]/'adapters'
-    try:matched=all(sha256_hex((root/name).read_bytes())==expected for name,expected in SOURCE_PINS.items())
-    except OSError:matched=False
-    if not matched:raise ValueError('NATIVE_WORKER_FILE_COMMON_SOURCE_MISMATCH')
-
-
 def _declared_references(prepared,*,origins=('EXAMPLE','DECLARED')):
     scope=prepared['model_read_scope'];asset=prepared['assets']['model-read-scope.json']
     _require(type(scope) is dict and type(asset) is dict and mapping.fingerprint(asset['sha256']) and scope['nonsecret_model_weights'] is True and scope['data_origin'] in origins)
-    files=scope['files'];_require(type(files) is list and 0<len(files)<=256);allowed={}
-    for row in files:
-        _require(type(row) is dict and set(row)=={'normalized_path_sha256','reference_sha256','bytes'} and mapping.fingerprint(row['normalized_path_sha256'])
-            and mapping.fingerprint(row['reference_sha256']) and type(row['bytes']) is int and 0<=row['bytes']<2**63 and row['normalized_path_sha256'] not in allowed)
-        allowed[row['normalized_path_sha256']]=row
-    return allowed
+    return index_declared_files(
+        scope['files'], fingerprint=mapping.fingerprint, error_code='NATIVE_WORKER_FILE_INPUT_INVALID',
+    )
 
 
 def _inputs(packet,prepared):
@@ -133,7 +125,7 @@ def _join_candidates(allowed,missing,startups,weights,maps,scope_sha256,*,profil
 
 
 def analyze(packet,prepared):
-    _source_gate()
+    verify_adapter_source_pins(Path(__file__), SOURCE_PINS, 'NATIVE_WORKER_FILE_COMMON_SOURCE_MISMATCH')
     try:return _analyze(packet,prepared)
     except (ValueError,KeyError,TypeError,UnicodeError,RecursionError):
         raise ValueError('NATIVE_WORKER_FILE_INPUT_INVALID') from None

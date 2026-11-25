@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import math
 import re
 import time
 import uuid
@@ -22,7 +21,8 @@ from guard.adapters import vllm_worker_generation_sensor as generation_sensor
 from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor
 from guard.adapters import vllm_worker_generation_metadata as generation_metadata
 from guard.adapters import vllm_ready_endpoint_metadata as endpoint_metadata
-from guard.collectors.file import load_environment
+from guard.collectors.file import load_bounded_json, load_environment
+from guard.transport_options import valid_duration
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
@@ -129,8 +129,7 @@ def inputs_manifest(cfg):
         for row in rows:
             if type(row) is not dict or set(row) != {'id', 'target', 'prepared', 'environment'}:
                 raise ValueError
-            with Path(row['target']).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(row['target'])
             manifest.append(_manifest_row(row['id'], load_environment(Path(row['environment'])), target,
                                           load_prepared(row['prepared'])))
         return manifest
@@ -156,8 +155,7 @@ def load_generations(cfg, env, values):
             selected_env = load_environment(Path(row['environment']))
             if not supports(selected_env.engine.name, selected_env.engine.version):
                 raise ValueError
-            with Path(row['target']).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(row['target'])
             prepared = load_prepared(row['prepared'])
             if row['id'] in generations or prepared['session'] in sessions:
                 raise ValueError
@@ -331,11 +329,11 @@ class LifecycleTransitionExecutor:
             if not matches:
                 raise ValueError('TRANSITION_EXPLICIT_GENERATION_TARGET_APPROVAL_REQUIRED')
         timeout = self.cfg.get('request_timeout', 30)
-        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+        if not valid_duration(timeout, 30):
             raise ValueError('TRANSITION_CONFIGURATION_INVALID')
         duration = self.cfg.get('max_duration_seconds', 300)
         binary = self.cfg.get('kubectl_binary', 'kubectl')
-        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
+        if (not valid_duration(duration, 300)
                 or type(binary) is not str or not binary.strip()):
             raise ValueError('TRANSITION_CONFIGURATION_INVALID')
         started = self.clock()

@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime
+from guard.executors.record_time import is_record_time as _timestamp
 import math
 import re
 import time
@@ -61,15 +61,6 @@ def validate_policy(check, values, cfg):
         raise ValueError("only the fixed single-user template supply fixture is supported")
     if len(NORMAL_TEXT.encode("utf-8")) > limits["max_input_bytes"]:
         raise ValueError("fixed normal fixture exceeds input byte budget")
-
-
-def _timestamp(value):
-    if type(value) is not str or len(value) > 40:
-        return False
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).tzinfo is not None
-    except ValueError:
-        return False
 
 
 def _target(ctx, *, profile_support=None, kubernetes=False):

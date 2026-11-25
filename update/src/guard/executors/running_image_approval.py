@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from guard.models.artifacts import is_pinned_image as _pinned
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.kubernetes_binding import validate_container_binding, verify_owned_pod
 
@@ -18,15 +19,10 @@ from .http_common import functional_requests, functional_results
 PROFILE = "running-image-approval-v1"
 VERSION = "0.5.0"
 POLICY_KEY = "approved_image_digests"
-_PINNED = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
 _CONTAINER_ID = re.compile(r"[0-9a-f]{64}")
 _CONTAINER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 KUBERNETES_CONSUMER_VERSION = "0.1.0"
-
-
-def _pinned(value):
-    return type(value) is str and len(value) <= 512 and _PINNED.fullmatch(value) is not None
 
 
 def _manifest_matches(pinned, declared):

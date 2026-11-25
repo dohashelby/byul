@@ -15,6 +15,7 @@ import re
 from tempfile import NamedTemporaryFile
 from typing import Any
 
+from guard.collectors import check_observations
 from guard.executors import registry
 from guard.executors.base import EvidenceDraft
 from guard.models import (
@@ -35,7 +36,7 @@ from guard.models import (
     sha256_hex,
     utcnow,
 )
-from guard.models.objects import Artifact, Execution, ExecutorInfo, PlanItem, PluginInfo
+from guard.models.objects import Artifact, Execution, ExecutorInfo, PluginInfo
 from guard.store import Store
 
 
@@ -49,6 +50,8 @@ class RunConfig:
     abort_reason: str | None = None
     requested: dict | None = None
     attempt_id: str | None = None
+    runtime_environ: dict[str, str] | None = field(default=None, repr=False)
+    kubernetes_target_pins: dict[str, str] | None = None
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -68,18 +71,6 @@ def _empty_evidence_parts(check: CheckDef) -> dict[str, Any]:
         "challenges": [{"step": s, "attempted": False} for s in check.challenge_steps],
         "observations": {o.key: {"value": None, "collected": False} for o in check.required_observations},
     }
-
-
-def _blocked_reason(item: PlanItem, cfg: RunConfig, env=None) -> str | None:
-    if Gap.NO_EXECUTOR in item.gaps:
-        return "NO_EXECUTOR: check has no automated executor (manual test required)"
-    if item.executor not in cfg.executors:
-        return f"executor {item.executor!r} not configured in guard.toml [executors]"
-    if registry.resolve_executor(item.executor, cfg.executors[item.executor], engine=env.engine.name if env else None, version=env.engine.version if env else None) is None:
-        return f"executor implementation {cfg.executors[item.executor]!r} not available"
-    if Gap.NO_POLICY_VALUE in item.gaps:
-        return "NO_POLICY_VALUE: required policy values missing"
-    return None
 
 
 def _normalize(check: CheckDef, draft: EvidenceDraft) -> dict[str, Any]:
@@ -130,11 +121,13 @@ def run_plan_locked(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
     expected_recipe = plan.inputs.execution_recipe_sha256
     software_digests: dict[Path, tuple[bytes, str]] = {}
 
-    def verify_recipe():
+    def verify_recipe(record_reads=None):
         if expected_recipe is None:
             return
         requested = cfg.requested if cfg.requested is not None else cfg.raw
-        if configuration_sha256(requested, environments, software_digests=software_digests) != expected_recipe:
+        if configuration_sha256(
+            requested, environments, software_digests=software_digests, record_reads=record_reads,
+        ) != expected_recipe:
             raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
 
     verify_recipe()
@@ -161,7 +154,7 @@ def recover_pending_locked(store: Store, plan: Plan, attempt_id: str) -> list[Ev
 
 
 def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[Environment], policy: Policy, *,
-              verify_recipe: Callable[[], None], only_side: Side | None = None) -> list[Evidence]:
+              verify_recipe: Callable[[dict | None], None], only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     if plan.mode == Mode.update:
@@ -174,6 +167,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
     }
 
     out: list[Evidence] = []
+    decoded_by_side = {}
     for item in plan.items:
         if not item.selected:
             continue  # INV-10
@@ -181,7 +175,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
         for side, env in _sides(plan, envs):
             if only_side is not None and side != only_side:
                 continue
-            verify_recipe()
+            record_reads = {}
+            verify_recipe(record_reads)
             side_cfg = cfg.side_configs.get(side.value, cfg)
             adapter_factory = registry.adapter_factory(side_cfg.adapter)
             adapter = adapter_factory() if adapter_factory else None
@@ -205,8 +200,11 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
                 refs=[plan_ref, environment_ref],
             )
             side_cfg.attempt_id = cfg.attempt_id
-            evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,
-                           policy_validity=(policy.valid_from, policy.valid_until))
+            with check_observations.bind(record_reads, decoded_by_side.setdefault(side, {})):
+                evd = _run_one(
+                    store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan,
+                    common, policy_validity=(policy.valid_from, policy.valid_until),
+                )
             try:
                 store.put(evd)
             except Exception:
@@ -241,9 +239,16 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             **_empty_evidence_parts(check),
         ).seal()
 
-    reason = _blocked_reason(item, cfg, env)
-    if reason:
-        return stopped(ExecStatus.NOT_RUN, reason)
+    if Gap.NO_EXECUTOR in item.gaps:
+        return stopped(ExecStatus.NOT_RUN, "NO_EXECUTOR: check has no automated executor (manual test required)")
+    if item.executor not in cfg.executors:
+        return stopped(ExecStatus.NOT_RUN, f"executor {item.executor!r} not configured in guard.toml [executors]")
+    impl_name = cfg.executors[item.executor]
+    factory = registry.resolve_executor(item.executor, impl_name, engine=env.engine.name, version=env.engine.version)
+    if factory is None:
+        return stopped(ExecStatus.NOT_RUN, f"executor implementation {impl_name!r} not available")
+    if Gap.NO_POLICY_VALUE in item.gaps:
+        return stopped(ExecStatus.NOT_RUN, "NO_POLICY_VALUE: required policy values missing")
     if cfg.abort_reason:
         return stopped(ExecStatus.ABORTED, cfg.abort_reason)
     from guard.configuration import for_check
@@ -263,15 +268,20 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)
 
-    impl_name = cfg.executors[item.executor]
     started = utcnow()
     info_stub: ExecutorInfo | None = None
     try:
         from guard.adapters.engine_provider import PROVIDERS
         provider = PROVIDERS.get(env.engine.name)
         if provider is not None: provider.validate_environment(env, item.executor, impl_name)
+        if cfg.runtime_environ is not None or cfg.kubernetes_target_pins is not None:
+            raw = dict(raw)
+            if cfg.runtime_environ is not None:
+                raw["_runtime_environ"] = cfg.runtime_environ
+            if cfg.kubernetes_target_pins is not None:
+                raw["_kubernetes_target_sha256_by_executor"] = cfg.kubernetes_target_pins
         with registry.environment_binding(env):
-            executor = registry.build_executor(item.executor, impl_name, raw)
+            executor = registry.build_executor(item.executor, impl_name, raw, factory=factory)
         info_stub = ExecutorInfo(name=executor.name, version=executor.version, config_sha256=sha256_hex(b""))
         workdir = Path(store.root) / "work" / plan.id / cfg.attempt_id / check.id / str(common["side"])
         draft = executor.run(check, env, policy_values, adapter, workdir)

@@ -58,12 +58,15 @@ def pass_gate(check: CheckDef, evd: Evidence) -> list[str]:
     return blocks
 
 
+def _policy_exception_statuses(check_id: str, policy: Policy, as_of: datetime):
+    for exception in policy.exceptions:
+        if exception.check_id == check_id:
+            yield exception, exception.unavailable_reason(as_of)
+
+
 def _exception(check_id: str, policy: Policy, as_of: datetime) -> tuple[ExceptionMark | None, list[str]]:
     mark, reasons = None, []
-    for exc in policy.exceptions:
-        if exc.check_id != check_id:
-            continue
-        reason = exc.unavailable_reason(as_of)
+    for exc, reason in _policy_exception_statuses(check_id, policy, as_of):
         if reason is not None:
             detail = {"unapproved": "not approved", "expired": f"expired at {exc.expires_at}"}.get(reason, reason)
             reasons.append(f"policy exception not shown: {detail} ({exc.reason})")

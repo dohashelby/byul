@@ -1,13 +1,12 @@
 """LIF09 canonical single-stage observation; full experiment lineage remains separate."""
-from pathlib import Path
 import uuid
+from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_initialization_sensor as sensor,vllm_initialization_metadata as metadata
 from guard.adapters import vllm_initialization_release_sensor as init_release
 from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor,vllm_ready_endpoint_contract as endpoint_contract,vllm_ready_endpoint_metadata as endpoint_metadata
 from guard.adapters import vllm_worker_generation_sensor as generation_sensor,vllm_worker_generation_metadata as generation_metadata
 from guard.adapters import vllm_worker_initialization_sensor as joint_sensor,vllm_worker_initialization_metadata as joint_metadata
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_initialization import KubernetesInitializationHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
@@ -50,7 +49,7 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
         try:
             if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg['target'])
             target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end=normalize_check_policy(check,policy_values)
             if prepared['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}:
                 required={item.key for item in check.required_observations}

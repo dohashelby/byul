@@ -775,6 +775,31 @@
       "manifest_sha256": "78506292a2c36694ff67130f3f41f3adf82c2f384669709248f87929e9db4c0c",
       "reviewed_by": "Codex / Linux CI handoff regression fixes / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T10:21:35.366Z"
+    },
+    {
+      "manifest_sha256": "057db0c0a3ed7dee90d4b81b60d7c5591b668caf8cd01f5def8fec9919cff9ee",
+      "reviewed_by": "Codex / execution and record reader dedup / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T12:55:35.362Z"
+    },
+    {
+      "manifest_sha256": "251340907a2b8c587b529b81f511015b4f070ed826e1bae3181502888036c0a3",
+      "reviewed_by": "Codex / observer projection and scoped record reuse / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:32:25.837Z"
+    },
+    {
+      "manifest_sha256": "692f3084a38367f2685f73898e9a7c62209edc949132824e4bd87dec3ea5fda8",
+      "reviewed_by": "Codex / CI import resolution / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:36:51.652Z"
+    },
+    {
+      "manifest_sha256": "88731956412f0721a7c53420bd6808f3cc5a5724389e1d3d14ebeb7f8c93af61",
+      "reviewed_by": "Codex / evidence collection completion / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:40:29.430Z"
+    },
+    {
+      "manifest_sha256": "bd8772e46f61ad4fb2c45c57aebc95a50852b8a0b44374c623cfa17a0de75833",
+      "reviewed_by": "Codex / collector dependencies / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:57:17.985Z"
     }
   ]
 }

@@ -6,6 +6,7 @@ import threading
 from guard.models import canonical_json,sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.adapters.vllm_stored_responses import creation_body,response_projection,REVIEWED_SOURCES
+from .response_evidence import complete_body
 from .kubernetes_routes import KubernetesRoutesHTTP,EXTERNAL
 from .kubernetes_http import KubernetesBindingError
 from .kubernetes_forwarded_identity_http import header_value
@@ -99,12 +100,11 @@ class KubernetesStoredResponsesHTTP(KubernetesRoutesHTTP):
                 if row.get('id')!=rid or row.get('method')!=method or row.get('mode')!='json':raise ValueError
                 status=row.get('outcome')
                 if not(type(status) is int and 100<=status<=599 or type(status) is str and status in {'refused','timeout','unreachable','dns_error','error','probe_error'}):raise ValueError
-                text=row.get('body');complete=(type(text) is str and len(text.encode())<=128*1024 and row.get('capture_complete') is True
-                    and row.get('eof') is True and row.get('utf8_valid') is True and row.get('body_truncated') is False
-                    and type(row.get('body_bytes')) is int and row['body_bytes']==len(text.encode()) and row.get('body_sha256')==sha256_hex(text.encode()))
+                body_bytes = complete_body(row)
+                complete = body_bytes is not None
                 safe.update(outcome=status,capture_complete=complete)
                 if status==200 and complete:
-                    value=strict_json(text.encode(),limit=128*1024)
+                    value=strict_json(body_bytes,limit=128*1024)
                     safe.update(response_projection(value,expected_id=response_id,api_model=self.api_model,previous=previous))
                     if safe['object_shape_verified']:
                         if action=='create':self.scope.remember_creation_claim(*key,value['id'])

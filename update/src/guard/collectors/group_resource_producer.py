@@ -16,9 +16,9 @@ GPU 메모리 반환은 이 관측으로 확인하지 않는다(`GPU_MEMORY_RELE
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from . import gpu_common_inputs as contract
+from .source_pins import producer_source_sha256
 from . import group_resource_observer as observer
 
 PRODUCER_NAME = 'guard-engine-failed-group-resources'
@@ -26,10 +26,8 @@ PRODUCER_VERSION = '1'
 
 
 def producer():
-    digest = hashlib.sha256()
-    for path in (Path(observer.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    source_sha256 = producer_source_sha256(observer.__file__, __file__)
+    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': source_sha256}
 
 
 def _sha(text):

@@ -16,24 +16,26 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
-from pathlib import Path
 import re
 import time
 
-from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.collectors.file import load_bounded_json
+from guard.models import canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import capture_pipes, strict_json
 from guard.runtime.kubernetes_http import GATEWAY_EVENT_PROFILE, KubernetesHTTP
 from guard.runtime.kubernetes_routes import KubernetesRoutesHTTP
 from . import observation_contract as base
 from .http_common import Ctx, HttpCheckExecutor
-from .kubernetes_lifecycle_capture import KubernetesCaptureError, KubernetesLifecycleReader
-from .owned_capture import _FILE_READER, MAX_BYTES
+from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
+from .kubernetes_lifecycle_capture import KubernetesCaptureError
+from .kubernetes_observation import finish_required_event
 
 PROFILE = "kubernetes-gateway-required-event-record-v1"
 POLICY_TYPES = {**base.POLICY_TYPES, "observation_gateway_target_id": "str"}
 OBSERVATIONS = dict(base.OBSERVATIONS)
 RECORD_PATH = "/srv/serving/runtime/data/gateway_records.jsonl"
 RECORD_SCHEMA = "runtime-mvp-record/1.0"
+_RECORD_PROFILE = FixedRecordProfile(RECORD_PATH)
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
 
 
@@ -91,19 +93,13 @@ def record_events(lines, *, run_id):
     return events
 
 
-class GatewayRecordReader(KubernetesLifecycleReader):
-    def __init__(self, routes, target, session, *, binary, duration, runner):
-        if target.get("lab") is not True:
-            raise KubernetesCaptureError()
-        binding = {"context": routes.binding["context"], "run_id": routes.binding["run_id"],
-                   "engine": deepcopy(routes.binding["gateway"])}
-        self._initialize(binding, target, {"session": session}, binary=binary, duration=duration, runner=runner)
-
-    def _program(self, container, argv, max_bytes):
-        if (container != self.binding["engine"]["container"]
-                or argv != ["python3", "-c", _FILE_READER, RECORD_PATH, str(MAX_BYTES)] or max_bytes != 2 * MAX_BYTES):
-            raise KubernetesCaptureError()
-        return "file"
+def GatewayRecordReader(routes, target, session, *, binary, duration, runner):
+    if target.get("lab") is not True:
+        raise KubernetesCaptureError()
+    binding = {"context": routes.binding["context"], "run_id": routes.binding["run_id"],
+               "engine": deepcopy(routes.binding["gateway"])}
+    return FixedRecordReader(binding, target, session, profile=_RECORD_PROFILE,
+                             binary=binary, duration=duration, runner=runner)
 
 
 class KubernetesGatewayRequiredEventExecutor(HttpCheckExecutor):
@@ -125,8 +121,7 @@ class KubernetesGatewayRequiredEventExecutor(HttpCheckExecutor):
                     or set(self.roles()) != {"allowed", "denied"}):
                 raise ValueError
             keys = self.keys()
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg["target"])
             digest = sha256_hex(canonical_json(target)); start, end = normalize_policy(policy_values)
             if (target.get("lab") is not True or digest != policy_values["observation_target_sha256"]
                     or env.ref().sha256 != policy_values["observation_environment_sha256"]
@@ -161,8 +156,7 @@ class KubernetesGatewayRequiredEventExecutor(HttpCheckExecutor):
             try:
                 if not start <= utcnow() <= end:
                     raise ValueError
-                role = reader.binding["engine"]
-                raw, provenance = reader.read_file(reader, ctx._full_target, container=role["container"], image=role["image"], path=RECORD_PATH)
+                raw, provenance = reader.read_record(ctx._full_target)
                 if provenance.get("owner_binding_verified") is not True:
                     raise ValueError
                 packet = {"schema": base.SCHEMA, "session": values["observation_session"],
@@ -251,10 +245,4 @@ class KubernetesGatewayRequiredEventExecutor(HttpCheckExecutor):
         return {k: {"value": v, "collected": True} for k, v in observations.items()}, normal, challenges, summary
 
     def _finish(self, ctx):
-        draft = super()._finish(ctx)
-        ceiling = DataOrigin.EXAMPLE if self.runner is not None or ctx.target["lab"] or ctx.env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin = min(draft.data_origin, ceiling, key=lambda origin: ORIGIN_STRENGTH[origin])
-        if ctx._obs_gap or ctx._obs_cleanup:
-            draft.status = ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._obs_cleanup)
-        return draft
+        return finish_required_event(super()._finish(ctx), ctx, injected_runner=self.runner is not None)

@@ -3,8 +3,8 @@ from pathlib import Path
 import math
 import re
 
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_routes import KubernetesRoutesHTTP, PROFILE
 from .base import DraftArtifact
 from .direct_route import DirectRouteExecutor
@@ -37,8 +37,7 @@ class _KubernetesRoutes:
                 raise ValueError
             if any(re.fullmatch('[A-Za-z0-9_.-]{1,64}', role) is None for role in self.roles()):
                 raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg['target'])
             if self._target_pin is not None and sha256_hex(canonical_json(target)) != self._target_pin:
                 raise ValueError
             if self.check_id == 'REQ-01' and not target['direct_targets']:

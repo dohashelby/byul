@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 import tomllib
 from datetime import datetime, timezone
 import os
@@ -13,7 +14,7 @@ from typing import Optional
 import typer
 import yaml
 
-from guard.collectors.file import load_environment, load_policy
+from guard.collectors.file import load_bounded_json, load_environment, load_policy
 from guard.collectors.change import read_change, resolve_plan, save_change, extracted_input
 from guard.collectors.updates import update_object
 from guard.core.change_selection import build_context
@@ -27,6 +28,7 @@ from guard.core.run import recover_pending_locked, run_plan
 from guard.core.select import select as select_plan
 from guard.models import Mode, Pack, Plan, load_pack, utcnow
 from guard.models.objects import Report
+from guard.models.hashing import sha256_hex
 from guard.store import Store
 from guard.store import IntegrityError
 from guard.store.packs import PackNotStoredError, get_pack, put_pack
@@ -564,14 +566,12 @@ def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path 
     output: Path = typer.Option(...,"--output"),nonsecret_model_weights: bool = typer.Option(False,"--nonsecret-model-weights"),
     hash_model_bytes: bool = typer.Option(False,"--hash-model-bytes"),max_hash_bytes: int = typer.Option(2**31,"--max-hash-bytes")) -> None:
     """선언한 비밀 아닌 safetensors 참조 범위를 만든다. 모델 파일을 읽지 않는다."""
-    from guard.collectors.file import load_environment
     from guard.collectors.model_read_scope import build_scope
-    from guard.executors.owned_capture import strict_json
     from guard.collectors.route_observations import validate_output
     from guard.models import canonical_json
     try:
         environment=load_environment(env)
-        with target.open('rb') as stream:topology=strict_json(stream.read(65537))
+        topology = load_bounded_json(target)
         value=build_scope(environment,topology,model_manifest,model_root,nonsecret_model_weights=nonsecret_model_weights,
             hash_model_bytes=hash_model_bytes,max_hash_bytes=max_hash_bytes)
         validate_output(output,Path(__file__).resolve().parents[3]);destination=output.absolute()
@@ -650,6 +650,35 @@ def capture_lifecycle_observations(
                           "product_connected":False,"security":"UNKNOWN"}))
 
 
+def _encode_capture(value: dict, *, max_bytes: int, bound_code: str | None) -> str:
+    raw = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    # The serialized artifact is ASCII, so text length equals its UTF-8 byte length.
+    if len(raw) > max_bytes:
+        raise ValueError() if bound_code is None else ValueError(bound_code)
+    return raw
+
+
+def _publish_capture(
+    output: Path,
+    value: dict,
+    raw: str,
+    validate_output: Callable[[Path, Path], None],
+    failure_code: str,
+) -> dict[str, int | str]:
+    try:
+        validate_output(output, Path(__file__).resolve().parents[3])
+        with output.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(raw)
+    except (OSError, UnicodeError, ValueError):
+        # Only validated metadata reaches this fallback; preserve collected facts.
+        typer.echo(json.dumps({
+            "capture_executed": True, "artifact_saved": False, "security": "UNKNOWN",
+            "diagnostic_codes": [failure_code], "capture": value,
+        }, ensure_ascii=True))
+        raise typer.Exit(1)
+    return {"sha256": sha256_hex(raw.encode("utf-8")), "bytes": len(raw)}
+
+
 @app.command("capture-lifecycle-session")
 def capture_lifecycle_session(
     env: Path = typer.Option(...,"--env"),
@@ -661,7 +690,6 @@ def capture_lifecycle_session(
     execute: bool = typer.Option(False,"--execute",help="소유 세션의 프로세스·파일 metadata만 읽기"),
 ) -> None:
     """세션의 개별 기록과 누락을 보존한다. 종결·전체 회수 판정은 UNKNOWN이다."""
-    import hashlib
     from guard.collectors.lifecycle import load_session_inputs,validate_output,collect_session
     from guard.executors.owned_capture import create_capture_client,SourceCaptureError
     try:
@@ -671,24 +699,13 @@ def capture_lifecycle_session(
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
             return
         value=collect_session(create_capture_client(topology["run_id"]),environment,topology,container,image,assets)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode("utf-8"))>64*1024**2:
-            raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
+        raw = _encode_capture(value, max_bytes=64 * 1024**2, bound_code="LIFECYCLE_SESSION_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError,SourceCaptureError):
         typer.echo("LIFECYCLE_SESSION_CAPTURE_FAILED")
         raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open("x",encoding="utf-8",newline="\n") as stream:
-            stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        # Only validated metadata reaches this fallback; preserve collected facts.
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
-        raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
-        "recordings":len(value["recordings"]),"sha256":hashlib.sha256(raw.encode("utf-8")).hexdigest(),
-        "bytes":len(raw.encode("utf-8"))}))
+        "recordings":len(value["recordings"]),**saved}))
 
 
 @app.command("capture-kubernetes-lifecycle-session")
@@ -703,7 +720,6 @@ def capture_kubernetes_lifecycle_session(
     execute: bool = typer.Option(False,"--execute",help="명시 소유 Kubernetes 세션의 파일·프로세스 metadata만 읽기"),
 ) -> None:
     """명시 context/Pod 세대에서 고정 읽기 helper만 실행한다. 보안 판정은 UNKNOWN이다."""
-    import hashlib
     from guard.collectors.kubernetes_lifecycle import load_inputs,load_model_mapping,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
@@ -715,21 +731,13 @@ def capture_kubernetes_lifecycle_session(
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
             return
         value=collect(environment,topology,assets,binary=kubectl_binary,duration=max_duration,model_mapping=mapping)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode("utf-8"))>64*1024**2:raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
+        raw = _encode_capture(value, max_bytes=64 * 1024**2, bound_code="LIFECYCLE_SESSION_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):
         typer.echo("KUBERNETES_LIFECYCLE_CAPTURE_FAILED")
         raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open("x",encoding="utf-8",newline="\n") as stream:stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
-        raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
-        "recordings":len(value["recordings"]),"sha256":hashlib.sha256(raw.encode("utf-8")).hexdigest(),
-        "bytes":len(raw.encode("utf-8"))}))
+        "recordings":len(value["recordings"]),**saved}))
 
 
 @app.command("capture-kubernetes-process-snapshot")
@@ -742,7 +750,6 @@ def capture_kubernetes_process_snapshot(
     execute: bool=typer.Option(False,"--execute",help="선택 컨테이너의 process metadata·환경 이름만 읽기"),
 ) -> None:
     """기존 권한/자격 소비자의 공통 입력. worker/source 귀속과 보안 판정은 미확인이다."""
-    import hashlib
     from guard.collectors.kubernetes_process import load_inputs,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
@@ -754,22 +761,14 @@ def capture_kubernetes_process_snapshot(
                 "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN"}))
             return
         value=collect(environment,topology,binary=kubectl_binary,duration=max_duration,candidate_paths=selected)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode())>1024**2:
-            raise ValueError('KUBERNETES_PROCESS_ATTACHMENT_BOUND')
+        raw = _encode_capture(value, max_bytes=1024**2, bound_code="KUBERNETES_PROCESS_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,RuntimeError,yaml.YAMLError):
         typer.echo('KUBERNETES_PROCESS_CAPTURE_FAILED')
         raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open('x',encoding='utf-8',newline='\n') as stream:stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["PROCESS_SNAPSHOT_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
-        raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "PROCESS_SNAPSHOT_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"available":value['available'],
         "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN",
-        "sha256":hashlib.sha256(raw.encode()).hexdigest(),"bytes":len(raw.encode())}))
+        **saved}))
     if not value['available']:
         raise typer.Exit(1)
 
@@ -784,7 +783,6 @@ def capture_native_weight_files(
     execute: bool=typer.Option(False,"--execute",help="명시된 소유 모델 파일의 bytes 해시만 읽기"),
 ) -> None:
     """native iterator 경로 지문과 별도 파일 해시를 대조한다. 최종 모델/소비 판정은 미확인이다."""
-    import hashlib
     from guard.collectors.native_weight_files import load_inputs,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
@@ -795,18 +793,12 @@ def capture_native_weight_files(
         if not execute:
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}));return
         value=collect(inputs,duration=max_duration,max_file_bytes=max_file_bytes,binary=kubectl_binary)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode())>16*1024**2:raise ValueError()
+        raw = _encode_capture(value, max_bytes=16 * 1024**2, bound_code=None)
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):
         typer.echo("NATIVE_WEIGHT_FILE_CAPTURE_FAILED");raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open("x",encoding="utf-8",newline="\n") as stream:stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["WEIGHT_FILE_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True));raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "WEIGHT_FILE_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
-        "files":len(value["files"]),"sha256":hashlib.sha256(raw.encode()).hexdigest(),"bytes":len(raw.encode())}))
+        "files":len(value["files"]),**saved}))
 
 
 @app.command("capture-stream-pressure")

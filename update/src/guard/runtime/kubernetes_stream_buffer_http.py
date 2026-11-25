@@ -4,6 +4,7 @@ from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import math,re,threading
 from guard.models import canonical_json,sha256_hex
+from .response_evidence import complete_body
 from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
 from .kubernetes_stream_buffer import normalize_read_profiles
 
@@ -52,9 +53,8 @@ class KubernetesStreamBufferHTTP:
                 if (value.get('id'),value.get('method'),value.get('mode'))!=(r['id'],'POST',r['mode']):raise ValueError
                 outcome=value.get('outcome')
                 if not(type(outcome) is int and 100<=outcome<=599 or type(outcome) is str and outcome in {'refused','timeout','unreachable','dns_error','error','probe_error'}):raise ValueError
-                text=value.get('body');complete=(type(text) is str and len(text.encode())<=131072 and value.get('capture_complete') is True and value.get('eof') is True
-                    and value.get('utf8_valid') is True and value.get('body_truncated') is False and type(value.get('body_bytes')) is int
-                    and value['body_bytes']==len(text.encode()) and value.get('body_sha256')==sha256_hex(text.encode()))
+                body_bytes = complete_body(value)
+                complete = body_bytes is not None
                 row={'case_id':'lif04-'+slot,'outcome':outcome,'binding_verified':True,'capture_complete':complete,
                     'event_stream':value.get('content_type')=='text/event-stream',
                     'eof':value.get('eof') is True,'terminal_seen':value.get('terminal_seen') is True,'client_closed':False,
@@ -77,7 +77,7 @@ class KubernetesStreamBufferHTTP:
                     row.update(client_closed=closed,client_close_ms=close if closed else None,read_count=count,read_pause_count=pause,
                         read_observations=deepcopy(observations),intentional_client_close=closed)
                 self.rows.append(row)
-                return [{'id':'lif04-'+slot,**row,'body':text if complete and not streaming else None}]
+                return [{'id':'lif04-'+slot,**row,'body':value['body'] if complete and not streaming else None}]
             except Exception:
                 self.failed=True;self.rows.append({'case_id':'lif04-'+slot if slot in SLOTS else None,'binding_verified':False,'diagnostic':'STREAM_BUFFER_HTTP_UNAVAILABLE'})
                 raise KubernetesBindingError() from None

@@ -9,9 +9,9 @@ B 소비자(`kubernetes_unix_ipc`)가 쓸 수 있도록 `summarize`가 역할별
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from . import gpu_common_inputs as contract
+from .source_pins import producer_source_sha256
 from . import ipc_ownership_observer as observer
 
 PRODUCER_NAME = 'guard-engine-ipc-ownership'
@@ -20,10 +20,8 @@ TCP_LISTEN, TCP_ESTABLISHED = 10, 1
 
 
 def producer():
-    digest = hashlib.sha256()
-    for path in (Path(observer.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    source_sha256 = producer_source_sha256(observer.__file__, __file__)
+    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': source_sha256}
 
 
 def _state(item):

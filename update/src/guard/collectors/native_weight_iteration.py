@@ -10,12 +10,13 @@ from pathlib import Path
 from guard.adapters import vllm_lifecycle_profiles as profiles
 from guard.adapters import vllm_weight_iteration_metadata as common
 from guard.adapters import vllm_weight_iteration_sensor as sensor
-from guard.models import canonical_json, sha256_hex
+from guard.models import canonical_json
+from .source_pins import verify_adapter_source_pins
 
 VERSION = "0.1.1"
 SCHEMA = "guard-native-weight-selection-iteration/1"
 SOURCE_PINS = {
-    "vllm_weight_iteration_metadata.py": "f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0",
+    "vllm_weight_iteration_metadata.py": "fb80e45de5355b038896a2aa66e60548e94649948762b7107b2d64eae5cb1489",
     "vllm_weight_iteration_sensor.py": "74d0b65aaf4b45185c3d53b520d0881ebe711950e89b17dd48b0a1ca10e1a87a",
 }
 MAX_SELECTIONS = 256
@@ -27,16 +28,6 @@ MAX_LOCATORS = 64
 def _require(value):
     if not value:
         raise ValueError("NATIVE_WEIGHT_ITERATION_INPUT_INVALID")
-
-
-def _source_gate():
-    root = Path(__file__).resolve().parents[1] / "adapters"
-    try:
-        matched = all(sha256_hex((root / name).read_bytes()) == expected for name, expected in SOURCE_PINS.items())
-    except OSError:
-        matched = False
-    if not matched:
-        raise ValueError("NATIVE_WEIGHT_ITERATION_COMMON_SOURCE_MISMATCH")
 
 
 def _selection(value):
@@ -143,7 +134,7 @@ def _analyze(packet):
 
 
 def analyze(packet):
-    _source_gate()
+    verify_adapter_source_pins(Path(__file__), SOURCE_PINS, "NATIVE_WEIGHT_ITERATION_COMMON_SOURCE_MISMATCH")
     try:
         return _analyze(packet)
     except (ValueError, KeyError, TypeError, UnicodeError, RecursionError):

@@ -1,23 +1,21 @@
 """Common live input for A-2 permission/credential consumers, not a new judge."""
-import math
 from pathlib import Path
 
-from guard.collectors.file import load_environment
+from guard.transport_options import valid_kubectl_options
+from guard.collectors.file import load_bounded_json, load_environment
 from guard.executors.owned_capture import strict_json
 from guard.executors.kubernetes_container_config import (
     normalize_process_capture_paths, validate_process_capture_target, collect_process_capture)
 
 
 def validate_options(binary,duration):
-    if (type(binary) is not str or not binary.strip() or type(duration) not in (int,float)
-            or not math.isfinite(duration) or not 0 < duration <= 300):
+    if not valid_kubectl_options(binary, duration):
         raise ValueError('KUBERNETES_PROCESS_OPTIONS_INVALID')
 
 
 def load_inputs(env_path,target_path,paths_path=None):
     environment = load_environment(Path(env_path))
-    with Path(target_path).open('rb') as stream:
-        target = strict_json(stream.read(65537),limit=65536)
+    target = load_bounded_json(target_path)
     selected = None
     if paths_path is not None:
         with Path(paths_path).open('rb') as stream:

@@ -84,8 +84,8 @@ def project(record):
             'missing': ['approved_Qwen2_VL_2B_snapshot_not_loaded', 'actual_vllm_MM_worker_transport_not_run']}
 
 
-RUNNER = r'''
-import hashlib,importlib,json,pathlib,sys
+# Both producers hash their assembled RUNNER, including every newline.
+_MODEL_SETUP = r'''import hashlib,importlib,json,pathlib,sys
 pins,config,producer=map(json.loads,sys.argv[1:])
 def sources(): return {n:hashlib.sha256(pathlib.Path(importlib.import_module(n).__file__).read_bytes()).hexdigest() for n in pins}
 def digest(v): return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(',',':')).encode()).hexdigest()
@@ -98,13 +98,17 @@ from tokenizers import Tokenizer,models,pre_tokenizers
 from transformers import Qwen2VLConfig,Qwen2VLForConditionalGeneration,Qwen2VLImageProcessor,Qwen2VLVideoProcessor,Qwen2VLProcessor,PreTrainedTokenizerFast
 torch.set_num_threads(1);torch.manual_seed(0)
 cfg=Qwen2VLConfig(**config);cfg._attn_implementation='eager'
-model=Qwen2VLForConditionalGeneration(cfg).eval()
+'''
+
+_PROCESSOR_SETUP = r'''model=Qwen2VLForConditionalGeneration(cfg).eval()
 backend=Tokenizer(models.WordLevel({'<unk>':0,'<|vision_start|>':1,'<|vision_end|>':2,'<|image_pad|>':3,'<|video_pad|>':4,'Hello':5,'<|endoftext|>':31},unk_token='<unk>'))
 backend.pre_tokenizer=pre_tokenizers.WhitespaceSplit()
 tokenizer=PreTrainedTokenizerFast(tokenizer_object=backend,unk_token='<unk>',pad_token='<unk>',extra_special_tokens=['<|vision_start|>','<|vision_end|>','<|image_pad|>','<|video_pad|>'])
 processor=Qwen2VLProcessor(image_processor=Qwen2VLImageProcessor(patch_size=2,temporal_patch_size=2,merge_size=2,do_resize=False),
                          video_processor=Qwen2VLVideoProcessor(patch_size=2,temporal_patch_size=2,merge_size=2,do_resize=False),tokenizer=tokenizer)
-seen={}
+'''
+
+RUNNER = ("\n" + _MODEL_SETUP + _PROCESSOR_SETUP + r'''seen={}
 def vision(module,args,output): seen['vision']=output.pooler_output
 def language(module,args,kwargs): seen['language']=kwargs.get('inputs_embeds')
 model.model.visual.register_forward_hook(vision)
@@ -137,7 +141,7 @@ for name in ('image-rgb','image-grayscale','token-mismatch','recovery'):
     rows.append(row)
 print(json.dumps({'schema':'guard-mm-processor-model-cpu/1','producer':producer,'data_origin':'EXAMPLE','sources_before':before,'sources_after':sources(),
                   'config_identity':config_identity,'target_model':None,'pretrained_weights_loaded':False,'source_ended':True,'rows':rows}))
-'''
+''')
 
 
 def runner_args():

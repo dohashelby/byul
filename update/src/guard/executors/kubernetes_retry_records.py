@@ -1,13 +1,14 @@
 """Read-only LIF12 declarations using the existing owned OBS01 file reader."""
 
+from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
-from pathlib import Path
 import os
 import stat
 
-from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.models import canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import capture_pipes, strict_json
 from guard.runtime.engine_http import KubernetesHTTP, REQUIRED_EVENT_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_observation import RequiredEventReader
 from .owned_capture import MAX_BYTES
@@ -65,8 +66,7 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
             start, end = contract.normalize_policy(policy_values)
             if env.ref().sha256 != policy_values['retry_environment_sha256'] or not start <= utcnow() <= end:
                 raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg['target'])
             target_hash = sha256_hex(canonical_json(target))
             if (target.get('lab') is not True or target_hash != policy_values['retry_target_sha256']
                     or self.expected_target is not None and target_hash != self.expected_target):
@@ -165,9 +165,5 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
 
     def _finish(self, ctx):
         draft = super()._finish(ctx)
-        ceiling = DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin = min(draft.data_origin, ceiling, key=lambda value: ORIGIN_STRENGTH[value])
-        if ctx._retry_gap or ctx._retry_cleanup:
-            draft.status = ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._retry_cleanup)
-        return draft
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self.runner is not None or ctx.target['lab'])
+        return draft.finish_collection(ceiling, bool(ctx._retry_gap or ctx._retry_cleanup), ctx._retry_cleanup)

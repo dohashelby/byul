@@ -6,15 +6,15 @@ import hashlib
 from pathlib import Path
 import re
 
-from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
 from guard.models.objects import Observation
 from guard.runtime.bounded import capture_pipes
 from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
 from .composite_collection import merge_drafts, select_policy, sub_check
 from .kubernetes_container_config import KubernetesContainerConfigExecutor
-from .kubernetes_lifecycle_capture import KubernetesLifecycleReader, KubernetesCaptureError
+from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
 from .native_observations import validate_capture
-from .owned_capture import _FILE_READER, MAX_BYTES, strict_json
+from .owned_capture import strict_json
 
 PROFILE = "kubernetes-owned-route-record-v1"
 POLICY_TYPES = {
@@ -81,40 +81,21 @@ def normalize_policy(values):
         raise ValueError("KUBERNETES_ROUTE_POLICY_INVALID") from None
 
 
-class KubernetesRouteReader(KubernetesLifecycleReader):
+_RECORD_PROFILE = FixedRecordProfile(
+    "/guard-route/data/{session}/route-observations.json",
+    file_report_profile=PROFILE,
+    unverified_fields=("native_producer_verified", "authorization_verified"),
+    require_plain_argv=True,
+    parent_cleanup_code="KUBERNETES_ROUTE_PARENT_CLEANUP_UNVERIFIED",
+)
+
+
+def KubernetesRouteReader(target, env, session, *, binary="kubectl", duration=30, runner=None):
     """기존 native profile의 lab/source/image gate를 보존하는 제한 기록 reader."""
-    def __init__(self, target, env, session, *, binary="kubectl", duration=30, runner=None):
-        transport = KubernetesHTTP(target, env, duration=duration, binary=binary,
-                                   runner=runner, profile=REQUEST_BINDING_PROFILE)
-        self.cleanup_errors = []
-        actual_runner = runner or capture_pipes
-        def bounded_runner(*args, **kwargs):
-            result = actual_runner(*args, **kwargs)
-            pipe = result.get("capture", {})
-            if pipe.get("pipes_closed") is False or "child_reap" in pipe.get("read_errors", []):
-                if "KUBERNETES_ROUTE_PARENT_CLEANUP_UNVERIFIED" not in self.cleanup_errors:
-                    self.cleanup_errors.append("KUBERNETES_ROUTE_PARENT_CLEANUP_UNVERIFIED")
-                self.gap = True
-            return result
-        self._initialize(transport.binding, target, {"session": session},
-                         binary=binary, duration=duration, runner=bounded_runner)
-        self.injected = runner is not None
-
-    def _program(self, container, argv, max_bytes):
-        if (container != self.binding["engine"]["container"] or type(argv) is not list
-                or argv != ["python3", "-c", _FILE_READER,
-                            "/guard-route/data/" + self.session + "/route-observations.json", str(MAX_BYTES)]
-                or max_bytes != 2 * MAX_BYTES):
-            raise KubernetesCaptureError()
-        return "file"
-
-    def report(self):
-        result = super().report()
-        result.update(profile=PROFILE, cleanup_errors=list(self.cleanup_errors),
-                      native_producer_verified=False, authorization_verified=False)
-        # This profile can run only the fixed file reader, never native census/context.
-        result["programs"] = {"file": result["programs"]["file"]}
-        return result
+    transport = KubernetesHTTP(target, env, duration=duration, binary=binary,
+                               runner=runner, profile=REQUEST_BINDING_PROFILE)
+    return FixedRecordReader(transport.binding, target, session, profile=_RECORD_PROFILE,
+                             binary=binary, duration=duration, runner=runner, default_runner=capture_pipes)
 
 
 def _events(packet):
@@ -201,16 +182,14 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
             reader = KubernetesRouteReader(ctx.target, ctx.env, values["route_session"],
                 binary=self.cfg.get("kubectl_binary", "kubectl"),
                 duration=self.cfg.get("max_duration_seconds", 30), runner=self._kubectl_runner)
-            role = reader.binding["engine"]
-            raw, provenance = reader.read_file(reader, ctx.target, container=role["container"], image=role["image"],
-                path="/guard-route/data/" + values["route_session"] + "/route-observations.json")
+            raw, provenance = reader.read_record(ctx.target)
             declared = values.get(FILE_KEY)
             if (declared is not None and provenance["capture_sha256"] != declared
                     or provenance.get("owner_binding_verified") is not True or not start <= utcnow() <= end):
                 raise ValueError
             packet = strict_json(raw)
             record = validate_capture(packet, kind="route", env_ref=ctx.env.ref().model_dump(mode="json"),
-                                      run_id=reader.binding["run_id"], image=role["image"])
+                                      run_id=reader.binding["run_id"], image=reader.binding["engine"]["image"])
             summary["record"] = {**record, "file_bytes_sha256": provenance["capture_sha256"],
                                  "file_bytes": provenance["bytes"], "file_identity": provenance["file_identity"],
                                  "owner_binding_verified": True,
@@ -230,10 +209,4 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
             "detail": "Recorded claims only; independent normal/denied route probes unavailable."}, [], summary
 
     def _finish(self, ctx):
-        draft = super()._finish(ctx)
-        draft.data_origin = min(draft.data_origin, ctx._route_origin,
-                                key=lambda origin: ORIGIN_STRENGTH[origin])
-        if ctx._route_gap:
-            draft.status = ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._route_cleanup)
-        return draft
+        return super()._finish(ctx).finish_collection(ctx._route_origin, ctx._route_gap, ctx._route_cleanup)

@@ -14,6 +14,7 @@ import re
 import secrets
 import time
 
+from guard.models.artifacts import is_pinned_image as _pinned_image
 from guard.automation_policy import validate_log_integrity_policy
 from guard.report.log_integrity import render_log_integrity, verify_log_display
 from guard.runtime.docker import Docker
@@ -34,12 +35,7 @@ _ENV = {"VLLM_CONFIGURE_LOGGING": "1", "VLLM_LOGGING_LEVEL": "INFO", "VLLM_LOGGI
         "VLLM_LOGGING_PREFIX": "", "VLLM_LOGGING_STREAM": "ext://sys.stdout"}
 _LOGGER_SHA = "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010"
 _FORMATTER_SHA = "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5"
-_PINNED = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
-
-
-def _pinned_image(value):
-    return type(value) is str and len(value) <= 512 and _PINNED.fullmatch(value) is not None
 
 
 class LogIntegrityExecutor(HttpCheckExecutor):

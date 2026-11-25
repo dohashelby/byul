@@ -2,6 +2,7 @@
 from copy import deepcopy
 from hashlib import sha256
 import json
+from pathlib import Path
 import pytest
 from guard.collectors import gpu_process_qualification as qualification
 
@@ -31,6 +32,20 @@ def test_empty_registry_cannot_qualify_a_collector_or_whole_recovery(tmp_path,mo
     monkeypatch.setattr(qualification,'REGISTRY',path)
     value=qualification.status('mock','EXAMPLE','example.invalid/unqualified')
     assert value['registered']is value['whole_gpu_release_qualified']is value['whole_group_recovery_qualified']is value['whole69_complete']is False
+
+
+def test_producer_identity_includes_the_shared_source_reader(monkeypatch):
+    before = qualification.producer()
+    read_bytes = Path.read_bytes
+
+    def changed(path):
+        raw = read_bytes(path)
+        return raw + b"\n" if path.name == "source_assets.py" else raw
+
+    monkeypatch.setattr(Path, "read_bytes", changed)
+    after = qualification.producer()
+    assert after == {**before, "source_sha256": after["source_sha256"]}
+    assert after["source_sha256"] != before["source_sha256"]
 
 
 def test_exact_example_lookup_does_not_qualify_another_image_engine_version_or_source(tmp_path,monkeypatch):

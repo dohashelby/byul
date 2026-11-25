@@ -14,6 +14,15 @@ import yaml
 from guard.models import DataOrigin, Environment, Pack, Policy, new_id
 
 
+def load_bounded_json(path: str | Path) -> Any:
+    """Read a local JSON document of at most 64 KiB."""
+    from guard.executors.owned_capture import strict_json
+
+    limit = 64 * 1024
+    with Path(path).open("rb") as stream:
+        return strict_json(stream.read(limit + 1), limit=limit)
+
+
 def _read(path: Path) -> dict[str, Any]:
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):

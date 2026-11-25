@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+from pathlib import Path
 import subprocess
 
 import pytest
@@ -10,12 +11,13 @@ from guard import application
 from guard.adapters.vllm_stock_python_mode import CONFIG_SHA256, FILE_SIZES, LOADER, MODEL, STOCK_MODEL, launch_command, observer_profile
 from guard.configuration import NORMAL_PYTHON_MODE_SCOPE_ERROR, validate_normal_python_mode_update
 from guard.executors import kubernetes_normal_python_mode as stock
-from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
+from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
-from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
+from tests.builders import T0, assert_unconfirmed_security_failure, environment, policy
 from tests.test_kubernetes_sampling import World, inputs
 
 READY = "2026-10-26T00:00:01Z"
+PACK = Path(__file__).resolve().parents[1] / "packs" / "PACK-BASELINE"
 SOURCES = {
     "0.30.0": "5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
     "0.31.0": "a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
@@ -104,7 +106,7 @@ class OwnedWorld(World):
 
 @pytest.mark.parametrize("missing_rank", [False, True])
 def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypatch, missing_rank):
-    pack = baseline_pack()
+    pack = load_pack(PACK)
     pol = policy(pack.ref(), status="CONFIRMED", confirmed_by="fixture owner", confirmed_at=T0,
                  scope={"include": ["SUP-11"]}, values={})
     rows = {side: capsule(tmp_path / side, side, version) for side, version in
@@ -132,7 +134,8 @@ def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypa
     monkeypatch.setattr(subprocess, "Popen", no_subprocess)
     envs = [row[0] for row in rows.values()]
     prepared = application.update_readiness(pack, envs, pol, cfg)
-    assert prepared["ready"] and prepared["execution_ready"], prepared
+    if not prepared["ready"] or not prepared["execution_ready"]:
+        pytest.fail(json.dumps(prepared, ensure_ascii=False, sort_keys=True))
     store = Store(tmp_path / "store")
     report, _ = application.execute_update(store, pack, envs, pol, cfg, tmp_path / "output", utcnow())
     results = next(row for row in report.by_check if row.check_id == "SUP-11")

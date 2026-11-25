@@ -1,3 +1,25 @@
+## 2026-11-25 — 엔진 센서 입력의 판본·이미지 및 수집 경계 재검토
+
+- 양쪽 ENV를 비교 작업 기록의 기준·후보 판본 및 이미지와 대조한다. 준비 자산의 세션, 대상 결합, 정책값 형식을 검증하고 두 쪽이 준비된 점검만 J02 실행 범위에 넣는다.
+- 페이지 사이에 새 기록 작성자가 나타나면 원본 파일 집합의 변화를 기록한다. 체크포인트를 발행한 작성자의 회전 파일과 독립 작성자를 구분한다.
+- 이 변경은 정적 입력과 보관된 기록의 검증을 다룬다. 이번 검토에서 엔진을 기동하거나 GPU 실측을 수행하지 않았다.
+
+## 2026-11-25 — 엔진 센서 6개 점검의 두 판본 입력 결합
+
+- 한 일: 공식 원본(PACK-BASELINE@39)에서 REQ-14·15·16·18·19·21이 양쪽 `UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE`로 NOT_RUN이었다. 원인을 확인했다. 실행기(`engine_sensor` kubernetes)와 0.30.0·0.31.0 관측 고정값은 이미 있다. 빠진 것은 쪽마다 실제 ENV·target·설치 콜백 세션에 묶은 사례 manifest와 J02 점검별 설정이었다. `tools/engine_sensor_pair_inputs.py`를 더했다.
+  - 두 판본이 같은 사례 bytes를 쓰고, manifest는 쪽마다 자기 세션·target·ENV에 묶는다.
+  - REQ-19 경계(1024 token 이하·초과)와 REQ-21 재기동 사례를 더했다.
+  - J02 선언 조각(`sides.<side>.checks.<점검>.executor`)과 정적 보고서를 쓴다.
+  - 판정 방식: `run_binding.effective_values`로 `READY_STATIC`·`MISSING_INPUT`을 판정한다. 기업 정책 값(REQ-16 `required_cache_contexts`)은 채우지 않는다. REQ-15는 Gateway 입력이 필요해 `REQ15_GATEWAY_INPUTS_REQUIRED`로 남긴다.
+- 테스트 결과: `tests/test_engine_sensor_pair_inputs.py` 7건을 추가했다. 로컬 실행 금지 규칙에 따라 PR Linux CI 결과로 확인한다(미확인).
+- 다음 단계: AWS TP2 양쪽 기동에서 콜백 세션 하나씩 설치(`guard prepare-engine-callbacks --lab-kernel-checks`), target 발견 → 이 도구 → J02 설정 → `prepare-update` → `guard update` 실측. GPU 사용 순서는 Codex 순차 실측과 맞춘다.
+- 막힌 것: REQ-15 Gateway 입력. REQ-16 정책 값(기업 또는 EXAMPLE 모의 입력). REQ-21 L4 P2P 부재 시 통신기 비활성 UNKNOWN 가능성(`docs/dev-1/tp2-run-plan.md`).
+- AWS 양판본 시도 4회(2026-11-25, `/Users/doha/Desktop/Buyl/byul-claude-engine-sensor-20261125/aws*`): SUP-09 봉인 소스와 이 도구를 썼다. 0.30.0·0.31.0을 `v1-callback`(GPU 1장씩)으로 함께 띄우고 REQ-14·18(CONFIRMED)과 REQ-16(EXAMPLE)을 돌렸다. 매번 정리를 확인했다(stopped·g6.2xlarge 복원). 가동은 약 64분이다.
+  1. `update_readiness`가 `executor.keys()`를 부르는데 `EngineSensorExecutor`에 이 메서드가 없었다. 그래서 엔진 센서 점검이 입력과 무관하게 준비 실패로 실행 범위에서 빠졌다. → `keys()`를 더하고 회귀 시험을 추가했다. 이 PR이다.
+  2. 수정 뒤 세 점검이 처음으로 실행됐다. 기준은 정상 요청 200·위반 없음이었다. REQ-18은 `full_scope=true`까지 찼다. 그러나 콜백 페이지 읽기가 `CALLBACK_CHECKPOINT_UNAVAILABLE`(잘림)이었다. 기본 준비 자산의 옛 `Sink`는 체크포인트를 쓰지 않는데, 현재 페이지 읽기기는 `capture_id`가 있으면 체크포인트를 요구한다. 그 결과 기준이 ABORTED가 됐고, 후보는 `BASELINE_EXECUTION_FAILED`로 실행되지 않았다.
+  3. `worker_shards` 모드는 기동 뒤 기록을 봉인해 같은 진단이 났다. `scoped_runner_consumption` 모드에서는 일부 프로세스(pid 1 포함)의 체크포인트 미응답과 `CALLBACK_CAPTURE_NOT_FINALIZED`가 남았다.
+  - 다음: 엔진 센서 콜백 읽기 계약(옛 동기 `Sink` 파일의 체크포인트 적용 여부, 또는 기본 준비 자산의 기록기)을 정한다. 이 묶음은 그 뒤에 다시 실측한다. 실측 설정으로 우회하지 않는다.
+
 ## 2026-11-25 — 적용 점검의 보안 판정 통일
 
 - 새 적용 점검의 보안 RES와 RPT는 PASS 또는 사유 태그가 있는 FAIL로 기록한다. API와 화면은 각 측의 태그를 표시한다. 위반 근거가 없는 FAIL은 버전 비교의 회귀 수에서 제외한다.

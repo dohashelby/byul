@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -32,15 +33,18 @@ import yaml
 from guard.adapters import engine_profiles
 from guard.collectors import engine_callbacks
 from guard.collectors.file import load_environment
+from guard.core.select import check_policy_value
 from guard.executors import engine_callback_projection as projection
 from guard.executors import run_binding
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
+from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesBindingError, KubernetesHTTP
 from tools import gpu_a_run_inputs
 
 SCHEMA = 'byul-engine-sensor-pair-inputs/1'
 ROOT = Path(__file__).resolve().parents[1]
 PACK = ROOT / 'packs/PACK-BASELINE'
+CAMPAIGN = ROOT / 'docs/dev-1/mvp31-development.json'
 SIDES = ('baseline', 'candidate')
 CHECKS = ('REQ-14', 'REQ-15', 'REQ-16', 'REQ-18', 'REQ-19', 'REQ-21')
 # 기존 사례 생성기(gpu_a_run_inputs.cases)를 그대로 쓴다. REQ-16은 lab 문맥이 없는 salt 묶음이다.
@@ -79,14 +83,14 @@ def _read_target(path):
         return strict_json(stream.read(TARGET_LIMIT + 1), limit=TARGET_LIMIT)
 
 
-def _load_side(env_path, target_path, prepared_path):
+def _load_side(env_path, target_path, prepared_path, expected):
     """쪽 공통 입력. 읽지 못한 항목은 코드로 남기고 값을 만들지 않는다."""
     codes, env, target, prepared = [], None, None, None
     try:
         env = load_environment(Path(env_path))
         if not env.hash_ok():
             codes.append('ENV_HASH_INVALID'); env = None
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError, TypeError, yaml.YAMLError):
         codes.append('ENV_UNAVAILABLE')
     try:
         target = _read_target(target_path)
@@ -96,21 +100,43 @@ def _load_side(env_path, target_path, prepared_path):
         codes.append('TARGET_UNAVAILABLE'); target = None
     try:
         prepared = engine_callbacks.load_prepared(prepared_path)
-    except (OSError, ValueError, TypeError, KeyError):
-        codes.append('PREPARED_INVALID')
+        root = Path(prepared_path)
+        root = root if root.is_dir() else root.parent
+        with (root / 'settings.json').open('rb') as stream:
+            settings = strict_json(stream.read(65537), limit=65536)
+        if (type(prepared.get('session')) is not str or re.fullmatch('[0-9a-f]{32}', prepared['session']) is None
+                or type(settings) is not dict or settings.get('session') != prepared['session']
+                or type(settings.get('secret')) is not str or re.fullmatch('[0-9a-f]{64}', settings['secret']) is None
+                or settings.get('lab_kernel_checks') is not prepared.get('lab_kernel_checks')):
+            raise ValueError
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        codes.append('PREPARED_INVALID'); prepared = None
     if env is not None:
+        image = (env.engine.image_digest or '').removeprefix('docker.io/')
+        if (env.engine.name, env.engine.version, image) != (expected['engine'], expected['version'],
+                                                          expected['image'].removeprefix('docker.io/')):
+            codes.append('ENGINE_SENSOR_SIDE_IDENTITY_MISMATCH')
         if not engine_profiles.supports(env.engine.name, env.engine.version, 'native_lifecycle'):
             codes.append('ENGINE_SENSOR_PROFILE_UNREVIEWED')
-        if target is not None and target.get('environment_ref') != env.ref().model_dump(mode='json'):
-            codes.append('TARGET_ENVIRONMENT_MISMATCH')
+        if target is not None:
+            if target.get('environment_ref') != env.ref().model_dump(mode='json'):
+                codes.append('TARGET_ENVIRONMENT_MISMATCH')
+            else:
+                try:
+                    # Constructor validates the same declaration as the executor without contacting the cluster.
+                    KubernetesHTTP(target, env, duration=300, profile=ENGINE_CALLBACK_PROFILE)
+                except KubernetesBindingError:
+                    codes.append('TARGET_BINDING_INVALID')
     return env, target, prepared, codes
 
 
-def side_inputs(side, env_path, target_path, prepared_path, out_dir, *, checks=CHECKS, policy_values=None, pack=None):
+def side_inputs(side, env_path, target_path, prepared_path, out_dir, *, checks=CHECKS, policy_values=None, pack=None, version_pair=None):
     """한 쪽의 점검별 manifest와 실행기 설정. 파일은 새로 만든 폴더에만 쓴다."""
     pack = pack or load_pack(PACK)
     policy_values = policy_values or {}
-    env, target, prepared, common = _load_side(env_path, target_path, prepared_path)
+    if version_pair is None:
+        version_pair = json.loads(CAMPAIGN.read_bytes())['version_pair']
+    env, target, prepared, common = _load_side(env_path, target_path, prepared_path, version_pair[side])
     prepared_manifest = Path(prepared_path)
     prepared_manifest = (prepared_manifest if prepared_manifest.is_dir() else prepared_manifest.parent).absolute() / 'manifest.json'
     rows = {}
@@ -145,10 +171,23 @@ def side_inputs(side, env_path, target_path, prepared_path, out_dir, *, checks=C
         row.update(executor=executor, manifest_sha256=sha256_hex(canonical_json(manifest)),
                    cases_sha256=sha256_hex(canonical_json(cases)))
         # guard update가 실행 직전에 하는 같은 결합 계산. 정책 값은 기업 입력이라 받은 것만 쓴다.
-        values = {k: v for k, v in (policy_values.get(check_id) or {}).items()}
+        values = policy_values.get(check_id, {})
         try:
-            run_binding.effective_values(pack.checks[check_id], executor, env, values,
-                                         side=side, attempt_id=None, issued_at=utcnow())
+            if type(values) is not dict:
+                raise ValueError
+            for param in pack.checks[check_id].policy_params:
+                if param.key in values:
+                    check_policy_value(check_id, param.key, param.type, values[param.key])
+        except ValueError:
+            row['codes'] = ['POLICY_VALUES_INVALID']
+            continue
+        try:
+            _, effective = run_binding.effective_values(pack.checks[check_id], executor, env, values,
+                                                         side=side, attempt_id=None, issued_at=utcnow())
+            expected = {'sensor_environment_sha256': env.ref().sha256, 'sensor_target_sha256': manifest['target_sha256'],
+                        'sensor_prepared_sha256': sha256_hex(canonical_json(prepared)), 'sensor_manifest_sha256': row['manifest_sha256']}
+            if any(effective.get(key) != digest for key, digest in expected.items()):
+                raise ValueError('ENGINE_SENSOR_PAIR_INPUT_CHANGED')
         except ValueError as error:
             row['codes'] = [str(error) or 'RUN_BINDING_UNAVAILABLE']
             continue
@@ -177,11 +216,12 @@ def pair(sides, out_dir, *, checks=CHECKS, policy_file=None):
             raise ValueError('ENGINE_SENSOR_PAIR_POLICY_INVALID')
         policy_values = document.get('values') or {}
     pack = load_pack(PACK)
+    version_pair = json.loads(CAMPAIGN.read_bytes())['version_pair']
     out_dir.mkdir(parents=True)
     rows, envs, sessions = {}, {}, {}
     for side in SIDES:
         rows[side], envs[side], prepared = side_inputs(side, sides[side]['env'], sides[side]['target'], sides[side]['prepared'],
-            out_dir, checks=checks, policy_values=policy_values, pack=pack)
+            out_dir, checks=checks, policy_values=policy_values, pack=pack, version_pair=version_pair)
         sessions[side] = prepared['session'] if prepared else None
     shared_session = sessions['baseline'] is not None and sessions['baseline'] == sessions['candidate']
     if shared_session:
@@ -190,13 +230,14 @@ def pair(sides, out_dir, *, checks=CHECKS, policy_file=None):
             for row in rows[side].values():
                 row['status'] = 'MISSING_INPUT'; row['codes'] = sorted({*row['codes'], 'PREPARED_SESSION_SHARED_ACROSS_SIDES'})
     ready = [c for c in checks if all(rows[s][c]['status'] == 'READY_STATIC' for s in SIDES)]
-    spec = {'executors': {'engine_sensor': 'kubernetes'},
+    spec = {'executors': {'engine_sensor': 'kubernetes'} if ready else {},
+            'shared': {'update': {'mode': 'external', 'allowed_checks': ready}},
             'sides': {side: {'checks': {c: {'executor': deepcopy(rows[side][c]['executor'])} for c in ready}} for side in SIDES}}
     spec_path = out_dir / 'j02-engine-sensor.yaml'
     spec_path.write_text(yaml.safe_dump(spec, allow_unicode=True, sort_keys=False), encoding='utf-8')
-    same_inventory = (None if None in envs.values()
-                      else envs['baseline'].model.inventory_sha256 == envs['candidate'].model.inventory_sha256)
-    report = {'schema': SCHEMA, 'pack_ref': pack.ref().model_dump(mode='json'), 'checks': list(checks),
+    inventories = [env.model.inventory_sha256 if env is not None else None for env in envs.values()]
+    same_inventory = inventories[0] == inventories[1] if None not in inventories else None
+    report = {'schema': SCHEMA, 'expected_version_pair': version_pair, 'pack_ref': pack.ref().model_dump(mode='json'), 'checks': list(checks),
               'ready_static_both_sides': ready, 'rows': {s: rows[s] for s in SIDES},
               'sessions': sessions, 'session_shared_across_sides': shared_session,
               'model_inventory_equal': same_inventory, 'j02_spec_fragment': str(spec_path),

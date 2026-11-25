@@ -95,7 +95,12 @@ def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
                 gaps.append('CALLBACK_CAPTURE_NOT_FINALIZED')
         elif segmented:
             gaps.append('CALLBACK_JOURNAL_STATE_UNAVAILABLE')
-    if (not checkpoints and files != sorted(snapshot)) or any(name not in files for name in snapshot):
+    # Only new segments of a writer that acknowledged this cut can be outside its fixed prefix.
+    extras = set(files) - snapshot.keys()
+    if (snapshot.keys() - set(files) or any(
+            (pid := int(NAME.fullmatch(name)[1])) not in checkpoints
+            or not name.startswith(f'callbacks-{pid}-') or name in checkpoints[pid]['offsets']
+            for name in extras)):
         gaps.append('CALLBACK_SOURCE_SET_CHANGED')
     # Only queued journal writers (a state file or rotated segments) answer capture cuts. A legacy
     # synchronous writer (one callbacks-<pid>.jsonl, no state file) writes each row inside the callback,

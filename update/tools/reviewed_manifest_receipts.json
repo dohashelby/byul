@@ -820,6 +820,11 @@
       "manifest_sha256": "da1e3d606ce2f3cd76d3b1ec2b2d7839179e2bb54badd0ad0a678618a1db98da",
       "reviewed_by": "Claude / PR304 콜백 페이지 옛 Sink 체크포인트 제외 / 사용자 지시로 기록 / B 검토 면제(사용자 결정 5)",
       "reviewed_at": "2026-11-25T11:40:39.000Z"
+    },
+    {
+      "manifest_sha256": "457795bf660a5243a8c72d8cbcb9653f92ad5a57873969add83474192283d3a0",
+      "reviewed_by": "Codex / 판본 비교 및 CI 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T13:07:09.511Z"
     }
   ]
 }

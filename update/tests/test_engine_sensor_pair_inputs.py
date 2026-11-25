@@ -21,10 +21,11 @@ UPDATE = Path(__file__).resolve().parents[1]
 POLICY = {'values': {'REQ-16': {'required_cache_contexts': ['cache_salt']}}}
 
 
-def side(tmp_path, name, generation='v1-req16-lab', *, kernel_checks=True):
+def side(tmp_path, name, generation='v1-req16-lab', *, kernel_checks=True, identity=None, image=None):
     root = tmp_path / name
     root.mkdir()
-    deployed(root, generation)
+    declared = json.loads(pair.CAMPAIGN.read_bytes())['version_pair'][identity or name]
+    deployed(root, generation, engine_version=declared['version'], engine_image=image or declared['image'])
     inputs.main(['env', '--render', str(root / 'render.json'), '--gpu-model', 'NVIDIA L4', '--driver', 'EXAMPLE-driver',
         '--out', str(root / 'env.json')])
     inputs.main(['target', '--env', str(root / 'env.json'), '--render', str(root / 'render.json'),
@@ -55,7 +56,7 @@ def test_presets_pass_the_projection_contract():
 
 
 def test_lab_pair_binds_each_side_and_writes_a_j02_fragment(tmp_path):
-    sides = {'baseline': side(tmp_path, 'b'), 'candidate': side(tmp_path, 'c')}
+    sides = {'baseline': side(tmp_path, 'baseline'), 'candidate': side(tmp_path, 'candidate')}
     report = pair.pair(sides, tmp_path / 'out', policy_file=policy_file(tmp_path))
     assert report['ready_static_both_sides'] == ['REQ-14', 'REQ-16', 'REQ-18', 'REQ-19', 'REQ-21']
     assert report['ready_for_execution'] is False and report['engine_executed'] is False
@@ -81,13 +82,15 @@ def test_lab_pair_binds_each_side_and_writes_a_j02_fragment(tmp_path):
     spec = yaml.safe_load((tmp_path / 'out/j02-engine-sensor.yaml').read_text())
     config = j02_run_config.build_config(spec)
     assert config['executors'] == {'engine_sensor': 'kubernetes'}
+    assert config['update']['allowed_checks'] == report['ready_static_both_sides']
+    assert report['model_inventory_equal'] is None
     for name in pair.SIDES:
         assert sorted(config['sides'][name]['check_config']) == report['ready_static_both_sides']
         assert config['sides'][name]['check_config']['REQ-14'] == report['rows'][name]['REQ-14']['executor']
 
 
 def test_bound_manifest_reaches_the_executor_without_binding_mismatch(tmp_path):
-    sides = {'baseline': side(tmp_path, 'b'), 'candidate': side(tmp_path, 'c')}
+    sides = {'baseline': side(tmp_path, 'baseline'), 'candidate': side(tmp_path, 'candidate')}
     report = pair.pair(sides, tmp_path / 'out', checks=('REQ-14',))
     cfg = report['rows']['baseline']['REQ-14']['executor']
     env = load_environment(sides['baseline']['env'])
@@ -104,8 +107,8 @@ def test_bound_manifest_reaches_the_executor_without_binding_mismatch(tmp_path):
 
 
 def test_non_lab_target_and_missing_kernel_checks_stay_missing(tmp_path):
-    sides = {'baseline': side(tmp_path, 'b', 'v1-callback', kernel_checks=False),
-             'candidate': side(tmp_path, 'c', kernel_checks=False)}
+    sides = {'baseline': side(tmp_path, 'baseline', 'v1-callback', kernel_checks=False),
+             'candidate': side(tmp_path, 'candidate', kernel_checks=False)}
     report = pair.pair(sides, tmp_path / 'out', policy_file=policy_file(tmp_path))
     base, cand = report['rows']['baseline'], report['rows']['candidate']
     assert base['REQ-19']['codes'] == ['LAB_TARGET_REQUIRED', 'LAB_KERNEL_CHECKS_REQUIRED']
@@ -118,7 +121,7 @@ def test_non_lab_target_and_missing_kernel_checks_stay_missing(tmp_path):
 
 
 def test_enterprise_policy_value_is_not_filled(tmp_path):
-    sides = {'baseline': side(tmp_path, 'b'), 'candidate': side(tmp_path, 'c')}
+    sides = {'baseline': side(tmp_path, 'baseline'), 'candidate': side(tmp_path, 'candidate')}
     report = pair.pair(sides, tmp_path / 'out', checks=('REQ-16',))
     for name in pair.SIDES:
         row = report['rows'][name]['REQ-16']
@@ -128,8 +131,8 @@ def test_enterprise_policy_value_is_not_filled(tmp_path):
 
 
 def test_one_prepared_session_for_both_versions_is_refused(tmp_path):
-    baseline = side(tmp_path, 'b')
-    candidate = side(tmp_path, 'c')
+    baseline = side(tmp_path, 'baseline')
+    candidate = side(tmp_path, 'candidate')
     candidate['prepared'] = baseline['prepared']
     report = pair.pair({'baseline': baseline, 'candidate': candidate}, tmp_path / 'out', checks=('REQ-14',))
     assert report['session_shared_across_sides'] is True and report['ready_static_both_sides'] == []
@@ -137,14 +140,14 @@ def test_one_prepared_session_for_both_versions_is_refused(tmp_path):
 
 
 def test_target_for_another_environment_and_bad_inputs_are_reported(tmp_path):
-    baseline = side(tmp_path, 'b')
-    candidate = side(tmp_path, 'c')
+    baseline = side(tmp_path, 'baseline')
+    candidate = side(tmp_path, 'candidate')
     candidate['target'] = baseline['target']
     (tmp_path / 'broken').mkdir()
     report = pair.pair({'baseline': baseline, 'candidate': candidate}, tmp_path / 'out', checks=('REQ-14',))
     assert report['rows']['candidate']['REQ-14']['codes'] == ['TARGET_ENVIRONMENT_MISMATCH']
     bad = {'env': tmp_path / 'missing.json', 'target': tmp_path / 'missing-target.json', 'prepared': tmp_path / 'broken'}
-    report = pair.pair({'baseline': bad, 'candidate': side(tmp_path, 'd')}, tmp_path / 'out2', checks=('REQ-14',))
+    report = pair.pair({'baseline': bad, 'candidate': side(tmp_path, 'another', identity='candidate')}, tmp_path / 'out2', checks=('REQ-14',))
     assert report['rows']['baseline']['REQ-14']['codes'] == ['ENV_UNAVAILABLE', 'TARGET_UNAVAILABLE', 'PREPARED_INVALID']
     with pytest.raises(ValueError, match='ENGINE_SENSOR_PAIR_OUTPUT_EXISTS'):
         pair.pair({'baseline': baseline, 'candidate': candidate}, tmp_path / 'out', checks=('REQ-14',))
@@ -157,7 +160,7 @@ def test_paired_engine_sensor_inputs_pass_update_readiness_inputs(tmp_path):
     from guard import application
     from tests.builders import policy
 
-    sides = {'baseline': side(tmp_path, 'b'), 'candidate': side(tmp_path, 'c')}
+    sides = {'baseline': side(tmp_path, 'baseline'), 'candidate': side(tmp_path, 'candidate')}
     report = pair.pair(sides, tmp_path / 'out', checks=('REQ-14', 'REQ-18'))
     assert report['ready_static_both_sides'] == ['REQ-14', 'REQ-18']
     assert engine_sensor.EngineSensorExecutor({}).keys() == {}
@@ -171,3 +174,62 @@ def test_paired_engine_sensor_inputs_pass_update_readiness_inputs(tmp_path):
     data = application.update_readiness(pack, envs, pol, cfg)
     inputs_rows = [row for row in data['checks'] if row['check'] == 'inputs' or row['check'].startswith('inputs:')]
     assert inputs_rows and all(row['ok'] for row in inputs_rows), inputs_rows
+
+
+@pytest.mark.parametrize('base_identity,candidate_identity,image,invalid', [
+    ('candidate', 'candidate', None, {'baseline'}),
+    ('candidate', 'baseline', None, {'baseline', 'candidate'}),
+    ('baseline', 'candidate', 'docker.io/vllm/vllm-openai@sha256:' + '1' * 64, {'candidate'}),
+])
+def test_published_pair_requires_campaign_versions_and_images(tmp_path, base_identity, candidate_identity, image, invalid):
+    sides = {'baseline': side(tmp_path, 'baseline', identity=base_identity),
+             'candidate': side(tmp_path, 'candidate', identity=candidate_identity, image=image)}
+    report = pair.pair(sides, tmp_path / 'out', checks=('REQ-14',))
+    assert report['session_shared_across_sides'] is False
+    assert {name for name in pair.SIDES if 'ENGINE_SENSOR_SIDE_IDENTITY_MISMATCH' in report['rows'][name]['REQ-14']['codes']} == invalid
+    assert report['ready_static_both_sides'] == []
+    fragment = yaml.safe_load(Path(report['j02_spec_fragment']).read_text())
+    assert fragment['executors'] == {} and fragment['shared']['update']['allowed_checks'] == []
+
+
+def test_incorrect_policy_type_and_unusable_target_are_reported(tmp_path):
+    sides = {name: side(tmp_path, name) for name in pair.SIDES}
+    path = sides['candidate']['target']
+    target = json.loads(path.read_text())
+    del target['kubernetes']['engine']
+    path.write_text(json.dumps(target))
+    policy_path = tmp_path / 'policy.yaml'
+    policy_path.write_text(yaml.safe_dump({'values': {'REQ-16': {'required_cache_contexts': 'cache_salt'}}}))
+    report = pair.pair(sides, tmp_path / 'out', checks=('REQ-16',), policy_file=policy_path)
+    assert report['rows']['baseline']['REQ-16']['codes'] == ['POLICY_VALUES_INVALID']
+    assert report['rows']['candidate']['REQ-16']['codes'] == ['TARGET_BINDING_INVALID']
+    assert report['ready_static_both_sides'] == []
+
+
+def test_prepared_assets_and_settings_must_agree_on_session(tmp_path):
+    sides = {name: side(tmp_path, name) for name in pair.SIDES}
+    path = sides['candidate']['prepared'] / 'settings.json'
+    settings = json.loads(path.read_text())
+    settings['session'] = 'f' * 32
+    path.write_text(json.dumps(settings))
+    report = pair.pair(sides, tmp_path / 'out', checks=('REQ-14',))
+    assert report['rows']['candidate']['REQ-14']['codes'] == ['PREPARED_INVALID']
+    assert report['ready_static_both_sides'] == []
+
+
+def test_changed_target_cannot_be_rebound_to_the_original_manifest(tmp_path, monkeypatch):
+    sides = {name: side(tmp_path, name) for name in pair.SIDES}
+    effective_values = run_binding.effective_values
+
+    def reread(check, settings, env, values, **kwargs):
+        if kwargs['side'] == 'baseline':
+            target_path = Path(settings['target'])
+            target = json.loads(target_path.read_text())
+            target['kubernetes']['context'] += '-changed'
+            target_path.write_text(json.dumps(target))
+        return effective_values(check, settings, env, values, **kwargs)
+
+    monkeypatch.setattr(run_binding, 'effective_values', reread)
+    report = pair.pair(sides, tmp_path / 'out', checks=('REQ-14',))
+    assert report['rows']['baseline']['REQ-14']['codes'] == ['ENGINE_SENSOR_PAIR_INPUT_CHANGED']
+    assert report['ready_static_both_sides'] == []

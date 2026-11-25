@@ -199,3 +199,26 @@ def test_legacy_torn_last_row_is_still_loss_with_a_capture_id(tmp_path):
     result = assemble(_capture_pages(tmp_path, 'e' * 32))
     assert result['truncated'] and 'CALLBACK_ROW_INCOMPLETE' in result['diagnostic_codes']
     assert result['processes'][0]['events'] == [{'EXAMPLE': 1}]
+
+
+@pytest.mark.parametrize('late_name,expect_gap', [
+    ('callbacks-13.jsonl', True),
+    ('callbacks-12-0001.jsonl', False),
+])
+def test_additional_writer_is_distinct_from_a_post_checkpoint_segment(tmp_path, late_name, expect_gap):
+    capture_id = 'f' * 32
+    segment = tmp_path / 'callbacks-12-0000.jsonl'
+    segment.write_text(''.join(json.dumps({'EXAMPLE': i, 'padding': 'x' * 100000}) + '\n' for i in range(6)))
+    counters = {'accepted': 6, 'written': 6, 'dropped': 0, 'errors': 0}
+    (tmp_path / 'callbacks-12.state.json').write_text(json.dumps({
+        'schema': 'guard-observer-journal/3', 'closed': False, **counters}))
+    (tmp_path / f'checkpoint-12-{capture_id}.json').write_text(json.dumps({
+        'schema': 'guard-observer-checkpoint/1', 'capture_id': capture_id, 'pid': 12,
+        'offsets': {segment.name: segment.stat().st_size}, **counters}))
+    pages = _capture_pages(tmp_path, capture_id)
+    first = next(pages)
+    assert not first['done'] and not first['gaps']
+    (tmp_path / late_name).write_text(json.dumps({'EXAMPLE': 'after-first-page'}) + '\n')
+    result = assemble([first, *pages])
+    assert ('CALLBACK_SOURCE_SET_CHANGED' in result['diagnostic_codes']) is expect_gap
+    assert result['truncated'] is expect_gap

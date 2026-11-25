@@ -113,6 +113,7 @@ def _normal_obs03_metadata(store, evd, values):
             or type(control["capture_complete"]) not in (bool, type(None))
             or (control["http_status"] is not None and (type(control["http_status"]) is not int
                                                         or not 100 <= control["http_status"] <= 599))
+            or (evd.normal_control.succeeded is True and control["http_status"] != 200)
             or (control["stage"] == "response_id_observed" and evd.normal_control.succeeded is not True)):
         raise ValueError("saved ordinary log control differs from its writer")
     flags = (*producer._PIPE_FLAGS, "child_reap_unverified")

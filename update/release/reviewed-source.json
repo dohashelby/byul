@@ -555,7 +555,7 @@
   "update/src/guard/judges/policy_items.py": "e6a9d347d5dd44223c4930735d6229ed6e3e1b0dd8969b555b53d849dff79f06",
   "update/src/guard/judges/registry.py": "ecbbc80e68dfe1b313bd813c1de64f38150d335f2a7c710853d9a17d8048ef9c",
   "update/src/guard/judges/rule_table.py": "f0aa55fb07a50e5c6713bd5063e859da675369207be71d98169311347340cc84",
-  "update/src/guard/log_evidence.py": "a200e6b40ac2be1b8da78a2a708f53a2e56b61669a3eb80764ab5f729b195b43",
+  "update/src/guard/log_evidence.py": "ea0bfce789bbaf2ae9b629b1b818c817b11442ed214fe96bd169fb252c7ecc0a",
   "update/src/guard/log_policy_profiles.py": "ae03b913e8acd212ca6fc596cd4fd1c5df9db110ccd08d899c52437583494a9c",
   "update/src/guard/manual_audit.py": "bd48943c57e6ba6bf033e8eb31f34c08dd461203cf35b5ec68c5070b3b3110fc",
   "update/src/guard/manual_policy.py": "8368694f955b8a1ce3dce69bae4bda97cb44257a4808913f2e8a8e9082c8862b",

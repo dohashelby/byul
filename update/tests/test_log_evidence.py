@@ -158,15 +158,23 @@ def test_ordinary_log_metadata_is_readable_in_a_paired_report_with_passive_hops(
         store.put(revised)
         return f"{revised.id}@{revised.revision}"
 
-    evd = logs["baseline"]
-    original_item, = evd.artifacts
-    summary = json.loads((store.root / original_item.path).read_bytes())
-    summary["fixture"]["policy_sha256"] = "0" * 64
-    replacement = store.put_artifact(json.dumps(summary).encode() + b"\n")
-    changed = original_item.model_copy(update={"path": replacement.path, "sha256": replacement.sha256, "bytes": replacement.bytes})
-    bad_summary = publish_revised(evd, artifacts=[changed])
-    assert "OBS-03/baseline: saved ordinary log summary differs from its pinned fixture" in analyze_saved_logs(
-        store.root, bad_summary)["problems"]
+    for side, problem in (("baseline", "saved ordinary log summary differs from its pinned fixture"),
+                          ("candidate", "saved ordinary log control differs from its writer")):
+        evd = logs[side]
+        original_item, = evd.artifacts
+        summary = json.loads((store.root / original_item.path).read_bytes())
+        if side == "baseline":
+            summary["fixture"]["policy_sha256"] = "0" * 64
+        else:
+            control = summary["collection_status"]["normal_control"]
+            assert evd.normal_control.succeeded is True and control["stage"] == "response_id_observed"
+            assert control["http_status"] == 200
+            control["http_status"] = 503
+        replacement = store.put_artifact(json.dumps(summary).encode() + b"\n")
+        changed = original_item.model_copy(update={"path": replacement.path, "sha256": replacement.sha256,
+                                                   "bytes": replacement.bytes})
+        bad_summary = publish_revised(evd, artifacts=[changed])
+        assert f"OBS-03/{side}: {problem}" in analyze_saved_logs(store.root, bad_summary)["problems"]
 
     # Both sources are in this report, but the candidate hop cannot use the baseline's evidence.
     hop = hops[Side.candidate]

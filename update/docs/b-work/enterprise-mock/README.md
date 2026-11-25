@@ -25,17 +25,28 @@ PACK-BASELINE@39의 69개 공식 비교(2026-11-23 TP2, `RPT-01M83D7MZWJQ2RME46S
 | REQ-17 | (정책값은 11-08 확정) 공유 그룹·metrics 독자 | cache 공유 집단 2개, metrics 독자 | Gateway 주체별 cache salt, 엔진 센서 | COMPLETED / UNKNOWN |
 | LIF-13 | (정책값은 11-08 확정) release 신원 | runtime_controller 신원의 release 1회 | 11-05의 가중치 공유 daemon과 소비자 2개 | COMPLETED / UNKNOWN |
 | OBS-06 | 기록 조회 허용·비허용 주체, 로그 사본 목록 | 조회 주체 계획, RBAC, 사본 3개(원본·수집·백업) | 로그 수집 사이드카, 암호화 백업, 사본 목록 생산자 | COMPLETED / UNKNOWN |
-| OBS-11 | 수집 파이프라인 상태 기록 | 수집기 대역과 3초 공백 훈련 | `collection-status` 컨테이너 | COMPLETED / UNKNOWN |
+| OBS-11 | 수집 파이프라인 상태 기록 | 수집기 대역과 3초 공백 훈련 | 실행 target에 결합된 probe 컨테이너의 수집기 대역 | COMPLETED / UNKNOWN |
 | PLT-10 | 발급자 철회 사건 | 실험실 키 발급자, 대조·퇴역 키 쌍 | 엔진 `--api-key`(대조 키) 기동 | COMPLETED / UNKNOWN |
 | PLT-11 | 살아 있는 세션 철회 발급자 | 같은 키 발급자와 철회 사건 | 아래 열린 문제 참고 | 준비 조건 확인 필요 |
 | PLT-12 | 자격 사본 목록, 처리 기록 | canary 사본 3개(Secret·ENV·FILE), 30초 안 삭제 | canary Pod, 사본 기록 생산자 | COMPLETED / UNKNOWN |
 
 기대 결과가 UNKNOWN인 까닭은 생산자 미인증과 관측 전용 경로이기 때문이다. 2026-11-08 사용자 결정으로 OBS-01·REQ-02·OBS-06·OBS-11·PLT-10·11·12는 1차 범위에서 빠졌다. 이 7개는 "실행 경로를 준비하고 UNKNOWN으로 남기면 완성"이 기준이다(CLAUDE.md 5절). 이번 모의 실행은 이 점검들을 NOT_RUN에서 실행된 UNKNOWN으로 바꾸는 것이 목표다.
 
+## 2026-11-25 1차 실측 (A)
+
+서울 AWS TP2 노드를 한 번 기동해 DRAFT·EXAMPLE POL(`POL-01M88VDVKR6E3X86AAF4XX3Q2B@1`)로 실행했다. 보고서 3개는 모두 `official=false`다.
+
+| 점검 | 0.30.0 | 0.31.0 | 원인과 이 판에서 고친 것 |
+|---|---|---|---|
+| OBS-01 | COMPLETED / UNKNOWN | COMPLETED / UNKNOWN | Gateway 기록 스냅숏 경로는 허용 기록만 EVD에 넣는다. 거부 403은 별도 영수증에만 있다. Gateway가 빈 역할 목록을 받지 않아 거부 주체 역할을 `no-route-role`로 바꿨다. |
+| REQ-02 | ABORTED | ABORTED | 기준 쪽 `native_route:SUBCOLLECTION_UNAVAILABLE`(lifecycle 센서 준비물 없음), 후보 쪽 `BASELINE_EXECUTION_FAILED`. Gateway가 `GET /v1/models` 권한 매핑을 지원하지 않아 표에서 뺐다. |
+| REQ-03 | COMPLETED / UNKNOWN / 기능 FAIL | 같음 | 일반 주체 `POST /v1/completions` 403은 1차 모의 입력의 경로 표 충돌 때문이었다. REQ-02 표가 completions를 다른 역할에 묶었다. 세 점검이 같은 `shared_gateway.route_roles`를 쓰도록 고쳤다. 관리 주체 `GET /metrics` 404는 Gateway 한계라 남는다. |
+| 나머지 7개 | NOT_RUN | NOT_RUN | 센서·기록 생산자·철회 시험 구성이 아직 없다(아래 열린 문제). |
+
 ## A가 할 일
 
 1. **POL**: `enterprise-mock-inputs.json`의 `policy_values`로 DRAFT·EXAMPLE POL을 만든다. PLT-12 `copy_treatments`는 `copy_rule`과 사본 목록으로 `tools/mvp_credential_copy_inputs.py`가 채운다.
-2. **Gateway 인증**: OBS-01·REQ-02·REQ-03 주체와 `route_roles`를 쪽별 auth Secret에 넣는다. 토큰은 Secret과 실행 환경변수에만 둔다.
+2. **Gateway 인증**: OBS-01·REQ-02·REQ-03 주체를 쪽별 auth Secret에 넣고, 경로 권한은 `shared_gateway.route_roles` 하나만 쓴다. 토큰은 Secret과 실행 환경변수에만 둔다.
 3. **엔진 Pod 볼륨**: 기록을 읽는 위치를 읽기 전용으로 붙인다.
    - `/guard-route`: REQ-02
    - `/guard-observation`: PLT-12
@@ -54,9 +65,12 @@ PACK-BASELINE@39의 69개 공식 비교(2026-11-23 TP2, `RPT-01M83D7MZWJQ2RME46S
 - **PLT-10 확인값 불일치**: 11-16 확인 정책의 `revocation_subject_label`은 `byul-mvp69-retired`다. 그런데 `credential_revocation_contract.normalize_policy`는 `retired` 하나만 받는다. 확인값을 그대로 쓰면 `CREDENTIAL_REVOCATION_POLICY_INVALID`로 실행 전에 막힌다. 모의 입력은 `retired`를 쓴다. 확인 정책 쪽 정정 여부는 사용자가 정한다.
 - **REQ-17 표본 수**: 역할별 최소 200을 채우려면 사용자 결정23의 분할 수집(504개씩 두 묶음)이 필요하다([설계](../../dev-1/req17-split-collection.md)).
 - **LIF-13 정책값 미사용**: 세 정책값은 팩과 `tools/overrides/LIF-13.yaml`에만 있고 실행기·판정 규칙이 읽지 않는다.
-- **REQ-02**: 실행 결합이 `native_route.prepared` 파일로 `route_native_prepared_sha256`을 계산한다(lifecycle 로더). 엔진 lifecycle 센서 준비물이 없을 때 결합 실패로 NOT_RUN이 되는지 확인이 필요하다.
+- **REQ-02**: 1차 실측에서 기준 쪽 native 부분 수집이 준비물 없이 실패해 양쪽 ABORTED였다. 두 판본 엔진 lifecycle 센서 준비물이 선행 조건이다.
+- **PLT-10 실행 창**: guard는 실행 직전에 창을 새로 계산하고, 계약은 창 시작 <= `deny_after` <= 창 끝을 요구한다. 엔진 재기동으로 철회하면 사건과 1초 마감이 창보다 앞서 결합이 거절된다. 창 안에서 철회할 수 있는 발급자 구성이나 계약 결정이 먼저 필요하다.
+- **OBS-11 설정**: Kubernetes 경로는 `[check_config.OBS-11]`의 `target`·`collection_status_snapshot_only = true`를 쓴다. `collection_status = {container, image}`는 Docker 경로 설정이다. 상태 기록은 실행 target에 결합된 probe 컨테이너에 둔다.
+- **PLT-12 결합**: `tools/mvp_credential_copy_inputs.py`는 확인 운영 POL 전용이다. EXAMPLE에서는 `credential_copy_contract`의 `treatments`·`validate_treatments`·`validate_inventory`로 결합한다. `deadline_at`은 실제 canary 생성 시각이 생긴 뒤 채운다.
+- **OBS-01 범위**: 스냅숏 경로는 허용 기록만 수집한다. ACCESS_DENIED까지 EVD에 넣으려면 비스냅숏 경로(소유 probe가 허용·거부를 직접 일으키는 경로)가 필요하다.
 - **PLT-11**: vLLM API 키는 기동 때 고정이라 살아 있는 연결 중에 철회할 수 없다. 엔진을 재기동해 철회하면 기존 연결이 끊긴다. 그러면 "철회 뒤 기존 세션 거부"를 시험한 것이 아니다. 엔진 앞에 철회 가능한 인증 대역을 둘지 A와 사용자가 정해야 한다.
-- **PLT-12**: `tools/mvp_credential_copy_inputs.py`는 EXAMPLE ENV를 거절하고 확인 정책의 승인 규칙(`approved_rules`)을 읽는다. DRAFT POL로 돌릴 때 이 도구를 그대로 쓸지 정해야 한다.
 - **REQ-17·LIF-13**: 정책값은 이미 확정돼 있다. NOT_RUN의 남은 원인은 기업 입력이 아니라 두 판본의 엔진 센서 준비물이다.
 - **REQ-03**: 11-05 실측에서 runtime Gateway가 관리 경로를 전달하지 않아 404였다. update에서 runtime을 고치지 않으므로 같은 결과(보안 UNKNOWN·기능 FAIL)가 예상된다.
 

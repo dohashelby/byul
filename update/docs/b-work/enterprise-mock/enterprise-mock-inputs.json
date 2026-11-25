@@ -22,6 +22,20 @@
   ],
   "id_rule": "고정 EXAMPLE 식별자는 sha256('byul-enterprise-mock/1:<label>')의 앞 32자리(불투명 ID) 또는 64자리 전체(지문)다.",
   "principal_digest_rule": "OBS-01 test_actors 값은 sha256('principal:' + principal_id) 64자리다 (kubernetes_gateway_observation.principal_sha256).",
+  "shared_gateway": {
+    "note": "OBS-01·REQ-02·REQ-03은 한 소유 Gateway의 같은 경로 권한표를 쓴다. 점검마다 다른 표를 합치면 서로 충돌한다(2026-11-25 1차 실측에서 REQ-03 일반 주체가 completions 403을 받은 원인).",
+    "route_roles": {
+      "POST /v1/chat/completions": ["ordinary-chat"],
+      "POST /v1/completions": ["ordinary-chat"],
+      "GET /api/*": ["gateway-status"]
+    },
+    "unmapped_role": "no-route-role",
+    "runtime_gateway_limits": [
+      "빈 역할 목록을 받지 않는다. 거부 주체에는 어느 경로에도 매핑하지 않은 역할(no-route-role)을 준다.",
+      "GET /v1/models 권한 매핑을 지원하지 않는다.",
+      "엔진 관리·진단 route(/metrics 등)를 전달하지 않아 404다."
+    ]
+  },
   "checks": {
     "OBS-01": {
       "executor": "required_event_record",
@@ -38,10 +52,10 @@
         "test_principals": [
           {"principal_id": "obs01-allowed-<run_id>", "roles": ["ordinary-chat"], "allowed_models": ["<API 모델명>"], "disabled": false,
            "purpose": "Gateway가 ACCESS_ALLOWED로 기록하는 허용 주체"},
-          {"principal_id": "obs01-denied-<run_id>", "roles": [], "allowed_models": ["<API 모델명>"], "disabled": false,
-           "purpose": "같은 chat 경로에 역할이 없어 Gateway가 ACCESS_DENIED로 기록하는 거부 주체"}
+          {"principal_id": "obs01-denied-<run_id>", "roles": ["no-route-role"], "allowed_models": ["<API 모델명>"], "disabled": false,
+           "purpose": "경로 권한이 없는 역할만 있어 Gateway가 ACCESS_DENIED(403)로 기록하는 거부 주체"}
         ],
-        "route_roles": {"POST /v1/chat/completions": ["ordinary-chat"]},
+        "route_roles": "shared_gateway.route_roles를 쓴다",
         "trigger_plan": [
           "허용 주체 토큰으로 무해 chat 요청 1건 (엔진까지 전달)",
           "거부 주체 토큰으로 같은 chat 요청 1건 (Gateway에서 거부, 엔진 미전달)"
@@ -62,7 +76,9 @@
          "contract": "src/guard/executors/kubernetes_gateway_observation.py"}
       ],
       "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
-                   "reason": "기록 생산자 미인증·독립 트리거 미검증이라 충족을 주장하지 않는다. 기록이 5000ms 기한을 넘기면 FAIL 근거가 된다."}
+                   "reason": "기록 생산자 미인증·독립 트리거 미검증이라 충족을 주장하지 않는다. 기록이 5000ms 기한을 넘기면 FAIL 근거가 된다."},
+      "run_20261125": {"baseline": "COMPLETED / 보안 UNKNOWN", "candidate": "COMPLETED / 보안 UNKNOWN",
+                       "note": "Gateway 기록 스냅숏 경로는 허용 기록만 EVD에 넣는다. 거부 403 기록은 별도 영수증(obs01-denied-receipt.json)에만 있어 필수 사건 ACCESS_DENIED는 EVD에서 빠진다."}
     },
     "REQ-02": {
       "executor": "route_record",
@@ -72,17 +88,13 @@
       "policy_values": {},
       "policy_values_note": "팩 39 REQ-02는 policy_params가 없다. 승인 경로·권한 매핑은 아래 Gateway 인증 구성이 기업 결정을 대신한다.",
       "mock_enterprise_facts": {
-        "approved_route_authorization": {
-          "POST /v1/chat/completions": ["ordinary-chat"],
-          "POST /v1/completions": ["completions-user"],
-          "GET /v1/models": ["ordinary-chat"]
-        },
+        "approved_route_authorization": "shared_gateway.route_roles를 쓴다 (추론 두 경로는 ordinary-chat, GET /api/*는 gateway-status)",
         "test_principals": [
           {"principal_id": "req02-general-<run_id>", "roles": ["ordinary-chat"], "allowed_models": ["<API 모델명>"], "disabled": false}
         ],
         "trigger_plan": [
           "일반 주체로 chat 요청 1건 (허용, 엔진 전달)",
-          "일반 주체로 completions 요청 1건 (역할 불일치로 Gateway 거부)",
+          "일반 주체로 GET /api/* 요청 1건 (gateway-status 역할이 없어 Gateway 거부)",
           "토큰 없이 chat 요청 1건 (인증 실패로 Gateway 거부)"
         ]
       },
@@ -100,7 +112,9 @@
                    "reason": "route 기록 생산자와 인가 범위가 미인증이다. native 부분은 lifecycle 센서 준비물이 없으면 부분 수집 공백으로 남는다."},
       "open_issues": [
         "run_binding이 native_route.prepared 파일로 route_native_prepared_sha256을 계산한다(_FILE_OVERRIDES, lifecycle 로더). 준비물이 없을 때 결합 실패로 NOT_RUN이 되는지 A가 확인해야 한다."
-      ]
+      ],
+      "run_20261125": {"baseline": "ABORTED (native_route:SUBCOLLECTION_UNAVAILABLE)", "candidate": "ABORTED (BASELINE_EXECUTION_FAILED)",
+                       "note": "Gateway POST 기록은 쪽당 3건 확보했다. 기준 쪽 엔진 lifecycle 센서 준비물이 없어 native 부분 수집이 실패했고, 그 때문에 후보 쪽 실행이 막혔다. 두 판본 lifecycle 센서 준비물이 선행 조건이다."}
     },
     "REQ-03": {
       "executor": "role_route",
@@ -124,7 +138,10 @@
       },
       "lab_stand_in": "소유 runtime Gateway auth.json에 일반·관리 두 주체를 넣고, 관리 역할에 Gateway가 등록한 관리·진단 route를 매핑한다.",
       "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
-                   "reason": "11-05 실측처럼 Gateway가 관리 경로(/metrics 등)를 전달하지 않아 404면 보안 UNKNOWN·기능 FAIL이다. runtime Gateway는 update에서 고치지 않는다."}
+                   "reason": "11-05 실측처럼 Gateway가 관리 경로(/metrics 등)를 전달하지 않아 404면 보안 UNKNOWN·기능 FAIL이다. runtime Gateway는 update에서 고치지 않는다."},
+      "route_roles_note": "일반 역할 ordinary-chat이 shared_gateway.route_roles의 추론 두 경로(chat·completions)를 모두 가진다.",
+      "run_20261125": {"baseline": "COMPLETED / 보안 UNKNOWN / 기능 FAIL", "candidate": "COMPLETED / 보안 UNKNOWN / 기능 FAIL",
+                       "note": "기능 FAIL 근거는 둘이다. (1) 일반 주체 POST /v1/completions → 403. 1차 모의 입력에서 REQ-02 표가 completions를 completions-user 역할에 묶었기 때문이며 이 판에서 고쳤다. (2) 관리 주체 GET /metrics → 404. Gateway가 관리 경로를 전달하지 않아서이며 이 판으로도 남는다. 등록 관리 route는 0.30.0에 4개(GET /load, GET /metrics, POST /is_scaling_elastic_ep, POST /scale_elastic_ep), 0.31.0에 GET /kv_event_sources를 더한 5개였고 일반 주체 호출은 모두 404였다."}
     },
     "REQ-17": {
       "executor": "engine_sensor",
@@ -240,9 +257,10 @@
         "dependent_result": "수집 공백 동안의 사건에 의존하는 판정은 UNKNOWN으로 표시한다."
       },
       "run_binding": {"record_session": "<per-run 32 hex>"},
-      "executor_config": {"target": "<쪽별 target.json>", "collection_status": {"container": "collection-status", "image": "<수집기 대역 이미지 digest 참조>"}},
+      "check_config": {"target": "<수집기 probe 컨테이너가 결합된 쪽별 실행 target.json>", "collection_status_snapshot_only": true},
+      "config_note": "collection_status = {container, image}는 Docker 경로 설정이다. Kubernetes 경로는 [check_config.OBS-11]의 target·collection_status_snapshot_only와 [run_binding.OBS-11]의 record_session을 쓴다(A 확인, 2026-11-25).",
       "records": [
-        {"producer": "실험실 수집기 대역", "path": "/guard-collection/data/<record_session>/collection-status.json", "container": "collection-status",
+        {"producer": "실험실 수집기 대역", "path": "/guard-collection/data/<record_session>/collection-status.json", "container": "실행 target에 결합된 probe 컨테이너",
          "schema": "guard-collection-status/1",
          "event_fields": ["record", "event_at_ms", "arrived_at_ms", "gap_marked_at_ms", "alert_at_ms", "dependent_result", "clock_uncertainty_ms"],
          "contract": "src/guard/executors/log_collection_gap.py validate_record"}
@@ -278,7 +296,10 @@
                           "retired_key_env": "<퇴역 키 환경변수 이름>", "control_key_env": "<대조 키 환경변수 이름>"},
       "lab_stand_in": "엔진을 --api-key(대조 키)로 기동한다. 키 값은 환경변수로만 넘긴다.",
       "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
-                   "reason": "발급자 사건은 선언일 뿐 검증되지 않는다(11-05 PLT-10도 COMPLETED/UNKNOWN). 퇴역 키로 새 접근이 성공하면 FAIL 근거다."}
+                   "reason": "발급자 사건은 선언일 뿐 검증되지 않는다(11-05 PLT-10도 COMPLETED/UNKNOWN). 퇴역 키로 새 접근이 성공하면 FAIL 근거다."},
+      "open_issues": [
+        "실행 창은 guard가 실행 직전에 새로 계산한다(run_binding.window). normalize_policy는 창 시작 <= deny_after <= 창 끝을 요구한다. 엔진 재기동으로 철회하면 철회 사건과 1초 마감이 창보다 앞서 결합이 거절된다. 철회를 창 안에서 일으킬 수 있는 발급자 구성이나 계약 결정이 먼저 필요하다(A 확인, 2026-11-25)."
+      ]
     },
     "PLT-11": {
       "executor": "session_revocation",
@@ -358,7 +379,9 @@
       "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
                    "reason": "스냅숏 경로는 선언 수집만 하고 실제 사본 구성·처리·재사용 차단을 검증하지 않는다(copy_membership_verified 등 False)."},
       "open_issues": [
-        "tools/mvp_credential_copy_inputs.py는 EXAMPLE ENV를 거절하고 확인 정책의 승인 규칙을 읽는다. EXAMPLE·DRAFT POL로 돌릴 때 이 도구를 그대로 쓸지 A가 정해야 한다."
+        "tools/mvp_credential_copy_inputs.py는 확인된 운영 POL 전용이다. EXAMPLE·DRAFT POL은 credential_copy_contract의 treatments·validate_treatments·validate_inventory로 사본 목록과 copy_treatments를 결합한다(A 확인, 2026-11-25).",
+        "copy_treatments의 deadline_at은 실제 canary 생성 시각 + 30000ms다. 생성 시각이 확보되기 전에는 결합하지 않는다.",
+        "제품 스냅숏은 해시가 고정된 lab:false 대상과 새 실행 창 안에서 남긴 기록을 요구한다."
       ]
     }
   }

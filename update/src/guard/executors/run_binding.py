@@ -478,6 +478,18 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
     `policy_row` is this check's values as written in the POL (stage 4).
     """
+    from guard.configuration import NORMAL_PYTHON_MODE_OPTION
+
+    if isinstance(executor_cfg, dict) and NORMAL_PYTHON_MODE_OPTION in executor_cfg:
+        if (check.id != "SUP-11" or check.executor != "supply_boot"
+                or check.collection_profile != "supply-boot-python-mode-v1"
+                or executor_cfg[NORMAL_PYTHON_MODE_OPTION] is not True
+                or run_cfg is not None or policy_row not in (None, {})):
+            raise RunBindingUnavailable("RUN_BINDING_SUP11_SCOPE_INVALID")
+        files = normal_python_mode_pins(executor_cfg)
+        return {"schema": SCHEMA, "check_id": check.id, "side": side, "attempt_id": attempt_id,
+                "environment_sha256": env.ref().sha256, "files": files, "validity": None,
+                "issued_at": _stamp(issued_at)}, {}
     stages = stages_for(check)
     keys = tuple(k for k in KEYS_BY_CHECK.get(check.id, ()) if 1 in stages)
     if not stages:
@@ -539,6 +551,17 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     if with_values:
         document['values'] = extra
     return document, {**values, **extra}
+
+
+def normal_python_mode_pins(settings):
+    from guard.runtime.bounded import strict_json
+    from .cache_timing_group import read_regular
+
+    try:
+        return {f"python_mode_{name}_sha256": sha256_hex(canonical_json(
+            strict_json(read_regular(settings[name], limit=65536), limit=65536))) for name in ("target", "provenance")}
+    except (KeyError, OSError, TypeError, ValueError):
+        raise RunBindingUnavailable("RUN_BINDING_SUP11_INPUT_UNAVAILABLE") from None
 
 
 def run_config(raw, check_id):

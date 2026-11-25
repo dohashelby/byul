@@ -30,6 +30,49 @@ def merge_config(base, override):
 
 
 CHECK_CONFIG = "check_config"
+NORMAL_PYTHON_MODE_OPTION = "normal_python_mode_only"
+NORMAL_PYTHON_MODE_SCOPE_ERROR = "SUP11_STOCK_MODE_SCOPE_INVALID"
+
+
+def _python_mode_options(value, path=()):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            location = (*path, key)
+            if key == NORMAL_PYTHON_MODE_OPTION:
+                yield location, item
+            else:
+                yield from _python_mode_options(item, location)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from _python_mode_options(item, (*path, index))
+
+
+def normal_python_mode_requested(config):
+    return next(_python_mode_options(config), None) is not None
+
+
+def validate_normal_python_mode_update(config):
+    options = dict(_python_mode_options(config))
+    if not options:
+        return
+    locations = {("sides", side, CHECK_CONFIG, "SUP-11", NORMAL_PYTHON_MODE_OPTION)
+                 for side in ("baseline", "candidate")}
+    update = config.get("update", {})
+    if (set(options) != locations or any(value is not True for value in options.values())
+            or type(update) is not dict
+            or update.get("mode", "external") != "external"
+            or update.get("kubernetes_candidate_binding", "prebound") != "prebound"
+            or update.get("allowed_checks") not in (None, ["SUP-11"])):
+        raise ValueError(NORMAL_PYTHON_MODE_SCOPE_ERROR)
+    settings = [merge_config(config, config["sides"][side]) for side in ("baseline", "candidate")]
+    entries = [for_check(side, "supply_boot", "SUP-11")["supply_boot"] for side in settings]
+    if (any(side.get("executors") != {"supply_boot": "kubernetes"} or side.get("record_attestation")
+            for side in settings)
+            or any(type(entry.get(key)) is not str or not entry[key]
+                   for entry in entries for key in ("target", "provenance"))
+            or any(Path(entries[0][key]).resolve() == Path(entries[1][key]).resolve()
+                   for key in ("target", "provenance"))):
+        raise ValueError(NORMAL_PYTHON_MODE_SCOPE_ERROR)
 
 # Host inputs consumed by executors or run-binding validation. Remote paths
 # such as usage_sink.path and native_observation_path are bound by the target.
@@ -91,6 +134,7 @@ def requested_input_paths(config, *, base_dir=None):
                 records = any(part in _RECORD_INPUTS for part in location)
                 if isinstance(item, (str, Path)):
                     if (key in _INPUT_FILES or key == "path" and records
+                            or key == "provenance" and location[-2:] == (CHECK_CONFIG, "SUP-11")
                             or key == "environment" and "generations" in location):
                         path = Path(item)
                         deferred = (key == "target" and location[:2] == ("sides", "candidate")

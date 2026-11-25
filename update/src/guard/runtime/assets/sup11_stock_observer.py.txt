@@ -1,0 +1,110 @@
+"""Capture only the reviewed installed service and stock worker startup boundaries."""
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import sys
+
+
+ROOT = Path("/guard-sup11")
+DESTINATION = Path("/cache/guard-sup11")
+LOADER = "vllm.model_executor.model_loader.default_loader"
+MODEL = "vllm.model_executor.models.qwen2_vl"
+SERVICE = "vllm.entrypoints.launchers.api_server.entry"
+
+
+def read_file(path, limit):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        first = os.fstat(stream.fileno())
+        if not stat.S_ISREG(first.st_mode) or not 0 < first.st_size <= limit:
+            raise ValueError()
+        raw = stream.read(first.st_size + 1)
+        if len(raw) != first.st_size or os.fstat(stream.fileno()).st_ctime_ns != first.st_ctime_ns:
+            raise ValueError()
+        return raw
+
+
+def source_digest(filename, module):
+    path = Path(filename)
+    expected = Path(PROFILE["installed_root"]) / (module.replace(".", "/") + ".py")
+    if not path.is_absolute() or ".." in path.parts or path != expected or path.resolve(strict=True) != expected:
+        raise ValueError()
+    return hashlib.sha256(read_file(path, 1024**2)).hexdigest()
+
+
+def start_ticks():
+    line = read_file_proc("/proc/self/stat")
+    return int(line.rsplit(b") ", 1)[1].split()[19])
+
+
+def read_file_proc(path):
+    with open(path, "rb") as stream:
+        return stream.read(4096)
+
+
+def loaded_module(name):
+    module = sys.modules.get(name)
+    if module is None:
+        raise ValueError()
+    return vars(module)
+
+
+def observe(frame, event, _value):
+    if event != "call":
+        return
+    name = frame.f_globals.get("__name__")
+    function = frame.f_code.co_qualname
+    service = name == PROFILE["service"]["module"] and function == "run_server"
+    worker = name == LOADER and function == "DefaultModelLoader.load_weights"
+    if not service and not worker:
+        return
+    try:
+        if sys.flags.optimize != 0 or frame.f_globals is not loaded_module(name):
+            return
+        anchor_digest = source_digest(frame.f_code.co_filename, name)
+        if service:
+            if anchor_digest != PROFILE["service"]["sha256"]:
+                return
+            role, rank, module, module_digest = "service", None, name, anchor_digest
+        else:
+            if anchor_digest != PROFILE["worker_loader_sha256"]:
+                return
+            model_class = type(frame.f_locals.get("model"))
+            if (model_class.__module__ != MODEL or model_class.__name__ != "Qwen2VLForConditionalGeneration"
+                    or loaded_module(MODEL).get(model_class.__name__) is not model_class):
+                return
+            actual = loaded_module(MODEL)
+            module_digest = source_digest(actual["__file__"], MODEL)
+            if module_digest != PROFILE["model_source_sha256"]:
+                return
+            group = loaded_module("vllm.distributed.parallel_state").get("_TP")
+            rank = vars(group).get("rank_in_group")
+            if type(rank) is not int or rank not in {0, 1}:
+                return
+            role, module = "worker", MODEL
+        row = {"role": role, "rank": rank, "pid": os.getpid(), "start_ticks": start_ticks(),
+               "python_optimize": sys.flags.optimize, "anchor_module": name, "anchor_sha256": anchor_digest,
+               "module": module, "module_sha256": module_digest, "producer_sha256": PRODUCER}
+        label = role if rank is None else f"worker-{rank}"
+        path = DESTINATION / (label + ".json")
+        flags = os.O_WRONLY | os.O_NOFOLLOW | os.O_CREAT | os.O_EXCL
+        with os.fdopen(os.open(path, flags, 0o600), "wb") as stream:
+            stream.write(json.dumps(row, sort_keys=True, separators=(",", ":")).encode())
+        # Spawned stock workers install their own observer.
+        sys.setprofile(None)
+    except (AttributeError, IndexError, KeyError, OSError, TypeError, ValueError):
+        return
+
+
+try:
+    PROFILE = json.loads(read_file(ROOT / "profile.json", 8192))
+    PRODUCER = hashlib.sha256(read_file(ROOT / "sitecustomize.py", 65536)).hexdigest()
+    if (PROFILE["schema"] == "guard-sup11-stock-observer/1"
+            and PROFILE["service"]["module"] == SERVICE and sys.getprofile() is None
+            and sys.flags.optimize == 0):
+        sys.setprofile(observe)
+except (AttributeError, KeyError, OSError, TypeError, ValueError):
+    pass

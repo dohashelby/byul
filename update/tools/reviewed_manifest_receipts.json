@@ -780,6 +780,11 @@
       "manifest_sha256": "3d103d300a8496d697eb9e277f338a7ed6efa6288bae6176fc2d95a4c16af330",
       "reviewed_by": "Codex / UPDATE 보안 판정 / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-25T06:53:51.951Z"
+    },
+    {
+      "manifest_sha256": "1f069841ebf3847fd274cb909e0c358043ba93c12d426f56dffe90f5efcf8afb",
+      "reviewed_by": "Codex / BYUL SUP-11 isolated source review",
+      "reviewed_at": "2026-11-25T16:58:18+09:00"
     }
   ]
 }

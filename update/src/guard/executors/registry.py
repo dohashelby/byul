@@ -81,6 +81,21 @@ from .record_attestation import attested
 from .lifecycle_transition import LifecycleTransitionExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
+def _kubernetes_supply_boot(cfg):
+    from guard.configuration import NORMAL_PYTHON_MODE_OPTION
+
+    settings = cfg.get("supply_boot", {})
+    if isinstance(settings, dict) and NORMAL_PYTHON_MODE_OPTION in settings:
+        from .kubernetes_normal_python_mode import KubernetesNormalPythonModeExecutor
+
+        pins = cfg.get("_normal_python_mode_input_pins", {})
+        return KubernetesNormalPythonModeExecutor(settings,
+            expected_target_sha256=pins.get("python_mode_target_sha256"),
+            expected_provenance_sha256=pins.get("python_mode_provenance_sha256"))
+    return KubernetesSupplyBootExecutor(settings, environ=cfg.get("_runtime_environ"),
+                                        expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
+
+
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "rank_failure:common-input": lambda cfg: _rank_record_input(cfg),
     "engine_sensor:kubernetes": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="kubernetes", expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
@@ -105,7 +120,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "request_termination:kubernetes": lambda cfg: KubernetesRequestTerminationExecutor(cfg.get("request_termination", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "model_authorization:kubernetes": lambda cfg: KubernetesModelAuthorizationExecutor(cfg.get("model_authorization", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "record_access:kubernetes": lambda cfg: KubernetesRecordAccessExecutor(cfg.get("record_access", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "supply_boot:kubernetes": lambda cfg: KubernetesSupplyBootExecutor(cfg.get("supply_boot", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "supply_boot:kubernetes": _kubernetes_supply_boot,
     "route_record:kubernetes": lambda cfg: KubernetesRouteRecordExecutor(cfg.get("route_record", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "fake": lambda cfg: FakeExecutor(cfg.get("fake", {}).get("scenario", "pass"), cfg.get("fake", {}).get("scenarios", {})),
     "direct_route:real": lambda cfg: DirectRouteExecutor(cfg.get("direct_route", {}), environ=cfg.get("_runtime_environ")),
@@ -203,5 +218,12 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
             # generations. Only the HTTP executors verified by the transition
             # receive its selected target hash.
             cfg = {**cfg, '_kubernetes_target_sha256': cfg['_kubernetes_target_sha256_by_executor'].get(executor)}
+        from guard.configuration import NORMAL_PYTHON_MODE_OPTION, NORMAL_PYTHON_MODE_SCOPE_ERROR
+
+        settings = cfg.get("supply_boot") if executor == "supply_boot" else None
+        if isinstance(settings, dict) and NORMAL_PYTHON_MODE_OPTION in settings:
+            if cfg.get("record_attestation"):
+                raise ValueError(NORMAL_PYTHON_MODE_SCOPE_ERROR)
+            return factory(cfg)
         factory = activated(factory) if executor in ACTIVATED else attested(factory)
     return factory(cfg)

@@ -12,7 +12,9 @@ import secrets
 
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
-from guard.configuration import for_check, validate_requested_config
+from guard.configuration import (NORMAL_PYTHON_MODE_OPTION, NORMAL_PYTHON_MODE_SCOPE_ERROR, for_check,
+                                 normal_python_mode_requested, validate_normal_python_mode_update,
+                                 validate_requested_config)
 from guard.core.judge import judge_plan_locked
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan_locked, validate_update_run_config
@@ -76,6 +78,7 @@ def _credentials(cfg, gateway_profile):
 def update_inputs(envs, cfg: dict):
     """Shared input checks; no containers, stores or output directories are created."""
     validate_requested_config(cfg)
+    validate_normal_python_mode_update(cfg)
     if len(envs) != 2:
         raise ValueError("UPDATE_REQUIRES_TWO_ENVIRONMENTS")
     mode = cfg.get("update", {}).get("mode", "external")
@@ -153,6 +156,8 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
         raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
     plan = (select(pack, envs, policy, change=chg, mode=Mode.update, context=context)
             if context is not None else select(pack, envs, policy, mode=Mode.update))
+    if normal_python_mode_requested(cfg) and [item.check_id for item in plan.items if item.selected] != ["SUP-11"]:
+        raise ValueError(NORMAL_PYTHON_MODE_SCOPE_ERROR)
     plan = bind_recipe(plan, cfg, envs)
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
@@ -164,6 +169,10 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
 def _validate_update_policy(side_cfgs, policy):
     if any(c.get("update", {}).get("credential_canary", False) for c in side_cfgs.values()) and policy.status.value != "DRAFT":
         raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
+    if normal_python_mode_requested(side_cfgs) and (
+            policy.status != "CONFIRMED" or policy.scope.include != ["SUP-11"]
+            or policy.scope.exclude or policy.values or policy.exceptions):
+        raise ValueError(NORMAL_PYTHON_MODE_SCOPE_ERROR)
 
 
 def execute_saved_update(store, pack, plan, cfg: dict, run_dir: Path, *, replace_manual: bool = False):
@@ -544,6 +553,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             prepared = ("managed", {"single": effective}, {"single": managed})
         else:
             prepared = update_inputs(envs, cfg)
+            _validate_update_policy(prepared[1], policy)
         option_group = "validation" if single else "update"
         if any(c.get(option_group, {}).get("credential_canary", False) for c in prepared[1].values()) and policy.status.value != "DRAFT":
             raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
@@ -552,6 +562,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                        mode=plan_mode, context=context) if context is not None
                 else select(pack, envs, policy, mode=plan_mode))
         selected = [item for item in plan.items if item.selected]
+        if normal_python_mode_requested(cfg) and (single or [item.check_id for item in selected] != ["SUP-11"]):
+            raise ValueError(NORMAL_PYTHON_MODE_SCOPE_ERROR)
         if not selected:
             if not single and any(item.carried_over is not None for item in plan.items):
                 record("inputs", True, "Carryover-only PLAN; no new trials are required")
@@ -590,9 +602,29 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         c = for_check(c, item.executor, item.check_id)
                     else:
                         c = config_for_check[side](item.executor, item.check_id)
-                    executor = factory(c)
                     support = {} if side in failed_support_sides else support_by_key[side, item.check_id]
                     check_def = pack.checks[item.check_id]
+                    settings = c.get(item.executor, {})
+                    if isinstance(settings, dict) and NORMAL_PYTHON_MODE_OPTION in settings:
+                        from guard.executors import run_binding
+
+                        binding, values = run_binding.effective_values(check_def, settings, env,
+                            policy.values.get(item.check_id, {}), side=side, attempt_id=None,
+                            issued_at=utcnow(), run_cfg=run_binding.run_config(c, item.check_id),
+                            policy_ref=policy.ref())
+                        pins = binding["files"]
+                        executor = factory({**c, "_normal_python_mode_input_pins": pins})
+                        executor.prepared_normal_python_mode(check_def, env, values,
+                            target_sha=pins["python_mode_target_sha256"],
+                            provenance_sha=pins["python_mode_provenance_sha256"])
+                        support.update(status="SUPPORTED", code_available=True, profile_available=True,
+                            policy_supported=True, runtime_qualified=False,
+                            scope="owned stock service and TP worker default Python mode",
+                            reasons=["Pinned inputs select the bounded default-mode collector."])
+                        support.setdefault("limitations", []).append(
+                            "Other supported modes and security enforcement require separate evidence.")
+                        continue
+                    executor = factory(c)
                     # A valid policy can exceed a collector's bounded profile.
                     # Still validate launch settings, budgets and fixtures.
                     # The input matrix budget depends on the paired policy.

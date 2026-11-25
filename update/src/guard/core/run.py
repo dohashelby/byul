@@ -162,8 +162,18 @@ def recover_pending_locked(store: Store, plan: Plan, attempt_id: str) -> list[Ev
 
 def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[Environment], policy: Policy, *,
               verify_recipe: Callable[[], None], only_side: Side | None = None) -> list[Evidence]:
+    from guard.configuration import (NORMAL_PYTHON_MODE_SCOPE_ERROR, normal_python_mode_requested,
+                                     validate_normal_python_mode_update)
+
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
+    requested = cfg.requested if cfg.requested is not None else cfg.raw
+    if normal_python_mode_requested(requested):
+        validate_normal_python_mode_update(requested)
+        if (plan.mode != Mode.update or [item.check_id for item in plan.items if item.selected] != ["SUP-11"]
+                or policy.status != "CONFIRMED" or policy.scope.include != ["SUP-11"]
+                or policy.scope.exclude or policy.values or policy.exceptions):
+            raise ValueError(NORMAL_PYTHON_MODE_SCOPE_ERROR)
     if plan.mode == Mode.update:
         validate_update_run_config(cfg)
 
@@ -246,22 +256,26 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         return stopped(ExecStatus.NOT_RUN, reason)
     if cfg.abort_reason:
         return stopped(ExecStatus.ABORTED, cfg.abort_reason)
-    from guard.configuration import for_check
+    from guard.configuration import NORMAL_PYTHON_MODE_OPTION, for_check
     try:
         raw = for_check(cfg.raw, item.executor, check.id)  # [check_config.<CHECK>] (RB2-S)
     except ValueError:
         return stopped(ExecStatus.NOT_RUN, "CHECK_CONFIG_INVALID")
     from guard.executors import run_binding
-    if run_binding.keys_for(check):
+    settings = raw.get(item.executor, {})
+    normal_python_mode = isinstance(settings, dict) and NORMAL_PYTHON_MODE_OPTION in settings
+    if run_binding.keys_for(check) or normal_python_mode:
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
             binding, policy_values = run_binding.effective_values(
-                check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
+                check, settings, env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
                 run_cfg=run_binding.run_config(cfg.raw, check.id), policy_ref=plan.inputs.policy)
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)
+        if normal_python_mode:
+            raw = {**raw, "_normal_python_mode_input_pins": binding["files"]}
 
     impl_name = cfg.executors[item.executor]
     started = utcnow()

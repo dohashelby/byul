@@ -1,0 +1,66 @@
+"""Read the fixed stock observer identity and receipts from the owned Pod."""
+
+import hashlib
+import json
+import os
+import stat
+
+
+def directory(*parts):
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    current = os.open("/", flags)
+    try:
+        for part in parts:
+            child = os.open(part, flags, dir_fd=current)
+            os.close(current)
+            current = child
+        return os.dup(current)
+    finally:
+        os.close(current)
+
+
+def read(directory_fd, name, cap):
+    flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
+    with os.fdopen(os.open(name, flags, dir_fd=directory_fd), "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= cap:
+            raise ValueError()
+        value = stream.read(before.st_size + 1)
+        after = os.fstat(stream.fileno())
+        if len(value) != before.st_size or after.st_ctime_ns != before.st_ctime_ns:
+            raise ValueError()
+    return value
+
+
+def observe():
+    mount = directory("guard-sup11")
+    receipt = directory("cache", "guard-sup11")
+    try:
+        if not (os.fstatvfs(mount).f_flag & os.ST_RDONLY):
+            raise ValueError()
+        if set(os.listdir(mount)) != {"sitecustomize.py", "profile.json"}:
+            raise ValueError()
+        labels = ["service.json", "worker-0.json", "worker-1.json"]
+        if set(os.listdir(receipt)) != set(labels):
+            raise ValueError()
+        rows = [json.loads(read(receipt, name, 4096)) for name in labels]
+        for row in rows:
+            pid = row["pid"]
+            if type(pid) is not int or not 0 < pid < 2**23:
+                raise ValueError()
+            with open(f"/proc/{pid}/stat", "rb") as stream:
+                record = stream.read(4096)
+            if int(record.rsplit(b") ", 1)[1].split()[19]) != row["start_ticks"]:
+                raise ValueError()
+        return {"producer_sha256": hashlib.sha256(read(mount, "sitecustomize.py", 65536)).hexdigest(),
+                "profile_sha256": hashlib.sha256(read(mount, "profile.json", 8192)).hexdigest(),
+                "processes": rows}
+    finally:
+        os.close(receipt)
+        os.close(mount)
+
+
+try:
+    print(json.dumps(observe(), sort_keys=True, separators=(",", ":")))
+except (IndexError, KeyError, OSError, TypeError, ValueError):
+    print("{}")

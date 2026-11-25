@@ -7,6 +7,7 @@ import hashlib
 import math
 import re
 import time
+from enum import StrEnum
 from types import SimpleNamespace
 
 from guard.models import canonical_json, sha256_hex
@@ -28,6 +29,7 @@ from guard.adapters import vllm_initialization_release_sensor as init_release
 from guard.adapters import vllm_profiler_sensor as profiler_sensor
 from guard.adapters import vllm_release_observation_sensor as release_observation
 from guard.adapters import vllm_file_read_sensor as read_sensor
+from guard.adapters.vllm_lifecycle_catalog import approved_file_read
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor
 from guard.runtime.bounded import capture_pipes
 from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod, project_owned_snapshot
@@ -41,14 +43,44 @@ from .session_seal import SESSION_SEALER,LARGE_SESSION_SEALER
 PROFILE = "kubernetes-owned-lifecycle-read-v1"
 
 
-def validate_target(target,env):
+def validate_target(target,env,*,require_lab=True):
     """Keep runtime binding access inside the executor boundary, including dry runs."""
-    return validate_capture_target(target,env)
+    return validate_capture_target(target,env,require_lab=require_lab)
+
+
+class KubernetesCaptureFailureKind(StrEnum):
+    BUDGET = "budget"
+    RUNNER = "runner"
+    MALFORMED_CAPTURE = "malformed_capture"
+    TIMEOUT = "timeout"
+    CAP = "cap"
+    PARENT_CLEANUP = "parent_cleanup"
+    NONZERO_PROCESS = "nonzero_process"
+    UTF8_DECODE = "utf8_decode"
+    UNAVAILABLE = "unavailable"
 
 
 class KubernetesCaptureError(ValueError):
-    def __init__(self):
+    def __init__(self, *, failure_kind: KubernetesCaptureFailureKind | None = None):
         super().__init__("KUBERNETES_CAPTURE_BINDING_UNAVAILABLE")
+        self.failure_kind = failure_kind
+
+
+def _pipe_failure_kind(returncode, pipe, raw, cap, parent_cleanup):
+    """Classify a rejected runner result using its bounded capture flags."""
+    if parent_cleanup:
+        return KubernetesCaptureFailureKind.PARENT_CLEANUP
+    if (type(returncode) is not int or type(raw) is not bytes or any(
+            type(pipe.get(key)) is not bool for key in ("complete", "bounded_at_source", "timed_out", "truncated"))):
+        return KubernetesCaptureFailureKind.MALFORMED_CAPTURE
+    if pipe["bounded_at_source"]:
+        if pipe["timed_out"]:
+            return KubernetesCaptureFailureKind.TIMEOUT
+        if pipe["truncated"] or len(raw) > cap:
+            return KubernetesCaptureFailureKind.CAP
+        if pipe["complete"] and returncode != 0:
+            return KubernetesCaptureFailureKind.NONZERO_PROCESS
+    return KubernetesCaptureFailureKind.UNAVAILABLE
 
 
 def supervised_source(source):
@@ -63,8 +95,12 @@ def supervised_source(source):
 
 
 class KubernetesLifecycleReader:
-    def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None,node_image_verification=None):
+    def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None,node_image_verification=None,
+                 read_only=False):
         if node_image_verification not in (None,"local-containerd-v1"):raise KubernetesCaptureError()
+        if read_only and (target.get("lab") is not False or node_image_verification is not None
+                or prepared.get("profile") not in {generation_sensor.PROFILE, endpoint_sensor.PROFILE}):
+            raise KubernetesCaptureError()
         self.node_image_verification=node_image_verification;self.node_image_receipts=[];self.node_image_proof_failures=0
         if prepared.get('profile')==release_observation.RANK_PROFILE and not supports(env.engine.name,env.engine.version,'rank_release_rows'):
             raise KubernetesCaptureError()
@@ -75,9 +111,10 @@ class KubernetesLifecycleReader:
             raise KubernetesCaptureError()
         from guard.collectors.model_read_scope import validate_binding
         validate_binding(prepared,env,target)
-        self._initialize(validate_target(target,env),target,prepared,binary=binary,duration=duration,runner=runner)
+        self._initialize(validate_target(target,env,require_lab=not read_only),target,prepared,
+                         binary=binary,duration=duration,runner=runner,read_only=read_only)
 
-    def _initialize(self,binding,target,prepared,*,binary,duration,runner):
+    def _initialize(self,binding,target,prepared,*,binary,duration,runner,read_only=False):
         # Internal reuse only: callers must supply their profile's validated binding.
         self.binding=binding
         if (type(binary) is not str or not binary.strip() or type(duration) not in (int,float)
@@ -85,9 +122,13 @@ class KubernetesLifecycleReader:
                 or type(prepared.get("session")) is not str or re.fullmatch(r"[0-9a-f]{32}",prepared["session"]) is None):
             raise KubernetesCaptureError()
         self.target_sha256=sha256_hex(canonical_json(target));self.lab=target.get("lab")is True
+        self.read_only=read_only
         self.session=prepared["session"]
+        is_approved_read = approved_file_read(prepared.get("profile"))
         self.file_read_profile = LARGE_RECORDING_PROFILE if prepared.get("profile")==sglang_sensor.PROFILE else EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,init_release.PROFILE,profiler_sensor.PROFILE,release_observation.STREAM_PROFILE,release_observation.PROFILER_PROFILE,release_observation.RANK_PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else None
         self.file_read_limit = sglang_sensor.MAX_BYTES if prepared.get("profile")==sglang_sensor.PROFILE else termination_sensor.MAX_BYTES if prepared.get("profile")in {fault_sensor.PROFILE,termination_sensor.PROFILE} else weight_sensor.MAX_BYTES if prepared.get("profile") in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else profiler_sensor.MAX_BYTES if prepared.get("profile") in {profiler_sensor.PROFILE,release_observation.PROFILER_PROFILE} else init_sensor.MAX_BYTES if prepared.get("profile") in {init_sensor.PROFILE,init_release.PROFILE} else rank_sensor.MAX_BYTES if prepared.get("profile") in {rank_sensor.PROFILE,release_observation.RANK_PROFILE} else stream_sensor.MAX_BYTES if prepared.get("profile") in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE} else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
+        if is_approved_read:
+            self.file_read_profile, self.file_read_limit = EXTENDED_RECORDING_PROFILE, read_sensor.MAX_BYTES
         self.binary=binary;self.deadline=time.monotonic()+duration
         self.runner=runner or capture_pipes;self.injected=runner is not None
         self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"inventory_rolling":ROLLING_INVENTORY_READER,"seal":LARGE_SESSION_SEALER if prepared.get("profile")==sglang_sensor.PROFILE else SESSION_SEALER}
@@ -96,7 +137,8 @@ class KubernetesLifecycleReader:
 
     def _remaining(self,deadline):
         value=min(self.deadline,deadline)-time.monotonic()
-        if value<=0:raise KubernetesCaptureError()
+        if value <= 0:
+            raise KubernetesCaptureError(failure_kind=KubernetesCaptureFailureKind.BUDGET)
         return value
 
     def _request(self,args,*,deadline,cap):
@@ -104,18 +146,26 @@ class KubernetesLifecycleReader:
         argv=[self.binary,f"--context={self.binding['context']}",f"--request-timeout={remaining:.3f}s",*args]
         try:
             result=self.runner(argv,timeout=remaining,env_extra={},max_stdout_bytes=cap,max_stderr_bytes=4096)
-            pipe=result["capture"];raw=result["stdout_bytes"]
-            if pipe.get("pipes_closed") is False or "child_reap" in pipe.get("read_errors",[]):
-                self.gap=True
-                self._parent_cleanup_failures+=1
-            if (result["returncode"]!=0 or pipe.get("complete") is not True
-                    or pipe.get("bounded_at_source") is not True or pipe.get("timed_out") is not False
-                    or pipe.get("truncated") is not False or type(raw) is not bytes or len(raw)>cap):
-                raise KubernetesCaptureError()
-            return raw
         except Exception:
             self.gap=True
-            raise KubernetesCaptureError() from None
+            raise KubernetesCaptureError(failure_kind=KubernetesCaptureFailureKind.RUNNER) from None
+        try:
+            pipe=result["capture"];raw=result["stdout_bytes"]
+            parent_cleanup = pipe.get("pipes_closed") is False or "child_reap" in pipe.get("read_errors",[])
+            if parent_cleanup:
+                self.gap=True
+                self._parent_cleanup_failures+=1
+            returncode = result["returncode"]
+            if (returncode!=0 or pipe.get("complete") is not True
+                    or pipe.get("bounded_at_source") is not True or pipe.get("timed_out") is not False
+                    or pipe.get("truncated") is not False or type(raw) is not bytes or len(raw)>cap):
+                failure_kind = _pipe_failure_kind(returncode, pipe, raw, cap, parent_cleanup)
+            else:
+                return raw
+        except Exception:
+            failure_kind = KubernetesCaptureFailureKind.MALFORMED_CAPTURE
+        self.gap=True
+        raise KubernetesCaptureError(failure_kind=failure_kind) from None
 
     def snapshot(self,timeout=5):
         """Transient verified identity/mount projection; never a raw API object."""
@@ -168,7 +218,7 @@ class KubernetesLifecycleReader:
             return "inventory"
         if argv[2]==ROLLING_INVENTORY_READER and len(argv)==4 and max_bytes==131072 and argv[3]==self.session:
             return "inventory_rolling"
-        if (argv[2]==self.programs["seal"] and len(argv)==5 and max_bytes==4096 and argv[3]==self.session
+        if (argv[2]==self.programs["seal"] and not self.read_only and len(argv)==5 and max_bytes==4096 and argv[3]==self.session
                 and argv[4]==str(self.file_read_limit)):
             return "seal"
         raise KubernetesCaptureError()
@@ -187,17 +237,23 @@ class KubernetesLifecycleReader:
             raw=self._request([f"--namespace={role['namespace']}","exec",role["pod"],f"--container={role['container']}",
                 "--","python3","-I","-S","-B","-c",self.wrapped[key],repr(budget),*argv[3:]],
                 deadline=deadline,cap=max_bytes)
-            text=raw.decode("utf-8","strict")
+            try:
+                text=raw.decode("utf-8","strict")
+            except UnicodeDecodeError:
+                raise KubernetesCaptureError(failure_kind=KubernetesCaptureFailureKind.UTF8_DECODE) from None
             row["transport_complete"]=True
             if key=="context":
                 try:schema=strict_json(raw,limit=4096).get("schema")
                 except Exception:schema=None
                 row["result"]={"guard-lifecycle-process-context/1":"context","guard-lifecycle-process-absent/1":"process_absent"}.get(schema,"unrecognized")
-        except Exception:
+        except Exception as error:
             row["diagnostic_codes"].append("KUBERNETES_READ_TRANSPORT_UNAVAILABLE")
             self.gap=True
             self.rows.append(row)
-            raise KubernetesCaptureError() from None
+            failure_kind = KubernetesCaptureFailureKind.UNAVAILABLE
+            if type(error) is KubernetesCaptureError and type(error.failure_kind) is KubernetesCaptureFailureKind:
+                failure_kind = error.failure_kind
+            raise KubernetesCaptureError(failure_kind=failure_kind) from None
         try:row["owner_before_after_verified"]=self._owner(self._remaining(deadline))==before
         except Exception:row["diagnostic_codes"].append("KUBERNETES_READ_OWNER_RECHECK_UNAVAILABLE")
         if not row["owner_before_after_verified"]:self.gap=True

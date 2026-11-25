@@ -262,9 +262,29 @@ def test_obs05_fields_and_sinks_are_compared_to_the_approved_lists(tmp_path, mon
     assert result.verdicts.security.value == security
 
 
-def test_obs05_no_report_observed_never_passes(tmp_path, monkeypatch):
-    _, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), usage_snapshot()]), ALLOWED, monkeypatch, [[START], [START]])
+@pytest.mark.parametrize("after", [usage_snapshot(), usage_snapshot(sha="b" * 64)])
+def test_obs05_no_sink_arrival_never_passes(tmp_path, monkeypatch, after):
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), after]),
+                            ALLOWED, monkeypatch, [[START], [START]])
+    assert evd.observations["usage_send_sensor_available"].value is True
+    assert evd.observations["usage_report_observed"].collected is True
+    assert evd.observations["usage_report_observed"].value is False
     assert_unconfirmed_security_failure(result)
+
+
+@pytest.mark.parametrize("local_fields,confirmed", [(("event",), False), (("event", "extra"), True)])
+def test_obs05_changed_sink_prefix_keeps_only_qualified_local_fields(tmp_path, monkeypatch, local_fields, confirmed):
+    after = usage_snapshot(sha="b" * 64, fields=local_fields)
+    sink = [[START, receipt(["event"])], [START, receipt(["changed"]), receipt(["unverified"], "other")]]
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), after]), ALLOWED, monkeypatch, sink)
+    assert evd.observations["usage_send_sensor_available"].value is False
+    assert evd.observations["usage_sink_receipts"].collected is False
+    assert evd.observations["usage_report_observed"].collected is False
+    assert evd.observations["usage_fields_seen"].value == list(local_fields)
+    assert result.verdicts.security.value == "FAIL"
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is confirmed
+    if not confirmed:
+        assert_unconfirmed_security_failure(result)
 
 
 def test_usage_sink_rejects_open_records():
@@ -328,7 +348,7 @@ GONE = {"tcp": False, "tls": False, "reason": "unreachable"}
 
 @pytest.mark.parametrize("reply,confirmed", [
     (handshake(OK, REFUSED_PEER), False), (handshake(PLAIN, PLAIN), True),
-    (handshake(OK, OK), True), (handshake(GONE, GONE), False),
+    (handshake(OK, OK), True), (handshake(GONE, GONE), False), (handshake(OK, GONE), False),
 ])
 def test_plt09_handshake_results(tmp_path, reply, confirmed):
     evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=HelperDocker([reply])), TRANSPORT,
@@ -337,7 +357,60 @@ def test_plt09_handshake_results(tmp_path, reply, confirmed):
     assert ('CONFIRMED_VIOLATION' in result.security_failure_tags) is confirmed
     if not confirmed:
         assert_unconfirmed_security_failure(result)
+    assert evd.execution.status.value == "COMPLETED"
+    assert evd.observations["record_transport_segments_tested"].value == (
+        [SEGMENT["name"]] if reply["expected"]["tcp"] and reply["wrong"]["tcp"] else [])
+    assert evd.observations["record_transport_unreachable"].value == (
+        [] if reply["expected"]["tcp"] and reply["wrong"]["tcp"] else [SEGMENT["name"]])
+    if reply == handshake(OK, GONE):
+        trial, = evd.observations["record_transport_trials"].value
+        assert trial["state"] == "protected" and trial["wrong_peer_state"] == "unreachable"
     assert evd.observations["record_transport_sender_verified"].value is False
+
+
+@pytest.mark.parametrize("wrong_peer,confirmed", [(REFUSED_PEER, False), (OK, True)])
+def test_plt09_expected_peer_rejection_is_not_an_unprotected_transfer(tmp_path, wrong_peer, confirmed):
+    docker = HelperDocker([handshake(REFUSED_PEER, wrong_peer)])
+    evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), TRANSPORT,
+                           extra_cfg={"record_segments": [SEGMENT]})
+    assert evd.observations["record_transport_trials"].value[0]["state"] == "peer_rejected"
+    assert evd.observations["record_transport_unprotected"].value == []
+    assert evd.observations["record_transport_sender_verified"].value is False
+    assert evd.normal_control.succeeded is None
+    assert result.verdicts.security.value == "FAIL"
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is confirmed
+    if not confirmed:
+        assert_unconfirmed_security_failure(result)
+
+
+@pytest.mark.parametrize("reply,expected_state,wrong_state,confirmed", [
+    (handshake(OK, {**REFUSED_PEER, "tls": "false"}), "protected", None, False),
+    ({"expected": OK}, "protected", None, False),
+    (handshake({**PLAIN, "tcp": 1}, REFUSED_PEER), None, "peer_rejected", False),
+    (handshake({**GONE, "tcp": True}, REFUSED_PEER), None, "peer_rejected", False),
+    (handshake({**OK, "version": None}, REFUSED_PEER), None, "peer_rejected", False),
+    ({"expected": PLAIN}, "no_tls", None, True),
+])
+def test_plt09_partial_receipt_preserves_only_valid_legs(tmp_path, reply, expected_state, wrong_state, confirmed):
+    docker = HelperDocker([reply])
+    evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), TRANSPORT,
+                           extra_cfg={"record_segments": [SEGMENT]})
+    assert evd.data_origin.value == "EXAMPLE"
+    assert evd.execution.status.value == "ABORTED"
+    assert evd.execution.abort_reason == "RECORD_TRANSPORT_SEGMENT_UNAVAILABLE"
+    trial, = evd.observations["record_transport_trials"].value
+    assert trial["state"] == expected_state
+    assert trial["wrong_peer_state"] == wrong_state
+    assert trial["tls_version"] == ("TLSv1.3" if expected_state == "protected" else None)
+    assert evd.observations["record_transport_segments_tested"].value == []
+    assert evd.observations["record_transport_wrong_peer_accepted"].value == []
+    assert evd.observations["record_transport_unreachable"].value == []
+    assert evd.observations["record_transport_sender_verified"].value is False
+    assert evd.normal_control.succeeded is None
+    assert result.verdicts.security.value == "FAIL"
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is confirmed
+    if not confirmed:
+        assert_unconfirmed_security_failure(result)
 
 
 def test_plt09_segment_mismatch_is_rejected_before_any_probe(tmp_path):
@@ -345,6 +418,19 @@ def test_plt09_segment_mismatch_is_rejected_before_any_probe(tmp_path):
     evd, _ = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), TRANSPORT,
                       extra_cfg={"record_segments": [{**SEGMENT, "name": "other"}]})
     assert evd.execution.status.value == "ABORTED" and docker.calls == []
+
+
+@pytest.mark.parametrize("duplicate_name", ["engine-collector", "collector-sink"])
+def test_plt09_requires_one_configured_sender_per_policy_segment(tmp_path, duplicate_name):
+    docker = HelperDocker([])
+    names = ["engine-collector", "collector-sink"]
+    values = {"record_transport_segments": names, "record_tls_required_segments": names}
+    segments = [SEGMENT, {**SEGMENT, "name": "collector-sink", "container": "collector"},
+                {**SEGMENT, "name": duplicate_name, "container": "other"}]
+    evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=docker), values,
+                           extra_cfg={"record_segments": segments})
+    assert evd.execution.status.value == "ABORTED" and docker.calls == []
+    assert_unconfirmed_security_failure(result)
 
 
 def test_plt09_later_segment_error_keeps_the_earlier_failure(tmp_path):
@@ -380,6 +466,15 @@ def test_obs11_clock_uncertainty_and_missing_record_are_not_clean():
     assert log_collection_gap.evaluate({"events": [{**gap_row(), "record": "other"}]}, GAP)["missing"] == ["access"]
 
 
+@pytest.mark.parametrize("row", [
+    gap_row(arrived_at_ms=999), gap_row(gap_marked_at_ms=999), gap_row(alert_at_ms=999),
+    gap_row(clock_uncertainty_ms=-1),
+])
+def test_obs11_impossible_event_chronology_is_unverified(row):
+    result = log_collection_gap.evaluate({"events": [row]}, GAP)
+    assert result == {"violations": [], "unverified": ["access"], "missing": [], "normal": []}
+
+
 def test_obs11_record_shape_and_binding_are_closed():
     good = {"schema": log_collection_gap.SCHEMA, "session": GAP["collection_session"], "environment_ref": {"id": 1}, "events": [gap_row()]}
     log_collection_gap.validate_record(good, environment_ref={"id": 1}, session=GAP["collection_session"])
@@ -408,6 +503,58 @@ def test_obs11_declared_late_detection_fails_and_clean_record_stays_unknown(tmp_
     assert result.verdicts.security.value == "FAIL"
     (tmp_path / "clean").mkdir()
     _, result = gap_run(tmp_path / "clean", monkeypatch, packet(gap_row()))
+    assert_unconfirmed_security_failure(result)
+
+
+def test_obs11_unverified_timeline_preserves_an_independent_observed_violation(tmp_path, monkeypatch):
+    env = environment(model={"id": "test"})
+    packet = {"schema": log_collection_gap.SCHEMA, "session": GAP["collection_session"],
+              "environment_ref": env.ref().model_dump(mode="json"),
+              "events": [gap_row(arrived_at_ms=999), gap_row(gap_marked_at_ms=None)]}
+    evidence, result = gap_run(tmp_path, monkeypatch, packet)
+    assert evidence.observations["collection_records_unverified"].value == ["access"]
+    assert evidence.observations["collection_normal_arrivals"].value == []
+    assert evidence.observations["collection_gap_violations"].value == [
+        {"record": "access", "reason": "gap_not_marked_in_time"}]
+    assert result.verdicts.security.value == "FAIL"
+
+
+def test_obs11_docker_retains_selected_status_timestamps_and_original_byte_hash(tmp_path):
+    from guard.models import canonical_json, sha256_hex
+    from tests.test_native_observations import CaptureWorld, IMAGE
+
+    class Collector(CaptureWorld):
+        def inspect_json(self, container, timeout):
+            detail = super().inspect_json(container, timeout)
+            detail["Config"]["Labels"]["guard.run"] = "run"
+            return detail
+
+    env = environment(model={"id": "test"})
+    normal = gap_row(arrived_at_ms=1050)
+    unverified = gap_row(arrived_at_ms=999)
+    unselected = gap_row(record="EXAMPLE-unselected", alert_at_ms=9486)
+    packet = {"schema": log_collection_gap.SCHEMA, "session": GAP["collection_session"],
+              "environment_ref": env.ref().model_dump(mode="json"), "events": [normal, unverified, unselected]}
+    collector = Collector(packet)
+
+    def unexpected_probe(*args):
+        pytest.fail("collector status receipt should not send requests")
+
+    evidence, result = pipeline(tmp_path, "OBS-11",
+        lambda cfg: LogIntegrityExecutor(cfg, container_probe=unexpected_probe, docker=collector),
+        GAP, extra_cfg={"collection_status": {"container": "collector", "image": IMAGE}})
+    artifact, = evidence.artifacts
+    saved = (tmp_path / "store" / artifact.path).read_bytes()
+    summary = json.loads(saved.splitlines()[-1])
+
+    assert collector.calls == ["inspect", "read", "inspect"]
+    assert summary["selected_record_timeline"] == [normal, unverified]
+    assert summary["file_sha256"] == sha256_hex(json.dumps(packet).encode())
+    assert summary["record_sha256"] == sha256_hex(canonical_json(packet)) != summary["file_sha256"]
+    assert artifact.sha256 == sha256_hex(saved) and b"EXAMPLE-unselected" not in saved
+    assert evidence.observations["collection_normal_arrivals"].value == ["access"]
+    assert evidence.observations["collection_records_unverified"].value == ["access"]
+    assert evidence.observations["collection_producer_authenticated"].value is False
     assert_unconfirmed_security_failure(result)
 
 

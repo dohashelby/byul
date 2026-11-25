@@ -76,6 +76,17 @@ def test_mode_specific_import_is_a_sup11_violation_only_when_normal_was_rejected
     assert entry.project(changed)['SUP-11']['model_entry_mode_violations']['value'] == []
 
 
+@pytest.mark.parametrize(('case_id', 'invalid_mode'), [('model-entry-False-normal', False), ('model-entry-False-O', True)])
+def test_sup11_rejects_boolean_interpreter_mode_in_retained_record(case_id, invalid_mode):
+    changed = deepcopy(rows())
+    selected = by_id(changed)
+    selected['model-entry-False-O']['events'] = [{'phase': 'import', 'module': 'modeling'}]
+    selected[case_id]['python_optimize'] = invalid_mode
+    projected = entry.project(changed)
+    assert case_id in projected['errors']
+    assert projected['SUP-11']['model_entry_mode_violations']['value'] == []
+
+
 @pytest.mark.parametrize('change', [
     lambda r: r.update(forward_completed=False),
     lambda r: r.update(selected_source_matches=False),

@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 
+_OPTIMIZE = {'normal': 0, 'O': 1, 'OO': 2}
+
 
 def fixtures():
     return [{'case_id':f'{entry}-{trust}-{mode}','entry':entry,'trust':trust,'mode':mode}
@@ -31,6 +33,10 @@ def project(rows):
             errors.append('unknown_or_duplicate_case');continue
         case=specs[key]
         if row.get('case_identity')!=identity(case):errors.append(key);continue
+        if 'python_optimize' in row:
+            optimize = row['python_optimize']
+            if type(optimize) is not int or optimize != _OPTIMIZE[case['mode']]:
+                errors.append(key);continue
         try:events=clean_phases(row.get('events',[]))
         except ValueError:errors.append(key);continue
         valid[key]=row

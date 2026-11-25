@@ -110,6 +110,40 @@ def test_real_daemon_and_loader_code_cover_every_branch_except_release_authoriza
     assert '2000' not in str(result['release_actors'])  # 주체는 keyed 요약만 남는다.
 
 
+def test_ordinary_loader_state_returns_retain_mode_and_entry_count_without_identity(tmp_path):
+    w = world(tmp_path)
+    consumer(w, 101)
+    consumer(w, 102)
+
+    result = projection.project_weights_lifetime([], {}, w.rows, [])
+
+    assert result['loader_state_returns'] == {
+        'zero_copy': {'returned_calls': 2, 'min_entries': 2, 'max_entries': 2},
+    }
+    assert result['consumers'] == 2 and result['full_scope'] is False and result['violation'] is None
+
+
+@pytest.mark.parametrize('drift', ['duplicate', 'different_source', 'unqualified'])
+def test_ordinary_loader_state_summary_omits_ambiguous_or_unqualified_calls(tmp_path, drift):
+    w = world(tmp_path)
+    consumer(w, 101)
+    consumer(w, 102)
+    terminal = next(row for row in w.rows if row.get('point') == projection.LOADER_STATE and row['phase'] == 'RETURN')
+    if drift == 'duplicate':
+        w.rows.append(dict(terminal))
+    elif drift == 'different_source':
+        terminal['source_file_sha256'] = '0' * 64
+    else:
+        terminal['entry_qualified_after'] = False
+
+    result = projection.project_weights_lifetime([], {}, w.rows, [])
+
+    assert result['loader_state_returns'] == {
+        'zero_copy': {'returned_calls': 1, 'min_entries': 2, 'max_entries': 2},
+    }
+    assert result['consumers'] == 2 and result['full_scope'] is False and result['violation'] is None
+
+
 def test_released_generation_served_again_is_a_violation(tmp_path):
     w = world(tmp_path)
     consumer(w, 101); consumer(w, 102)

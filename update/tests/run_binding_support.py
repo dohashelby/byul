@@ -21,6 +21,17 @@ import pytest
 from guard.executors import run_binding
 
 
+def run_locked_update_trial(store, pack, plan, config, *, only_side=None):
+    """Exercise the coordinator's dispatch boundary with a real PLAN lock."""
+    from guard.core.execution_recipe import execution_lock
+    from guard.core.run import run_plan_locked, validate_update_run_config
+
+    assert plan.mode == 'update'
+    validate_update_run_config(config)
+    with execution_lock(store.root, plan.id):
+        return run_plan_locked(store, pack, plan, config, only_side=only_side)
+
+
 def before_stage4(check):
     """Replay the earlier definition's policy ownership, including its old decision-file hashes."""
     from guard.models.checkdef import PolicyParam

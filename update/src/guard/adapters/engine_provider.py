@@ -6,12 +6,14 @@ import re
 
 from .base import LaunchSpec
 from .model_inventory import inventory
-from .vllm import VllmAdapter, BOUNDED_LAUNCH_KEYS, BOUNDED_LAUNCH_PROFILE, GpuLaunchOptions, CONTAINER_PORT
+from .vllm import (VllmAdapter, BOUNDED_LAUNCH_KEYS, BOUNDED_LAUNCH_PROFILE, GpuLaunchOptions, CONTAINER_PORT,
+                   REQUEST_BINDING_GPU_IMAGE)
 from .openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.runtime import generation_readiness
 
 ENGINE_PORT = CONTAINER_PORT
 CACHE_ENV = {'VLLM_CACHE_ROOT': '/guard-cache/vllm', 'TORCHINDUCTOR_CACHE_DIR': '/guard-cache/torchinductor'}
+NATIVE_LOG_REPLAY_BASELINE_IMAGE = "vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
 
 
 class EngineProvider:
@@ -123,6 +125,57 @@ class VllmProvider(EngineProvider):
     def release_profile(self, version):
         from .vllm_release_profiles import release_profile
         return release_profile(version)
+
+    def native_log_replay_profile(self, image_digest: str, engine_version: str) -> dict | None:
+        """Reviewed additional source mapping for offline saved log evidence."""
+        candidate_images = (REQUEST_BINDING_GPU_IMAGE, "docker.io/" + REQUEST_BINDING_GPU_IMAGE)
+        baseline_images = (NATIVE_LOG_REPLAY_BASELINE_IMAGE, "docker.io/" + NATIVE_LOG_REPLAY_BASELINE_IMAGE)
+        if image_digest in candidate_images:
+            reviewed_version = "0.31.0"
+        elif image_digest in baseline_images:
+            reviewed_version = "0.30.0"
+        else:
+            return None
+        if engine_version != reviewed_version:
+            raise ValueError("saved native log image differs from the declared release")
+        if reviewed_version == "0.31.0":
+            contract = self.adapter().native_log_contract(REQUEST_BINDING_GPU_IMAGE, engine_version)
+            return {"contract": contract, "request_logger_line": 65, "image_spellings": candidate_images}
+        # Exact logger, formatter and ordinary INFO entry from the installed
+        # linux/amd64 manifest. The existing live profile has separate scope.
+        sources = [
+            {"path": "vllm/logger.py", "sha256": "17a9293737985a6e5f68c5d7dd848b4c9ac666e55e9c867ae6a4db84a2c7645c", "lines": "22-69,173-202"},
+            {"path": "vllm/logging_utils/formatter.py", "sha256": "d8caa69bf25884f6d4f59ca1b3c27e1162f7ab775874b236afc32e0696d5fe7c", "lines": "59-75"},
+            {"path": "vllm/entrypoints/serve/utils/request_logger.py", "sha256": "c4212c34eafb043be73503079d0cbb880148b5fb476b5264736865e4667cb83e", "lines": "35-68"},
+        ]
+        from .vllm import fixed_native_log_profile
+
+        contract = fixed_native_log_profile("request-info-v1")
+        contract.update(logger_sha256=sources[0]["sha256"], formatter_sha256=sources[1]["sha256"], sources=sources)
+        return {"contract": contract, "request_logger_line": 63}
+
+    def evidence_contract(self, name, *args):
+        if name == "native_log_replay_profile":
+            return self.native_log_replay_profile(*args)
+        if name == "startup_load_source":
+            from .vllm_startup_load import source_profile
+            return source_profile(*args)
+        if name == "compile_cache_source":
+            from .vllm_startup_load import compile_cache_profile
+            return compile_cache_profile(*args)
+        if name == "safetensors_reader_source":
+            from .vllm_startup_load import safetensors_reader_profile
+            return safetensors_reader_profile(*args)
+        if name == "approved_file_read_preparation":
+            from .vllm_lifecycle_catalog import approved_file_read_preparation
+            return approved_file_read_preparation(*args)
+        if name == "graph_capture_source":
+            from .vllm_startup_load import graph_capture_profile
+            return graph_capture_profile(*args)
+        if name == "usage_report_source":
+            from .vllm_release_profiles import usage_report_profile
+            return usage_report_profile(*args)
+        return super().evidence_contract(name, *args)
 
     def sandbox_arguments(self, options):
         # Published callers/fixtures retain their legacy keyword contract.

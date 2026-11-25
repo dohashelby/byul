@@ -19,10 +19,11 @@ def stamp(value):
     return result
 
 
-def normalize_policy(v):
+def normalize_policy(v, *, normal_only=False):
     try:
-        if type(v) is not dict or set(v)!=set(POLICY_TYPES) or v['buffer_debug_mode']!='unverified':raise ValueError
-        if any(type(v[k]) is not str or re.fullmatch('[0-9a-f]{64}',v[k]) is None for k in POLICY_TYPES if k.endswith('_sha256')):raise ValueError
+        keys=set(POLICY_TYPES)-({'buffer_prepared_sha256'} if normal_only else set())
+        if type(v) is not dict or set(v)!=keys or v['buffer_debug_mode']!='unverified':raise ValueError
+        if any(type(v[k]) is not str or re.fullmatch('[0-9a-f]{64}',v[k]) is None for k in keys if k.endswith('_sha256')):raise ValueError
         start,end=stamp(v['buffer_validity_start']),stamp(v['buffer_validity_end'])
         if not 0<(end-start).total_seconds()<=600:raise ValueError
         for key in ('buffer_max_write_bytes','buffer_max_process_rss_bytes','buffer_max_send_wait_ms','buffer_release_deadline_ms'):

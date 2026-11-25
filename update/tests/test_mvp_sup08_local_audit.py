@@ -108,13 +108,30 @@ def test_example_environment_contracts_are_not_actual_environment_proof(tmp_path
     assert not result['ready_for_final_assembly'] and not result['input_preflight_passed']
 
 
+@pytest.fixture
+def example_engine_selector(monkeypatch):
+    from guard.adapters.engine_provider import VllmProvider
+    original = VllmProvider.release_profile
+    baseline = versions()['baseline']['version']
+    name = 'EXAMPLE_FUTURE_ENGINE_MODE'
+
+    def changed(self, version):
+        row = original(self, version)
+        if row is not None and version == baseline:
+            row['launch']['env'] = {name: 'selected'}
+        return row
+
+    monkeypatch.setattr(VllmProvider, 'release_profile', changed)
+    return name
+
+
 @pytest.mark.parametrize('damage',['missing','wrong-value','duplicate','value-from','render-selection','undeclared-env'])
-def test_rehashed_launch_cannot_normalize_a_wrong_engine_selection(tmp_path,monkeypatch,damage):
+def test_rehashed_launch_cannot_normalize_a_wrong_engine_selection(tmp_path,monkeypatch,damage,example_engine_selector):
     fixture,launch,_,_=local_assets(tmp_path,monkeypatch)
     path=launch.parent/'baseline/engine.yaml'
     deployment,service=list(yaml.safe_load_all(path.read_bytes()))
     entries=deployment['spec']['template']['spec']['containers'][0]['env']
-    selected,=(row for row in entries if row['name']=='VLLM_USE_V1')
+    selected,=(row for row in entries if row['name']==example_engine_selector)
     if damage=='missing':entries.remove(selected)
     elif damage=='wrong-value':selected['value']='0'
     elif damage=='duplicate':entries.append(dict(selected))
@@ -135,18 +152,8 @@ def test_rehashed_launch_cannot_normalize_a_wrong_engine_selection(tmp_path,monk
     assert not result['ready_for_final_assembly'] and result['actual_comparison'] is None
 
 
+@pytest.mark.usefixtures('example_engine_selector')
 def test_engine_selection_comparison_uses_provider_data_for_other_variable_names(tmp_path, monkeypatch):
-    from guard.adapters.engine_provider import VllmProvider
-    original = VllmProvider.release_profile
-    baseline = versions()['baseline']['version']
-
-    def changed(self, version):
-        row = original(self, version)
-        if row is not None and version == baseline:
-            row['launch']['env'] = {'EXAMPLE_FUTURE_ENGINE_MODE': 'selected'}
-        return row
-
-    monkeypatch.setattr(VllmProvider, 'release_profile', changed)
     fixture, launch, _, _ = local_assets(tmp_path, monkeypatch)
     result = tool.audit(fixture, launch)
     assert result['local_assets_valid'] and result['launch_plan_valid']
@@ -155,6 +162,7 @@ def test_engine_selection_comparison_uses_provider_data_for_other_variable_names
 
 @pytest.mark.parametrize('damage', ['missing-selection', 'wrong-env', 'rewritten-env', 'duplicate-env',
                                   'changed-engine', 'unrelated-env'])
+@pytest.mark.usefixtures('example_engine_selector')
 def test_self_rehashed_engine_selection_changes_or_other_env_differences_remain_invalid(tmp_path, monkeypatch, damage):
     fixture, launch, _, _ = local_assets(tmp_path, monkeypatch)
     side = 'candidate' if damage == 'unrelated-env' else 'baseline'
@@ -245,8 +253,13 @@ def test_reader_refuses_symlink_without_following_it(tmp_path, monkeypatch):
 def test_both_launch_commands_use_current_provider_data(tmp_path, monkeypatch):
     from guard.adapters.engine_provider import VllmProvider
     _, launch, _, _ = local_assets(tmp_path, monkeypatch)
-    for side, expected in versions().items():
+    pair = versions()
+    assert [pair[side]['version'] for side in tool.SIDES] == ['0.30.0', '0.31.0']
+    for side, expected in pair.items():
         deployment, _ = list(yaml.safe_load_all((launch.parent / side / 'engine.yaml').read_bytes()))
         engine, = deployment['spec']['template']['spec']['containers']
-        assert engine['command'] == VllmProvider().release_profile(expected['version'])['launch']['command']
-        assert engine['command'] != ['/usr/local/bin/vllm-nonroot-entrypoint.sh']
+        release = VllmProvider().release_profile(expected['version'])
+        render = json.loads((launch.parent / side / 'render.json').read_bytes())
+        assert engine['image'] == render['engine_image'] == expected['image']
+        assert engine['command'] == render['launch']['command'] == release['launch']['command']
+        assert render['launch']['engine'] == release['launch']['engine'] == 'V1'

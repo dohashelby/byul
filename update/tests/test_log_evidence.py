@@ -6,17 +6,19 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 
 import pytest
 
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.log_evidence import analyze_saved_logs, main
+from guard.log_evidence import _artifact, analyze_saved_logs, main
 from guard.models import DataOrigin, PolicyStatus, ReviewStatus
 from guard.store import Store
 from guard.validation_evidence import inventory_tree
 from tests.builders import PACK_DIR, baseline_pack
 from tests.prepared_fixtures import manual_setup_seed
+from tests.test_passive_api_hop import paired_original, passive_update
 
 
 _spec = importlib.util.spec_from_file_location("wheel_log_fixture", Path(__file__).resolve().parents[1] / "tools/wheel_log_fixture.py")
@@ -76,6 +78,123 @@ def test_positive_exact_pinned_log_replay_is_read_only_and_example_not_official(
     assert result["checks"][0]["data_origin"] == "EXAMPLE"
     assert result["official"] is False and result["policy_status"] == "DRAFT"
     assert result["original_inventory_preserved"] and before == inventory_tree(source)
+
+
+@pytest.mark.parametrize("replacement", [b'{"sample":2}', b'{"sample":10}'], ids=["same-size", "longer"])
+def test_replay_consumes_only_the_named_artifacts_pinned_bytes(tmp_path, replacement):
+    store = Store(tmp_path / "store")
+    raw = b'{"sample":1}'
+    saved = store.put_artifact(raw)
+    item = SimpleNamespace(name="log_integrity_events.json", path=saved.path, sha256=saved.sha256, bytes=saved.bytes)
+    evidence = SimpleNamespace(artifacts=[item])
+    assert _artifact(store.root, evidence, item.name) == raw
+
+    (store.root / saved.path).write_bytes(replacement)
+    with pytest.raises(ValueError, match="^log replay artifact bytes differ from pinned evidence$"):
+        _artifact(store.root, evidence, item.name)
+
+
+def test_ordinary_log_metadata_is_readable_in_a_paired_report_with_passive_hops(tmp_path, monkeypatch, passive_update,
+                                                                          paired_original):
+    from guard import application
+    from guard.executors import registry
+    from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
+    from guard.models import Side
+    from tests.builders import T0
+    from tests.test_kubernetes_passive_log_analysis import LogWorld, PRIVATE, REQUEST_ID, STDERR, VALUES
+
+    store, pack, envs, policy, config, _ = passive_update
+    policy = policy.model_copy(update={
+        "scope": policy.scope.model_copy(update={"include": [*policy.scope.include, "OBS-03", "OBS-09"]}),
+        "values": {**policy.values, "OBS-03": VALUES}}).seal()
+    config["update"]["allowed_checks"].append("OBS-03")
+    config["executors"]["log_analysis"] = "kubernetes"
+    worlds = {}
+    for side, (_, _, _, prior_world) in paired_original.items():
+        target_path = config["sides"][side.value]["container_config"]["target"]
+        config["sides"][side.value]["log_analysis"] = {"target": target_path}
+        worlds[target_path] = LogWorld(prior_world.target, "plain")
+
+    def ordinary_logs(cfg):
+        options = cfg["log_analysis"]
+        executor = KubernetesLogAnalysisExecutor(options, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
+        executor._kubectl_runner = worlds[options["target"]].runner
+        return executor
+
+    monkeypatch.setitem(registry.EXECUTORS, "log_analysis:kubernetes", ordinary_logs)
+    report, _ = application.execute_update(store, pack, envs, policy, config, tmp_path / "update", T0)
+    original = f"{report.id}@{report.revision}"
+    pinned = [store.resolve(ref) for ref in report.inputs_manifest if ref.kind == "EVD"]
+    logs = {evd.side.value: evd for evd in pinned if evd.check_id == "OBS-03"}
+    hops = {evd.side: evd for evd in pinned if evd.check_id == "PLT-08"}
+    assert all(len(evd.refs) == 3 for evd in hops.values()) and set(hops) == {Side.baseline, Side.candidate}
+    assert all(len(world.packets) == world.log_reads == 1 for world in worlds.values())
+
+    before = inventory_tree(store.root)
+    audit = analyze_saved_logs(store.root, original)
+    assert audit["original_inventory_preserved"] and inventory_tree(store.root) == before
+    assert audit["report"] == report.ref().model_dump(mode="json") and not audit["accepted"] and not audit["official"]
+    rows = {(row["check_id"], row["side"]): row for row in audit["checks"]}
+    for side in ("baseline", "candidate"):
+        row = rows["OBS-03", side]
+        assert row["status"] == "NORMAL_METADATA_VALIDATED" and row["data_origin"] == "EXAMPLE"
+        assert not row["replayed"] and not row["raw_source_replayed"] and not row["coverage_complete"]
+        assert "verdicts" not in row and row["normal_capture"]["artifact_sha256"] == logs[side].artifacts[0].sha256
+        assert row["normal_capture"]["source"]["payload_retained"] is False
+        assert row["normal_capture"]["collection_status"]["engine_stdout"]["stage"] == "bounded_capture_complete"
+        assert rows["OBS-09", side]["replayed"] is False
+    assert all(marker not in json.dumps(audit) for marker in (PRIVATE, REQUEST_ID, STDERR))
+
+    plan = store.resolve(hops[Side.baseline].plan)
+
+    def publish_revised(evd, **updates):
+        changed_evidence = evd.model_copy(update={"revision": evd.revision + 1, **updates}).seal()
+        store.put(changed_evidence)
+        attempt_id = changed_evidence.execution.attempt_id
+        trial = [item for item in pinned if item.id != evd.id and item.execution.attempt_id == attempt_id]
+        trial.append(changed_evidence)
+        judged = judge_plan(store, pack, plan, T0, evidence=trial, attempt_id=attempt_id)
+        revised = build_report(store, pack, plan, T0, evidence=trial, judged=judged, attempt_id=attempt_id)
+        store.put(revised)
+        return f"{revised.id}@{revised.revision}"
+
+    for side, problem in (("baseline", "saved ordinary log summary differs from its pinned fixture"),
+                          ("candidate", "saved ordinary log control differs from its writer")):
+        evd = logs[side]
+        original_item, = evd.artifacts
+        summary = json.loads((store.root / original_item.path).read_bytes())
+        if side == "baseline":
+            summary["fixture"]["policy_sha256"] = "0" * 64
+        else:
+            control = summary["collection_status"]["normal_control"]
+            assert evd.normal_control.succeeded is True and control["stage"] == "response_id_observed"
+            assert control["http_status"] == 200
+            control["http_status"] = 503
+        replacement = store.put_artifact(json.dumps(summary).encode() + b"\n")
+        changed = original_item.model_copy(update={"path": replacement.path, "sha256": replacement.sha256,
+                                                   "bytes": replacement.bytes})
+        bad_summary = publish_revised(evd, artifacts=[changed])
+        assert f"OBS-03/{side}: {problem}" in analyze_saved_logs(store.root, bad_summary)["problems"]
+
+    # Both sources are in this report, but the candidate hop cannot use the baseline's evidence.
+    hop = hops[Side.candidate]
+    other_source = next(evd.ref() for evd in pinned if evd.check_id == "PLT-01" and evd.side == Side.baseline)
+    binding = hop.execution.run_binding
+    wrong_binding = {**binding, "values": {**binding["values"], "source_evidence": other_source.model_dump(mode="json")}}
+    wrong_side = publish_revised(hop, refs=[hop.plan, hop.environment, other_source],
+                                 execution=hop.execution.model_copy(update={"run_binding": wrong_binding}))
+    with pytest.raises(ValueError, match="^PASSIVE_API_HOP_SOURCE_SCOPE_UNVERIFIED$"):
+        analyze_saved_logs(store.root, wrong_side)
+
+    # The new attempt's report omits the old attempt's PLT-01 source entirely.
+    hop = hops[Side.baseline]
+    wrong_attempt = "ATTEMPT-EXAMPLE-OTHER"
+    execution = hop.execution.model_copy(update={"attempt_id": wrong_attempt,
+        "run_binding": {**hop.execution.run_binding, "attempt_id": wrong_attempt}})
+    bad_link = publish_revised(hop, execution=execution)
+    with pytest.raises(ValueError, match="^saved passive API hop source is absent from the original report$"):
+        analyze_saved_logs(store.root, bad_link)
+    assert analyze_saved_logs(store.root, original)["checks"] == audit["checks"]
 
 
 def test_cli_new_output_and_no_input_overwrite(tmp_path, capsys):
@@ -258,18 +377,17 @@ def test_no_log_report_does_not_count_as_success(tmp_path, monkeypatch):
     assert not result["accepted"] and result["original_inventory_preserved"]
 
 
-@pytest.mark.parametrize("changes", [{}, {"duplicate": True}, {"no_logs": True}, {"wrong_owner": True}])
-def test_native_integrity_persisted_capture_replays_original_verdict_and_tags(tmp_path, changes):
+def save_native_integrity_report(tmp_path, draft, env, version):
     from guard.core.select import select
     from guard.models import Evidence
     from guard.store.packs import put_pack
-    from tests.builders import environment, policy
-    from tests.test_log_integrity import IMAGE, VALUES, run
-    draft, _ = run(tmp_path, changes)
+    from tests.builders import policy
+    from tests.test_log_integrity import VALUES
+
+    assert draft.status.value == "COMPLETED"
     store = Store(tmp_path / "native-store")
     pack = baseline_pack()
     put_pack(store, PACK_DIR)
-    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}, model={"id": "fixture-model"})
     pol = policy(pack.ref(), scope={"include": ["OBS-09"]}, values={"OBS-09": VALUES})
     store.put_many([env, pol])
     plan = select(pack, [env], pol)
@@ -278,17 +396,30 @@ def test_native_integrity_persisted_capture_replays_original_verdict_and_tags(tm
     for item in draft.artifacts:
         saved = store.put_artifact(item.path.read_bytes())
         artifacts.append({"name": item.name, "path": saved.path, "sha256": saved.sha256, "bytes": saved.bytes,
-                          "collected_at": env.created_at, "collector": "EXAMPLE-persisted-draft"})
+                          "collected_at": env.created_at, "collector": getattr(item, "collector", "EXAMPLE-persisted-draft")})
     evd = Evidence(id="EVD-EXAMPLE-NATIVE", data_origin="EXAMPLE", refs=[plan.ref(), env.ref()],
         plan=plan.ref(), environment=env.ref(), check_id="OBS-09", side="single",
-        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": "0.3.0", "config_sha256": "0" * 64}},
+        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": version, "config_sha256": "0" * 64}},
         normal_control=draft.normal_control, challenges=draft.challenges, observations=draft.observations,
         artifacts=artifacts).seal()
     store.put(evd)
     judge_plan(store, pack, plan, env.created_at)
     report = build_report(store, pack, plan, env.created_at)
     store.put(report)
-    result = analyze_saved_logs(store.root)
+    return store.root
+
+
+@pytest.mark.parametrize("changes,version", [
+    ({}, "0.3.0"), ({"duplicate": True}, "0.3.1"), ({"no_logs": True}, "0.3.0"), ({"wrong_owner": True}, "0.3.0"),
+])
+def test_native_integrity_persisted_capture_replays_original_verdict_and_tags(tmp_path, changes, version):
+    from tests.builders import environment
+    from tests.test_log_integrity import IMAGE, run
+
+    draft, _ = run(tmp_path, changes)
+    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}, model={"id": "fixture-model"})
+    source = save_native_integrity_report(tmp_path, draft, env, version)
+    result = analyze_saved_logs(source)
     assert result["accepted"], result
     assert result["checks"][0]["status"] == "PROJECTION_REPLAY_MATCH"
     assert result["checks"][0]["raw_source_replayed"] is False
@@ -297,6 +428,198 @@ def test_native_integrity_persisted_capture_replays_original_verdict_and_tags(tm
     tags = result["checks"][0].get("security_failure_tags", [])
     assert ("CONFIRMED_VIOLATION" in tags) == bool(changes.get("duplicate"))
     assert bool(tags) == bool(changes)
+
+
+@pytest.mark.parametrize("release,scope", [
+    ("0.30.0", "matched"), ("0.30.0", "different-image"), ("0.30.0", "different-version"),
+    ("0.30.0", "different-contract"), ("0.30.0", "different-source"),
+    ("0.31.0", "matched"), ("0.31.0", "matched-canonical-source"),
+    ("0.31.0", "different-image"), ("0.31.0", "different-version"),
+    ("0.31.0", "different-contract"), ("0.31.0", "different-source"),
+])
+def test_saved_obs09_replay_uses_the_pinned_environment(tmp_path, release, scope):
+    from guard.adapters.engine_provider import NATIVE_LOG_REPLAY_BASELINE_IMAGE, get_provider
+    from guard.adapters.vllm import REQUEST_BINDING_GPU_IMAGE, VllmAdapter
+    from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
+    from guard.log_evidence import _obs09
+    from guard.models import canonical_json, sha256_hex
+    from tests.builders import environment
+    from tests.test_log_integrity import VALUES
+    from tests.test_native_artifact_privacy import fixture
+
+    baseline = release == "0.30.0"
+    image = "docker.io/" + (NATIVE_LOG_REPLAY_BASELINE_IMAGE if baseline else REQUEST_BINDING_GPU_IMAGE)
+    source_image = image if baseline or scope in {"matched-canonical-source", "different-version"} else REQUEST_BINDING_GPU_IMAGE
+    other_image = "vllm/vllm-openai@sha256:" + "f" * 64
+    foreign_source = not baseline and scope == "different-source"
+    if foreign_source:
+        source_image = "foreign/vllm-openai@" + REQUEST_BINDING_GPU_IMAGE.rsplit("@", 1)[1]
+    adapter = VllmAdapter()
+    profile = get_provider("vllm").evidence_contract("native_log_replay_profile", image, release)
+    request_logger_line = 63 if baseline else 65
+    assert profile["request_logger_line"] == request_logger_line
+    assert adapter.native_log_contract(image, release) is None
+
+    def record_identity(capture, trials, before, after):
+        for identity in [before, after]:
+            identity.update(image=source_image, image_id=source_image)
+
+    _, _, _, sample = fixture(change=record_identity, cases=("before", "after"), request_logger_line=request_logger_line)
+    sample["native_contract_sha256"] = sha256_hex(canonical_json(profile["contract"]))
+    if not baseline:
+        assert sample["native_contract_sha256"] == "97bea97ae6e7984b8d3ce53bcefe9e7665471c228b9dc36eeb7e4a3a3373daf2"
+    collection = replay_native(sample, request_logger_line=request_logger_line)["collection"]
+    collection.update(capture_window=sample["capture"]["window"], redaction=PROFILE)
+    document = render_projection(collection)
+    sample["display_sha256"] = sha256_hex(document.encode())
+    artifacts, artifact_refs = [], []
+    fixture_store = Store(tmp_path / "fixture-store")
+    for name, content in (("log_integrity_events.json", json.dumps(envelope(collection))),
+                          ("log_integrity_display.html", document)):
+        saved = fixture_store.put_artifact(content.encode("utf-8"))
+        artifacts.append(SimpleNamespace(name=name, path=fixture_store.root / saved.path))
+        artifact_refs.append(SimpleNamespace(name=name, path=saved.path, sha256=saved.sha256, bytes=saved.bytes))
+
+    fixture_evd = SimpleNamespace(artifacts=artifact_refs, execution=SimpleNamespace(executor=SimpleNamespace(version="0.3.1")))
+    original = environment(engine={"name": "vllm", "version": release, "image_digest": image},
+                           model={"id": "EXAMPLE-projection"})
+    replay_env = original
+    if foreign_source:
+        # The saved foreign transcript is internally consistent, including its physical image digest.
+        replay_env = environment(engine={"name": "vllm", "version": release, "image_digest": source_image})
+    obs, complete = _obs09(fixture_store.root, fixture_evd, sample, VALUES, replay_env)
+    assert not complete and obs["normal_controls"] and obs["log_trials_reached"] == ["before", "after"]
+
+    if scope in {"different-image", "different-version"}:
+        other_version = "0.31.0" if baseline else "0.30.0"
+        original = environment(engine={"name": "vllm", "version": other_version if scope == "different-version" else release,
+                                      "image_digest": other_image if scope == "different-image" else image},
+                               model={"id": "EXAMPLE-projection"})
+    elif scope == "different-contract":
+        sample["native_contract_sha256"] = "b" * 64
+    elif scope == "different-source" and baseline:
+        sample["source_identity_after"]["image"] = other_image
+
+    samples = tmp_path / "log_integrity_samples.json"
+    samples.write_text(json.dumps(envelope(sample)), encoding="utf-8")
+    artifacts.append(SimpleNamespace(name=samples.name, path=samples))
+    draft = SimpleNamespace(status=SimpleNamespace(value="COMPLETED"), artifacts=artifacts, challenges=[],
+                           normal_control={"attempted": True, "succeeded": True},
+                           observations={key: {"value": value, "collected": True} for key, value in obs.items()})
+    store = save_native_integrity_report(tmp_path, draft, original, "0.3.1")
+    result = analyze_saved_logs(store)
+    assert result["accepted"] is (scope in {"matched", "matched-canonical-source"}), result
+    assert result["original_inventory_preserved"] and result["official"] is False
+    if scope == "different-image":
+        assert result["problems"] == ["OBS-09/single: saved native identity differs from the pinned environment"]
+    if scope == "different-version":
+        assert result["problems"] == ["OBS-09/single: saved native log image differs from the declared release"]
+    if result["accepted"]:
+        row, = result["checks"]
+        assert row["status"] == "PROJECTION_REPLAY_MATCH" and row["verdicts"]["security"] == "FAIL"
+        assert row["security_failure_tags"] and "CONFIRMED_VIOLATION" not in row["security_failure_tags"]
+        assert row["coverage_complete"] is False and row["raw_source_replayed"] is False
+
+
+@pytest.mark.parametrize("version,source_available,accepted", [
+    ("0.3.1+k8s.1", True, True), ("0.3.1+k8s.2", True, True), ("0.3.1+k8s.2", False, True),
+    ("0.3.1+k8s.99", True, False),
+])
+def test_native_kubernetes_transcript_replays_partial_cri_evidence(tmp_path, monkeypatch, version, source_available, accepted):
+    from tests.test_kubernetes_log_integrity import run
+
+    identity = None if source_available else {"env": {"VLLM_LOGGING_LEVEL": "DEBUG"}}
+    draft, _, env = run(tmp_path, monkeypatch, attach=None, identity=identity)
+    expected = ["before", "cr", "reserved", "html", "after"] if source_available else []
+    assert draft.observations["log_trials_reached"].value == expected
+    sample_artifact = next(item for item in draft.artifacts if item.name == "log_integrity_samples.json")
+    assert sample_artifact.collector == "log_integrity/0.3.1+k8s.2"
+    source = save_native_integrity_report(tmp_path, draft, env, version)
+    before = inventory_tree(source)
+    result = analyze_saved_logs(source)
+    detail, = result["checks"]
+
+    assert result["accepted"] is accepted, result
+    assert detail["replayed"] is accepted
+    assert detail["status"] == ("PROJECTION_REPLAY_MATCH" if accepted else "REPLAY_MISMATCH")
+    assert detail["coverage_complete"] is False
+    if accepted:
+        assert detail["verdicts"]["security"] == "FAIL"
+        assert detail["security_failure_tags"] and "CONFIRMED_VIOLATION" not in detail["security_failure_tags"]
+        assert detail["raw_source_replayed"] is False
+        assert detail["original_native_parser_replayed"] is False
+    if version == "0.3.1+k8s.2" and source_available:
+        pins = detail["native_source_pins"]
+        assert set(pins["attachments"]) == {
+            "probe_log.jsonl", "log_integrity_samples.json", "log_integrity_events.json", "log_integrity_display.html"}
+        assert pins["recorded_cri_raw"] == pins["recorded_raw_retained"]
+    else:
+        assert "native_source_pins" not in detail
+    assert result["original_inventory_preserved"] and inventory_tree(source) == before
+
+
+@pytest.mark.parametrize("aligned,omit_cri_digest", [(True, False), (False, False), (True, True)],
+                         ids=["attach", "cri-only", "attach-without-cri-digest"])
+def test_native_kubernetes_writer_joins_sealed_receipt_without_recovering_stdout(tmp_path, aligned, omit_cri_digest):
+    from guard.executors.kubernetes_log_integrity import KubernetesLogIntegrityExecutor
+    from guard.executors.native_projection import PROFILE, envelope, render_projection, replay_native
+    from guard.log_evidence import _kubernetes_obs09_source_pins
+    from guard.models import sha256_hex
+    from tests.test_native_artifact_privacy import CANARY, fixture
+
+    executor = KubernetesLogIntegrityExecutor({"target": "EXAMPLE: no command or connection"})
+
+    def collect_ordinary(capture, _trials, _before, _after):
+        native_lines = capture["text"].splitlines(keepends=True)
+        cri = ("2026-10-23T02:59:59Z prior ordinary line\n" + "".join(native_lines)).encode()
+        attach = "".join(line.split(" ", 1)[1] for line in native_lines).encode()
+        retained = {"stdout_bytes": len(attach), "stdout_sha256": sha256_hex(attach)}
+        executor._stop_attach = lambda: ({"returncode": 0, "stdout_bytes": attach, "stderr_bytes": b"",
+            "capture": {"schema": "guard-attach-capture/1", "complete": True, **retained}} if aligned else None)
+        ctx = SimpleNamespace(cprobe=SimpleNamespace(engine_logs=lambda *_: {"stdout_bytes": cri,
+            "stderr_bytes": b"", "returncode": 0, "capture": {"complete": True}}))
+        capture.update(executor._read(ctx, capture["window"]["since"], capture["window"]["until"], float("inf")))
+
+    _, _, _, sample = fixture(change=collect_ordinary, cases=("before", "after"))
+    assert executor._source["alignment"]["aligned"] is aligned
+    assert sample["source_transport"]["raw_retained_sha256"] != sample["source_transport"]["decoded_stdout_sha256"]
+    collection = replay_native(sample)["collection"]
+    collection.update(capture_window=sample["capture"]["window"], redaction=PROFILE)
+    display = render_projection(collection)
+    sample["display_sha256"] = sha256_hex(display.encode())
+    source = executor._source.copy()
+    if omit_cri_digest:
+        del source["cri_raw_sha256"]
+    files = {"probe_log.jsonl": json.dumps({"summary": True, "kubernetes_source": source}) + "\n",
+             "log_integrity_samples.json": json.dumps(envelope(sample)),
+             "log_integrity_events.json": json.dumps(envelope(collection)), "log_integrity_display.html": display}
+    store = Store(tmp_path / "native-pins")
+    artifacts = []
+    for name, body in files.items():
+        item = store.put_artifact(body.encode())
+        artifacts.append(SimpleNamespace(name=name, path=item.path, sha256=item.sha256, bytes=item.bytes,
+                                         collector=f"{executor.name}/{executor.version}"))
+    evd = SimpleNamespace(artifacts=artifacts)
+    before = inventory_tree(store.root)
+    if omit_cri_digest:
+        with pytest.raises(ValueError, match="saved Kubernetes log CRI receipt is invalid"):
+            _kubernetes_obs09_source_pins(store.root, evd, sample)
+        assert inventory_tree(store.root) == before
+        return
+    pins = _kubernetes_obs09_source_pins(store.root, evd, sample)
+    assert pins["attachments"] == {item.name: {"sha256": item.sha256, "bytes": item.bytes} for item in artifacts}
+    assert pins["recorded_cri_raw"] == {"sha256": source["cri_raw_sha256"], "bytes": source["cri_raw_bytes"]}
+    assert (pins["recorded_cri_raw"]["sha256"] != pins["recorded_raw_retained"]["sha256"]) is aligned
+    transport = sample["source_transport"]
+    for output, prefix in (("recorded_raw_retained", "raw_retained"), ("recorded_decoded_stdout", "decoded_stdout")):
+        assert pins[output] == {"sha256": transport[f"{prefix}_sha256"], "bytes": transport[f"{prefix}_bytes"]}
+    assert CANARY not in json.dumps(pins)
+
+    for field, message in (("decoded_stdout_sha256", "decoded stdout"), ("raw_retained_sha256", "retained source")):
+        changed = {**sample, "source_transport": {**transport, field: "f" * 64}}
+        with pytest.raises(ValueError, match=message):
+            _kubernetes_obs09_source_pins(store.root, evd, changed)
+    assert inventory_tree(store.root) == before
 
 
 @pytest.mark.parametrize("kind,leak", [(None, False), ("request", False), ("nested", True), ("nan", False)])

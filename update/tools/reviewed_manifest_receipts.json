@@ -812,6 +812,531 @@
       "reviewed_at": "2026-11-25T07:53:01.061Z"
     },
     {
+      "manifest_sha256": "3f88c4dbfca9c266a2a6ff83f62138816a3cb2b5f2690790779e4b1b41c91d9d",
+      "reviewed_by": "Codex / pinned vLLM 0.31.0 GPU launch metadata and HTTP lookup boundary; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T07:50:51+00:00"
+    },
+    {
+      "manifest_sha256": "6116056170305fae21e19fdfb13e53e763234f422debced1918352e6be6d5b16",
+      "reviewed_by": "Codex / REQ-09 matrix audit and OBS-01/11 evidence timing; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T08:30:07+00:00"
+    },
+    {
+      "manifest_sha256": "c8946f571281f415999e96066c54869872ffa99578706f506cb904a7d48a5908",
+      "reviewed_by": "Codex / REQ-09 historical audit profile compatibility; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T09:04:43+00:00"
+    },
+    {
+      "manifest_sha256": "e9b49900382a369e0ea9b476e5844e8eaa4fa7f60d5d32f4f80ad4a72378759d",
+      "reviewed_by": "Codex / external Kubernetes preparation routing; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T11:18:26+00:00"
+    },
+    {
+      "manifest_sha256": "00d25fbc44abd0b61528c2b9bc4afcb6b377626d0c5d0ca186385a1a5d633bcd",
+      "reviewed_by": "Codex / paired passive Kubernetes readiness and template comparison; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T11:30:29+00:00"
+    },
+    {
+      "manifest_sha256": "6c15c874d4f6fe2665c36a5a3deee59ddf5fdb3e62260588616819af6ef89c25",
+      "reviewed_by": "Codex / bounded owned Pod normal log observation; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T13:41:49+00:00"
+    },
+    {
+      "manifest_sha256": "fcfc0bde9008912f8fbfe7558fed24fa814b9b3b824216fc4f0f96e4128bbaa4",
+      "reviewed_by": "Codex / paired normal log and template observations; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T13:52:28+00:00"
+    },
+    {
+      "manifest_sha256": "91942e34bf80eb8574b0ce85a52895c1e42c09ee5e4ae538d3c425e91b55fb81",
+      "reviewed_by": "Codex / scoped local usage and worker trust observations; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T16:31:27+00:00"
+    },
+    {
+      "manifest_sha256": "8a30682d35cd5900b650a1518078859af4b2fbb89beb355dee761104e315b1a7",
+      "reviewed_by": "Codex / exact prebound target recipe snapshots; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T16:39:43+00:00"
+    },
+    {
+      "manifest_sha256": "a8df0f6c64f2823880cfa42761e9274aeca8a4d54eec77d928d7fceb39c8baf9",
+      "reviewed_by": "Codex / paired passive PLT-08 evidence self-review under 2026-11-12 decision 5",
+      "reviewed_at": "2026-11-18T18:01:02+00:00"
+    },
+    {
+      "manifest_sha256": "43783e3e2d51948986c9e8d495dda56e60e18c747c1e8145fb3b8ed4a52b075e",
+      "reviewed_by": "Codex / scoped audit, IPC and copy metadata self-review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T19:14:34+00:00"
+    },
+    {
+      "manifest_sha256": "6255865edce58e03c98dc3f5cb6234651d72c2018e9da186f7c926577ac0d029",
+      "reviewed_by": "Codex / paired record scopes and evidence consumers self-review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T19:30:12+00:00"
+    },
+    {
+      "manifest_sha256": "7640f410eb307e883334436fc3cefff27cce577dbdde1f1f283573c8088d0eb9",
+      "reviewed_by": "Codex / exact SUP-05 provenance and PLT-09 state review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T19:45:49+00:00"
+    },
+    {
+      "manifest_sha256": "b455a27db986d4e5074f727514d70da6ec692cec23fc41cfd6646d25c7a2c1a8",
+      "reviewed_by": "Codex / owned Gateway record, normal stream and terminal owner readback / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T20:40:18+00:00"
+    },
+    {
+      "manifest_sha256": "c445e35985185d8240f95af1d3baff5166c6535b0d137073ad5f990cc373c355",
+      "reviewed_by": "Codex / ordinary approved sampling in the owned paired target / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T21:22:29+00:00"
+    },
+    {
+      "manifest_sha256": "4e2b15f97e3c073b5f2c4fc47e872fe559d3652b343d0f53da9aec5f81a14e72",
+      "reviewed_by": "Codex / exact normal sampling target admission and existing stream scope / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T21:24:32+00:00"
+    },
+    {
+      "manifest_sha256": "d0161adbb4be514943944bb77a4c6b41a6c4adc1fff12be99cc37d1de6ddf9c7",
+      "reviewed_by": "Codex / typed SUP-07 cache evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T21:46:21+00:00"
+    },
+    {
+      "manifest_sha256": "4eb5858787eed47532bdadd4339b43ab32c44f2822049d361e33f6191e407af2",
+      "reviewed_by": "Codex / owned normal token input pair and explicit scope / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T22:43:02+00:00"
+    },
+    {
+      "manifest_sha256": "c87917f34eade2bb4c29cb2d01eaa500eebe886aceebb39ec9758a9cbea2d3ce",
+      "reviewed_by": "Codex / isolated normal token observer and native producer preservation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T23:09:21+00:00"
+    },
+    {
+      "manifest_sha256": "0b015206c9e91cfc99887919ca9b433218e27c1942de8faa715eec650c6d96ca",
+      "reviewed_by": "Codex / paired normal serving readiness and REQ09/10 comparison / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T23:45:25+00:00"
+    },
+    {
+      "manifest_sha256": "fc67cf9c81a6f4c65003c529327f199f73efafca18a826b3adbf884accc4cdf1",
+      "reviewed_by": "Codex / paired normal LIF03 timing and LIF04 co-execution / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-18T23:59:10+00:00"
+    },
+    {
+      "manifest_sha256": "d099d1c016dce0f6c1e1f1c5745e27e763ef1d1f75839701adcd317fe6bfe3a9",
+      "reviewed_by": "Codex / paired owned SUP10 installed plugin metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T00:28:22+00:00"
+    },
+    {
+      "manifest_sha256": "373c30b8f47addecc69df0e2f8745621b18427adab44bbca6fbfc0089204ef33",
+      "reviewed_by": "Codex / closed installed distribution metadata interface / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T00:45:11+00:00"
+    },
+    {
+      "manifest_sha256": "360c779e03953416796e5288577f924261944b7a4ce50bcd899c8e0fe41b52b7",
+      "reviewed_by": "Codex / paired owned Cilium endpoint policy state / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T01:19:39+00:00"
+    },
+    {
+      "manifest_sha256": "516634f1531a3f30eb352b38853a8f5c7544a7a1f18e5201d7102671a7e309c7",
+      "reviewed_by": "Codex / paired source-bound normal LIF01 startup load / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T02:06:47+00:00"
+    },
+    {
+      "manifest_sha256": "65046cbb3339335e913cfb2967d107d732164b644699abe3b1463a7b06e83822",
+      "reviewed_by": "Codex / paired startup compile cache metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T03:04:53+00:00"
+    },
+    {
+      "manifest_sha256": "9ec6d9f964024d0ef7cc2dee7623dabe9a44bd9fa6e9a78f5f8f01336c274791",
+      "reviewed_by": "Codex / paired stock Safetensors reader branch / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T04:27:07+00:00"
+    },
+    {
+      "manifest_sha256": "81ebe39df1346b42983b004d4332e260b42fd1f006bc6d98b1a443cc9d413667",
+      "reviewed_by": "Codex / paired stock CUDA graph capture / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T04:48:01+00:00"
+    },
+    {
+      "manifest_sha256": "d06414b946b69cb3d3b227b4d316066e068508fc45fc5a109574802506410526",
+      "reviewed_by": "Codex / paired candidate scope and effective usage report / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T05:21:13+00:00"
+    },
+    {
+      "manifest_sha256": "a05cbd4fe245fd129d3c035f4e62027555b93e1eb097c252fb7fee223147d63c",
+      "reviewed_by": "Codex / paired readiness and stock usage launch / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T05:24:54+00:00"
+    },
+    {
+      "manifest_sha256": "1d3349f63f334df8177abfda8f41bb11fdbf59892d802955006de9f09f036180",
+      "reviewed_by": "Codex / Gateway preflight and owned source observations / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T05:58:43+00:00"
+    },
+    {
+      "manifest_sha256": "eb894f7f19633fa7e5e8dacf30de24ee0ae41522ab6a65ece795fa6139614980",
+      "reviewed_by": "Codex / owned LIF-11 census phase binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T06:00:10+00:00"
+    },
+    {
+      "manifest_sha256": "689c49c8b8c845ca93e44612e99fbd3f5eede153ba164e8858cce65816e6846e",
+      "reviewed_by": "Codex / owned OBS-11 status bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T06:03:50+00:00"
+    },
+    {
+      "manifest_sha256": "2695180b77f8325c921aed6cdd7b92c7f6c879f135d6175d2edc76851fff73f5",
+      "reviewed_by": "Codex / LIF-01, LIF-02, SUP-11 and PLT-09 evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T06:38:47+00:00"
+    },
+    {
+      "manifest_sha256": "04ebac5e554f190c4524f330a0033c04c70462227617a93cf99676beb0345afa",
+      "reviewed_by": "Codex / SUP-05 approved file reads and SUP-15 ownership / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T07:27:43+00:00"
+    },
+    {
+      "manifest_sha256": "f2f08215b3b7f0708543493b1720a3a5a0d24a6dfdc520b887b69e28ed81fa3a",
+      "reviewed_by": "Codex / normal SUP-05 binding stages and mixed supply targets / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T07:51:49+00:00"
+    },
+    {
+      "manifest_sha256": "dee2eb14108d849d32ac4084c3172240fbe8878181f2ad9d3ef6911972537811",
+      "reviewed_by": "Codex / SUP-05 original recording bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T08:04:20+00:00"
+    },
+    {
+      "manifest_sha256": "ee4a5dfb6a548b39f48a6274bbf2812dbff4627327790cba5f413d3dee6b2ce4",
+      "reviewed_by": "Codex / paired SUP-05 offline inputs and OBS-02 and SUP-12 validation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T08:45:44+00:00"
+    },
+    {
+      "manifest_sha256": "1f3d612a1c33ed970b07a452b2be432b980d9641a883d89ac7708abfaa17c1ec",
+      "reviewed_by": "Codex / OBS-01 policy binding and OBS-09 and OBS-11 evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T08:59:14+00:00"
+    },
+    {
+      "manifest_sha256": "d4445fbb9b2c8fb98499a28153286dec8596fe3d4b2e25d2ce98cd20d2247f73",
+      "reviewed_by": "Codex / SUP-05 preparation executor ownership / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T09:04:06+00:00"
+    },
+    {
+      "manifest_sha256": "823f2961f2844a41b11634ac5a65c06a77c2e881778ad29cb279418dda2fa620",
+      "reviewed_by": "Codex / external OBS-09 log support diagnosis / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T09:17:53+00:00"
+    },
+    {
+      "manifest_sha256": "2ab724b682a2973e56412c8e10795b78a703d913bf707278fe57ccb3acab72a3",
+      "reviewed_by": "Codex / deployment generation binding and SUP-06 rank evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T10:01:09+00:00"
+    },
+    {
+      "manifest_sha256": "ddeac85a32086a281def1770a3e7bf7fd014a4a9bc6d9e399bbadaede862da2a",
+      "reviewed_by": "Codex / paired initialization preparation and PLT-12 snapshot lineage / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T10:28:29+00:00"
+    },
+    {
+      "manifest_sha256": "b27286bf36ba405f4e6b67c9189166c393efd068e4bd2aed6011e61dc4507ada",
+      "reviewed_by": "Codex / immutable initialization inputs and scoped LIF-08 rank evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T10:47:38+00:00"
+    },
+    {
+      "manifest_sha256": "f38243977af3197a5e686eb3432b985d22f218bb543fd5e7bf3eecaeff053466",
+      "reviewed_by": "Codex / initialization file-binding compatibility and scoped evidence tests / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T10:54:03+00:00"
+    },
+    {
+      "manifest_sha256": "2bd474fd184b86a8f409a748cd62ef6f1767fb0bdbd49673ee8d8c4c101df6e8",
+      "reviewed_by": "Codex / SUP-15 role isolation and OBS-06 provenance / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T11:11:52+00:00"
+    },
+    {
+      "manifest_sha256": "a50c8ac6237692359d49860ea634ecec11d19f21066ae5200c327bce4ef70619",
+      "reviewed_by": "Codex / SUP-15 prepared roles, OBS-01 runtime framing and LIF-06 generation-bound evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T11:45:58+00:00"
+    },
+    {
+      "manifest_sha256": "cd79aa181f7b15890a73b2345963bdcc326287d761c8d58bee2b4949bf0509db",
+      "reviewed_by": "Codex / LIF-07/LIF-09 input readiness and OBS-03 bounded diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T11:58:22+00:00"
+    },
+    {
+      "manifest_sha256": "f8e6862cf8ddbd7a50da1bbb17f1445f7167bee4d1f8d1de24991b6cd98ae275",
+      "reviewed_by": "Codex / REQ-13 prebound Gateway inputs, LIF-11 namespace observations and OBS-09 capture window / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T12:36:38+00:00"
+    },
+    {
+      "manifest_sha256": "8abb2a392c9dcf46c95a68efaedbbcd60f7120b73fd04601c66c64fc02af1d81",
+      "reviewed_by": "Codex / SUP-15 and SUP-16 prebound prepared-role and producer integrity / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T12:50:05+00:00"
+    },
+    {
+      "manifest_sha256": "e4c91db25dffd3fe08a515dcc48b7148c0b30978e845d6bfe4b8ebd3a638abdc",
+      "reviewed_by": "Codex / paired supply role readiness and REQ-02 partial record / SUP-06 provenance / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T16:25:57+00:00"
+    },
+    {
+      "manifest_sha256": "64a11dc06405e2d91f68471b03294039970e378baa2beaefae20f0ddf47e1cd5",
+      "reviewed_by": "Codex / canonical paired supply and redeployment generation readiness / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T16:51:36+00:00"
+    },
+    {
+      "manifest_sha256": "d1b3e5b54a452765b44129d797aab2e5eb437eaec3c7c4fc0e50bf19d2e48a0b",
+      "reviewed_by": "Codex / canonical LIF-06 generation file readiness / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T16:58:38+00:00"
+    },
+    {
+      "manifest_sha256": "b9f2aa51d61e921522832627b6a2edadd78c6b902b60d2231372945a277f840b",
+      "reviewed_by": "Codex / LIF-08 passive source integrity and OBS-11/LIF-11 declared evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T17:34:36+00:00"
+    },
+    {
+      "manifest_sha256": "22309ebaf11a842f8448aa678d5eb22a2a0d138082951b81b6c1309f51297e1e",
+      "reviewed_by": "Codex / OBS-04 and PLT-06 owned declaration readiness / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T17:45:45+00:00"
+    },
+    {
+      "manifest_sha256": "4f3f680de1cb667bc230d6a075f989cc29fe24cd64c9c539d257a42d21736eec",
+      "reviewed_by": "Codex / paired OBS-06 and PLT-12 input integrity / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T18:24:06+00:00"
+    },
+    {
+      "manifest_sha256": "fb7a6d62ed1b6af1deff2aa561328969e1a039af5a51f5417e92f218757755a6",
+      "reviewed_by": "Codex / paired OBS-01 snapshot and LIF-12 retry input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T18:51:51+00:00"
+    },
+    {
+      "manifest_sha256": "f016a8fb2f0ed405caa478f62c4b65365b15759b785e5069d653de58a2e7ae6b",
+      "reviewed_by": "Codex / paired REQ-10 sampling and LIF-04 stream input validation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T19:19:30+00:00"
+    },
+    {
+      "manifest_sha256": "3c1126b201e236e28077088bfc2708006b1205481343e8c408b23d2c023cda1b",
+      "reviewed_by": "Codex / REQ-10 optional collection profile preparation correction / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T19:34:32+00:00"
+    },
+    {
+      "manifest_sha256": "e67a04fae23bec7bcea4ad4da32038b91fa664b911b9d0718dd1a49b51f99117",
+      "reviewed_by": "Codex / owned startup source and saved observation input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T20:13:00+00:00"
+    },
+    {
+      "manifest_sha256": "195132a89d9765ac30421e8cdd66592c823912004d54c5e52ecc70ad9714e6a1",
+      "reviewed_by": "Codex / LIF-03 effective normal latency input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T20:19:46+00:00"
+    },
+    {
+      "manifest_sha256": "711a5e71c8a4c8bdb8af3beb2bb4ab74171b2d7adb99d9424d944094d4bea14e",
+      "reviewed_by": "Codex / PLT-02 protected path input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T20:53:17+00:00"
+    },
+    {
+      "manifest_sha256": "4b6481f4032e15c4a9604e54cfc2968e0d1835aa374119f8f35892830782548f",
+      "reviewed_by": "Codex / REQ-09 token and SUP-05 reader input preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T21:20:24+00:00"
+    },
+    {
+      "manifest_sha256": "ab2863592ca424c01512b07d5df541220a1f131f319a2d920990d1ca5c300e94",
+      "reviewed_by": "Codex / vLLM paired local declaration preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T21:42:44+00:00"
+    },
+    {
+      "manifest_sha256": "e2be25808d117f12d1aefc4ba9841bc9d84889d98748299380883c261275a997",
+      "reviewed_by": "Codex / SUP-05 paired saved preparation inputs / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T22:16:34+00:00"
+    },
+    {
+      "manifest_sha256": "379ec8067c1737fb88bac5c82e40db518946bc97bed086c3b5d85cf4a1f2a211",
+      "reviewed_by": "Codex / SUP-05 receipt-bound product handoff and replay / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T22:46:41+00:00"
+    },
+    {
+      "manifest_sha256": "90fbccce4ff83754e8e25a8adf07105858eddfabfd71ee54d6c3565e877fe383",
+      "reviewed_by": "Codex / SUP-06 observed worker shard assignments and index gaps / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T23:19:15+00:00"
+    },
+    {
+      "manifest_sha256": "d0566d53faccd0df29aa12a7de2769e8f43a816408bd828ae5d2db1c5dd07bd4",
+      "reviewed_by": "Codex / SUP-06 paired passive sources and bounded PLT-02/06 receipt retention / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-19T23:51:34+00:00"
+    },
+    {
+      "manifest_sha256": "41c8374126255dfabdd28c5ee5e41961e5de1fe15db9d32bfc927dd77f6a0437",
+      "reviewed_by": "Codex / SUP-06 same-call native shard index observation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T00:21:21+00:00"
+    },
+    {
+      "manifest_sha256": "96d558be388338bebf67df3da7aa9cd4f2157b668e20ffac38b8a34006143d3d",
+      "reviewed_by": "Codex / SUP-06 callback capture and boot input binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T00:41:21+00:00"
+    },
+    {
+      "manifest_sha256": "1dbfe55a0af91dc87b439c5b9de4233e05dcbf4c473d8e89d426f8fc8f85ae5d",
+      "reviewed_by": "Codex / OBS-09 pinned replay and redeployment preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T01:05:04+00:00"
+    },
+    {
+      "manifest_sha256": "103add7e0f0a6cd966c1fa60cac628af4b5a3c81b0fe1383fd590b283f3f9f30",
+      "reviewed_by": "Codex / LIF-12 passive input and local observation diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T01:36:55+00:00"
+    },
+    {
+      "manifest_sha256": "67b8768e6ffac47bec831002ce8f03fcedd19e8cee587166d05ceaa635f658cb",
+      "reviewed_by": "Codex / Paired LIF-12 and OBS-11 record input binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T02:16:44+00:00"
+    },
+    {
+      "manifest_sha256": "e5cb9b236370385f51b2f24f3e236b103e6061e43c4ed8db5e0b47abcad7d692",
+      "reviewed_by": "Codex / OBS-11 canonical model mapping preflight / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T02:34:03+00:00"
+    },
+    {
+      "manifest_sha256": "77dc0350af37f158e4492a08b1b659a4ee526e2cfc0884e90b5f9bac92c484a5",
+      "reviewed_by": "Codex / OBS-11 status and LIF-12 selected target binding / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T03:12:39+00:00"
+    },
+    {
+      "manifest_sha256": "edcb54ccbc55ca242d8eaa93ebb5f5844895ef6e06558a52a416b2685d0265b3",
+      "reviewed_by": "Codex / LIF-05 and LIF-16 pinned paired transition preparation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T04:26:07+00:00"
+    },
+    {
+      "manifest_sha256": "bb5a9b6caa659c5e4d07827a7e1eb24880b8e48ead71fcbcc6117514a7b83432",
+      "reviewed_by": "Codex / LIF-05 and LIF-16 pinned model reference scopes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T07:00:43+00:00"
+    },
+    {
+      "manifest_sha256": "a5710ac4944d97c6f99abffb881c4dae5807f9de17a9d44b0aad0d9f646abfe9",
+      "reviewed_by": "Codex / LIF-05 and LIF-16 pinned model reference scopes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T07:09:07+00:00"
+    },
+    {
+      "manifest_sha256": "7e68f5173d9db59fce11d6b732f668843b498856080d5ffc9766e04303edbbab",
+      "reviewed_by": "Codex / passive metadata target-read review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-20T08:47:19+00:00"
+    },
+    {
+      "manifest_sha256": "d4ea1eb5698f88d2052178743dc177ec7c94cd99706c9ebe809a1e3adfce77ee",
+      "reviewed_by": "Codex / PLT-12 and OBS-01 passive snapshot target verification / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-21T07:51:08+00:00"
+    },
+    {
+      "manifest_sha256": "37e88749ba8123cdae0a41c795b9acd78988f3f5a3ff6b978f050508e7a0fde4",
+      "reviewed_by": "Codex / LIF-07 and LIF-09 saved initialization input review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-21T11:12:54+00:00"
+    },
+    {
+      "manifest_sha256": "0a8bbc49578a9f184935a32896d1dacd6d7906a31ff719260f39ccb65a4a75ea",
+      "reviewed_by": "Codex / SUP-09 and SUP-11 reported model entry normal controls / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-21T15:34:57+00:00"
+    },
+    {
+      "manifest_sha256": "19922e2641de7cfc221318bd69b4f1831d965e926c04bf1c19ad31a444d8ba3e",
+      "reviewed_by": "Codex / OBS-09 exact candidate saved logger source / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-21T16:02:39+00:00"
+    },
+    {
+      "manifest_sha256": "f90467241e16586795d6eff356181f0479d7d495b2bc926f3118fa6d4a5d6ee0",
+      "reviewed_by": "Codex / SUP-12 filesystem report and OBS-09 sealed artifact bytes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T04:41:15.726Z"
+    },
+    {
+      "manifest_sha256": "f24c3da5b34ba7729c6e226164e27b8a2f016c2a0a92a712d09c9db95a9ce49b",
+      "reviewed_by": "Codex / SUP-07 compile report and OBS-03 sealed log metadata / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T05:38:23.367Z"
+    },
+    {
+      "manifest_sha256": "5f614e55bcfb660e327e97386d03a191709b8cf63d3417b36117d72c7a1d396f",
+      "reviewed_by": "Codex / OBS-09 retained source receipt and projection / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T06:01:33.448Z"
+    },
+    {
+      "manifest_sha256": "a90f839cffa34b5d7f41ab01953828298ab2a7b1f18e92222001a0b7c5fb8b09",
+      "reviewed_by": "Codex / SUP-05 bounded owned read gap diagnostics / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T06:32:37.735Z"
+    },
+    {
+      "manifest_sha256": "6f75c52ea6b0b0b522a4b5294fe0ddae864bae9a6044ebc20a84980cfd5fdc9a",
+      "reviewed_by": "Codex / OBS-11 scoped file capture receipt / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T07:28:44.018Z"
+    },
+    {
+      "manifest_sha256": "1c6fff930efab4452783d94b3eff1afe3ed16b3616e711620cfc52cd9ebd8fdb",
+      "reviewed_by": "Codex / LIF-02 and PLT-09 evidence review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T07:58:18.972Z"
+    },
+    {
+      "manifest_sha256": "b6fb013f98d291c6f8b6f0ac842e3a1a545523fe6bdd2253f52651df03453424",
+      "reviewed_by": "Codex / OBS-09 replay and REQ-20 boot receipt / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T12:04:05.389Z"
+    },
+    {
+      "manifest_sha256": "f79d54d7e48c467e13d82ce8433b14cf711122ef130b2c94cffa2102364fbafd",
+      "reviewed_by": "Codex / initialization receipts and supply artifacts / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T12:30:09.042Z"
+    },
+    {
+      "manifest_sha256": "c6e7609cf42128e250240ac65ecd9e43c1db8b813e648cb19ed71177adcadb44",
+      "reviewed_by": "Codex / LIF-11 and OBS-06 evidence review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T13:00:33.607Z"
+    },
+    {
+      "manifest_sha256": "0cc62cae23a276a35c06d0787cbd0f8faf70c2aa0d865cb6101e598d098bb8ee",
+      "reviewed_by": "Codex / LIF-11 and LIF-13 evidence retention review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T13:31:55.655Z"
+    },
+    {
+      "manifest_sha256": "5fd3376aa85a00379a92c68df5fba7fea4b2f81d32cb6678d26e472390a841fb",
+      "reviewed_by": "Codex / OBS-04 bounded capture and failure-kind review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T14:53:48.404Z"
+    },
+    {
+      "manifest_sha256": "393dc2a4e785bce540dc86bedb5a98de07ff4dbc76f235441a7ef4db6768eb8b",
+      "reviewed_by": "Codex / bound OBS03/04 and SUP07/REQ20 evidence review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T06:02:40.128Z"
+    },
+    {
+      "manifest_sha256": "3a655df950305ddb27943355bf19d0ef450cbb738bac4d4072f1d07f17f73986",
+      "reviewed_by": "Codex / SUP05 mount continuity and LIF01 time-window review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T07:16:07.407Z"
+    },
+    {
+      "manifest_sha256": "691428b3d94f398846debbfe782637bdd63d12688900a0139b82795b42f1759b",
+      "reviewed_by": "Codex / OBS09 CRI and attach source receipt review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T07:47:23.594Z"
+    },
+    {
+      "manifest_sha256": "192b6ec65c98923887624a1fcd0154c599a5745c42dde641556f4034490c4601",
+      "reviewed_by": "Codex / REQ13 target pins and SUP05 sealed diagnostics review / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T08:14:37.419Z"
+    },
+    {
+      "manifest_sha256": "503cc9d7bc64b22471de6bb34bbd86e5193a3305883f6d8e3eb16d419564b385",
+      "reviewed_by": "Codex / merge reviewed UPDATE changes into development; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T08:21:54+00:00"
+    },
+    {
+      "manifest_sha256": "ff6ca7e70698e068ddae7fa1560077205dd00933d385265b118c56c9c05d1f41",
+      "reviewed_by": "Codex / LIF-01 and OBS-06 stable input reads; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:00:12+00:00"
+    },
+    {
+      "manifest_sha256": "316d32a064fecffa5731c6021dec5bef7d116fdcf193f8d27d07fe16965926df",
+      "reviewed_by": "Codex / OBS-05 verified sink arrival; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:18:09+00:00"
+    },
+    {
+      "manifest_sha256": "eea55b3b92326ee8c86562ddde84ceb93e4f02739a369acdf6dc13fe49e12d64",
+      "reviewed_by": "Codex / scoped preparation and original Gateway route rows; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:29:09+00:00"
+    },
+    {
+      "manifest_sha256": "47bef0cce1641b3a794eddbef48a92f6f0367a736bca1c7f037b1bfdd0f37244",
+      "reviewed_by": "Codex / canonical Gateway snapshot actor binding; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:59:24+00:00"
+    },
+    {
+      "manifest_sha256": "05a83c73313cf318988e500907393bcd8dfaf896d797bcae341e074bfb479392",
+      "reviewed_by": "Codex / 11월 24일 통합 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T12:14:27.066Z"
+    },
+    {
+      "manifest_sha256": "5a5175f9e83e5d0cefec7cccef9fbb8892cf92c563c3c9b96759e3388825a888",
+      "reviewed_by": "Codex / 판본 비교 및 CI 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T13:05:53.849Z"
+    },
+    {
       "manifest_sha256": "19be228d67e649e93461b2827d7733522453c618a5de160deda2bf12b472d069",
       "reviewed_by": "Claude / PR304 엔진 센서 keys() / 사용자 지시로 기록 / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-25T10:28:33.000Z"
@@ -825,6 +1350,16 @@
       "manifest_sha256": "457795bf660a5243a8c72d8cbcb9653f92ad5a57873969add83474192283d3a0",
       "reviewed_by": "Codex / 판본 비교 및 CI 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-25T13:07:09.511Z"
+    },
+    {
+      "manifest_sha256": "94a7f1efb358e9fee1e75d3a8a667da5357e523a0ad63b44bef0aeb6c2edec7d",
+      "reviewed_by": "Codex / 판본 비교 및 CI 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T13:07:50.380Z"
+    },
+    {
+      "manifest_sha256": "d75d5da1ede5c278063659aa9e84c25306466fdf1077af8bfa72d7220ebdfd3f",
+      "reviewed_by": "Codex / 판본 비교 및 CI 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T13:08:23.794Z"
     }
   ]
 }

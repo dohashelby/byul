@@ -1,4 +1,5 @@
 """Direct transition contracts; CPU fixtures never claim deployment/GPU proof."""
+import asyncio
 from copy import deepcopy
 from datetime import timedelta
 import json
@@ -19,7 +20,7 @@ from tests.test_kubernetes_sampling import World as PodWorld, PRIVATE
 from tests.test_lifecycle_capture import case, external
 from tests.test_lifecycle_sensor import writer_factory, CONTEXT
 from tests.test_lifecycle_session import group, collect as collect_existing
-from tests.test_kubernetes_lifecycle import target as native_target
+from tests.test_kubernetes_lifecycle import capture as capture_existing, target as native_target
 
 
 def policy():
@@ -145,10 +146,10 @@ class Clock:
         with self.lock: self.value += timedelta(seconds=seconds)
 
 
-def harness(monkeypatch, *, failure=None):
+def harness(monkeypatch, *, failure=None, observed_packet=None, lab=True):
     clock = Clock(); entered = threading.Event(); release = threading.Event(); log = []; ids = {}
     env = environment()
-    generations = {key: subject.Generation(key, env, {'lab': True}, {}, {'session': str(i) * 32})
+    generations = {key: subject.Generation(key, env, {'lab': lab}, {}, {'session': str(i) * 32})
         for i, key in enumerate(('old', 'new', 'restored'), 1)}
     monkeypatch.setattr(subject, 'load_generations', lambda *a: (generations, []))
     executor = subject.LifecycleTransitionExecutor({}, runner=lambda *a: None, clock=clock.now, wait=clock.wait)
@@ -160,11 +161,15 @@ def harness(monkeypatch, *, failure=None):
             return {'sealed': True}
         return SimpleNamespace(seal_session=seal, report=lambda: {})
     def probe(generation, phase, request, timeout):
-        log.append(('probe', phase)); ids[phase] = sha256_hex(request.encode())
+        log.append(('probe', phase)); ids[phase] = request
         if phase == 'inflight':
             entered.set(); assert release.wait(3)
         if failure == 'recovery' and phase == 'recovered': raise OSError(PRIVATE)
-        return {'normal_shape_verified': True, 'transport': {'cleanup_errors': []}}
+        if observed_packet is None:
+            return {'normal_shape_verified': True, 'transport': {'cleanup_errors': []}}
+        return {'normal_shape_verified': True, 'capture_complete': True,
+            'transport': {'cleanup_errors': [], 'collection_gap': False,
+            'requests': [{'binding_verified_before_after': True}]}}
     def capture(generation):
         log.append(('capture', generation.key))
         if 'inflight' in ids:
@@ -172,7 +177,11 @@ def harness(monkeypatch, *, failure=None):
             if clock.now() >= T0 + timedelta(seconds=5): release.set()
             if failure == 'replacement' and generation.key == 'old' and clock.now() >= T0 + timedelta(seconds=5):
                 raise OSError(PRIVATE)
-            return packet(ids['inflight'], [('1' * 64, '2' * 64), ('3' * 64, '4' * 64)])
+            if observed_packet is not None:
+                return observed_packet(generation, ids['inflight'])
+            return packet(sha256_hex(ids['inflight'].encode()), [('1' * 64, '2' * 64), ('3' * 64, '4' * 64)])
+        if observed_packet is not None:
+            return observed_packet(generation, None)
         return packet()
     monkeypatch.setattr(executor, '_reader', reader); monkeypatch.setattr(executor, '_probe', probe)
     monkeypatch.setattr(executor, '_capture', capture)
@@ -196,6 +205,16 @@ def test_normal_transition_ongoing_request_and_recovery_all_profiles(monkeypatch
     assert PRIVATE not in draft.artifacts[0].path.read_text(encoding='utf-8')
 
 
+def test_read_only_redeployment_does_not_seal_the_producer_session(monkeypatch, tmp_path):
+    executor, env, log = harness(monkeypatch, lab=False)
+    draft = executor.run(check(), env, policy(), None, tmp_path)
+    assert not any(action == 'seal' for action, _ in log)
+    artifact = json.loads(draft.artifacts[0].path.read_bytes())
+    assert artifact['samples'][-1]['phase'] == 'final'
+    assert draft.data_origin == DataOrigin.EXAMPLE  # Injected transport.
+    assert not draft.observations['activation_scope_complete'].value
+
+
 def test_external_scalar_approval_cannot_cover_other_generation_targets(monkeypatch, tmp_path):
     executor, env, log = harness(monkeypatch)
     executor.expected_target = 'a' * 64
@@ -205,6 +224,193 @@ def test_external_scalar_approval_cannot_cover_other_generation_targets(monkeypa
     with pytest.raises(ValueError, match='EXPLICIT_GENERATION_TARGET_APPROVAL_REQUIRED'):
         executor.run(check(), env, policy(), None, tmp_path)
     assert not log
+
+
+def test_lif05_normalization_keeps_observed_request_facts_and_transition_gaps(monkeypatch, tmp_path):
+    from guard.core.run import _normalize
+    from guard.models import load_pack
+
+    executor, env, _ = harness(monkeypatch)
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    definition = pack.checks['LIF-05']
+    draft = executor.run(definition, env, policy(), None, tmp_path)
+    observed = _normalize(definition, draft)['observations']
+    row, = observed['activation_steps']['value']
+    assert row['step'] == 'passive-scheduled-redeployment-observation'
+    assert len(row['trials']) == 5 and all('transport' not in trial for trial in row['trials'])
+    assert row['request_generation_bindings'] == draft.observations['transition_request_generation_bindings'].value
+    assert row['request_generation_bindings']
+    assert row['request_configuration_facts']
+    assert row['request_configuration_conflict_candidates']
+    assert not row['transition_activation_verified'] and not row['actual_consumption_verified']
+    assert 'drain_and_external_admission_gate_unverified' in observed['activation_missing']['value']
+    assert observed['activation_violations']['value'] == []
+    assert observed['activation_scope_complete']['value'] is False
+
+
+@pytest.mark.parametrize('case_kind', ['bound', 'owner-unbound', 'ambiguous-invocation', 'wrong-generation', 'late-ambiguity'])
+def test_lif06_preserves_writer_assignment_and_normal_observations_with_exact_provenance(
+        monkeypatch, tmp_path, group, native_target, writer_factory, case_kind):
+    from guard.adapters import vllm_lifecycle_sensor as sensor
+    from guard.core.judge import judge_evidence
+    from guard.core.run import _normalize
+    from guard.models import Evidence, load_pack
+    from tests.builders import dummy_ref, policy as sealed_policy
+    from tests.test_lifecycle_asgi_binding import MODULE, assigned, scope
+    from tests.test_lifecycle_sensor import RecordingObserver
+
+    packets = {}
+    prefixes = []
+    observed_generation = 'new' if case_kind == 'wrong-generation' else 'old'
+    def observed_packet(generation, request):
+        if generation.key != observed_generation or request is None:
+            return None
+        if request not in packets:
+            prepared = group.prepared
+            writer, raw = writer_factory(session=prepared['session'],
+                settings_sha=prepared['assets']['settings.json']['sha256'])
+            writer.write('MODULE', {'module': MODULE, 'verified': True,
+                'source_sha256': sensor.SOURCE_SHA[MODULE], 'code_sha256': 'c' * 64})
+            observer = RecordingObserver()
+            monkeypatch.setattr(sensor, '_OBSERVER', observer)
+            monkeypatch.setattr(observer, 'emit', lambda event, payload: writer.write(event, payload))
+            async def app(*args):
+                assigned(observer, request)
+            async def noop(*args):
+                return None
+            for index in range(2 if case_kind in {'ambiguous-invocation', 'late-ambiguity'} else 1):
+                asyncio.run(sensor.Middleware(app)(
+                    {**scope(request.encode()), 'path': '/v1/chat/completions', 'method': 'POST'}, noop, noop))
+                if case_kind == 'late-ambiguity' and index == 0:
+                    group.raw_by_pid[42] = bytes(raw.data)
+                    earlier, _ = capture_existing(group, native_target)
+                    prefixes.append(earlier)
+            writer.close('SEALED')
+            group.raw_by_pid[42] = bytes(raw.data)
+            packet, _ = capture_existing(group, native_target)
+            if case_kind == 'owner-unbound':
+                packet['recordings'][0]['session_owner_match'] = False
+            packets[request] = packet
+            if prefixes:
+                return prefixes[0]
+        return packets[request]
+
+    executor, env, _ = harness(monkeypatch, failure='recovery', observed_packet=observed_packet)
+    generations, _ = subject.load_generations({}, env, policy())
+    selected = generations[observed_generation]
+    selected.prepared = group.prepared
+    selected.env = group.env
+    selected.target = native_target
+    for key, generation in generations.items():
+        if key != observed_generation:
+            generation.target['example_generation'] = key
+    manifest = [subject._manifest_row(g.key, g.env, g.target, g.prepared) for g in generations.values()]
+    monkeypatch.setattr(subject, 'load_generations', lambda *args: (generations, manifest))
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    definition = pack.checks['LIF-06']
+    draft = executor.run(definition, env, policy(), None, tmp_path)
+    evd = Evidence(id='EVD-TRANSITION-LIF06', data_origin=draft.data_origin, plan=dummy_ref('PLAN'),
+        environment=env.ref(), check_id=definition.id, side='single', execution={'status': draft.status},
+        **_normalize(definition, draft)).seal()
+    observed = {key: value.value for key, value in evd.observations.items() if value.collected}
+    row, = observed['activation_steps']
+    assert {record['case_id'] for record in row['normal_controls']} == {'before', 'during', 'after'}
+    assert row['prepared_scopes'] == manifest
+    assert not row['actual_consumption_verified'] and not row['transition_activation_verified']
+    assert 'selected_phase_normal_control_incomplete' in observed['activation_missing']
+    assert observed['activation_violations'] == [] and observed['activation_scope_complete'] is False
+    request, packet = next(iter(packets.items()))
+    if case_kind == 'bound':
+        binding, = row['request_generation_bindings']
+        assert binding['generation'] == 'old' and binding['session'] == group.prepared['session']
+        assert next(item for item in row['prepared_scopes'] if item['id'] == binding['generation'])['target_sha256'] == sha256_hex(canonical_json(native_target))
+        assert binding['request_id_sha256'] == sha256_hex(request.encode())
+        source = binding['source_receipt']
+        capture = packet['recordings'][source['event'][0]]['capture']
+        assert source['pid'] == CONTEXT['pid'] and source['start_ticks'] == CONTEXT['start_ticks']
+        assert source['recording_sha256'] == sha256_hex(group.raw_by_pid[42])
+        assert source['file_identity_sha256'] == sha256_hex(canonical_json(capture['provenance']['file_identity']))
+        selection = binding['selection_source_receipt']
+        assert selection['event'][0] == source['event'][0] and selection['event'][1] > source['event'][1]
+        assert selection['source_sha256'] == source['source_sha256'] == sensor.SOURCE_SHA[MODULE]
+        assert selection['recording_sha256'] == source['recording_sha256']
+    else:
+        assert row['request_generation_bindings'] == []
+        assert row['request_configuration_facts'] == []
+        assert 'inflight:native_request_generation_unlinked' in observed['activation_missing']
+        if case_kind == 'wrong-generation':
+            assert any(event['phase'] == 'RETURN'
+                and event['metadata']['asgi_request_sha256'] == sha256_hex(request.encode())
+                for event in packet['request_selection_index']['events'])
+        if case_kind == 'late-ambiguity':
+            prefix, = prefixes
+            trial = {'case_id': 'inflight', 'generation': 'old', 'request_id_sha256': sha256_hex(request.encode())}
+            early = subject.project([sample(prefix), sample(prefix, 'after')], [trial], retain_receipts=True)
+            assert len(early['request_generation_bindings']) == 1
+            assert trial['request_id_sha256'] in packet['request_selection_index']['ambiguous_asgi_request_sha256']
+            assert 'inflight:native_request_generation_ambiguous' in observed['activation_missing']
+    assert request.encode() not in canonical_json(evd.to_dict())
+    judgment = judge_evidence(definition, evd, sealed_policy(pack.ref()), T0)
+    assert evd.data_origin is DataOrigin.EXAMPLE and judgment.verdicts.security.value == 'UNKNOWN'
+
+
+@pytest.mark.parametrize('case', ['terminated', 'absent', 'replaced', 'running', 'changed-namespace', 'unseen-old', 'read-error'])
+def test_lif05_retirement_preserves_only_exact_api_outcomes(case):
+    from tests.test_kubernetes_transition import Pair
+
+    pair = Pair(stop=case != 'running', replace=case == 'replaced')
+    old = pair.worlds[0].target
+    engine = old['kubernetes']['engine']
+    session = 'a' * 32
+    generation = subject.Generation('old', pair.envs[0], old, {}, {'session': session})
+    reads = []
+
+    def runner(argv, **kwargs):
+        reads.append(argv)
+        if 'namespace' in argv:
+            uid = 'unmatched-uid' if case == 'changed-namespace' and len(reads) == 3 else engine['namespace_uid']
+            raw = canonical_json({'kind': 'Namespace', 'metadata': {'name': engine['namespace'], 'uid': uid}})
+            return {'returncode': 0, 'stdout_bytes': raw, 'stderr_bytes': b'', 'capture': {'complete': True}}
+        if case == 'read-error':
+            raise OSError('EXAMPLE private raw transport error')
+        if case == 'absent':
+            return {'returncode': 0, 'stdout_bytes': b'', 'stderr_bytes': b'', 'capture': {'complete': True}}
+        result = pair.runner(argv, **kwargs)
+        pod = json.loads(result['stdout_bytes'])
+        result['stdout_bytes'] = canonical_json({'kind': 'Pod', **pod})
+        return result
+
+    executor = subject.LifecycleTransitionExecutor({}, runner=runner, clock=lambda: T0)
+    before = {'capture_sha256': 'e' * 64, 'owner_stable': case != 'unseen-old',
+              'owner': {key: engine[key] for key in ('namespace_uid', 'pod_uid', 'container_id', 'restart_count')}}
+    samples = [sample({'session': session, 'before': before}, phase='before')]
+    result = executor._observe_retirement(generation, samples)
+    if case in ('terminated', 'absent'):
+        assert result['state'] == ('selected_container_terminated' if case == 'terminated' else 'selected_pod_absent')
+        assert result['prior_live_inventory_sha256'] == 'e' * 64
+        assert result['target_sha256'] == sha256_hex(canonical_json(old))
+        assert bool(result['reported_container_finished_at']) == (case == 'terminated')
+        assert result['native_terminal_tail_collected'] is False
+    else:
+        assert result is None
+    if case == 'unseen-old':
+        assert not reads
+    assert all('get' in call and 'exec' not in call and 'delete' not in call for call in reads)
+
+
+def test_lif05_does_not_seal_a_verified_retired_generation(tmp_path, monkeypatch):
+    executor, env, log = harness(monkeypatch)
+    retirement = {'generation': 'old', 'state': 'selected_pod_absent', 'native_terminal_tail_collected': False}
+    monkeypatch.setattr(executor, '_observe_retirement', lambda *_: retirement)
+    draft = executor.run(check(), env, policy(), None, tmp_path)
+    steps, = draft.observations['activation_steps'].value
+    assert steps['old_api_retirement'] == retirement
+    assert 'retired_generation_native_terminal_tail_unobserved' in draft.observations['activation_missing'].value
+    assert 'drain_and_external_admission_gate_unverified' in draft.observations['activation_missing'].value
+    assert ('seal', 'old') not in log and ('seal', 'new') in log
+    assert ('capture', 'old') not in log[log.index(('seal', 'new')):]
+    assert not draft.observations['activation_scope_complete'].value
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
 
 
 @pytest.mark.parametrize('failure', ['cleanup', 'recovery', 'replacement'])
@@ -257,7 +463,9 @@ def test_real_http_transport_closed_safe_request_and_replacement_binding(replace
     result = subject.LifecycleTransitionExecutor({}, runner=world.runner)._probe(generation, 'before', 'example-request', 3)
     assert result['normal_shape_verified'] is (not replacement)
     assert len(world.execs) == 1
-    assert world.execs[0]['body']['max_tokens'] == 1
+    assert world.execs[0]['url'].endswith('/v1/chat/completions')
+    assert world.execs[0]['body'] == {'model': 'fixture-model', 'messages': [{'role': 'user', 'content': 'hello'}],
+        'max_tokens': 1, 'temperature': 0, 'stream': False}
     assert world.execs[0]['headers'] == {'X-Request-Id': 'example-request'}
     assert PRIVATE not in json.dumps(result)
     assert all(not any(a in argv for a in ('apply', 'create', 'delete', 'patch', 'rollout')) for argv in world.calls)

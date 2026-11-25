@@ -18,7 +18,7 @@ _FIELDS = {"record", "event_at_ms", "arrived_at_ms", "gap_marked_at_ms", "alert_
 _DICTS = ("collection_deadline_ms", "max_clock_uncertainty_ms", "detection_deadline_ms", "alert_deadline_ms")
 
 
-def validate_policy(values):
+def validate_policy_shape(values):
     records = values.get("required_records") if type(values) is dict else None
     if type(records) is not list or not records or any(type(r) is not str or not r for r in records):
         raise ValueError("COLLECTION_GAP_POLICY_INVALID")
@@ -27,6 +27,10 @@ def validate_policy(values):
         if (type(table) is not dict or set(table) != set(records)
                 or any(type(v) is not int or isinstance(v, bool) or v < 0 for v in table.values())):
             raise ValueError("COLLECTION_GAP_POLICY_INVALID")
+
+
+def validate_policy(values):
+    validate_policy_shape(values)
     if type(values.get("collection_session")) is not str or re.fullmatch("[0-9a-f]{32}", values["collection_session"]) is None:
         raise ValueError("COLLECTION_GAP_POLICY_INVALID")
 
@@ -52,6 +56,11 @@ def validate_record(packet, *, environment_ref, session):
     return packet
 
 
+def selected_record_timeline(packet, required_records):
+    """Keep only closed, validated status rows for policy-selected record IDs."""
+    return [row for row in packet["events"] if row["record"] in required_records]
+
+
 def evaluate(packet, values):
     """기록별 정상 도착과 누락 처리 위반을 나눈다. 시각 오차를 넘긴 행은 판단하지 않는다."""
     violations, unverified, missing, normal = [], [], [], []
@@ -65,14 +74,15 @@ def evaluate(packet, values):
             continue
         for row in selected:
             start = row["event_at_ms"]
-            if row["clock_uncertainty_ms"] > values["max_clock_uncertainty_ms"][record]:
+            observed = (row["arrived_at_ms"], row["gap_marked_at_ms"], row["alert_at_ms"])
+            if (not 0 <= row["clock_uncertainty_ms"] <= values["max_clock_uncertainty_ms"][record]
+                    or any(timestamp is not None and timestamp < start for timestamp in observed)):
                 unverified.append(record)
                 continue
-            arrived = row["arrived_at_ms"]
+            arrived, marked, alerted = observed
             if arrived is not None and arrived - start <= values["collection_deadline_ms"][record]:
                 normal.append(record)
                 continue
-            marked, alerted = row["gap_marked_at_ms"], row["alert_at_ms"]
             if marked is None or marked - start > values["detection_deadline_ms"][record]:
                 violations.append({"record": record, "reason": "gap_not_marked_in_time"})
             if alerted is None or alerted - start > values["alert_deadline_ms"][record]:
@@ -103,6 +113,7 @@ def collect(ctx, docker, cfg):
     summary = {"profile": PROFILE, "diagnostic_codes": diagnostics,
                "record_sha256": sha256_hex(canonical_json(packet)) if packet is not None else None,
                "file_sha256": provenance["capture_sha256"] if provenance else None,
+               "selected_record_timeline": selected_record_timeline(packet, values["required_records"]) if collected else None,
                "fixture": {"profile": PROFILE, "schema": SCHEMA}}
     normal = {"attempted": collected, "succeeded": None, "detail": "상태 기록의 정상 도착은 생산자 미인증 주장이다."}
     return obs, normal, [{"step": step, "attempted": False} for step in ctx.check.challenge_steps], summary

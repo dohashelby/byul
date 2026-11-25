@@ -15,7 +15,8 @@ from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utc
 from guard.runtime.bounded import strict_json
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
-from .kubernetes_record_access import capture_record_access, _policy_ref
+from .kubernetes_record_access import PROFILE as ACCESS_CAPTURE_PROFILE, SCHEMA as ACCESS_CAPTURE_SCHEMA
+from .kubernetes_record_access import capture_record_access, _inputs, _policy_ref
 from .owned_capture import MAX_BYTES
 from .rank_failure_contract import stamp
 
@@ -38,6 +39,19 @@ _SHA = re.compile(r"[0-9a-f]{64}")
 
 def inventory_path(session):
     return "/guard-record-access/data/" + session + "/copy-inventory.json"
+
+
+def _read_declared_json(path, limit):
+    if limit == 65536:
+        return load_bounded_json(path)
+    with Path(path).open("rb") as stream:
+        return strict_json(stream.read(limit + 1), limit=limit)
+
+
+def _read_bound_json(path, limit):
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    return strict_json(dependency(path, None), limit=limit)
 
 
 def normalize_policy(values):
@@ -99,6 +113,40 @@ def evaluate_inventory(packet):
     return violations, sorted(set(missing))
 
 
+def _ordinary_capture_provenance(capture, env, values, policy_ref, started, policy_end):
+    """Keep the scope of a qualified ordinary read without its content or subject identities."""
+    if not capture or not any(
+        row["case_id"] in {"allowed-before", "allowed-after"} and row["role"] == "authorized_reader"
+        and all(row[key] is True for key in ("attempted", "identity_verified", "binding_verified", "read_verified"))
+        for row in capture["rows"]
+    ):
+        return None
+    expected = {
+        "schema": ACCESS_CAPTURE_SCHEMA, "profile": ACCESS_CAPTURE_PROFILE,
+        "environment_ref": env.ref().model_dump(mode="json"),
+        "target_sha256": values["record_target_sha256"], "subject_plan_sha256": values["record_subject_plan_sha256"],
+        "policy_ref": policy_ref, "data_origin": "EXAMPLE" if env.data_origin == DataOrigin.EXAMPLE else "DECLARED",
+    }
+    if any(capture.get(key) != value for key, value in expected.items()):
+        return None
+    collection_id = capture.get("collection_id")
+    if type(collection_id) is not str or re.fullmatch(r"record-access-[0-9a-f]{32}", collection_id) is None:
+        return None
+    try:
+        policy_sha256 = _policy_ref(policy_ref)["sha256"]
+        capture_start, capture_end = stamp(capture.get("started_at")), stamp(capture.get("finished_at"))
+        if not started <= capture_start <= capture_end <= policy_end:
+            return None
+    except ValueError:
+        return None
+    return {
+        "schema": ACCESS_CAPTURE_SCHEMA, "profile": ACCESS_CAPTURE_PROFILE, "collection_id": collection_id,
+        "environment_sha256": values["record_environment_sha256"], "target_sha256": expected["target_sha256"],
+        "subject_plan_sha256": expected["subject_plan_sha256"], "policy_sha256": policy_sha256,
+        "data_origin": expected["data_origin"], "started_at": capture_start.isoformat(), "finished_at": capture_end.isoformat(),
+    }
+
+
 _RECORD_PROFILE = FixedRecordProfile(
     inventory_path("{session}"), program_error_code="RECORD_ACCESS_INVENTORY_PROGRAM_INVALID",
 )
@@ -132,33 +180,64 @@ class KubernetesRecordAccessExecutor:
         raw, provenance = reader.read_record(target)
         if provenance.get("owner_binding_verified") is not True:
             raise ValueError("RECORD_ACCESS_INVENTORY_OWNER_CHANGED")
-        return validate_inventory(strict_json(raw, limit=MAX_BYTES), environment_ref=env.ref().model_dump(mode="json"),
-                                  target_sha256=digest, source_sha256=values["record_inventory_source_sha256"])
+        env_ref = env.ref()
+        packet = validate_inventory(strict_json(raw, limit=MAX_BYTES), environment_ref=env_ref.model_dump(mode="json"),
+                                    target_sha256=digest, source_sha256=values["record_inventory_source_sha256"])
+        # The file reader computes its digest and byte count from these exact retained bytes.
+        return packet, {"file_sha256": provenance["capture_sha256"], "file_bytes": provenance["bytes"],
+                        "environment_sha256": env_ref.sha256, "target_sha256": digest,
+                        "declared_source_sha256": packet["source_sha256"], "owner_binding_verified": True}
 
-    def run(self, check, env, policy_values, adapter, workdir):
-        started = utcnow()
-        self.validate_policy(check, policy_values)
-        begin, end = normalize_policy(policy_values)
+    def _bound_inputs(self, env, values, *, read=_read_declared_json, expected_target_sha256=None):
         try:
             if set(self.cfg) - {"target", "subjects", "kubectl_binary", "max_duration_seconds"}:
                 raise ValueError
-            target = load_bounded_json(self.cfg["target"])
-            with Path(self.cfg["subjects"]).open("rb") as stream:
-                subjects = strict_json(stream.read(262145), limit=262144)
+            target = read(self.cfg["target"], 65536)
+            subjects = read(self.cfg["subjects"], 262144)
             digest = sha256_hex(canonical_json(target))
-            if (digest != policy_values["record_target_sha256"] or env.ref().sha256 != policy_values["record_environment_sha256"]
-                    or sha256_hex(canonical_json(subjects)) != policy_values["record_subject_plan_sha256"]
-                    or self.expected_target is not None and self.expected_target != digest or not begin <= started <= end):
+            if (digest != values["record_target_sha256"] or env.ref().sha256 != values["record_environment_sha256"]
+                    or sha256_hex(canonical_json(subjects)) != values["record_subject_plan_sha256"]
+                    or any(pin is not None and pin != digest for pin in (self.expected_target, expected_target_sha256))):
                 raise ValueError
             # @38 (RB3-Q4): compare with the policy's reference instead of the plan file's own claim.
-            expected_policy_ref = policy_values.get(DECISION_KEY, subjects["policy_ref"])
+            expected_policy_ref = values.get(DECISION_KEY, subjects["policy_ref"])
             if expected_policy_ref != subjects["policy_ref"]:
                 raise ValueError
+            return target, subjects, digest, expected_policy_ref
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID") from None
+
+    def prepared_record_access(self, check, env, values, *, expected_target_sha256=None):
+        """Validate canonical saved declarations locally without creating a reader."""
+        from .run_binding import stages_for
+
+        self.validate_policy(check, values)
+        if check.executor != self.name or stages_for(check) != (1, 2, 3, 4) or DECISION_KEY not in values:
+            raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID")
+
+        target, subjects, _, policy_ref = self._bound_inputs(env, values, read=_read_bound_json,
+                                                             expected_target_sha256=expected_target_sha256)
+        try:
+            _inputs(env, target, subjects, policy_ref, self.cfg.get("kubectl_binary", "kubectl"),
+                    self.cfg.get("max_duration_seconds", 60), 5, False)
+        except OverflowError:
+            raise ValueError("RECORD_ACCESS_BUDGET_INVALID") from None
+
+    def run(self, check, env, policy_values, adapter, workdir):
+        from .run_binding import stages_for
+
+        started = utcnow()
+        self.validate_policy(check, policy_values)
+        begin, end = normalize_policy(policy_values)
+        bound = stages_for(check) == (1, 2, 3, 4) and DECISION_KEY in policy_values
+        read = _read_bound_json if bound else _read_declared_json
+        target, subjects, digest, expected_policy_ref = self._bound_inputs(env, policy_values, read=read)
+        if not begin <= started <= end:
+            raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID")
         workdir = Path(workdir)
         workdir.mkdir(parents=True, exist_ok=True)
-        diagnostics, capture, packet, evaluated = [], None, None, None
+        diagnostics = []
+        capture = packet = inventory_receipt = evaluated = None
         try:
             capture = capture_record_access(env, target, subjects, expected_policy_ref=expected_policy_ref, workdir=workdir,
                 binary=self.cfg.get("kubectl_binary", "kubectl"), duration=self.cfg.get("max_duration_seconds", 60),
@@ -166,13 +245,16 @@ class KubernetesRecordAccessExecutor:
         except Exception:
             diagnostics.append("RECORD_ACCESS_LOG_READ_UNAVAILABLE")
         try:
-            packet = self._inventory(env, target, policy_values, digest)
+            packet, inventory_receipt = self._inventory(env, target, policy_values, digest)
             evaluated = evaluate_inventory(packet)
         except Exception:
             diagnostics.append("RECORD_ACCESS_INVENTORY_UNAVAILABLE")
-        return self._draft(check, env, workdir, started, capture, packet, evaluated, diagnostics)
+        ordinary_capture = _ordinary_capture_provenance(capture, env, policy_values, expected_policy_ref, started, end)
+        return self._draft(check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture,
+                           inventory_receipt=inventory_receipt)
 
-    def _draft(self, check, env, workdir, started, capture, packet, evaluated, diagnostics):
+    def _draft(self, check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture,
+               *, inventory_receipt=None):
         unauthorized = capture.get("unauthorized_read_verified") if capture else None
         rows = [{key: row[key] for key in ("case_id", "role", "attempted", "identity_verified", "binding_verified",
                                            "read_verified", "returncode", "byte_count", "gaps")} for row in capture["rows"]] if capture else None
@@ -196,8 +278,12 @@ class KubernetesRecordAccessExecutor:
             if not item["collected"]:
                 item["value"] = None
         artifact = workdir / "record_access_summary.json"
-        artifact.write_text(json.dumps({"profile": PROFILE, "rows": rows, "diagnostic_codes": diagnostics, "copies": packet and packet["copies"]},
-                                       ensure_ascii=False, sort_keys=True), encoding="utf-8")
+        summary = {"profile": PROFILE, "rows": rows, "diagnostic_codes": diagnostics, "copies": packet and packet["copies"]}
+        if ordinary_capture is not None:
+            summary["ordinary_capture"] = ordinary_capture
+        if inventory_receipt is not None:
+            summary["inventory_receipt"] = inventory_receipt
+        artifact.write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True), encoding="utf-8")
         gap = bool(diagnostics or (capture and capture["gaps"]))
         cleanup = [] if capture is None or capture["cleanup"]["complete"] else ["RECORD_ACCESS_CLEANUP_UNVERIFIED"]
         return EvidenceDraft(

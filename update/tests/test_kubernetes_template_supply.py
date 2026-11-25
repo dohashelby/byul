@@ -17,7 +17,7 @@ from guard.cli import app
 from guard.executors import registry
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from guard.executors.reuse import preview_inputs
-from guard.models import DataOrigin, canonical_json, sha256_hex
+from guard.models import DataOrigin, canonical_json, load_pack, sha256_hex
 from guard.store import Store
 from tests.builders import assert_unconfirmed_security_failure, baseline_pack, policy, T0
 from tests.test_model_preparation_integration import full_inputs, FullWorld
@@ -122,6 +122,71 @@ def test_current_template_and_api_projection_preserve_unknown_supply_scope(tmp_p
     stored = "".join(a.path.read_text(encoding="utf-8") for a in draft.artifacts)
     assert PRIVATE not in stored and "EXAMPLE_PRIVATE_HOST_SNAPSHOT" not in stored
     assert "EXAMPLE-private-model-content" not in stored and "prompt_token_ids" not in stored
+
+
+def test_paired_template_fixture_matches_conditions_and_keeps_exact_per_side_mapping(tmp_path):
+    from tools.mvp_versions import versions
+
+    seeds = versions()
+    drafts = {}
+    for side, pin in seeds.items():
+        folder = tmp_path / side
+        folder.mkdir()
+        env, topology, _, cfg = inputs(folder)
+        env = env.model_copy(update={
+            "id": f"ENV-TEMPLATE-{side.upper()}",
+            "engine": env.engine.model_copy(update={"version": pin["version"], "image_digest": pin["image"]}),
+        }).seal()
+        topology["environment_ref"] = env.ref().model_dump(mode="json")
+        topology["observed_version"] = pin["version"]
+        topology["engine"]["image_digest"] = pin["image"]
+        topology["kubernetes"]["engine"].update(image=pin["image"], image_id=pin["image"])
+        topology["model_mapping"].update(environment_ref=topology["environment_ref"],
+                                         host_snapshot=f"/srv/EXAMPLE_PRIVATE_{side}/model")
+        Path(cfg["target"]).write_bytes(canonical_json(topology))
+        world = World(topology)
+        drafts[side] = KubernetesTemplateSupplyExecutor(cfg, runner=world.runner).run(
+            baseline_pack().checks["SUP-03"], env, VALUES, VllmAdapter(), folder / "work")
+        assert drafts[side].observations["template_identity_verified"].value is True
+        assert drafts[side].data_origin.value == "EXAMPLE"
+        assert summary(drafts[side])["model_mapping_sha256"] == sha256_hex(canonical_json(topology["model_mapping"]))
+
+    baseline, candidate = drafts["baseline"], drafts["candidate"]
+    assert baseline.comparability.fixture_sha256 == candidate.comparability.fixture_sha256
+    assert baseline.comparability.config_sha256 == candidate.comparability.config_sha256
+    assert summary(baseline)["model_mapping_sha256"] != summary(candidate)["model_mapping_sha256"]
+
+
+@pytest.mark.parametrize("mode,limit,approved,requests,reason", [
+    (None, 127, SHA, 2, None),
+    (None, 1, SHA, 1, "TEMPLATE_NORMAL_INPUT_BUDGET_EXCEEDED"),
+    ("file-change", 127, SHA, 1, "TEMPLATE_NORMAL_IDENTITY_CHANGED_BEFORE_INFERENCE"),
+    (None, 127, "f" * 64, 0, "TEMPLATE_NORMAL_APPROVAL_UNVERIFIED"),
+])
+def test_req07_normal_limit_checked_before_one_fixed_inference(tmp_path, mode, limit, approved, requests, reason):
+    env, _, world, cfg = inputs(tmp_path, mode)
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    check = pack.checks["REQ-07"]
+    values = {"allowed_template_sha256": [approved], "max_rendered_input_tokens": limit,
+              "request_template_override_allowed": False}
+    executor = KubernetesTemplateSupplyExecutor({**cfg, "req07_normal_only": True}, runner=world.runner)
+    draft = executor.run(check, env, values, VllmAdapter(), tmp_path / "work")
+    assert len(world.packets) == requests
+    assert draft.data_origin.value == "EXAMPLE"
+    assert draft.observations["collection_complete"].value is False
+    for key in ("max_consumed_prompt_tokens", "tested_rendered_input_limit", "enforcement_observed", "request_override_rejected"):
+        assert not draft.observations[key].collected and draft.observations[key].value is None
+    detail = summary(draft)
+    if reason is None:
+        assert draft.observations["rendered_prompt_tokens_exact_match"].value is True
+        counts = draft.observations["rendered_input_token_counts"].value
+        assert 0 < counts["normal"] <= limit
+        assert all("chat_template" not in request["body"] for packet in world.packets for request in packet)
+    else:
+        assert reason in detail["collection_errors"]
+        assert not draft.observations["rendered_prompt_tokens_exact_match"].collected
+    assert detail["fixture"]["declared_normal_input_limit"] == limit
+    assert not any(challenge.attempted for challenge in draft.challenges)
 
 
 @pytest.mark.parametrize("mode", ["tokens", "wrong-model", "wrong-id", "http-error", "http-exception", "cleanup"])

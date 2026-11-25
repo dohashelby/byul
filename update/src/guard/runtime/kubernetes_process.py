@@ -170,6 +170,13 @@ def _mounts(pod, binding):
     return result
 
 
+def capture_status(record):
+    """Summarize the capture boundary and its typed evidence without packet fields."""
+    packet = record.get('packet') or record.get('incomplete_packet')
+    return {'stage': record['capture_stage'],
+            'packet_sha256': sha256_hex(canonical_json(packet)) if packet is not None else None}
+
+
 def capture(transport, candidate_paths=None):
     if transport.profile != 'kubernetes-owned-request-binding-http-v1':
         raise ValueError('KUBERNETES_PROCESS_PROFILE_UNSUPPORTED')
@@ -181,29 +188,44 @@ def capture(transport, candidate_paths=None):
         'binding_before':None,'binding_after':None,'binding_verified_before_after':False,
         'candidate_paths_requested':selected_paths is not None,'mount_declarations':[],
         'mount_declarations_after':None,'mount_declarations_stable':False,
-        'packet':None,'diagnostic_codes':[],'cleanup_errors':[],
+        'packet':None,'incomplete_packet':None,'capture_stage':'binding_before',
+        'diagnostic_codes':[],'cleanup_errors':[],
         'worker_subject_verified':False,'worker_inventory_complete':False,'security':'UNKNOWN',
         'scope':'selected container-reported PID namespace; capture subject and observed processes remain distinct',
         'limitations':['No source/model worker classification or whole-worker coverage.',
                        'Environment names and explicit candidate lstat metadata only; no values/contents/access test.',
                        'API declarations and container-reported namespaces are not host-runtime isolation or consumption proof.']}
+    def retain(document):
+        # A validated document can survive a later parent transport failure.
+        record['capture_stage'] = 'packet_validation'
+        record['incomplete_packet'] = decode(document, selected_paths or [])
+        record['capture_stage'] = 'packet_transport'
+
     try:
         pods = transport._verify(capture_snapshot=True)
         binding = transport.binding['engine']
         record['binding_before'] = deepcopy(binding)
+        record['capture_stage'] = 'scope_before'
         record['mount_declarations'] = _mounts(pods['engine'],binding)
+        record['capture_stage'] = 'capture_budget'
         remaining = transport.deadline-transport.clock()
         _require(0 < remaining <= 300)
-        raw = transport._call(['--namespace='+binding['namespace'],'exec','-i',binding['pod'],
+        record['capture_stage'] = 'packet_transport'
+        transport._call(['--namespace='+binding['namespace'],'exec','-i',binding['pod'],
             '--container='+binding['container'],'--','python3','-c',program,str(remaining)],
-            payload=canonical_json({'candidate_paths':selected_paths or []}),cap=MAX_PACKET+1,budget=remaining)
-        record['packet'] = decode(raw,selected_paths or [])
+            payload=canonical_json({'candidate_paths':selected_paths or []}),cap=MAX_PACKET+1,budget=remaining,
+            on_document=retain)
+        # Existing observation consumers receive only accepted transport packets.
+        record['packet'], record['incomplete_packet'] = record['incomplete_packet'], None
+        record['capture_stage'] = 'binding_after'
         pods = transport._verify(capture_snapshot=True)
+        record['capture_stage'] = 'scope_after'
         record['mount_declarations_after'] = _mounts(pods['engine'],binding)
         record['mount_declarations_stable'] = record['mount_declarations'] == record['mount_declarations_after']
         if not record['mount_declarations_stable']:
             record['diagnostic_codes'].append('PROCESS_MOUNT_DECLARATIONS_CHANGED')
-        record.update(binding_after=deepcopy(binding),binding_verified_before_after=True,available=True)
+        record.update(binding_after=deepcopy(binding),binding_verified_before_after=True,available=True,
+                      capture_stage='complete')
     except Exception:
         record['diagnostic_codes'].append('KUBERNETES_PROCESS_CAPTURE_UNAVAILABLE')
     record['finished_at'] = utcnow().isoformat()

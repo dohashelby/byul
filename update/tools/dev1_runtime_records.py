@@ -13,10 +13,11 @@ route: REQ-02 `guard-route-native-observations/1`.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 
-RECORD_SCHEMA = 'runtime-mvp-record/1.0'
+from guard.executors.kubernetes_gateway_observation import RECORD_SCHEMA, final_records
+from guard.executors.native_observations import validate_capture
+
 PRODUCER = 'byul-runtime-gateway'
 _PATH = re.compile(r'/[A-Za-z0-9/_-]{1,255}')
 _ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}')
@@ -24,25 +25,6 @@ _ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}')
 
 def _sha(text):
     return hashlib.sha256(text.encode()).hexdigest()
-
-
-def final_records(lines, *, run_id, session=None):
-    """같은 run(과 관측 세션)의 final 기록만 순서대로. 형식이 다른 줄은 버리지 않고 오류로 낸다."""
-    rows = []
-    for number, line in enumerate(lines, 1):
-        if not line.strip():
-            continue
-        try:
-            value = json.loads(line)
-        except ValueError:
-            raise ValueError(f'RUNTIME_RECORD_LINE_INVALID:{number}') from None
-        if type(value) is not dict or value.get('schema_version') != RECORD_SCHEMA:
-            raise ValueError(f'RUNTIME_RECORD_SCHEMA_UNSUPPORTED:{number}')
-        if value.get('run_id') != run_id or session is not None and value.get('observation_session_id') != session:
-            continue
-        if value.get('phase') == 'final':
-            rows.append(value)
-    return rows
 
 
 def _decision(record):
@@ -90,5 +72,13 @@ def route_events(records, *, ingress_id, upstream_id):
 
 
 def route_packet(records, *, run_id, environment_ref, image, ingress_id, upstream_id):
-    return {'schema': 'guard-route-native-observations/1', 'run_id': run_id, 'environment_ref': environment_ref,
-            'image': image, 'events': route_events(records, ingress_id=ingress_id, upstream_id=upstream_id)}
+    """Project selected final rows from the same run as the owned route packet."""
+    records = tuple(records)
+    if (type(run_id) is not str or not run_id
+            or any(type(row) is not dict or row.get('schema_version') != RECORD_SCHEMA
+                   or row.get('phase') != 'final' or row.get('run_id') != run_id for row in records)):
+        raise ValueError('RUNTIME_ROUTE_SOURCE_SCOPE_INVALID')
+    packet = {'schema': 'guard-route-native-observations/1', 'run_id': run_id, 'environment_ref': environment_ref,
+              'image': image, 'events': route_events(records, ingress_id=ingress_id, upstream_id=upstream_id)}
+    validate_capture(packet, kind='route', env_ref=environment_ref, run_id=run_id, image=image)
+    return packet

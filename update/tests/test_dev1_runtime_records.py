@@ -4,6 +4,7 @@ import json
 import pytest
 
 from guard.executors.native_observations import validate_capture
+from tests.test_kubernetes_gateway_observation import ordinary_gateway_record
 from tools import dev1_runtime_records as bridge
 
 IMAGE = 'k3d-byul-reg:5111/vllm/vllm-openai-cpu@sha256:' + 'a' * 64
@@ -47,3 +48,24 @@ def test_unknown_results_engine_errors_and_limits():
         bridge.final_records(['{"schema_version": "other"}'], run_id='run-1')
     with pytest.raises(ValueError, match='RUNTIME_RECORD_LINE_INVALID'):
         bridge.final_records(['{'], run_id='run-1')
+
+
+@pytest.mark.parametrize('ordinary_gateway_record', [True], indirect=True)
+def test_route_packet_requires_the_original_gateway_final_scope(ordinary_gateway_record):
+    raw, final, _ = ordinary_gateway_record
+    run_id = final['run_id']
+    rows = bridge.final_records(raw.decode('utf-8').split('\n'), run_id=run_id)
+
+    def packet(selected):
+        return bridge.route_packet(selected, run_id=run_id, environment_ref=ENV, image=IMAGE,
+                                   ingress_id='gw', upstream_id='engine')
+
+    assert len(packet(rows)['events']) == 1
+    for changed in ({'run_id': 'another-owned-run'}, {'phase': 'started'}, {'schema_version': 'other'}):
+        with pytest.raises(ValueError, match='^RUNTIME_ROUTE_SOURCE_SCOPE_INVALID$'):
+            packet([{**final, **changed}])
+
+    with pytest.raises(ValueError, match='^RUNTIME_ROUTE_SOURCE_SCOPE_INVALID$'):
+        packet([*rows, {**final, 'run_id': 'another-owned-run'}])
+    with pytest.raises(ValueError, match='^NATIVE_ROUTE_EVENT_INVALID$'):
+        packet([*rows, final])

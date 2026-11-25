@@ -6,38 +6,51 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 from guard.adapters import vllm_rank_failure_sensor as sensor,vllm_rank_failure_metadata as metadata
+from guard.adapters import vllm_release_observation_sensor as release_observation
+from guard.adapters.vllm import VllmAdapter
 from guard.cli import app
 from guard.collectors import lifecycle
+from guard.core.judge import judge_evidence
+from guard.core.run import _normalize
 from guard.executors.rank_failure_contract import normalize_policy
-from guard.models import canonical_json,load_pack,sha256_hex,utcnow
+from guard.executors.registry import build_executor
+from guard.models import Evidence,canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.runtime.kubernetes_rank_failure import KubernetesRankFailureHTTP,SLOTS
 from guard.runtime.bounded import capture_pipes
 from guard.store import Store
-from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, dummy_ref, policy,T0
 from tests.test_a1_kubernetes_model_authorization_product import World as BaseWorld
 from tests.test_a1_rank_failure_sensor import make_world,invoke,REPO
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_lifecycle_capture import case,external,revised
 from tests.test_lifecycle_sensor import writer_factory
+from tests.test_rank_release_observation import composed as release_assets, original as release_module
 from tests.test_stream_probe import _server
 from tools.build_kubernetes_rank_failure_pack import derive
 
 PRIVATE='EXAMPLE_RANK_PRODUCT_PRIVATE'
+RELEASE_IMAGE = 'docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40'
 
 
 class World(BaseWorld):
-    def __init__(self,*args):
-        super().__init__(*args);self.observed=make_world(self.group.prepared['session']);self.cursor=0
+    def __init__(self,*args,observer_kwargs=None):
+        super().__init__(*args)
+        self.observed=make_world(self.group.prepared['session'],**(observer_kwargs or {}));self.cursor=0
 
     def add_native(self,rid,slot):
         kind=slot.removeprefix('observe-')
         try:invoke(self.observed,rid,kind if kind in {'exception','delay','communication-stall'} else 'normal')
         except (RuntimeError,TimeoutError):pass
+        self.record_native()
+
+    def record_native(self):
         additions=deepcopy(self.observed.observer.recorded[self.cursor:]);self.cursor=len(self.observed.observer.recorded)
         if self.mode=='mp-unobserved':additions=[r for r in additions if r['event']!='RANK_FAILURE']
         if self.mode=='invalid-native':
             next(r['payload'] for r in additions if r['event']=='RANK_FAILURE')['fault_activation_verified']=True
+        if self.mode=='wrong-source':
+            next(r['payload'] for r in additions if r['event']=='RANK_FAILURE')['source_sha256']='0'*64
         def change(rows):
             if additions:
                 rows[-1:-1]=additions;rows[-1]['monotonic_ns']=max(rows[-1]['monotonic_ns'],additions[-1]['monotonic_ns'])
@@ -64,16 +77,45 @@ class World(BaseWorld):
         return {'returncode':0,'stdout_bytes':canonical_json([row]),'stderr_bytes':PRIVATE.encode(),'capture':pipe}
 
 
-def inputs(tmp_path,group,target,mode):
+class NormalWorld(World):
+    def add_native(self, rid, slot):
+        if slot not in {'normal-before', 'normal-after'}:
+            return
+        invoke(self.observed, rid, non_block=self.mode == 'future-only')
+        self.record_native()
+
+    def runner(self, argv, **kwargs):
+        if self.mode == 'missing-owner' and 'exec' in argv and any('guard-lifecycle-process-context/1' in arg for arg in argv):
+            raise OSError(PRIVATE)
+        return super().runner(argv, **kwargs)
+
+
+def inputs(tmp_path,group,target,mode,*,world_type=World,release=None):
     environment=group.env.model_copy(deep=True);environment.model.id='EXAMPLE-model';environment.model.revision='EXAMPLE-revision'
     if mode=='version032':environment.engine.version='0.32.0'
-    group.env=environment.seal();target=deepcopy(target);target['environment_ref']=group.env.ref().model_dump(mode='json')
-    prepared=group.root/'rank-prepared';group.prepared=lifecycle.prepare_assets(prepared,REPO,profile=sensor.PROFILE);group.manifest_path=prepared/'manifest.json'
+    target=deepcopy(target)
+    observer_kwargs=None
+    profile,schema,commit=sensor.PROFILE,sensor.SCHEMA,sensor.COMMIT
+    if release is None:
+        prepared=group.root/'rank-prepared'
+        group.prepared=lifecycle.prepare_assets(prepared,REPO,profile=profile)
+    else:
+        prepared,group.prepared,base=release
+        environment.engine.version='0.30.0';environment.engine.image_digest=RELEASE_IMAGE
+        target['kubernetes']['engine']['image']=RELEASE_IMAGE
+        observer_kwargs={'private_base':base,'module_factory':release_module}
+        profile,schema,commit=base.PROFILE,base.SCHEMA,base.COMMIT
+    group.manifest_path=prepared/'manifest.json'
+    group.env=environment.seal();target['environment_ref']=group.env.ref().model_dump(mode='json')
     def header(rows):
-        rows[0]['payload'].update(schema=sensor.SCHEMA,profile=sensor.PROFILE,session=group.prepared['session'],
+        rows[0]['payload'].update(schema=schema,profile=profile,commit=commit,session=group.prepared['session'],
             settings_sha256=group.prepared['assets']['settings.json']['sha256'],sensor_sha256=group.prepared['assets']['guard_lifecycle_sensor.py']['sha256'])
+        if release is not None:
+            # The exact release writer supplies the new events, without unrelated /8 request rows.
+            del rows[1:-1]
     group.raw_by_pid={pid:revised(raw,header) for pid,raw in group.raw_by_pid.items()}
-    world=World(group,target,mode);receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack');now=utcnow()
+    world=world_type(group,target,mode,observer_kwargs=observer_kwargs)
+    receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack');now=utcnow()
     values={'rank_environment_sha256':group.env.ref().sha256,'rank_target_sha256':sha256_hex(canonical_json(world.target)),
         'rank_prepared_sha256':sha256_hex(canonical_json(group.prepared)),
         'rank_validity_start':(now-timedelta(minutes=1)).isoformat(),'rank_validity_end':(now+timedelta(minutes=2)).isoformat(),
@@ -136,6 +178,51 @@ def test_registered_cli_selected_mp_facts_four_missing_faults_and_exact_refs(tmp
     restored=Store.read_only(tmp_path/'restored');assert all(restored.resolve(o.ref()).to_dict()==o.to_dict() for o in objects)
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),'--store',tmp_path/'restored','--config',cfg]);assert [r.ref() for r in Store.read_only(tmp_path/'restored').iter_kind('RES')]==[res.ref()]
     cli(['verify','--store',tmp_path/'restored','--config',cfg])
+
+
+@pytest.mark.parametrize(('mode', 'native_count', 'control_count'), [
+    ('normal', 2, 2), ('before-shape', 2, 1), ('future-only', 0, 2),
+    ('missing-owner', 0, 2), ('wrong-source', 0, 2), ('normal-030', 2, 2),
+])
+def test_canonical_rank_evidence_keeps_concrete_owned_results_and_separate_controls(
+        tmp_path, group, native_target, monkeypatch, mode, native_count, control_count):
+    release = None
+    source = sensor.SOURCES[sensor.MP]
+    if mode == 'normal-030':
+        directory = group.root / 'rank-release'
+        directory.mkdir()
+        prepared, module = release_assets(directory, monkeypatch)
+        release = (directory / 'assets', prepared, module._private_base())
+        source = release_observation.RANK_ROWS[sensor.MP]
+    world, values, _, _ = inputs(tmp_path, group, native_target, mode, world_type=NormalWorld, release=release)
+    pack = load_pack(REPO / 'update/packs/PACK-BASELINE')
+    check = pack.checks['LIF-08']
+    target = tmp_path / 'canonical-rank-target.json'
+    target.write_bytes(canonical_json(world.target))
+    monkeypatch.setattr(http, 'capture_pipes', world.runner)
+    monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.capture_pipes', world.runner)
+    executor = build_executor(check.executor, 'kubernetes', {'rank_failure': {
+        'target': str(target), 'prepared': str(group.manifest_path)}}, engine=group.env.engine.name,
+        version=group.env.engine.version)
+    draft = executor.run(check, group.env, values, VllmAdapter(), tmp_path / 'evidence')
+    evidence = Evidence(id='EVD-CANONICAL-RANK', data_origin=draft.data_origin, plan=dummy_ref('PLAN'),
+        environment=group.env.ref(), check_id=check.id, side='single', execution={'status': draft.status},
+        **_normalize(check, draft)).seal()
+    observed = {key: item.value for key, item in evidence.observations.items() if item.collected}
+    native = [row for row in observed['activation_steps'] if row['step'] == 'native-rank-executor-value-return']
+    controls = [row for row in observed['activation_steps'] if row['step'] == 'direct-rank-normal-control']
+    assert len(native) == native_count and len(controls) == control_count
+    assert all(row['source_sha256'] == source and
+        row['operation_started_ns'] <= row['operation_finished_ns'] for row in native)
+    assert all(row['case_id'] in {'lif08-normal-before', 'lif08-normal-after'} and row['normal_shape_verified']
+        and row['capture_complete'] and not row['all_required_ranks_completed'] for row in controls)
+    assert ('RANK_NATIVE_EXECUTOR_VALUE_RETURN_UNAVAILABLE' in observed['activation_missing']) == (not native)
+    assert ('RANK_BOUNDED_NORMAL_CONTROL_PAIR_UNAVAILABLE' in observed['activation_missing']) == (len(controls) != 2)
+    assert not observed['activation_scope_complete'] and not observed['activation_violations']
+    assert PRIVATE.encode() not in canonical_json(evidence.to_dict())
+    result = judge_evidence(check, evidence, policy(pack.ref(), values={check.id: values}), utcnow())
+    assert evidence.data_origin.value == 'EXAMPLE'
+    assert result.verdicts.security.value == 'UNKNOWN'
 
 
 def test_pack_preserves_all_four_faults_original_normal_criteria_and_other76(tmp_path):

@@ -33,10 +33,10 @@ def _pairs(items):
     return value
 
 
-def _read(path):
+def _read(path, *, min_bytes=1, max_bytes=8 * 1024**2):
     path = Path(path)
     before = path.lstat()
-    if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= 8 * 1024**2:
+    if not stat.S_ISREG(before.st_mode) or not min_bytes <= before.st_size <= max_bytes:
         raise ValueError('MA7_INPUT_FILE_INVALID')
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
@@ -44,8 +44,8 @@ def _read(path):
         if not stat.S_ISREG(opened.st_mode):
             raise ValueError('MA7_INPUT_FILE_INVALID')
         chunks, size = [], 0
-        while size <= 8 * 1024**2:
-            block = os.read(fd, min(65536, 8 * 1024**2 + 1 - size))
+        while size <= max_bytes:
+            block = os.read(fd, min(65536, max_bytes + 1 - size))
             if not block:
                 break
             chunks.append(block)

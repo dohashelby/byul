@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 
 from guard import application
 from guard.cli import app
+from guard.models import load_pack
 from guard.runtime.docker import Docker, CmdResult
 from tests.builders import baseline_pack, environment, policy
 
@@ -21,6 +22,59 @@ def test_readiness_reports_invalid_inputs_and_unavailable_daemon(monkeypatch):
     assert result["ready"] is False
     assert {row["check"] for row in result["checks"]} >= {"inputs", "docker", "image-pair"}
     assert "secret daemon output" not in json.dumps(result)
+
+
+def test_kubernetes_only_readiness_keeps_unconfigured_input_without_docker(monkeypatch):
+    def no_docker(*args):
+        pytest.fail("Kubernetes-only preparation must not inspect a Docker daemon")
+
+    monkeypatch.setattr(application, "Docker", no_docker)
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    envs = [environment(engine={"name": "vllm", "version": version,
+                                "image_digest": "example/engine@sha256:" + digit * 64})
+            for version, digit in (("0.30.0", "a"), ("0.31.0", "b"))]
+    pol = policy(pack.ref(), scope={"include": ["SUP-03"]},
+                 values={"SUP-03": {"allowed_template_sha256": ["a" * 64]}})
+    cfg = {
+        "update": {"mode": "external", "kubernetes_candidate_binding": "after_baseline"},
+        "sides": {side: {"executors": {"container_config": "kubernetes"}}
+                  for side in ("baseline", "candidate")},
+    }
+    result = application.update_readiness(pack, envs, pol, cfg)
+    checks = {row["check"]: row for row in result["checks"]}
+    assert set(checks) == {"inputs", "inputs:baseline/SUP-03", "inputs:candidate/SUP-03", "kubernetes-static-preparation"}
+    assert checks["inputs"]["ok"] is False
+    for side in ("baseline", "candidate"):
+        row = checks[f"inputs:{side}/SUP-03"]
+        assert row["ok"] is False and row["detail"] == "real executor is required"
+    assert result["ready"] is False
+    assert {(row["side"], row["status"]) for row in result["check_support"]} == {
+        ("baseline", "UNSUPPORTED"), ("candidate", "UNSUPPORTED")}
+
+
+def test_invalid_external_side_override_stops_before_docker_inspection(monkeypatch):
+    calls = []
+
+    class Local:
+        def __init__(self, *args):
+            pass
+
+        def daemon_info(self, **kwargs):
+            calls.append("docker")
+            return {"os": "linux", "architecture": "amd64"}
+
+    monkeypatch.setattr(application, "Docker", Local)
+    pack = baseline_pack()
+    cfg = {
+        "executors": {"request_binding": "kubernetes"},
+        "sides": {"candidate": {"executors": {"request_binding": "real"}}},
+    }
+    result = application.update_readiness(pack, [environment(), environment()], policy(pack.ref()), cfg)
+    checks = {row["check"]: row for row in result["checks"]}
+    assert calls == []
+    assert set(checks) == {"inputs"}
+    assert checks["inputs"]["detail"] == "request_binding: both update sides must use real executors"
+    assert checks["inputs"]["ok"] is False and result["ready"] is False
 
 
 @pytest.mark.parametrize("image_arch, expected", [("amd64", True), ("arm64", False)])

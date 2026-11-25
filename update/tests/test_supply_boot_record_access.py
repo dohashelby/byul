@@ -59,7 +59,7 @@ class FakeRoles:
 
     def __init__(self, monkeypatch, parts):
         self.calls = []
-        def collect(executor, check, env, values, role):
+        def collect(executor, check, env, values, role, *, role_inputs=None):
             self.calls.append(role)
             part = parts[role]
             if isinstance(part, Exception):
@@ -193,6 +193,7 @@ def test_real_native_mismatch_output_becomes_a_violation(tmp_path, monkeypatch):
 VALUES = {"supply_stage_budget_ms": {"fetch": 10}, "supply_stage_budget_bytes": {"fetch": 10}, "supply_total_budget_ms": 10,
           "supply_max_attempts": 2, "supply_max_fetch_bytes": 10, "supply_allowed_objects": ["a"], "supply_allowed_identities": ["i"],
           "supply_allowed_readers": ["safetensors"]}
+SUP07_CACHE_PATH_SHA256 = sha256_hex(b"/test-cache/compiled-artifact")
 RECORD_CASES = [
     ("LIF-01", {"stage": "fetch", "elapsed_ms": 99, "peak_bytes": 1, "stopped": False, "temporary_cleaned": True},
      {"stage": "fetch", "elapsed_ms": 1, "peak_bytes": 1, "stopped": False, "temporary_cleaned": True}, "stage_budget_exceeded_without_stop"),
@@ -200,8 +201,9 @@ RECORD_CASES = [
      {"stage": "fetch", "elapsed_ms": 99, "peak_bytes": 99, "stopped": True, "temporary_cleaned": True}, "temporary_resources_left"),
     ("PLT-03", {"object_sha256": "b", "identity_sha256": "i", "outcome": "allowed"},
      {"object_sha256": "b", "identity_sha256": "i", "outcome": "denied"}, "unapproved_object_fetched"),
-    ("SUP-07", {"path_sha256": "p", "writer_allowed": False, "modified": True, "consumed": True, "verified_before_use": False},
-     {"path_sha256": "p", "writer_allowed": False, "modified": True, "consumed": False, "verified_before_use": False}, "tampered_cache_consumed"),
+    ("SUP-07", {"path_sha256": SUP07_CACHE_PATH_SHA256, "writer_allowed": False, "modified": True, "consumed": True, "verified_before_use": False},
+     {"path_sha256": SUP07_CACHE_PATH_SHA256, "writer_allowed": False, "modified": True, "consumed": False, "verified_before_use": False},
+     "tampered_cache_consumed"),
     ("SUP-15", {"path_sha256": "p", "relevant_change": True, "reused": True, "compatibility_verified": False},
      {"path_sha256": "p", "relevant_change": True, "reused": True, "compatibility_verified": True}, "incompatible_cache_reused"),
     ("SUP-12", {"fixture_sha256": "f", "format": "pt", "reader": "pickle", "outcome": "loaded", "fallback": True, "side_effects": []},
@@ -209,6 +211,18 @@ RECORD_CASES = [
     ("SUP-12", {"fixture_sha256": "f", "format": "st", "reader": "safetensors", "outcome": "loaded", "fallback": False, "side_effects": ["file_open"]},
      {"fixture_sha256": "f", "format": "st", "reader": "safetensors", "outcome": "loaded", "fallback": False, "side_effects": []}, "forbidden_side_effect"),
 ]
+
+
+def test_lif01_total_budget_ignores_stop_outside_selected_stage_costs():
+    budgets = {"fetch": 10, "load": 10}
+    values = {**VALUES, "supply_stage_budget_ms": budgets, "supply_stage_budget_bytes": budgets}
+    cost = {"elapsed_ms": 7, "peak_bytes": 1, "stopped": False, "temporary_cleaned": True}
+    rows = [{**cost, "stage": "fetch"}, {**cost, "stage": "load"}, {**cost, "stage": "compile", "stopped": True}]
+    evaluate = contract.EVALUATORS["LIF-01"]
+    assert evaluate(rows, values) == ([{"reason": "total_budget_exceeded_without_stop"}], [])
+
+    rows[1]["stopped"] = True
+    assert evaluate(rows, values) == ([], [])
 
 
 @pytest.mark.parametrize("check_id,bad,good,reason", RECORD_CASES)
@@ -260,6 +274,27 @@ def good_packet(env_ref, digest, check_id="SUP-07"):
             "target_sha256": digest, "source_sha256": SOURCE, "change": change(), "rows": []}
 
 
+def test_sup12_requires_typed_side_effect_events_before_evaluation():
+    env_ref, target = environment().ref().model_dump(mode="json"), "b" * 64
+    packet = good_packet(env_ref, target, "SUP-12")
+    binding = {"check_id": "SUP-12", "role": "normal", "environment_ref": env_ref,
+               "target_sha256": target, "source_sha256": SOURCE}
+    row = {"fixture_sha256": sha256_hex(b"approved-reader-fixture"), "format": "safetensors",
+           "reader": "safetensors", "outcome": "loaded", "fallback": False}
+    for malformed in ("false", False, None, {"file_open": False}, [False]):
+        packet["rows"] = [{**row, "side_effects": malformed}]
+        with pytest.raises(ValueError, match="SUPPLY_BOOT_RECORD_INVALID"):
+            contract.validate_record(json.loads(json.dumps(packet)), **binding)
+
+    packet["rows"] = [{**row, "side_effects": []}]
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-12", verified, VALUES) == ([], [])
+    packet["rows"] = [{**row, "side_effects": ["file_open"]}]
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-12", verified, VALUES) == (
+        [{"reason": "forbidden_side_effect", "fixture_sha256": row["fixture_sha256"]}], [])
+
+
 @pytest.mark.parametrize("damage", ["extra", "role", "environment", "target", "source", "profile", "row", "change"])
 def test_boot_record_binding_is_closed(damage):
     packet = good_packet({"id": 1}, "t")
@@ -273,6 +308,65 @@ def test_boot_record_binding_is_closed(damage):
     elif damage == "profile": packet["profile"] = "other"
     with pytest.raises(ValueError, match="SUPPLY_BOOT_RECORD_INVALID"):
         contract.validate_record(packet, check_id="SUP-07", role="normal", environment_ref={"id": 1}, target_sha256="t", source_sha256=SOURCE)
+
+
+@pytest.mark.parametrize("first_attempt", [0, 1])
+def test_lif02_valid_retry_records_keep_established_budget_counts(first_attempt):
+    env_ref, target = environment().ref().model_dump(mode="json"), "b" * 64
+    packet = good_packet(env_ref, target, "LIF-02")
+    binding = {"check_id": "LIF-02", "role": "normal", "environment_ref": env_ref,
+               "target_sha256": target, "source_sha256": SOURCE}
+    row = {"at_ms": 100, "bytes": 4, "outcome": "failed", "temporary_left": False}
+    packet["rows"] = [{**row, "attempt": first_attempt}, {**row, "attempt": first_attempt + 2, "outcome": "complete"}]
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("LIF-02", verified, VALUES) == ([], [])
+
+    packet["rows"].append({**row, "attempt": first_attempt + 3, "temporary_left": True})
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    violations, missing = contract.evaluate_record("LIF-02", verified, VALUES)
+    assert not missing
+    assert violations == [{"reason": "retry_attempts_exceeded", "attempts": 3},
+                          {"reason": "retry_bytes_exceeded"},
+                          {"reason": "temporary_file_left_after_stop"}]
+
+
+@pytest.mark.parametrize(("field", "invalid"), [
+    ("attempt", 0), ("attempt", -1), ("attempt", True), ("at_ms", 99), ("at_ms", False),
+    ("bytes", -1), ("bytes", True), ("bytes", "4"), ("outcome", []), ("outcome", " "),
+    ("temporary_left", "false"),
+])
+def test_lif02_rejects_invalid_attempt_rows_before_budget_evaluation(field, invalid):
+    env_ref, target = environment().ref().model_dump(mode="json"), "b" * 64
+    packet = good_packet(env_ref, target, "LIF-02")
+    row = {"attempt": 0, "at_ms": 100, "bytes": 4, "outcome": "failed", "temporary_left": False}
+    packet["rows"] = [row, {**row, "attempt": 1, field: invalid}]
+    with pytest.raises(ValueError, match="SUPPLY_BOOT_RECORD_INVALID"):
+        contract.validate_record(json.loads(json.dumps(packet)), check_id="LIF-02", role="normal",
+                                 environment_ref=env_ref, target_sha256=target, source_sha256=SOURCE)
+
+
+@pytest.mark.parametrize(("field", "invalid"), [
+    ("path_sha256", "not-a-digest"), ("writer_allowed", 0), ("modified", "false"),
+    ("consumed", "false"), ("verified_before_use", None),
+])
+def test_sup07_requires_explicit_cache_observation_types(field, invalid):
+    env_ref, target = {"id": 1}, "b" * 64
+    packet = good_packet(env_ref, target)
+    row = {"path_sha256": "a" * 64, "writer_allowed": False, "modified": True,
+           "consumed": True, "verified_before_use": False}
+    packet["rows"] = [row]
+    binding = {"check_id": "SUP-07", "role": "normal", "environment_ref": env_ref,
+               "target_sha256": target, "source_sha256": SOURCE}
+
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-07", verified, VALUES) == (
+        [{"reason": "tampered_cache_consumed", "path_sha256": "a" * 64}], [])
+    row["consumed"] = False
+    verified = contract.validate_record(json.loads(json.dumps(packet)), **binding)
+    assert contract.evaluate_record("SUP-07", verified, VALUES) == ([], [])
+    row[field] = invalid
+    with pytest.raises(ValueError, match="SUPPLY_BOOT_RECORD_INVALID"):
+        contract.validate_record(json.loads(json.dumps(packet)), **binding)
 
 
 def test_reader_allows_only_its_own_record_beyond_native_reads():
@@ -359,7 +453,7 @@ def access_run(tmp_path, monkeypatch, capture, inventory):
     def read(self, env, target, values_, digest):
         if inventory is None:
             raise ValueError("gone")
-        return {"copies": deepcopy(inventory)}
+        return {"copies": deepcopy(inventory)}, None
     monkeypatch.setattr(record_product, "capture_record_access", collect)
     monkeypatch.setattr(record_product.KubernetesRecordAccessExecutor, "_inventory", read)
     return pipeline(tmp_path, "OBS-06", values, lambda env, v: record_product.KubernetesRecordAccessExecutor(
@@ -496,7 +590,8 @@ def test_collect_role_reads_record_and_native_through_real_binding(tmp_path, mon
     FakeReader.raw = canonical_json(packet)
     monkeypatch.setattr(boot, "capture_session", lambda *a, **k: {"recorded_files_covered": True})
     monkeypatch.setattr("guard.collectors.native_model_file_reads.analyze",
-        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0, "missing": []})
+        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0,
+                                    "missing": [], "declared_scope": {}})
     part_ = executor._collect_role(PACK.checks["SUP-05"], env, values, "normal")
     assert part_["row"]["collected"] and part_["row"]["sealed"] and part_["row"]["native_files_covered"]
     assert part_["native"]["rows"] == [] and part_["cleanup"] == "SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"
@@ -517,6 +612,173 @@ def test_collect_role_record_failure_still_collects_native(tmp_path, monkeypatch
     monkeypatch.setattr(FakeReader, "fail_read", True)
     monkeypatch.setattr(boot, "capture_session", lambda *a, **k: {"recorded_files_covered": True})
     monkeypatch.setattr("guard.collectors.native_model_file_reads.analyze",
-        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0, "missing": []})
+        lambda captured, prepared: {"candidates": [], "groups": [], "unjoined_read_count": 0, "open_failure_count": 0,
+                                    "missing": [], "declared_scope": {}})
     part_ = executor._collect_role(PACK.checks["SUP-05"], env, values, "normal")
     assert part_["row"]["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"] and part_["native"] is not None
+
+
+@pytest.mark.parametrize("shared_input", ["target", "prepared", "session"])
+def test_sup05_rejects_reused_role_identity_before_collection(tmp_path, monkeypatch, shared_input):
+    env = environment(model={"id": "test"})
+    executor, values, _ = role_inputs(tmp_path, monkeypatch, "SUP-05", env)
+    challenge_target = {"lab": True}
+    if shared_input != "target":
+        challenge_target["example_role"] = "challenge"
+    target_path = tmp_path / "challenge-target.json"
+    target_path.write_bytes(canonical_json(challenge_target))
+    executor.cfg["challenge"] = {"target": str(target_path), "prepared": "q"}
+    prepared = {"p": {"session": "a" * 32}, "q": {"session": "b" * 32}}
+    if shared_input == "prepared":
+        prepared["q"] = dict(prepared["p"])
+    elif shared_input == "session":
+        prepared["q"] = {"session": "a" * 32, "example_role": "challenge"}
+    values.update(supply_challenge_target_sha256=sha256_hex(canonical_json(challenge_target)),
+                  supply_challenge_prepared_sha256=sha256_hex(canonical_json(prepared["q"])))
+    workdir = tmp_path / "evidence"
+    calls = []
+
+    def load(path):
+        calls.append(("load", path))
+        return prepared[path]
+
+    def reader(*args, **kwargs):
+        calls.append(("reader", None))
+        raise AssertionError("Duplicate role input must be rejected before collection")
+
+    monkeypatch.setattr("guard.collectors.lifecycle.load_prepared", load)
+    monkeypatch.setattr(boot, "SupplyBootReader", reader)
+    with pytest.raises(ValueError, match="^SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED$"):
+        executor.run(PACK.checks["SUP-05"], env, values, None, workdir)
+    assert calls == ([("load", "p"), ("load", "q")] if shared_input == "session" else [])
+    assert not workdir.exists()
+
+
+@pytest.mark.parametrize("hash_model_bytes", [True, False])
+def test_sup05_sealed_observation_keeps_source_and_reference_binding(tmp_path, monkeypatch, hash_model_bytes):
+    from guard.collectors.model_read_scope import validate_binding
+    from guard.core.run import _normalize
+
+    env = environment(model={"id": "test", "revision": "pinned", "inventory_sha256": "f" * 64})
+    executor, values, digest = role_inputs(tmp_path, monkeypatch, "SUP-05", env)
+    data, prepared, world = read_fixture(tmp_path, monkeypatch, scope_change=lambda scope: scope.update(
+        environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
+        model_sha256=sha256_hex(env.model.id.encode()), revision_sha256=sha256_hex(env.model.revision.encode()),
+        inventory_sha256=env.model.inventory_sha256, hash_model_bytes=hash_model_bytes))
+    validate_binding(prepared, env, {"lab": True})
+    capture = data["recordings"][0]["capture"]
+    recording_sha256 = sha256_hex(canonical_json(capture["records"]))
+    capture["provenance"] = {"capture_sha256": recording_sha256, "owner_binding_verified": True,
+                             "owner": {"private_detail": "EXAMPLE-PRIVATE-OWNER-METADATA"}}
+    data["recorded_files_covered"] = True
+    values["supply_normal_prepared_sha256"] = sha256_hex(canonical_json(prepared))
+    monkeypatch.setattr("guard.collectors.lifecycle.load_prepared", lambda path: prepared)
+    monkeypatch.setattr(boot, "capture_session", lambda *a, **k: data)
+    monkeypatch.setattr(FakeReader, "raw", canonical_json(good_packet(env.ref().model_dump(mode="json"), digest, "SUP-05")),
+                        raising=False)
+    check = PACK.checks["SUP-05"]
+    draft = executor.run(check, env, values, None, tmp_path / "evidence")
+    observed = _normalize(check, draft)["observations"]
+    native, = observed["supply_boot_native_consumption"]["value"]
+    row, = native["rows"]
+    source = row["source_binding"]
+
+    assert native["role"] == "normal" and native["source_binding"] == {
+        "session": prepared["session"], "target_sha256": digest,
+        "prepared_sha256": values["supply_normal_prepared_sha256"], "declared_scope": analyze(data, prepared)["declared_scope"]}
+    assert source["recording_sha256"] == recording_sha256 and source["recording_owner_binding_verified"] is True
+    assert source["process_start_ticks"] == capture["records"][0]["payload"]["context"]["start_ticks"]
+    assert [capture["records"][seq]["payload"]["phase"] for _, seq in source["source_events"]] == [
+        "OPEN_RETURN", "READ_RETURN", "CLOSE_RETURN"]
+    assert source["reference_sha256"] == prepared["model_read_scope"]["files"][0]["reference_sha256"]
+    assert source["read_return_sha256"] == (source["reference_sha256"] if hash_model_bytes else None)
+    assert source["hash_status"] == ("complete" if hash_model_bytes else "disabled")
+    assert observed["supply_boot_record_authenticated"]["value"] is False
+    assert observed["supply_boot_complete"]["value"] is False
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    summary = (tmp_path / "evidence" / "supply_boot_summary.json").read_text()
+    assert json.loads(summary)["native"] == [native]
+    assert str(world.path) not in summary and "EXAMPLE-PRIVATE-OWNER-METADATA" not in summary
+
+
+@pytest.mark.parametrize("condition", ["valid", "bad_type", "duplicate_stage", "unverified_owner"])
+def test_lif01_keeps_only_bound_reported_stage_costs(tmp_path, monkeypatch, condition):
+    env = environment(model={"id": "test"})
+    executor, values, digest = role_inputs(tmp_path, monkeypatch, "LIF-01", env)
+    values.update(supply_stage_budget_ms={"fetch": 10}, supply_stage_budget_bytes={"fetch": 100}, supply_total_budget_ms=10)
+    cost = {"stage": "fetch", "elapsed_ms": 7, "peak_bytes": 29, "stopped": False, "temporary_cleaned": True}
+    packet = good_packet(env.ref().model_dump(mode="json"), digest, "LIF-01")
+    packet["change"] = change(applied=False)
+    packet["rows"] = [dict(cost), {**cost, "stage": "EXAMPLE-UNSELECTED-DETAIL"}]
+    if condition == "bad_type":
+        packet["rows"][0]["peak_bytes"] = "EXAMPLE-NONNUMERIC"
+    elif condition == "duplicate_stage":
+        packet["rows"].append(dict(cost))
+    raw = canonical_json(packet)
+    calls = []
+
+    def read_file(self, client, target, *, container, image, path):
+        calls.append(path)
+        return raw, {"capture_sha256": sha256_hex(raw), "owner_binding_verified": condition != "unverified_owner"}
+
+    monkeypatch.setattr(FakeReader, "read_file", read_file)
+    monkeypatch.setattr(FakeReader, "report", lambda self: {})
+    draft = executor.run(PACK.checks["LIF-01"], env, values, None, tmp_path)
+    summary = json.loads((tmp_path / "supply_boot_summary.json").read_text())
+    normal, missing_challenge = draft.observations["supply_boot_sessions"].value
+
+    assert calls == [boot.record_path("a" * 32)]
+    assert summary["sessions"] == [normal, missing_challenge]
+    assert missing_challenge["diagnostic_codes"] == ["SUPPLY_BOOT_INPUT_UNAVAILABLE"]
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.observations["supply_boot_record_authenticated"].value is False
+    assert "EXAMPLE-UNSELECTED-DETAIL" not in json.dumps(summary)
+    assert "EXAMPLE-NONNUMERIC" not in json.dumps(summary)
+    assert [artifact.name for artifact in draft.artifacts] == ["supply_boot_summary.json"]
+    if condition == "valid":
+        assert normal["reported_stage_costs"] == [cost]
+        assert normal["record_sha256"] == sha256_hex(raw)
+    else:
+        assert "reported_stage_costs" not in normal and normal["record_sha256"] is None
+        assert normal["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"]
+
+
+@pytest.mark.parametrize("condition", ["valid", "bad_type", "wrong_source", "unverified_owner"])
+def test_lif02_preserves_only_bound_normal_fetch_attempt_facts(tmp_path, monkeypatch, condition):
+    env = environment(model={"id": "test"})
+    executor, values, digest = role_inputs(tmp_path, monkeypatch, "LIF-02", env)
+    values.update(supply_max_attempts=2, supply_max_fetch_bytes=10)
+    attempts = [{"attempt": 0, "at_ms": 100, "bytes": 3, "temporary_left": True},
+                {"attempt": 1, "at_ms": 170, "bytes": 5, "temporary_left": False}]
+    packet = good_packet(env.ref().model_dump(mode="json"), digest, "LIF-02")
+    packet["change"] = change(applied=False)
+    packet["rows"] = [{**attempt, "outcome": outcome}
+                      for attempt, outcome in zip(attempts, ("EXAMPLE unretained outcome detail", "complete"), strict=True)]
+    if condition == "bad_type":
+        packet["rows"][0]["bytes"] = True
+    elif condition == "wrong_source":
+        packet["source_sha256"] = sha256_hex(b"another EXAMPLE producer")
+    raw = canonical_json(packet)
+
+    def read_file(self, client, target, *, container, image, path):
+        assert path == boot.record_path("a" * 32)
+        return raw, {"capture_sha256": sha256_hex(raw), "owner_binding_verified": condition != "unverified_owner"}
+
+    monkeypatch.setattr(FakeReader, "read_file", read_file)
+    monkeypatch.setattr(FakeReader, "report", lambda self: {})
+    draft = executor.run(PACK.checks["LIF-02"], env, values, None, tmp_path)
+    summary, = draft.artifacts
+    assert summary.name == "supply_boot_summary.json"
+    saved = summary.path.read_text()
+    normal, missing_challenge = draft.observations["supply_boot_sessions"].value
+    assert json.loads(saved)["sessions"] == [normal, missing_challenge]
+    assert missing_challenge["diagnostic_codes"] == ["SUPPLY_BOOT_INPUT_UNAVAILABLE"]
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.observations["supply_boot_record_authenticated"].value is False
+    assert draft.observations["supply_boot_complete"].value is False
+    assert "EXAMPLE unretained outcome detail" not in saved and '"outcome"' not in saved
+    if condition == "valid":
+        assert normal["reported_fetch_attempts"] == attempts
+        assert normal["record_sha256"] == sha256_hex(raw)
+    else:
+        assert "reported_fetch_attempts" not in normal

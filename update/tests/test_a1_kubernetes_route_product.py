@@ -12,22 +12,28 @@ from types import SimpleNamespace
 import pytest
 from typer.testing import CliRunner
 
+from guard.adapters.vllm import VllmAdapter
 from guard.cli import app
 from guard.executors import kubernetes_route_record as route
 from guard.executors.kubernetes_fixed_record import FixedRecordReader
 from guard.executors.kubernetes_forwarded_identity import ForwardedIdentityReader
 from guard.executors.kubernetes_gateway_observation import GatewayRecordReader
 from guard.executors.kubernetes_lifecycle_capture import supervised_source, KubernetesCaptureError
+from guard.executors.kubernetes_native_route import KubernetesNativeRouteExecutor
 from guard.executors.kubernetes_observation import RequiredEventReader
 from guard.executors.kubernetes_record_access_product import InventoryReader
 from guard.executors.owned_capture import MAX_BYTES, _FILE_READER
+from guard.judges.rule_table import RuleTableJudge
 from guard.models import canonical_json, load_pack, utcnow
+from guard.models.checkdef import PolicyParam
 from guard.store import Store
-from tests.builders import assert_unconfirmed_security_failure, baseline_pack, policy, T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, evidence, policy, T0
+from tests.test_kubernetes_gateway_observation import ordinary_gateway_record
 from tests.test_kubernetes_request_binding import env, target
 from tests.test_kubernetes_sampling import World as PodWorld, PRIVATE
 from tests.test_native_observations import native_record, CaptureWorld
 from tools.build_kubernetes_route_pack import derive
+from tools.dev1_runtime_records import final_records, route_packet
 
 SESSION = "ab" * 16
 
@@ -106,6 +112,110 @@ def inputs(tmp_path, mode="normal"):
     receipt = derive(baseline_pack().path, tmp_path / "pack")
     pack = load_pack(tmp_path / "pack")
     return environment, world, values, pack, receipt
+
+
+def stored_gateway_route(world, environment, raw):
+    """Use the existing bridge on ordinary Gateway writer bytes for the owned-file fixture."""
+    binding = world.target["kubernetes"]
+    rows = final_records(raw.decode("utf-8").split("\n"), run_id=binding["run_id"])
+    world.record = route_packet(rows, run_id=binding["run_id"],
+                                environment_ref=environment.ref().model_dump(mode="json"),
+                                image=binding["engine"]["image"], ingress_id="fixture-gateway",
+                                upstream_id=binding["engine"]["pod"])
+    world.file = CaptureWorld(world.record)
+    world.raw = json.dumps(world.record).encode()
+
+
+@pytest.mark.parametrize("ordinary_gateway_record", [True], indirect=True)
+@pytest.mark.parametrize("mode,reads", [("normal", 1), ("wrong-target", 0), ("expired", 0), ("restart", 1)])
+def test_pack39_retains_owned_gateway_record_when_native_binding_is_absent(
+        tmp_path, monkeypatch, ordinary_gateway_record, mode, reads):
+    check = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE").checks["REQ-02"]
+    environment = env()
+    world = World(environment, mode)
+    gateway_raw, writer_row, _ = ordinary_gateway_record
+    stored_gateway_route(world, environment, gateway_raw)
+    selected = tmp_path / "route-target.json"
+    selected.write_bytes(canonical_json(world.target))
+    now = utcnow()
+    values = {
+        "route_environment_sha256": environment.ref().sha256,
+        "route_target_sha256": hashlib.sha256(selected.read_bytes()).hexdigest(),
+        "route_session": SESSION,
+        "route_validity_start": (now - timedelta(minutes=1)).isoformat(),
+        "route_validity_end": (now + timedelta(minutes=1)).isoformat(),
+    }
+    if mode == "wrong-target":
+        values["route_target_sha256"] = "0" * 64
+    if mode == "expired":
+        values["route_validity_end"] = (now - timedelta(seconds=1)).isoformat()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Native construction and external transport are unavailable to this fixture")
+
+    monkeypatch.setattr(KubernetesNativeRouteExecutor, "__init__", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    monkeypatch.setattr(socket, "socket", forbidden)
+    partial = route.KubernetesRouteRecordExecutor({
+        "target": str(selected),
+        "native_route": {"target": str(selected), "prepared": str(tmp_path / "missing.json")},
+    }, runner=world.runner)
+
+    draft = partial.run(check, environment, values, VllmAdapter(), tmp_path)
+    assert world.reads == reads
+    assert draft.status.value == "ABORTED" and draft.data_origin.value == "EXAMPLE"
+    assert not draft.normal_control.attempted and draft.challenges == []
+    route_observed = mode == "normal"
+    assert draft.observations["route_record_collected"].value is route_observed
+    assert draft.observations["route_producer_authenticated"].value is False
+    assert "native_route_events" not in draft.observations
+    routes = draft.observations["route_events"]
+    assert routes.collected is route_observed
+    assert draft.observations["composite_subcollections"].value == {
+        "completed": ["route_record"] if route_observed else [],
+        "incomplete": [] if route_observed else ["route_record"],
+        "failed": {"native_route": "SUBCOLLECTION_UNAVAILABLE"},
+    }
+    log, = draft.artifacts
+    log_bytes = Path(log.path).read_bytes()
+    retained = json.loads(log_bytes.splitlines()[-1])["record"]
+    if route_observed:
+        event, = routes.value
+        assert event["request_sha256"] == hashlib.sha256(writer_row["request_id"].encode()).hexdigest()
+        assert event["external_path_sha256"] == hashlib.sha256(b"/v1/completions").hexdigest()
+        assert event["auth_decision"] == "allow"
+        assert retained["file_bytes_sha256"] == hashlib.sha256(world.raw).hexdigest()
+        assert retained["file_bytes"] == len(world.raw) and retained["owner_binding_verified"] is True
+        assert retained["record_sha256"] == hashlib.sha256(canonical_json(world.record)).hexdigest()
+    else:
+        assert routes.value is None and retained is None
+    assert all(value not in log_bytes for value in (
+        writer_row["request_id"].encode(), b"/v1/completions", b"EXAMPLE-PRIVATE-REQUEST-DATA",
+        b"fixture-principal", PRIVATE.encode()))
+    evd = evidence(status=draft.status, data_origin=draft.data_origin, check_id=check.id,
+                   normal=draft.normal_control.model_dump(), observations=draft.observations, attempted=False)
+    assert RuleTableJudge().judge(check, evd, check.judge.params, {}).verdicts["security"].value == "UNKNOWN"
+
+
+def test_pack39_record_only_rejects_partial_native_values_and_bad_role():
+    check = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE").checks["REQ-02"]
+    now = utcnow()
+    values = {
+        "route_environment_sha256": "a" * 64,
+        "route_target_sha256": "b" * 64,
+        "route_session": SESSION,
+        "route_validity_start": now.isoformat(),
+        "route_validity_end": (now + timedelta(minutes=1)).isoformat(),
+    }
+    partial = route.KubernetesRouteRecordExecutor({"native_route": {"target": "target.json"}})
+    with pytest.raises(ValueError, match="^KUBERNETES_ROUTE_POLICY_INVALID$"):
+        partial.validate_policy(check, {**values, "route_native_environment_sha256": "a" * 64})
+    for key in ("route_environment_sha256", "route_session", "route_file_sha256"):
+        legacy = check.model_copy(update={"policy_params": [PolicyParam(key=key, type="str")]})
+        with pytest.raises(ValueError, match="^KUBERNETES_ROUTE_POLICY_INVALID$"):
+            partial.validate_policy(legacy, values)
+    with pytest.raises(ValueError, match="^KUBERNETES_ROUTE_CONFIGURATION_INVALID$"):
+        partial.run(check, None, values, None, None)
 
 
 @pytest.mark.parametrize("mode", ["normal", "reported-bypass", "missing", "malformed", "wrong-file-hash",

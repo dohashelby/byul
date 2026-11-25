@@ -35,6 +35,86 @@ def for_side(config, side):
 
 
 CHECK_CONFIG = "check_config"
+UPDATE_CHECK_OUTSIDE_SCOPE = "UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE"
+GATEWAY_RECORD_SNAPSHOT_OPTION = "gateway_record_snapshot_only"
+CILIUM_EGRESS_STATUS_OPTION = "cilium_egress_status_only"
+CILIUM_EGRESS_STATUS_SCOPE_ERROR = "CILIUM_EGRESS_STATUS_EXECUTION_SCOPE_INVALID"
+INSTALLED_PLUGIN_INVENTORY_OPTION = "installed_plugin_inventory_only"
+INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR = "INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID"
+NORMAL_STREAM_OPTION = "normal_stream_only"
+NORMAL_SAMPLING_OPTION = "normal_sampling_only"
+NORMAL_TOKEN_INPUT_OPTION = "normal_token_input_only"
+NORMAL_REQUEST_LATENCY_OPTION = "normal_request_latency_only"
+NORMAL_REQUEST_LATENCY_SCOPE_ERROR = "NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID"
+NORMAL_COMPILE_CACHE_OPTION = "normal_compile_cache_only"
+NORMAL_COMPILE_CACHE_SCOPE_ERROR = "NORMAL_COMPILE_CACHE_EXECUTION_SCOPE_INVALID"
+NORMAL_FILE_READS_OPTION = "normal_file_reads_only"
+NORMAL_FILE_READS_SCOPE_ERROR = "NORMAL_FILE_READS_EXECUTION_SCOPE_INVALID"
+SUP05_PREPARATION_RECEIPT = "preparation_receipt"
+NORMAL_GRAPH_CAPTURE_OPTION = "normal_graph_capture_only"
+NORMAL_GRAPH_CAPTURE_SCOPE_ERROR = "NORMAL_GRAPH_CAPTURE_EXECUTION_SCOPE_INVALID"
+NORMAL_SAFETENSORS_READER_OPTION = "normal_safetensors_reader_only"
+NORMAL_SAFETENSORS_READER_SCOPE_ERROR = "NORMAL_SAFETENSORS_READER_EXECUTION_SCOPE_INVALID"
+NORMAL_SERVING_READINESS_OPTION = "normal_serving_readiness_only"
+NORMAL_SERVING_READINESS_SCOPE_ERROR = "NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID"
+NORMAL_STARTUP_LOAD_OPTION = "normal_startup_load_only"
+NORMAL_STARTUP_LOAD_SCOPE_ERROR = "NORMAL_STARTUP_LOAD_EXECUTION_SCOPE_INVALID"
+_NORMAL_ONLY_CASES = {
+    "LIF-01": ("supply_boot", NORMAL_STARTUP_LOAD_OPTION, NORMAL_STARTUP_LOAD_SCOPE_ERROR),
+    "LIF-03": ("stream_buffer", NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR),
+    "LIF-04": ("stream_buffer", NORMAL_STREAM_OPTION, "NORMAL_STREAM_EXECUTION_SCOPE_INVALID"),
+    "OBS-02": ("observation_state", NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR),
+    "PLT-07": ("boundary_egress", CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR),
+    "REQ-09": ("input_validation", NORMAL_TOKEN_INPUT_OPTION, "NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID"),
+    "REQ-10": ("sampling_validation", NORMAL_SAMPLING_OPTION, "NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID"),
+    "REQ-20": ("engine_sensor", NORMAL_GRAPH_CAPTURE_OPTION, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR),
+    "SUP-05": ("supply_boot", NORMAL_FILE_READS_OPTION, NORMAL_FILE_READS_SCOPE_ERROR),
+    "SUP-07": ("supply_boot", NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
+    "SUP-12": ("supply_boot", NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
+    "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
+}
+RETRY_RECORD_SNAPSHOT_OPTION = "retry_record_snapshot_only"
+RETRY_RECORD_SNAPSHOT_SCOPE_ERROR = "RETRY_RECORD_SNAPSHOT_SCOPE_INVALID"
+COLLECTION_STATUS_SNAPSHOT_OPTION = "collection_status_snapshot_only"
+COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR = "COLLECTION_STATUS_SNAPSHOT_SCOPE_INVALID"
+RECORD_SNAPSHOT_OPTIONS = {
+    "OBS-01": "record_snapshot_only",
+    "PLT-12": "copy_record_snapshot_only",
+}
+KUBERNETES_BOUND_CHECK_OPTIONS = {
+    **RECORD_SNAPSHOT_OPTIONS,
+    "LIF-12": RETRY_RECORD_SNAPSHOT_OPTION,
+    "OBS-11": COLLECTION_STATUS_SNAPSHOT_OPTION,
+    **{check_id: option for check_id, (_, option, _) in _NORMAL_ONLY_CASES.items()},
+    "OBS-04": "local_observation_only",
+    "PLT-02": "protected_path_metadata_only",
+    "PLT-06": "worker_trust_metadata_only",
+    "PLT-08": "passive_from_plt01",
+}
+
+
+def update_allowed_checks(raw, pack):
+    """Read the common execution allowlist without changing PLAN selection."""
+    sides = raw.get("sides", {})
+    if type(sides) is not dict or any(type(side) is not dict for side in sides.values()):
+        raise ValueError("UPDATE_SIDES_CONFIGURATION_INVALID")
+    for side in sides.values():
+        side_options = side.get("update", {})
+        if type(side_options) is not dict:
+            raise ValueError("UPDATE_CONFIGURATION_INVALID")
+        if "allowed_checks" in side_options:
+            raise ValueError("UPDATE_ALLOWED_CHECKS_MUST_BE_COMMON")
+    options = raw.get("update", {})
+    if type(options) is not dict:
+        raise ValueError("UPDATE_CONFIGURATION_INVALID")
+    if "allowed_checks" not in options:
+        return None
+    check_ids = options["allowed_checks"]
+    if (type(check_ids) is not list
+            or any(type(cid) is not str or cid not in pack.checks or pack.checks[cid].retired for cid in check_ids)
+            or len(set(check_ids)) != len(check_ids)):
+        raise ValueError("UPDATE_ALLOWED_CHECKS_INVALID")
+    return frozenset(check_ids)
 
 # Host inputs consumed by executors or run-binding validation. Remote paths
 # such as usage_sink.path and native_observation_path are bound by the target.
@@ -51,12 +131,48 @@ _RECORD_INPUTS = frozenset({
 })
 
 
+_STAGED_OBSERVER_OWNERS = {
+    **{cid: executor for cid, (executor, _, _) in _NORMAL_ONLY_CASES.items() if cid != "SUP-05"},
+    "OBS-04": "boundary_egress", "PLT-02": "unix_ipc", "PLT-06": "unix_ipc",
+}
+
+
+def staged_observer_executors(candidate):
+    """Only explicitly scoped observers can bind a new candidate Pod after baseline."""
+    options = candidate.get("update", {})
+    if options.get("mode", "external") != "external" or options.get("kubernetes_candidate_binding") != "after_baseline":
+        return set()
+    allowed = options.get("allowed_checks")
+    overlays = candidate.get(CHECK_CONFIG, {})
+    implementations = candidate.get("executors", {})
+    if (type(allowed) is not list or not allowed or type(overlays) is not dict
+            or type(implementations) is not dict or candidate.get("lab_activation") or candidate.get("record_attestation")):
+        return set()
+    executors = set()
+    for cid in allowed:
+        if type(cid) is not str or cid not in _STAGED_OBSERVER_OWNERS:
+            return set()
+        check_config = overlays.get(cid)
+        option = KUBERNETES_BOUND_CHECK_OPTIONS[cid]
+        if type(check_config) is not dict or set(check_config) != {option} or check_config[option] is not True:
+            return set()
+        executor = _STAGED_OBSERVER_OWNERS[cid]
+        settings = candidate.get(executor)
+        if implementations.get(executor) != "kubernetes" or type(settings) is not dict or set(settings) != {"target"}:
+            return set()
+        executors.add(executor)
+    return executors
+
+
 def requested_input_paths(config, *, base_dir=None):
     """Yield approved local input paths and whether discovery is deferred."""
     validate_requested_config(config)
+    normal_file_reads = normal_file_reads_requested(config)
     deferred_paths = set()
+    staged_observers = set()
     if config.get("update", {}).get("kubernetes_candidate_binding") == "after_baseline":
         candidate = for_side(config, "candidate")
+        staged_observers = staged_observer_executors(candidate)
         implementations = candidate.get("executors", {})
         for executor in ("request_binding", "input_validation"):
             path = candidate.get(executor, {}).get("target")
@@ -95,11 +211,13 @@ def requested_input_paths(config, *, base_dir=None):
                 field = (*location, key)
                 records = any(part in _RECORD_INPUTS for part in location)
                 if isinstance(item, (str, Path)):
-                    if (key in _INPUT_FILES or key == "path" and records
+                    normal_reference = (normal_file_reads and key == "reference_manifest"
+                                        and location[-2:] in {("supply_boot", "normal"), ("SUP-05", "normal")})
+                    if (key in _INPUT_FILES or normal_reference or key == "path" and records
                             or key == "environment" and "generations" in location):
                         path = Path(item)
                         deferred = (key == "target" and location[:2] == ("sides", "candidate")
-                                    and path in deferred_paths)
+                                    and (path in deferred_paths or len(location) == 3 and location[2] in staged_observers))
                         yield field, path, deferred
                         if key in _MANIFEST_FILES:
                             for asset in manifest_assets(path):
@@ -151,3 +269,308 @@ def for_check(raw, executor, check_id):
     out = dict(raw)
     out[executor] = merge_config(section, entry)
     return out
+
+
+def normal_token_input_requested(raw):
+    """Detect the option before validating its value, check, or paired scope."""
+    overlays = raw.get(CHECK_CONFIG)
+    settings = (raw.get("input_validation"), *(overlays.values() if type(overlays) is dict else ()))
+    return any(type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section for section in settings)
+
+
+def _option_occurrences(value, option, path=()):
+    if type(value) is dict:
+        for key, child in value.items():
+            location = (*path, key)
+            if key == option:
+                yield location, child
+            else:
+                yield from _option_occurrences(child, option, location)
+    elif type(value) is list:
+        for index, child in enumerate(value):
+            yield from _option_occurrences(child, option, (*path, index))
+
+
+def _validate_normal_option_placement(raw, option, paths, error):
+    for path, value in _option_occurrences(raw, option):
+        if path[:2] in {("sides", "baseline"), ("sides", "candidate")}:
+            path = path[2:]
+        if value is not True or path not in paths:
+            raise ValueError(error)
+
+
+def retry_record_snapshot_requested(raw):
+    return next(_option_occurrences(raw, RETRY_RECORD_SNAPSHOT_OPTION), None) is not None
+
+
+def collection_status_snapshot_requested(raw):
+    return next(_option_occurrences(raw, COLLECTION_STATUS_SNAPSHOT_OPTION), None) is not None
+
+
+def normal_request_latency_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_REQUEST_LATENCY_OPTION), None) is not None
+
+
+def normal_compile_cache_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_COMPILE_CACHE_OPTION), None) is not None
+
+
+def validate_sup05_preparation_receipt(value):
+    """Validate the path and raw content pin of one saved SUP-05 preparation."""
+    if (type(value) is not dict or set(value) != {"path", "sha256"}
+            or type(value["path"]) is not str or not value["path"]
+            or type(value["sha256"]) is not str or len(value["sha256"]) != 64
+            or any(char not in "0123456789abcdef" for char in value["sha256"])):
+        raise ValueError("SUP05_NORMAL_PREPARATION_REFERENCE_INVALID")
+    return value
+
+
+def _sup05_preparation_receipts(raw):
+    for path, receipt in _option_occurrences(raw, SUP05_PREPARATION_RECEIPT):
+        if path[:2] in {("sides", "baseline"), ("sides", "candidate")}:
+            path = path[2:]
+        if path[0] in {CHECK_CONFIG, "supply_boot"}:
+            yield path, receipt
+
+
+def normal_file_reads_requested(raw):
+    return (next(_option_occurrences(raw, NORMAL_FILE_READS_OPTION), None) is not None
+            or next(_sup05_preparation_receipts(raw), None) is not None)
+
+
+def normal_graph_capture_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_GRAPH_CAPTURE_OPTION), None) is not None
+
+
+def normal_safetensors_reader_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_SAFETENSORS_READER_OPTION), None) is not None
+
+
+def normal_startup_load_requested(raw):
+    return next(_option_occurrences(raw, NORMAL_STARTUP_LOAD_OPTION), None) is not None
+
+
+def installed_plugin_inventory_requested(raw):
+    return next(_option_occurrences(raw, INSTALLED_PLUGIN_INVENTORY_OPTION), None) is not None
+
+
+def cilium_egress_status_requested(raw):
+    return next(_option_occurrences(raw, CILIUM_EGRESS_STATUS_OPTION), None) is not None
+
+
+def normal_serving_readiness_requested(raw):
+    """Detect a serving-readiness opt-in before validating its placement or value."""
+    return next(_option_occurrences(raw, NORMAL_SERVING_READINESS_OPTION), None) is not None
+
+
+def bounded_metadata_scopes(configurations, pack, allowed_checks):
+    """Bind the explicitly configured metadata cases without enabling sibling collectors."""
+    name = "required_event_record"
+    error = "OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID"
+    scopes = []
+    gateway_modes = []
+    for raw in configurations:
+        scoped = {}
+        overlays = raw.get(CHECK_CONFIG)
+        bindings = raw.get("run_binding")
+        _validate_normal_option_placement(raw, NORMAL_SERVING_READINESS_OPTION, {
+            ("observation_state", NORMAL_SERVING_READINESS_OPTION),
+            (CHECK_CONFIG, "OBS-02", NORMAL_SERVING_READINESS_OPTION),
+        }, NORMAL_SERVING_READINESS_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_REQUEST_LATENCY_OPTION, {
+            (CHECK_CONFIG, "LIF-03", NORMAL_REQUEST_LATENCY_OPTION),
+        }, NORMAL_REQUEST_LATENCY_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_STARTUP_LOAD_OPTION, {
+            (CHECK_CONFIG, "LIF-01", NORMAL_STARTUP_LOAD_OPTION),
+        }, NORMAL_STARTUP_LOAD_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_COMPILE_CACHE_OPTION, {
+            (CHECK_CONFIG, "SUP-07", NORMAL_COMPILE_CACHE_OPTION),
+        }, NORMAL_COMPILE_CACHE_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_FILE_READS_OPTION, {
+            (CHECK_CONFIG, "SUP-05", NORMAL_FILE_READS_OPTION),
+        }, NORMAL_FILE_READS_SCOPE_ERROR)
+        receipt_present = False
+        for path, receipt in _sup05_preparation_receipts(raw):
+            receipt_present = True
+            if path not in {(CHECK_CONFIG, "SUP-05", SUP05_PREPARATION_RECEIPT),
+                            ("supply_boot", SUP05_PREPARATION_RECEIPT)}:
+                raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+            validate_sup05_preparation_receipt(receipt)
+        _validate_normal_option_placement(raw, NORMAL_GRAPH_CAPTURE_OPTION, {
+            (CHECK_CONFIG, "REQ-20", NORMAL_GRAPH_CAPTURE_OPTION),
+        }, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, NORMAL_SAFETENSORS_READER_OPTION, {
+            (CHECK_CONFIG, "SUP-12", NORMAL_SAFETENSORS_READER_OPTION),
+        }, NORMAL_SAFETENSORS_READER_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, INSTALLED_PLUGIN_INVENTORY_OPTION, {
+            (CHECK_CONFIG, "SUP-10", INSTALLED_PLUGIN_INVENTORY_OPTION),
+        }, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
+        _validate_normal_option_placement(raw, CILIUM_EGRESS_STATUS_OPTION, {
+            (CHECK_CONFIG, "PLT-07", CILIUM_EGRESS_STATUS_OPTION),
+        }, CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+        if type(overlays) is dict and any(
+                check_id != "REQ-09" and type(section) is dict and NORMAL_TOKEN_INPUT_OPTION in section
+                for check_id, section in overlays.items()):
+            raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
+        for check_id, option in RECORD_SNAPSHOT_OPTIONS.items():
+            overlay = overlays.get(check_id) if type(overlays) is dict else None
+            sections = (raw.get(name), overlay)
+            gateway = check_id == "OBS-01" and any(
+                type(settings) is dict and GATEWAY_RECORD_SNAPSHOT_OPTION in settings for settings in sections)
+            if not gateway and not any(type(settings) is dict and option in settings for settings in sections):
+                continue
+            settings = for_check(raw, name, check_id).get(name, {})
+            if (settings.get(option) is not True or gateway and
+                    (settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is not True
+                     or raw.get("update", {}).get("kubernetes_candidate_binding", "prebound") != "prebound")):
+                raise ValueError(error)
+            scoped[check_id] = (settings, bindings.get(check_id) if type(bindings) is dict else None)
+        if scoped:
+            if (allowed_checks is None or set(scoped) != {cid for cid in allowed_checks if pack.checks[cid].executor == name}
+                    or raw.get("update", {}).get("mode", "external") != "external"
+                    or raw.get("executors", {}).get(name) != "kubernetes"
+                    or raw.get("record_attestation") or raw.get("lab_activation")):
+                raise ValueError(error)
+            sessions = [binding.get("record_session") for _, binding in scoped.values() if type(binding) is dict]
+            if len(sessions) == 2 and sessions[0] == sessions[1]:
+                raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SESSIONS_MUST_DIFFER")
+        retry_option = RETRY_RECORD_SNAPSHOT_OPTION
+        retry_error = RETRY_RECORD_SNAPSHOT_SCOPE_ERROR
+        retry_executor = "request_termination"
+        _validate_normal_option_placement(raw, retry_option, {
+            (retry_executor, retry_option),
+            (CHECK_CONFIG, "LIF-12", retry_option),
+        }, retry_error)
+        retry_base = raw.get(retry_executor)
+        retry_overlay = overlays.get("LIF-12") if type(overlays) is dict else None
+        retry_in_base = type(retry_base) is dict and retry_option in retry_base
+        if retry_in_base or type(retry_overlay) is dict and retry_option in retry_overlay:
+            settings = for_check(raw, retry_executor, "LIF-12").get(retry_executor, {})
+            update = raw.get("update", {})
+            if (allowed_checks is None or "LIF-12" not in allowed_checks
+                    or raw.get("executors", {}).get(retry_executor) != "kubernetes"
+                    or update.get("mode", "external") != "external"
+                    or update.get("kubernetes_candidate_binding", "prebound") != "prebound"
+                    or raw.get("lab_activation")
+                    or retry_in_base and any(cid != "LIF-12" and pack.checks[cid].executor == retry_executor
+                                             for cid in allowed_checks)):
+                raise ValueError(retry_error)
+            scoped["LIF-12"] = (settings, bindings.get("LIF-12") if type(bindings) is dict else None)
+        if collection_status_snapshot_requested(raw):
+            status_option = COLLECTION_STATUS_SNAPSHOT_OPTION
+            status_error = COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR
+            _validate_normal_option_placement(raw, status_option, {(CHECK_CONFIG, "OBS-11", status_option)}, status_error)
+            executor = "log_integrity"
+            settings = for_check(raw, executor, "OBS-11").get(executor, {})
+            update = raw.get("update", {})
+            status_binding = bindings.get("OBS-11") if type(bindings) is dict else None
+            if (settings.get(status_option) is not True or allowed_checks is None
+                    or {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {"OBS-11"}
+                    or raw.get("executors", {}).get(executor) != "kubernetes"
+                    or update.get("mode", "external") != "external"
+                    or update.get("kubernetes_candidate_binding", "prebound") != "prebound"
+                    or raw.get("lab_activation") or raw.get("record_attestation")
+                    or type(status_binding) is not dict or set(status_binding) != {"record_session"}):
+                raise ValueError(status_error)
+            scoped["OBS-11"] = (settings, status_binding)
+        stream_cases = {}
+        for check_id, (executor, option, scope_error) in _NORMAL_ONLY_CASES.items():
+            overlay = overlays.get(check_id) if type(overlays) is dict else None
+            if not any(type(settings) is dict and option in settings for settings in (raw.get(executor), overlay)):
+                continue
+            settings = for_check(raw, executor, check_id).get(executor, {})
+            if (settings[option] is not True or allowed_checks is None
+                    or (executor not in {"stream_buffer", "boundary_egress", "supply_boot"}
+                        and {cid for cid in allowed_checks if pack.checks[cid].executor == executor} != {check_id})
+                    or raw.get("executors", {}).get(executor) != "kubernetes"
+                    or raw.get("update", {}).get("mode", "external") != "external"
+                    or raw.get("lab_activation")
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10", "REQ-20",
+                                     "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
+                        and raw.get("record_attestation"))
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
+                        and "run_binding" in raw
+                        and (type(bindings) is not dict or check_id in bindings))
+                    or (check_id in {"LIF-01", "PLT-07", "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
+                        and set(settings) - {option, "target", "kubectl_binary", "max_duration_seconds"})):
+                raise ValueError(scope_error)
+            scoped[check_id] = (settings, None)
+            if executor == "stream_buffer":
+                stream_cases[check_id] = settings
+        if stream_cases:
+            stream_error = (NORMAL_REQUEST_LATENCY_SCOPE_ERROR if "LIF-03" in stream_cases
+                            else _NORMAL_ONLY_CASES["LIF-04"][2])
+            if set(stream_cases) != {cid for cid in allowed_checks if pack.checks[cid].executor == "stream_buffer"}:
+                raise ValueError(stream_error)
+            if "LIF-03" in stream_cases:
+                _validate_normal_option_placement(raw, NORMAL_STREAM_OPTION, {
+                    (CHECK_CONFIG, "LIF-04", NORMAL_STREAM_OPTION),
+                }, stream_error)
+                base = raw.get("stream_buffer", {})
+                target = base.get("target")
+                if (type(target) is not str or not target
+                        or any(settings.get("target") != target or {"prepared", "common_inputs"} & settings.keys()
+                               for settings in stream_cases.values())
+                        or ("run_binding" in raw and (type(bindings) is not dict or set(stream_cases) & bindings.keys()))):
+                    raise ValueError(stream_error)
+        supply_cases = {cid: scoped[cid][0] for cid in ("LIF-01", "SUP-07", "SUP-12", "SUP-10") if cid in scoped}
+        if receipt_present and "SUP-05" not in scoped:
+            raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+        if "SUP-05" in scoped:
+            settings, _ = scoped["SUP-05"]
+            supply_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}
+            normal = settings.get("normal")
+            if (supply_checks != {"SUP-05", *supply_cases} or set(settings) - {
+                    NORMAL_FILE_READS_OPTION, SUP05_PREPARATION_RECEIPT, "normal", "kubectl_binary", "max_duration_seconds"}
+                    or type(normal) is not dict or set(normal) != {"target", "prepared", "reference_manifest"}
+                    or any(type(path) is not str or not path for path in normal.values())
+                    or raw.get("update", {}).get("kubernetes_candidate_binding", "prebound") != "prebound"):
+                raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+            if supply_cases:
+                target = next(iter(supply_cases.values())).get("target")
+                if (type(target) is not str or not target or normal["target"] == target
+                        or any(case.get("target") != target for case in supply_cases.values())):
+                    raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+        elif supply_cases:
+            anchor = next(iter(supply_cases))
+            _, _, supply_error = _NORMAL_ONLY_CASES[anchor]
+            if set(supply_cases) != {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}:
+                raise ValueError(supply_error)
+            if anchor != "SUP-10":
+                target = raw.get("supply_boot", {}).get("target")
+                if (type(target) is not str or not target
+                        or any(settings.get("target") != target for settings in supply_cases.values())):
+                    raise ValueError(supply_error)
+        if "PLT-07" in scoped:
+            executor = "boundary_egress"
+            egress_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == executor}
+            target = raw.get(executor, {}).get("target")
+            if (egress_checks not in ({"PLT-07"}, {"PLT-07", "OBS-04"})
+                    or type(target) is not str or not target or scoped["PLT-07"][0].get("target") != target):
+                raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+            local_option = KUBERNETES_BOUND_CHECK_OPTIONS["OBS-04"]
+            _validate_normal_option_placement(raw, local_option, {
+                (CHECK_CONFIG, "OBS-04", local_option),
+            }, CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+            if "OBS-04" in egress_checks:
+                local = for_check(raw, executor, "OBS-04").get(executor, {})
+                if (local.get(local_option) is not True or local.get("target") != target
+                        or set(local) - {local_option, "target", "kubectl_binary", "max_duration_seconds",
+                                         "usage_wait_seconds"}
+                        or (type(bindings) is dict and "OBS-04" in bindings)):
+                    raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
+                scoped["OBS-04"] = (local, None)
+        scopes.append(scoped)
+        gateway_modes.append(scoped.get("OBS-01", ({}, None))[0].get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
+    for check_id, (_, _, scope_error) in _NORMAL_ONLY_CASES.items():
+        sides = [check_id in scoped for scoped in scopes]
+        if any(sides) and (len(sides) != 2 or not all(sides)):
+            raise ValueError(scope_error)
+    status_sides = ["OBS-11" in scoped for scoped in scopes]
+    if any(status_sides) and (len(status_sides) != 2 or not all(status_sides)):
+        raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
+    if any(scopes) and (len(scopes) != 2 or set(scopes[0]) != set(scopes[1])):
+        raise ValueError(error)
+    if any(gateway_modes) and not all(gateway_modes):
+        raise ValueError(error)
+    return scopes

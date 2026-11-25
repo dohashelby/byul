@@ -242,7 +242,7 @@ def select(
         raise ValueError("EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED")
     plan = select_plan(p, [e], pol, change=chg, context=context) if context is not None else select_plan(p, [e], pol)
     from guard.core.execution_recipe import bind_recipe
-    plan = bind_recipe(plan, cfg, [e])
+    plan = bind_recipe(plan, cfg, [e], from_selection_context=context is not None)
     st.put(plan)
     selected = [i for i in plan.items if i.selected]
     auto = [i for i in selected if not i.gaps]
@@ -566,23 +566,39 @@ def evidence_recover(
 
 
 @app.command("prepare-model-read-scope")
-def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path = typer.Option(...,"--target"),
-    model_manifest: Path = typer.Option(...,"--model-manifest"),model_root: str = typer.Option(...,"--model-root"),
-    output: Path = typer.Option(...,"--output"),nonsecret_model_weights: bool = typer.Option(False,"--nonsecret-model-weights"),
-    hash_model_bytes: bool = typer.Option(False,"--hash-model-bytes"),max_hash_bytes: int = typer.Option(2**31,"--max-hash-bytes")) -> None:
+def prepare_model_read_scope(
+    env: Path = typer.Option(..., "--env"),
+    target: Path = typer.Option(..., "--target"),
+    model_manifest: Path = typer.Option(..., "--model-manifest"),
+    model_root: str = typer.Option(..., "--model-root"),
+    output: Path = typer.Option(..., "--output"),
+    nonsecret_model_weights: bool = typer.Option(False, "--nonsecret-model-weights"),
+    hash_model_bytes: bool = typer.Option(False, "--hash-model-bytes"),
+    max_hash_bytes: int = typer.Option(2**31, "--max-hash-bytes"),
+    target_sha256: str | None = typer.Option(None, "--target-sha256", help="저장된 정상 HTTP 대상 파일의 바이트 해시"),
+    model_manifest_sha256: str | None = typer.Option(None, "--model-manifest-sha256", help="승인 모델 참조 파일의 바이트 해시"),
+) -> None:
     """선언한 비밀 아닌 safetensors 참조 범위를 만든다. 모델 파일을 읽지 않는다."""
     from guard.collectors.model_read_scope import build_scope
     from guard.collectors.route_observations import validate_output
     from guard.models import canonical_json
     try:
-        environment=load_environment(env)
-        topology = load_bounded_json(target)
-        value=build_scope(environment,topology,model_manifest,model_root,nonsecret_model_weights=nonsecret_model_weights,
-            hash_model_bytes=hash_model_bytes,max_hash_bytes=max_hash_bytes)
-        validate_output(output,Path(__file__).resolve().parents[3]);destination=output.absolute()
-        with destination.open('xb') as stream:stream.write(canonical_json(value))
-    except (OSError,ValueError,TypeError):
-        typer.echo("MODEL_READ_SCOPE_PREPARATION_FAILED");raise typer.Exit(2)
+        scope_options = {"nonsecret_model_weights": nonsecret_model_weights,
+                         "hash_model_bytes": hash_model_bytes, "max_hash_bytes": max_hash_bytes}
+        if target_sha256 is None and model_manifest_sha256 is None:
+            environment = load_environment(env)
+            topology = load_bounded_json(target)
+            value = build_scope(environment, topology, model_manifest, model_root, **scope_options)
+        else:
+            from guard.executors.lifecycle_transition_scope import prepare_scope
+            value = prepare_scope(env, target, model_manifest, model_root, expected_target_sha256=target_sha256,
+                                  approved_manifest_sha256=model_manifest_sha256, **scope_options)
+        validate_output(output, Path(__file__).resolve().parents[3])
+        with output.absolute().open("xb") as stream:
+            stream.write(canonical_json(value))
+    except (OSError, ValueError, TypeError):
+        typer.echo("MODEL_READ_SCOPE_PREPARATION_FAILED")
+        raise typer.Exit(2)
     typer.echo(json.dumps({"prepared":True,"model_files_read":False,"approval_verified":False}))
 
 
@@ -595,12 +611,14 @@ def prepare_engine_callbacks(output: Path = typer.Option(..., "--output", help="
     health_causal: bool = typer.Option(False, "--health-causal", help="#196 health-worker-causal 관측(API health 판단). --request-attempts와 함께 쓴다"),
     profiler_control: bool = typer.Option(False, "--profiler-control", help="#196 profiler-control 관측(API·EngineCore·worker profiler 사슬)"),
     runner_consumption: bool = typer.Option(False, "--runner-consumption", help="P2 runner 최종 소비 관측(API 검증·runner 도착·sampler 적용, V1 runner)"),
+    worker_shards: bool = typer.Option(False, "--worker-shards", help="SUP-06의 worker별 shard 배정과 적재 관측을 켠다"),
     supply_root: list[str] = typer.Option([], "--supply-root", help="SUP-03 공급 파일 읽기 관측의 루트(엔진 컨테이너 안 절대 경로). 여러 번 줄 수 있다"),
     supply_watch: bool = typer.Option(False, "--supply-watch", help="SUP-03 native 읽기를 inotify로도 관측한다(--supply-root 필요)")):
     """REQ-14~17 콜백 센서 자산을 만든다. 엔진을 시작하지 않는다."""
     from guard.collectors.engine_callbacks import prepare_assets
     typer.echo(json.dumps(prepare_assets(output, lab_faults=lab_faults, lab_kernel_checks=lab_kernel_checks, request_attempts=request_attempts, generation_transitions=generation_transitions, health_causal=health_causal, profiler_control=profiler_control, runner_consumption=runner_consumption,
-                                         supply_roots=supply_root or None, supply_watch=supply_watch), ensure_ascii=False))
+                                         supply_roots=supply_root or None, supply_watch=supply_watch,
+                                         worker_shards=worker_shards), ensure_ascii=False))
 
 
 @app.command("prepare-lifecycle-sensor")
@@ -617,6 +635,30 @@ def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output"),
         raise typer.Exit(2)
     typer.echo(json.dumps({"prepared":True,"engine_started":False,"product_connected":False,
                           "profile":value["profile"]}))
+
+
+@app.command("prepare-sup05-normal")
+def prepare_sup05_normal(
+    env: Path = typer.Option(..., "--env"),
+    target: Path = typer.Option(..., "--target"),
+    owner_snapshot: Path = typer.Option(..., "--owner-snapshot"),
+    owner_snapshot_sha256: str = typer.Option(..., "--owner-snapshot-sha256"),
+    model_manifest: Path = typer.Option(..., "--model-manifest"),
+    model_manifest_sha256: str = typer.Option(..., "--model-manifest-sha256"),
+    output: Path = typer.Option(..., "--output"),
+    nonsecret_model_weights: bool = typer.Option(False, "--nonsecret-model-weights"),
+) -> None:
+    """저장된 소유 관계와 승인 참조로 SUP-05 정상 읽기 입력을 준비한다."""
+    from guard.executors.kubernetes_sup05_normal_preparation import prepare
+    try:
+        value = prepare(output, Path(__file__).resolve().parents[3], environment=env, target=target,
+                        owner_snapshot=owner_snapshot, owner_snapshot_sha256=owner_snapshot_sha256,
+                        model_manifest=model_manifest, model_manifest_sha256=model_manifest_sha256,
+                        nonsecret_model_weights=nonsecret_model_weights)
+    except (OSError, ValueError, TypeError):
+        typer.echo("SUP05_NORMAL_PREPARATION_FAILED")
+        raise typer.Exit(2)
+    typer.echo(json.dumps(value, ensure_ascii=False))
 
 
 @app.command("capture-lifecycle-observations")

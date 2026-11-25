@@ -42,11 +42,32 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNAPSHOT_OPTION,
+                                 INSTALLED_PLUGIN_INVENTORY_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
+                                 NORMAL_COMPILE_CACHE_OPTION, NORMAL_FILE_READS_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
+                                 NORMAL_GRAPH_CAPTURE_OPTION,
+                                 NORMAL_SAFETENSORS_READER_OPTION,
+                                 NORMAL_SERVING_READINESS_OPTION, NORMAL_STARTUP_LOAD_OPTION,
+                                 NORMAL_STREAM_OPTION, RETRY_RECORD_SNAPSHOT_OPTION)
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
 SCHEMA_2 = 'guard-run-binding/2'
 SCHEMAS = (SCHEMA, SCHEMA_2)
+INITIALIZATION_CHECKS = frozenset({'LIF-07', 'LIF-09'})
+SUPPLY_RECORD_CHECKS = frozenset({'SUP-15', 'SUP-16'})
+# Pack 38 moved the OBS-06 subject plan from POL to binding at check revision 10.
+OBS06_STAGE4_MIN_CHECK_REVISION = 10
+_TARGET_ONLY_NORMAL_MODES = {
+    'LIF-01': ('supply_boot', NORMAL_STARTUP_LOAD_OPTION, 'supply_target_sha256'),
+    'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
+    'OBS-02': ('observation_state', NORMAL_SERVING_READINESS_OPTION, 'observation_state_target_sha256'),
+    'PLT-07': ('boundary_egress', CILIUM_EGRESS_STATUS_OPTION, 'egress_target_sha256'),
+    'REQ-20': ('engine_sensor', NORMAL_GRAPH_CAPTURE_OPTION, 'sensor_target_sha256'),
+    'SUP-07': ('supply_boot', NORMAL_COMPILE_CACHE_OPTION, 'supply_target_sha256'),
+    'SUP-10': ('supply_boot', INSTALLED_PLUGIN_INVENTORY_OPTION, 'supply_target_sha256'),
+    'SUP-12': ('supply_boot', NORMAL_SAFETENSORS_READER_OPTION, 'supply_target_sha256'),
+}
 
 # @34 policy keys moved to the run binding (RB-Q1, 2026-11-14 user approval).
 # PLT-10, PLT-11 and LIF-11 keep their validity window in policy: their policy
@@ -242,6 +263,7 @@ _CHECK_FILE_OVERRIDES = {
                'profiler_target_sha256': (('profiler_target',), 'json'),
                'identity_prepared_sha256': (('identity_prepared',), 'lifecycle'),
                'profiler_prepared_sha256': (('profiler_prepared',), 'lifecycle')},
+    'SUP-05': {'supply_normal_reference_manifest_sha256': (('normal', 'reference_manifest'), 'bytes')},
 }
 # Longest window each executor's policy contract accepts (end - start).
 _WINDOW_SECONDS = {'supply_boot': 3600}
@@ -270,6 +292,32 @@ def stages_for(check) -> tuple[int, ...]:
 def keys_for(check) -> tuple[str, ...]:
     """Run-binding keys of this CheckDef: empty for a definition that still declares them (@34)."""
     return tuple(k for number in stages_for(check) for k in STAGES[number - 1].get(check.id, ()))
+
+
+def is_supply_record_binding(check) -> bool:
+    return (check.id in SUPPLY_RECORD_CHECKS and check.executor == 'supply_boot'
+            and {1, 3}.issubset(stages_for(check)))
+
+
+def is_paired_supply_role_preflight(check, settings, update: dict) -> bool:
+    """Existing canonical role files are separate from explicit normal-only modes."""
+    return (check.id in _SUPPLY_CHECKS and check.executor == 'supply_boot'
+            and type(settings) is dict and ('normal' in settings or 'challenge' in settings)
+            and KUBERNETES_BOUND_CHECK_OPTIONS.get(check.id) not in settings
+            and update.get('mode', 'external') == 'external'
+            and update.get('kubernetes_candidate_binding', 'prebound') == 'prebound'
+            and {1, 3}.issubset(stages_for(check)))
+
+
+def is_record_access_binding(check) -> bool:
+    return check.id == 'OBS-06' and check.executor == 'record_access' and stages_for(check) == (1, 2, 3, 4)
+
+
+def is_lifecycle_generation_binding(check) -> bool:
+    """The canonical definition binds declared generation files in stage 2."""
+    return (check.executor == 'lifecycle_transition'
+            and 'transition_inputs_sha256' in KEYS_BY_CHECK_2.get(check.id, ())
+            and 2 in stages_for(check))
 
 
 def owned_keys(check):
@@ -305,7 +353,7 @@ def _load(path, loader):
     raise RunBindingUnavailable('RUN_BINDING_LOADER_UNSUPPORTED')
 
 
-def file_hash(check_id, key, executor_cfg) -> str:
+def file_hash(check_id, key, executor_cfg, *, require_regular_json=False) -> str:
     """Canonical JSON hash of the configured file, loaded the way the executor loads it."""
     path, loader = _source(check_id, key)
     if (check_id == 'LIF-08' and key == 'rank_prepared_sha256'
@@ -319,7 +367,36 @@ def file_hash(check_id, key, executor_cfg) -> str:
         raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE')
     if loader == 'bytes':
         return producer_sha256(node)
+    if loader == 'json' and require_regular_json:
+        from guard.adapters.vllm_file_read_sensor import dependency
+        from guard.runtime.bounded import strict_json
+
+        return sha256_hex(canonical_json(strict_json(dependency(node, None), limit=_MAX_JSON)))
     return sha256_hex(canonical_json(_load(node, loader)))
+
+
+def _verified_record_access_sha256(key, executor_cfg, expected_sha256, reason):
+    try:
+        digest = file_hash('OBS-06', key, executor_cfg, require_regular_json=True)
+    except (KeyError, OSError, TypeError, ValueError):
+        raise RunBindingUnavailable(reason) from None
+    if digest != expected_sha256:
+        raise RunBindingUnavailable(reason)
+    return digest
+
+
+def native_route_preparation_missing(executor_cfg) -> bool:
+    """Check only whether the declared manifest itself is absent."""
+    from .kubernetes_route_record import has_record_only_native_role
+
+    native_cfg = executor_cfg.get('native_route')
+    if not has_record_only_native_role(native_cfg):
+        return False
+    try:
+        Path(native_cfg['prepared']).lstat()
+    except FileNotFoundError:
+        return True
+    return False
 
 
 def policy_document_sha256(check_id, key, policy_row) -> str:
@@ -378,7 +455,7 @@ def producer_sha256(path) -> str:
     if type(path) is not str or not path:
         raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE')
     try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+        fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
     except OSError:
         raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE') from None
     info = os.fstat(fd)
@@ -407,16 +484,22 @@ def _issuer_event(check_id, path):
     return digest, {f'{_EVENT_PREFIX[check_id]}_{k}': v for k, v in event.items()}
 
 
-def _stage_3(check, run_cfg, issued_at, valid_from=None, valid_until=None):
+def _stage_3(check, executor_cfg, run_cfg, issued_at, valid_from=None, valid_until=None):
     """Return (file hashes, values, validity) for the stage-3 keys of this check."""
     cid, files, values, validity = check.id, {}, {}, None
     for entry, key in PRODUCERS_3.get(cid, {}).items():
         files[entry + '_sha256'] = values[key] = producer_sha256(run_cfg[entry])
     if cid == 'OBS-01':
         actors = run_cfg['test_actors']
-        if type(actors) is not dict or set(actors) != {'allowed', 'denied'} or actors['allowed'] == actors['denied']:
+        gateway_snapshot = (check.executor == 'required_event_record' and stages_for(check) == (1, 2, 3, 4)
+                            and executor_cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['OBS-01']) is True
+                            and executor_cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True
+                            and KUBERNETES_BOUND_CHECK_OPTIONS['PLT-12'] not in executor_cfg)
+        if (type(actors) is not dict or (actors.keys() != {'allowed', 'denied'}
+                                        and not (gateway_snapshot and actors.keys() == {'allowed'}))
+                or actors['allowed'] == actors.get('denied')):
             raise RunBindingUnavailable('RUN_BINDING_CONFIG_INVALID')
-        values.update({f'observation_{role}_actor_sha256': _hex(actors[role]) for role in ('allowed', 'denied')})
+        values.update({f'observation_{role}_actor_sha256': _hex(digest) for role, digest in actors.items()})
     elif cid == 'REQ-06':
         from guard.executors.stored_response_contract import REVIEWED_SOURCES
         values.update({f'stored_{name}_source_sha256': REVIEWED_SOURCES[name] for name in _STORED_SOURCES})
@@ -430,7 +513,24 @@ def _stage_3(check, run_cfg, issued_at, valid_from=None, valid_until=None):
     return files, values, validity
 
 
-def _stage_2(check, executor_cfg, run_cfg, issued_at):
+def initialization_recipe_digests(executor_cfg, run_cfg):
+    """Commit bounded raw input bytes separately from the published JSON digests."""
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    return {'prepared': sha256_hex(dependency(executor_cfg['prepared'], None)),
+            'scenario': sha256_hex(dependency(run_cfg['scenario'], None))}
+
+
+def supply_record_recipe_digests(executor_cfg, run_cfg):
+    """Commit the two prepared manifests and the record producer's identity bytes."""
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    return {'normal': sha256_hex(dependency(executor_cfg['normal']['prepared'], None)),
+            'challenge': sha256_hex(dependency(executor_cfg['challenge']['prepared'], None)),
+            'record_producer': producer_sha256(run_cfg['record_producer'])}
+
+
+def _stage_2(check, executor_cfg, run_cfg, issued_at, *, expected_initialization_scenario_sha256=None):
     """Return (file hashes, values) for the stage-2 keys of this check."""
     cid, files, values = check.id, {}, {}
     if cid in ('LIF-05', 'LIF-06', 'LIF-16'):
@@ -440,7 +540,17 @@ def _stage_2(check, executor_cfg, run_cfg, issued_at):
         path = run_cfg['scenario']
         if type(path) is not str or not path:
             raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE')
-        values[key] = files[key] = sha256_hex(canonical_json(_load(path, 'json')))
+        if cid in INITIALIZATION_CHECKS and expected_initialization_scenario_sha256 is not None:
+            from guard.adapters.vllm_file_read_sensor import dependency
+            from guard.runtime.bounded import strict_json
+            try:
+                raw = dependency(path, expected_initialization_scenario_sha256)
+            except (OSError, ValueError):
+                raise RunBindingUnavailable('RUN_BINDING_INITIALIZATION_SCENARIO_CHANGED') from None
+            scenario = strict_json(raw, limit=_MAX_JSON)
+        else:
+            scenario = _load(path, 'json')
+        values[key] = files[key] = sha256_hex(canonical_json(scenario))
     elif cid in _SESSION_KEY:
         values[_SESSION_KEY[cid]] = _session(run_cfg['record_session'])
     elif cid in ('PLT-07', 'PLT-08'):
@@ -472,17 +582,71 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 
 
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
-            run_cfg=None, policy_row=None, policy_ref=None):
+            run_cfg=None, policy_row=None, policy_ref=None, expected_target_sha256=None, expected_normal_file_sha256=None,
+            expected_transition_manifest_sha256=None, expected_initialization_digests=None,
+            expected_supply_record_digests=None, native_route_prepared_absent: bool = False,
+            expected_rank_prepared_file=None, expected_record_access_digests=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
     `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
     `policy_row` is this check's values as written in the POL (stage 4).
     """
     stages = stages_for(check)
+    if expected_rank_prepared_file is not None and (
+            check.id != 'LIF-08' or check.executor != 'rank_failure' or 1 not in stages
+            or type(executor_cfg) is not dict or executor_cfg.get('input_mode') != 'common-records'):
+        raise RunBindingUnavailable('RUN_BINDING_RANK_COMMON_SCOPE_INVALID')
+    supply_digests = expected_supply_record_digests
+    if supply_digests is not None and (
+            not is_supply_record_binding(check) or type(supply_digests) is not dict
+            or set(supply_digests) != {'normal', 'challenge', 'record_producer'}):
+        raise RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_FILE_SCOPE_INVALID')
+    if supply_digests is not None:
+        for digest in supply_digests.values():
+            _hex(digest)
+    record_digests = expected_record_access_digests
+    if record_digests is not None:
+        if (not is_record_access_binding(check) or type(record_digests) is not dict
+                or set(record_digests) != {'target', 'subjects', 'record_producer'}):
+            raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_FILE_SCOPE_INVALID')
+        for digest in record_digests.values():
+            _hex(digest)
+    normal = _TARGET_ONLY_NORMAL_MODES.get(check.id)
+    if normal is not None and type(executor_cfg) is dict and normal[1] in executor_cfg:
+        executor, marker, key = normal
+        error_prefix = f"RUN_BINDING_{check.id.replace('-', '')}_NORMAL"
+        if (check.executor != executor or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK[check.id]
+                or executor_cfg[marker] is not True or run_cfg is not None
+                or (check.id == 'LIF-03' and NORMAL_STREAM_OPTION in executor_cfg)):
+            raise RunBindingUnavailable(f'{error_prefix}_SCOPE_INVALID')
+        try:
+            target = file_hash(check.id, key, executor_cfg)
+        except (KeyError, OSError, TypeError, ValueError):
+            raise RunBindingUnavailable(f'{error_prefix}_TARGET_UNAVAILABLE') from None
+        if expected_target_sha256 is not None and target != expected_target_sha256:
+            raise RunBindingUnavailable(f'{error_prefix}_TARGET_CHANGED')
+        document = {'schema': SCHEMA, 'check_id': check.id, 'side': side, 'attempt_id': attempt_id,
+                    'environment_sha256': env.ref().sha256, 'files': {key: target}, 'validity': None,
+                    'issued_at': _stamp(issued_at)}
+        return document, {}
     keys = tuple(k for k in KEYS_BY_CHECK.get(check.id, ()) if 1 in stages)
+    normal_file_reads = check.id == 'SUP-05' and NORMAL_FILE_READS_OPTION in executor_cfg
+    if normal_file_reads:
+        if (check.executor != 'supply_boot' or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK[check.id]
+                or executor_cfg[NORMAL_FILE_READS_OPTION] is not True
+                or stages not in {(1,), (1, 3)} or run_cfg is not None):
+            raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_SCOPE_INVALID')
+        # This mode consumes a sealed native recording and has no supply-record producer.
+        stages = (1,)
+        keys = (*(key for key in keys if not key.startswith('supply_challenge_')),
+                'supply_normal_reference_manifest_sha256')
+    if check.id == 'LIF-04' and check.executor == 'stream_buffer' and executor_cfg.get(NORMAL_STREAM_OPTION) is True:
+        from .stream_buffer_contract import PROFILE
+        if getattr(check, 'collection_profile', None) == PROFILE:
+            keys = tuple(key for key in keys if key != 'buffer_prepared_sha256')
     if not stages:
         return None, {}
-    wanted = config_keys(check)
+    wanted = frozenset() if normal_file_reads else config_keys(check)
     if run_cfg is not None and not wanted:
         # These values still come from this definition's policy; never mix both sources.
         raise RunBindingUnavailable('RUN_BINDING_BELONGS_TO_POLICY')
@@ -492,18 +656,42 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
     start = end = basis = None
     validity = None
     try:
+        expected_prepared = expected_scenario = None
+        if expected_initialization_digests is not None:
+            expected_prepared = expected_initialization_digests['prepared']
+            expected_scenario = expected_initialization_digests['scenario']
         if 2 in stages:
-            stage_files, extra = _stage_2(check, executor_cfg, run_cfg, issued_at)
+            stage_files, extra = _stage_2(check, executor_cfg, run_cfg, issued_at,
+                                         expected_initialization_scenario_sha256=expected_scenario)
+            if expected_transition_manifest_sha256 is not None:
+                if extra.get('transition_inputs_sha256') != expected_transition_manifest_sha256:
+                    raise RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_CHANGED')
+                from guard.executors.lifecycle_transition import LifecycleTransitionExecutor
+                try:
+                    LifecycleTransitionExecutor(executor_cfg).prepared_generations(check, env, extra)
+                except ValueError:
+                    raise RunBindingUnavailable('RUN_BINDING_TRANSITION_GENERATIONS_INVALID') from None
             files.update(stage_files)
         if 3 in stages:
-            stage_files, stage_values, validity = _stage_3(check, run_cfg or {}, issued_at, valid_from, valid_until)
+            stage_files, stage_values, validity = _stage_3(check, executor_cfg, run_cfg or {}, issued_at, valid_from, valid_until)
+            if (supply_digests is not None
+                    and stage_values['supply_record_source_sha256'] != supply_digests['record_producer']):
+                raise RunBindingUnavailable('RUN_BINDING_SUPPLY_RECORD_PRODUCER_CHANGED')
+            if (record_digests is not None
+                    and stage_values['record_inventory_source_sha256'] != record_digests['record_producer']):
+                raise RunBindingUnavailable('RUN_BINDING_RECORD_ACCESS_PRODUCER_CHANGED')
             files.update(stage_files)
             extra = {**extra, **stage_values}
         if 4 in stages:
             stage_values = {}
             if check.id in RUN_FILE_KEYS:
                 key = RUN_FILE_KEYS[check.id]
-                stage_values[key] = files[key] = file_hash(check.id, key, executor_cfg)
+                if record_digests is None:
+                    digest = file_hash(check.id, key, executor_cfg)
+                else:
+                    digest = _verified_record_access_sha256(key, executor_cfg, record_digests['subjects'],
+                                                            'RUN_BINDING_RECORD_ACCESS_SUBJECTS_CHANGED')
+                stage_values[key] = files[key] = digest
             if check.id in POLICY_DOCUMENT_KEYS:
                 key = POLICY_DOCUMENT_KEYS[check.id]
                 stage_values[key] = policy_document_sha256(check.id, key, policy_row)
@@ -516,6 +704,23 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             extra = {**extra, **stage_values}
         if any(k.endswith(('validity_start', 'validity_end')) for k in keys):
             start, end, basis = window(check.executor, issued_at, valid_from, valid_until)
+        if (native_route_prepared_absent is True and check.id == 'REQ-02' and check.executor == 'route_record'
+                and stages == (1, 2)):
+            from guard.runtime.kubernetes_http import _validate as validate_target
+            from .kubernetes_route_record import has_record_only_native_role
+            from .native_route_contract import POLICY_TYPES
+
+            # The sealed recipe chose record-only. A later-created native file
+            # cannot add a subcollection, and the declared owner must still match.
+            native_cfg = executor_cfg.get('native_route')
+            if not has_record_only_native_role(native_cfg):
+                raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE')
+            target = _load(native_cfg['target'], 'json')
+            if (type(target) is not dict or target.get('schema') != 'guard-kubernetes-request-binding-target/1'
+                    or target.get('environment_ref') != env.ref().model_dump(mode='json')):
+                raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE')
+            validate_target(target, env)
+            keys = tuple(key for key in keys if key not in POLICY_TYPES)
         for key in keys:
             if key.endswith('environment_sha256'):
                 values[key] = env.ref().sha256
@@ -523,8 +728,55 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 values[key] = _stamp(start)
             elif key.endswith('validity_end'):
                 values[key] = _stamp(end)
+            elif key == 'record_target_sha256' and record_digests is not None:
+                values[key] = files[key] = _verified_record_access_sha256(
+                    key, executor_cfg, record_digests['target'], 'RUN_BINDING_RECORD_ACCESS_TARGET_CHANGED')
+            elif key == 'retry_target_sha256' and executor_cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+                values[key] = files[key] = file_hash(check.id, key, executor_cfg, require_regular_json=True)
+            elif key == 'rank_prepared_sha256' and expected_rank_prepared_file is not None:
+                from .lifecycle_common_input_consumption import _read
+                try:
+                    prepared, _ = _read(executor_cfg['prepared'], expected_file=expected_rank_prepared_file)
+                except (KeyError, TypeError, ValueError, OSError):
+                    raise RunBindingUnavailable('RUN_BINDING_RANK_PREPARED_CHANGED') from None
+                values[key] = files[key] = sha256_hex(canonical_json(prepared))
+            elif key == 'init_prepared_sha256' and (expected_prepared is not None
+                    or (type(executor_cfg.get('prepared')) is str and executor_cfg['prepared'])):
+                from guard.adapters.vllm_release_profiles import InitializationPreparationMismatch
+                from guard.collectors.lifecycle import load_initialization_prepared
+                try:
+                    prepared = load_initialization_prepared(executor_cfg['prepared'], env, expected_sha256=expected_prepared)
+                except InitializationPreparationMismatch as exc:
+                    raise RunBindingUnavailable(str(exc)) from None
+                except (OSError, ValueError):
+                    if expected_prepared is None:
+                        raise
+                    raise RunBindingUnavailable('RUN_BINDING_INITIALIZATION_PREPARED_CHANGED') from None
+                values[key] = files[key] = sha256_hex(canonical_json(prepared))
+            elif normal_file_reads and expected_normal_file_sha256 is not None and key == 'supply_normal_prepared_sha256':
+                from guard.collectors.lifecycle import load_prepared
+                try:
+                    manifest = load_prepared(executor_cfg['normal']['prepared'],
+                                             expected_sha256=expected_normal_file_sha256['prepared'])
+                except (OSError, ValueError):
+                    raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_PREPARED_CHANGED') from None
+                values[key] = files[key] = sha256_hex(canonical_json(manifest))
+            elif supply_digests is not None and key in {'supply_normal_prepared_sha256', 'supply_challenge_prepared_sha256'}:
+                from guard.collectors.lifecycle import load_prepared
+                role = key.split('_')[1]
+                try:
+                    manifest = load_prepared(executor_cfg[role]['prepared'], expected_sha256=supply_digests[role])
+                except (OSError, ValueError):
+                    raise RunBindingUnavailable(f'RUN_BINDING_SUPPLY_{role.upper()}_PREPARED_CHANGED') from None
+                values[key] = files[key] = sha256_hex(canonical_json(manifest))
             else:
                 values[key] = files[key] = file_hash(check.id, key, executor_cfg)
+        if (normal_file_reads and expected_target_sha256 is not None
+                and values['supply_normal_target_sha256'] != expected_target_sha256):
+            raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_TARGET_CHANGED')
+        if (normal_file_reads and expected_normal_file_sha256 is not None
+                and values['supply_normal_reference_manifest_sha256'] != expected_normal_file_sha256['reference_manifest']):
+            raise RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_REFERENCE_CHANGED')
     except RunBindingUnavailable:
         raise
     except Exception:
@@ -557,6 +809,9 @@ def effective_values(check, executor_cfg, env, policy_values, **kwargs):
         raise RunBindingUnavailable('RUN_BINDING_BELONGS_TO_EXECUTION')
     if type(executor_cfg) is not dict:
         raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE')
+    if (check.id == 'SUP-05' and NORMAL_FILE_READS_OPTION in executor_cfg
+            and 'supply_normal_reference_manifest_sha256' in (policy_values or {})):
+        raise RunBindingUnavailable('RUN_BINDING_BELONGS_TO_EXECUTION')
     kwargs.setdefault('policy_row', dict(policy_values or {}))
     document, values = compute(check, executor_cfg, env, **kwargs)
     return document, {**(policy_values or {}), **values}

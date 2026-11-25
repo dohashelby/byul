@@ -8,22 +8,31 @@ from guard.models import canonical_json,sha256_hex
 from guard.executors.owned_capture import strict_json
 
 
-def build_scope(env,target,manifest_path,model_root,*,nonsecret_model_weights,hash_model_bytes=False,max_hash_bytes=sensor.MAX_HASH_BYTES):
+def build_scope(env,target,manifest_path,model_root,*,nonsecret_model_weights,hash_model_bytes=False,
+                max_hash_bytes=sensor.MAX_HASH_BYTES,approved_manifest_sha256=None):
     from guard.executors.kubernetes_lifecycle_capture import validate_target
-    validate_target(target,env)
+    validate_target(target,env,require_lab=False)
     if (type(env.model.id) is not str or not env.model.id or type(env.model.revision) is not str or not env.model.revision
             or not sensor.fingerprint(env.model.inventory_sha256)):raise ValueError('MODEL_READ_SCOPE_MODEL_BINDING_REQUIRED')
     if (nonsecret_model_weights is not True or type(model_root) is not str or not model_root.startswith('/')
             or str(PurePosixPath(model_root))!=model_root or '..' in PurePosixPath(model_root).parts
             or '\\' in model_root or '\x00' in model_root or len(model_root)>4096):raise ValueError('MODEL_READ_SCOPE_ROOT_INVALID')
     # A file-only reference input: do not accept a directory and scan its bytes.
-    raw=Path(manifest_path).read_bytes()
-    manifest=_load_manifest(strict_json(raw,limit=16*1024**2),None)
+    approved = approved_manifest_sha256 is not None
+    raw = sensor.dependency(manifest_path, approved_manifest_sha256) if approved else Path(manifest_path).read_bytes()
+    value = strict_json(raw, limit=sensor.MAX_SCOPE_BYTES if approved else 16*1024**2)
+    if approved and (type(value) is not dict or type(value.get('files')) is not list
+                     or any(type(row) is not dict for row in value['files'])):
+        raise ValueError('MODEL_READ_SCOPE_APPROVED_MANIFEST_INVALID')
+    manifest = _load_manifest(value, None)
     if (manifest.get('schema')!='guard.model-manifest/1' or manifest.get('model_id')!=env.model.id
             or manifest['inventory_sha256']!=env.model.inventory_sha256):raise ValueError('MODEL_READ_SCOPE_MANIFEST_BINDING_INVALID')
     rows=[]
     for row in manifest['files']:
         if row['path'].endswith('.safetensors'):
+            if approved and (row['path'] != PurePosixPath(row['path']).as_posix() or '\x00' in row['path']
+                             or type(row['bytes']) is not int or not 0 < row['bytes'] <= max_hash_bytes):
+                raise ValueError('MODEL_READ_SCOPE_APPROVED_FILE_INVALID')
             rows.append({'normalized_path_sha256':sha256_hex(str(PurePosixPath(model_root)/row['path']).encode()),
                 'reference_sha256':row['sha256'],'bytes':row['bytes']})
     result={'schema':sensor.SCOPE_SCHEMA,'session':None,'input_scope_sha256':None,
@@ -52,9 +61,14 @@ def scope_summary(value):
 
 
 def validate_binding(prepared,env,target):
-    if prepared.get('profile') not in {sensor.PROFILE,'vllm-native-lifecycle-metadata/18','vllm-native-lifecycle-metadata/19','vllm-native-lifecycle-metadata/20','vllm-native-lifecycle-metadata/21','vllm-native-lifecycle-metadata/22'}:return
+    from guard.adapters import vllm_lifecycle_catalog as configured
+    profile = prepared.get('profile')
+    approved = configured.approved_file_read(profile)
+    if not approved and profile not in {sensor.PROFILE,'vllm-native-lifecycle-metadata/18','vllm-native-lifecycle-metadata/19','vllm-native-lifecycle-metadata/20','vllm-native-lifecycle-metadata/21','vllm-native-lifecycle-metadata/22'}:return
     value=prepared.get('model_read_scope',{})
     if type(env.model.id) is not str or type(env.model.revision) is not str:raise ValueError('MODEL_READ_SCOPE_MODEL_BINDING_REQUIRED')
     if (value.get('environment_ref')!=env.ref().model_dump(mode='json') or value.get('target_sha256')!=sha256_hex(canonical_json(target))
             or value.get('model_sha256')!=sha256_hex(env.model.id.encode()) or value.get('revision_sha256')!=sha256_hex(env.model.revision.encode())
-            or value.get('inventory_sha256')!=env.model.inventory_sha256):raise ValueError('MODEL_READ_SCOPE_TARGET_MISMATCH')
+            or value.get('inventory_sha256')!=env.model.inventory_sha256
+            or approved and (not configured.approved_file_read_matches(env, prepared)
+                             or value.get('hash_model_bytes') is not True)):raise ValueError('MODEL_READ_SCOPE_TARGET_MISMATCH')

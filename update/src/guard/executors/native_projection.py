@@ -10,7 +10,7 @@ from datetime import datetime
 import hashlib
 import re
 
-from .log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
+from .log_integrity_contract import DEFAULT_REQUEST_LOGGER_LINE, PLANNED_CASES, analyze_integrity_capture
 from .log_integrity_parser import parse_native_info
 from .log_projection import fingerprint
 
@@ -78,7 +78,7 @@ def decision(analysis):
 
 
 def project_native(capture, trials, before, after, *, initial_gaps=(), max_events=128,
-                   analysis=None):
+                   analysis=None, request_logger_line=DEFAULT_REQUEST_LOGGER_LINE):
     """Keep exact-match/equality predicates, not native message or ID values."""
     converted = []
     for trial in trials:
@@ -143,9 +143,9 @@ def project_native(capture, trials, before, after, *, initial_gaps=(), max_event
     replay_gaps = sorted(set(initial_gaps) | source_gaps)
     first, last = _identity(before), _identity(after)
     replay = analyze_integrity_capture(result, converted, first, last,
-        initial_gaps=replay_gaps, max_events=max_events)
+        initial_gaps=replay_gaps, max_events=max_events, request_logger_line=request_logger_line)
     original = analysis or analyze_integrity_capture(capture, trials, before, after,
-        initial_gaps=initial_gaps, max_events=max_events)
+        initial_gaps=initial_gaps, max_events=max_events, request_logger_line=request_logger_line)
     _require(decision(replay) == decision(original))
     return {"schema": SCHEMA, "projection_profile": PROFILE, "capture": result, "trials": converted,
             "source_summary": source, "source_identity_before": first, "source_identity_after": last,
@@ -155,8 +155,8 @@ def project_native(capture, trials, before, after, *, initial_gaps=(), max_event
             "max_events": max_events, "analysis": decision(replay)}
 
 
-def replay_native(sample):
-    """Strictly allow typed metadata and public predicate strings only."""
+def replay_native(sample, *, request_logger_line=DEFAULT_REQUEST_LOGGER_LINE):
+    """Replay typed metadata using the caller's reviewed logger source line."""
     _require(set(sample) == {"schema", "projection_profile", "capture", "trials", "source_summary",
         "source_identity_before", "source_identity_after", "initial_gaps", "replay_initial_gaps",
         "max_events", "analysis", "policy_values", "native_contract_sha256", "source_display_sha256",
@@ -256,7 +256,8 @@ def replay_native(sample):
     _require(type(sample["replay_initial_gaps"]) is list and sample["replay_initial_gaps"] == sorted(set(sample["replay_initial_gaps"]))
         and set(sample["replay_initial_gaps"]) == expected_gaps)
     analysis = analyze_integrity_capture(capture, trials, sample["source_identity_before"], sample["source_identity_after"],
-        initial_gaps=sample["replay_initial_gaps"], max_events=sample["max_events"])
+        initial_gaps=sample["replay_initial_gaps"], max_events=sample["max_events"],
+        request_logger_line=request_logger_line)
     _require(sample["analysis"] == decision(analysis))
     return analysis
 

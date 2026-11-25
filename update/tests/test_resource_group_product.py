@@ -1,6 +1,7 @@
 """EXAMPLE CLI evidence retains residual namespace references and closed gates."""
 from copy import deepcopy
 import json
+from pathlib import Path
 import sys
 import time
 
@@ -8,15 +9,21 @@ import pytest
 from typer.testing import CliRunner
 
 from guard.adapters import resource_group_probe as probe
+from guard.adapters import resource_recovery_probe as selected_probe
 from guard.cli import app
-from guard.models import canonical_json
+from guard.core.judge import judge_evidence
+from guard.core.run import _normalize
+from guard.executors.registry import build_executor
+from guard.models import DataOrigin, Evidence, canonical_json, load_pack, sha256_hex, utcnow
 from guard.runtime import kubernetes_http as http
+from guard.runtime import resource_group_source
 from guard.store import Store
-from tests.builders import policy,T0
+from tests.builders import dummy_ref, policy,T0
 from tests.test_a1_resource_recovery_product import inputs
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_lifecycle_capture import case,external
 from tests.test_lifecycle_sensor import writer_factory
+from tests.test_resource_group_probe import owned_child
 
 
 @pytest.mark.parametrize('mode',['retained-alias','collection-error','incomplete','owner-clock-invalid'])
@@ -79,3 +86,72 @@ def test_namespace_census_survives_native_evd_report_export_with_selected_absenc
     invoke(['evidence','export','--output',tmp_path/'bundle.zip'])
     invoke(['evidence','restore','--bundle',tmp_path/'bundle.zip','--destination',tmp_path/'restored'])
     restored=Store.read_only(tmp_path/'restored');assert restored.resolve(evidence.ref()).to_dict()==evidence.to_dict()
+
+
+@pytest.mark.parametrize('later_unavailable', [False, True])
+def test_canonical_lif11_keeps_held_owned_namespace_receipts_from_real_producer(
+        tmp_path, group, native_target, owned_child, later_unavailable):
+    child, scope = owned_child
+    world, _, values, _ = inputs(tmp_path, group, native_target, 'retained', 'runtime-failure')
+    selected = {'schema': selected_probe.SELECTION_SCHEMA, 'owners': [
+        {**scope['owners'][0], 'rank': 0, 'require_absent': True}], 'resources': []}
+    values.update(recovery_selection_sha256=sha256_hex(canonical_json(selected)), recovery_expected_ranks=['0'],
+        recovery_require_absent_kinds=['process'], recovery_phase='before-failure',
+        recovery_deadline_basis='after-verified-failure')
+    target_file = tmp_path / 'canonical-target.json'
+    target_file.write_bytes(canonical_json(world.target))
+    selection_file = tmp_path / 'canonical-selection.json'
+    selection_file.write_bytes(canonical_json(selected))
+    namespace_packets = []
+
+    def runner(argv, **kwargs):
+        request = json.loads(kwargs['input_bytes']) if 'input_bytes' in kwargs else {}
+        if request.get('schema') == probe.SELECTION_SCHEMA:
+            assert request == scope
+            if namespace_packets and later_unavailable:
+                raise OSError('EXAMPLE_NAMESPACE_NO_SECOND_READ')
+            result = probe.observe(scope, process_ids=[child.pid])
+            namespace_packets.append(result)
+        elif request.get('schema') == selected_probe.SELECTION_SCHEMA:
+            assert request == selected
+            result = selected_probe.observe(request)
+        else:
+            return world.runner(argv, **kwargs)
+        return {'returncode': 0, 'stdout_bytes': canonical_json(result), 'stderr_bytes': b'',
+            'capture': {'complete': True, 'bounded_at_source': True, 'timed_out': False, 'truncated': False}}
+
+    executor = build_executor('resource_recovery', 'kubernetes', {'resource_recovery': {
+        'target': str(target_file), 'prepared': str(group.manifest_path), 'selection': str(selection_file),
+        'namespace_resources': True}})
+    executor.runner = runner
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    check = pack.checks['LIF-11']
+    draft = executor.run(check, group.env, values, object(), tmp_path / 'canonical-evidence')
+    evd = Evidence(id='EVD-OWNED-NAMESPACE-EXAMPLE', data_origin=draft.data_origin, plan=dummy_ref('PLAN'),
+        environment=group.env.ref(), check_id=check.id, side='single', execution={'status': draft.status},
+        **_normalize(check, draft)).seal()
+    observations = {key: field.value for key, field in evd.observations.items()}
+    held = [row for row in observations['activation_steps'] if row['step'] == 'owned-namespace-held-resource-census']
+    assert [row['stage'] for row in held] == (['before'] if later_unavailable else ['before', 'after'])
+    for row, packet in zip(held, namespace_packets, strict=True):
+        assert row['packet_sha256'] == sha256_hex(canonical_json(packet))
+        assert row['target_sha256'] == values['recovery_target_sha256']
+        assert row['selection_sha256'] == sha256_hex(canonical_json(scope))
+        assert row['probe_source_sha256'] == resource_group_source.GROUP_SHA256
+        assert row['matched_owner_ids'] == [scope['owners'][0]['id']]
+        assert {reference['kind'] for reference in row['held_references']} == {'socket', 'posix-shm'}
+        source_forms = {}
+        for source in packet['references']:
+            digest = sha256_hex(canonical_json([source['kind'], source['device'], source['inode']]))
+            form = 'memory-mapping' if source['fd'] is None else 'file-descriptor'
+            source_forms.setdefault((source['kind'], digest), set()).add(form)
+        assert {'file-descriptor', 'memory-mapping'} in source_forms.values()
+        assert row['held_references'] == [
+            {'owner_id': scope['owners'][0]['id'], 'kind': kind, 'resource_sha256': digest, 'reference_forms': sorted(forms)}
+            for (kind, digest), forms in sorted(source_forms.items())
+        ]
+        assert not row['global_release_verified'] and not row['namespace_scan_complete']
+    assert ('owned_namespace_held_reference_census_incomplete' in observations['activation_missing']) is later_unavailable
+    assert observations['activation_violations'] is None and observations['activation_scope_complete'] is False
+    result = judge_evidence(check, evd, policy(pack.ref()), utcnow())
+    assert evd.data_origin is DataOrigin.EXAMPLE and result.verdicts.security.value == 'UNKNOWN'

@@ -568,6 +568,10 @@ class EngineCallbacks:
                        else ((module, 'apply_grammar_bitmask', None), observer.wrap_grammar(module))
                        if observer is getattr(self, 'link', None) and point == 'apply_grammar_bitmask'
                        else (cache._function(module, point), observer.wrap(module, point)) for observer, point in plan]
+            if name == worker_shard.LOADER and self.shard is not None:
+                index_change = self.shard.index_alias_change(module)
+                if index_change is not None:
+                    changes.append(index_change)
         except Exception:
             self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
             return False

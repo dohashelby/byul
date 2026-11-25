@@ -13,8 +13,9 @@ from .base import EvidenceDraft
 from .owned_helper import run_helper
 
 PROFILE = "record-transport-segments-v1"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 _NAME = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+_TLS_VERSION = re.compile(r"TLSv[0-9]+(?:\.[0-9]+)?")
 _PROBE = r'''
 import json,socket,ssl,sys
 host,port,name,wrong,ca,timeout=sys.argv[1:7];port=int(port);timeout=float(timeout)
@@ -46,29 +47,60 @@ def validate_policy(values):
 
 def _segments(cfg, names):
     rows = cfg.get("record_segments")
-    if type(rows) is not list or {row.get("name") if type(row) is dict else None for row in rows} != set(names):
+    if type(rows) is not list or len(rows) != len(names):
         raise ValueError("RECORD_TRANSPORT_CONFIGURATION_INVALID")
     for row in rows:
-        if (set(row) - {"name", "container", "host", "port", "server_name", "wrong_server_name", "ca_file"}
+        if (type(row) is not dict or type(row.get("name")) is not str
+                or set(row) - {"name", "container", "host", "port", "server_name", "wrong_server_name", "ca_file"}
                 or any(type(row.get(k)) is not str or not row[k] for k in ("container", "host", "server_name", "wrong_server_name"))
                 or type(row.get("port")) is not int or not 1 <= row["port"] <= 65535
                 or row["server_name"] == row["wrong_server_name"]):
             raise ValueError("RECORD_TRANSPORT_CONFIGURATION_INVALID")
+    if {row["name"] for row in rows} != set(names):
+        raise ValueError("RECORD_TRANSPORT_CONFIGURATION_INVALID")
     return rows
 
 
+def _attempt_state(receipt: object) -> str | None:
+    if type(receipt) is not dict:
+        return None
+    tcp, tls = receipt.get("tcp"), receipt.get("tls")
+    if type(tcp) is not bool or type(tls) is not bool:
+        return None
+    if tls:
+        version = receipt.get("version")
+        if (tcp and set(receipt) == {"tcp", "tls", "version"}
+                and type(version) is str and _TLS_VERSION.fullmatch(version)):
+            return "protected"
+        return None
+    if set(receipt) == {"tcp", "tls", "reason"}:
+        reason = receipt["reason"]
+        if tcp and reason in ("peer_rejected", "no_tls"):
+            return reason
+        if not tcp and reason == "unreachable":
+            return reason
+    return None
+
+
 def classify(row, reply, required):
-    expected, wrong = reply["expected"], reply["wrong"]
-    state = "unreachable" if not expected["tcp"] else "protected" if expected["tls"] else expected["reason"]
+    if type(reply) is not dict or set(reply) - {"expected", "wrong"}:
+        return None
+    expected = reply.get("expected")
+    state = _attempt_state(expected)
+    wrong_state = _attempt_state(reply.get("wrong"))
+    if state is None and wrong_state is None:
+        return None
     return {"name": row["name"], "state": state, "tls_required": required,
-            "tls_version": expected.get("version"), "wrong_peer_state": "accepted" if wrong["tls"] else wrong.get("reason"),
+            "tls_version": expected["version"] if state == "protected" else None,
+            "wrong_peer_state": "accepted" if wrong_state == "protected" else wrong_state,
             "endpoint_sha256": sha256_hex(canonical_json([row["host"], row["port"], row["server_name"]]))}
 
 
 def project(rows):
-    unprotected = [r["name"] for r in rows if r["tls_required"] and r["state"] in {"no_tls", "peer_rejected"}]
+    # A TLS peer rejection verifies refusal. The helper sends no record data.
+    unprotected = [r["name"] for r in rows if r["tls_required"] and r["state"] == "no_tls"]
     wrong = [r["name"] for r in rows if r["tls_required"] and r["wrong_peer_state"] == "accepted"]
-    unknown = [r["name"] for r in rows if r["state"] == "unreachable"]
+    unknown = [r["name"] for r in rows if "unreachable" in (r["state"], r["wrong_peer_state"])]
     return unprotected, wrong, unknown
 
 
@@ -87,14 +119,21 @@ def run(check, env, values, cfg, *, docker=None):
             reply = run_helper(docker, row["container"], _PROBE,
                 [row["host"], row["port"], row["server_name"], row["wrong_server_name"], row.get("ca_file", ""), timeout],
                 timeout=4 * timeout + 5, max_bytes=4096)
-            rows.append(classify(row, reply, row["name"] in values["record_tls_required_segments"]))
+            trial = classify(row, reply, row["name"] in values["record_tls_required_segments"])
         except Exception:
             diagnostics.append("RECORD_TRANSPORT_SEGMENT_UNAVAILABLE")
+            continue
+        if trial is not None:
+            rows.append(trial)
+        if trial is None or trial["state"] is None or trial["wrong_peer_state"] is None:
+            diagnostics.append("RECORD_TRANSPORT_SEGMENT_UNAVAILABLE")
     unprotected, wrong, unknown = project(rows)
+    tested = [r["name"] for r in rows
+              if r["state"] not in (None, "unreachable") and r["wrong_peer_state"] not in (None, "unreachable")]
     observations = {
         "record_transport_trials": {"value": rows, "collected": True},
         "record_transport_segments_planned": {"value": names, "collected": True},
-        "record_transport_segments_tested": {"value": [r["name"] for r in rows if r["state"] != "unreachable"], "collected": True},
+        "record_transport_segments_tested": {"value": tested, "collected": True},
         "record_transport_unprotected": {"value": unprotected, "collected": True},
         "record_transport_wrong_peer_accepted": {"value": wrong, "collected": True},
         "record_transport_unreachable": {"value": unknown, "collected": True},

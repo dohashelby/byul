@@ -8,6 +8,7 @@ import subprocess
 import pytest
 
 from guard import application
+from guard.adapters import vllm_stock_python_mode as stock_adapter
 from guard.adapters.vllm_stock_python_mode import CONFIG_SHA256, FILE_SIZES, LOADER, MODEL, STOCK_MODEL, launch_command, observer_profile
 from guard.configuration import NORMAL_PYTHON_MODE_SCOPE_ERROR, validate_normal_python_mode_update
 from guard.executors import kubernetes_normal_python_mode as stock
@@ -24,7 +25,7 @@ SOURCES = {
 }
 
 
-def capsule(folder, side, version):
+def capsule(folder, side, version, *, general=False):
     image = "docker.io/vllm/vllm-openai@sha256:" + SOURCES[version]
     repo, revision, inventory = STOCK_MODEL
     env = environment(id="ENV-" + side, engine={"name": "vllm", "version": version, "image_digest": image},
@@ -44,7 +45,9 @@ def capsule(folder, side, version):
                       "--tensor-parallel-size", "2"], "offline_env": stock._OFFLINE.copy()}}
     target["startup_ready_window"] = {"container_started_at": target["kubernetes"]["engine"]["started_at"],
                                      "ready_at": READY}
-    profile = observer_profile(env)
+    profile = stock_adapter.general_observer_profile(env) if general else observer_profile(env)
+    qualification = profile.get("qualification", {})
+    producer = stock.GENERAL_PRODUCER_SHA256 if general else stock.PRODUCER_SHA256
     profile_sha = sha256_hex(canonical_json(profile))
     processes = []
     for role, rank in (("service", None), ("worker", 0), ("worker", 1)):
@@ -54,11 +57,18 @@ def capsule(folder, side, version):
             "start_ticks": 42 if rank is None else rank + 43, "python_optimize": 0, "anchor_module": anchor,
             "anchor_sha256": origin, "module": anchor if rank is None else MODEL,
             "module_sha256": origin if rank is None else profile["model_source_sha256"],
-            "producer_sha256": stock.PRODUCER_SHA256})
-    readback = {"profile_sha256": profile_sha, "producer_sha256": stock.PRODUCER_SHA256, "processes": processes}
+            "producer_sha256": producer})
+        if general:
+            processes[-1].update(activation_sha256=qualification[f"{role}_activation_sha256"],
+                                 sitecustomize_sha256=qualification["sitecustomize_sha256"],
+                                 general_plugins=list(stock_adapter.GENERAL_PLUGIN_NAMES))
+    readback = {"profile_sha256": profile_sha, "producer_sha256": producer, "processes": processes}
+    if general:
+        readback["plugin_metadata"] = {name: sha256_hex(raw) for name, raw in stock_adapter.GENERAL_METADATA.items()}
     provenance = {"schema": stock.PROVENANCE_SCHEMA, "environment_ref": ref,
         "binding_sha256": sha256_hex(canonical_json(target["kubernetes"])), "profile": profile,
-        "profile_sha256": profile_sha, "oci_source_qualification_sha256": "a" * 64, "readback": readback}
+        "profile_sha256": profile_sha, "readback": readback,
+        "oci_source_qualification_sha256": qualification.get("oci_source_qualification_sha256", "a" * 64)}
     folder.mkdir()
     target_path, provenance_path = folder / "target.json", folder / "provenance.json"
     provenance_path.write_bytes(canonical_json(provenance))
@@ -95,8 +105,9 @@ class OwnedWorld(World):
         selected_mounts = {"models": self.target["model_mapping"]["host_snapshot"],
             "guard-sup11": self.target["sup11_observer_host_path"],
             "cache": "/fixture/owner/cache/" + self.target["kubernetes"]["run_id"]}
+        observer_env = stock._GENERAL_OBSERVER_ENV if "plugin_metadata" in self.readback else stock._OBSERVER_ENV
         container.update(command=self.target["engine"]["command"], args=self.target["comparison_config"]["launch"]["argv"],
-            env=[{"name": key, "value": value} for key, value in (stock._OFFLINE | stock._OBSERVER_ENV).items()],
+            env=[{"name": key, "value": value} for key, value in (stock._OFFLINE | observer_env).items()],
             volumeMounts=[{"name": name, "mountPath": "/" + name, "readOnly": name != "cache"} for name in selected_mounts],
             readinessProbe={"httpGet": {"path": "/health", "port": 8000}})
         pod["spec"]["volumes"] = [{"name": name, "hostPath": {"path": path, "type": "Directory"}}
@@ -105,11 +116,21 @@ class OwnedWorld(World):
 
 
 @pytest.mark.parametrize("missing_rank", [False, True])
-def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypatch, missing_rank):
+@pytest.mark.parametrize("general", [False, True], ids=["legacy", "stock-general-plugin"])
+def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypatch, missing_rank, general):
     pack = load_pack(PACK)
     pol = policy(pack.ref(), status="CONFIRMED", confirmed_by="fixture owner", confirmed_at=T0,
                  scope={"include": ["SUP-11"]}, values={})
-    rows = {side: capsule(tmp_path / side, side, version) for side, version in
+    if general:
+        pins = {
+            "oci_source_qualification_sha256": "1" * 64, "plugin_discovery_sha256": "2" * 64,
+            "site_roster_sha256": "3" * 64, "plugin_loader_sha256": "4" * 64,
+            "service_activation_sha256": "5" * 64, "worker_activation_sha256": "6" * 64,
+            "sitecustomize_origin": "/usr/lib/python3.12/sitecustomize.py",
+            "sitecustomize_target": "/etc/python3.12/sitecustomize.py", "sitecustomize_sha256": "7" * 64,
+        }
+        monkeypatch.setattr(stock_adapter, "_GENERAL_QUALIFICATIONS", {version: pins for version in SOURCES})
+    rows = {side: capsule(tmp_path / side, side, version, general=general) for side, version in
             (("baseline", "0.30.0"), ("candidate", "0.31.0"))}
     worlds = {}
     cfg = {"adapter": {"name": "vllm"}, "executors": {"supply_boot": "kubernetes"},
@@ -152,6 +173,15 @@ def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypa
         assert not evd.observations["supply_boot_normal_verified"].collected
         assert_unconfirmed_security_failure(result)
         assert ("ABORTED" in result.security_failure_tags) is (expected == ExecStatus.ABORTED)
+
+
+def test_general_plugin_requires_qualified_installed_sources(tmp_path, monkeypatch):
+    env, target, provenance, _, _ = capsule(tmp_path / "single", "baseline", "0.30.0")
+    monkeypatch.setattr(stock_adapter, "_GENERAL_QUALIFICATIONS", {})
+    provenance["profile"]["schema"] = stock_adapter.GENERAL_PROFILE_SCHEMA
+    provenance["profile_sha256"] = sha256_hex(canonical_json(provenance["profile"]))
+    with pytest.raises(ValueError, match="SUP11_GENERAL_OBSERVER_OCI_QUALIFICATION_UNAVAILABLE"):
+        stock.prepared_provenance(provenance, env, sha256_hex(canonical_json(target["kubernetes"])))
 
 
 def test_replaced_profile_hash_cannot_qualify(tmp_path):

@@ -785,6 +785,11 @@
       "manifest_sha256": "1f069841ebf3847fd274cb909e0c358043ba93c12d426f56dffe90f5efcf8afb",
       "reviewed_by": "Codex / BYUL SUP-11 isolated source review",
       "reviewed_at": "2026-11-25T16:58:18+09:00"
+    },
+    {
+      "manifest_sha256": "f5c27fa727b23deeec0bcbf600b0377c201265954d7b3fa8f6cefbb7a10074db",
+      "reviewed_by": "Codex / BYUL SUP-11 ordinary lifecycle source review",
+      "reviewed_at": "2026-11-25T18:28:20+09:00"
     }
   ]
 }

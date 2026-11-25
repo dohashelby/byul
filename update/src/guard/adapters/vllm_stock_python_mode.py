@@ -36,6 +36,25 @@ _RELEASES = {
     ),
 }
 _SHA = re.compile("[a-f0-9]{64}")
+GENERAL_PROFILE_SCHEMA = "guard-sup11-vllm-general-observer/1"
+GENERAL_MODULE_FILE = "guard_sup11_lifecycle_observer.py"
+GENERAL_DIST_INFO = "guard_sup11_lifecycle_observer-1.0.dist-info"
+GENERAL_PLUGIN_NAMES = ["guard_sup11_lifecycle_observer", "lora_filesystem_resolver", "lora_hf_hub_resolver"]
+GENERAL_METADATA = {
+    "METADATA": b"Metadata-Version: 2.1\nName: guard-sup11-lifecycle-observer\nVersion: 1.0\n",
+    "entry_points.txt": b"[vllm.general_plugins]\n"
+                        b"guard_sup11_lifecycle_observer = guard_sup11_lifecycle_observer:activate\n",
+}
+
+# Only reviewed complete installed-OCI qualifications belong here. The public
+# source tree's release tags are supporting material, not installation pins.
+_GENERAL_QUALIFICATIONS = {}
+_GENERAL_QUALIFICATION_ERROR = "SUP11_GENERAL_OBSERVER_OCI_QUALIFICATION_UNAVAILABLE"
+_GENERAL_QUALIFICATION_KEYS = {
+    "oci_source_qualification_sha256", "plugin_discovery_sha256", "site_roster_sha256",
+    "plugin_loader_sha256", "service_activation_sha256", "worker_activation_sha256",
+    "sitecustomize_origin", "sitecustomize_target", "sitecustomize_sha256",
+}
 
 
 def is_sha256(value):
@@ -61,8 +80,22 @@ def observer_profile(env):
 
 
 def validate_observer_profile(profile, env):
-    if profile != observer_profile(env):
+    expected = (general_observer_profile(env)
+                if type(profile) is dict and profile.get("schema") == GENERAL_PROFILE_SCHEMA
+                else observer_profile(env))
+    if profile != expected:
         raise ValueError("SUP11_INSTALLED_SOURCE_PROFILE_INVALID")
+
+
+def general_observer_profile(env):
+    profile = observer_profile(env)
+    pins = _GENERAL_QUALIFICATIONS.get(env.engine.version)
+    if (type(pins) is not dict or set(pins) != _GENERAL_QUALIFICATION_KEYS
+            or any(not is_sha256(pins[key]) for key in pins if key.endswith("_sha256"))
+            or pins["sitecustomize_origin"] != "/usr/lib/python3.12/sitecustomize.py"
+            or pins["sitecustomize_target"] != "/etc/python3.12/sitecustomize.py"):
+        raise ValueError(_GENERAL_QUALIFICATION_ERROR)
+    return {**profile, "schema": GENERAL_PROFILE_SCHEMA, "qualification": dict(pins)}
 
 
 def launch_command(env):

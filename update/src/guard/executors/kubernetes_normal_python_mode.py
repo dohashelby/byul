@@ -5,8 +5,10 @@ from pathlib import Path, PurePosixPath
 import re
 
 from guard.adapters.vllm_file_read_sensor import dependency
-from guard.adapters.vllm_stock_python_mode import (CONFIG_SHA256, FILE_SIZES, LOADER, MODEL, STOCK_MODEL, is_sha256,
-                                                  launch_command, validate_observer_profile)
+from guard.adapters.vllm_stock_python_mode import (
+    CONFIG_SHA256, FILE_SIZES, GENERAL_METADATA, GENERAL_PLUGIN_NAMES, GENERAL_PROFILE_SCHEMA, LOADER, MODEL, STOCK_MODEL,
+    is_sha256, launch_command, validate_observer_profile,
+)
 from guard.configuration import NORMAL_PYTHON_MODE_OPTION, NORMAL_PYTHON_MODE_SCOPE_ERROR
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -25,6 +27,8 @@ _UNCOLLECTED = ["supported_python_modes", "optimized_mode_startup", "mode_compar
                 "service_processor_consumption", "dynamic_import_enforcement"]
 _ASSETS = Path(__file__).resolve().parents[1] / "runtime/assets"
 PRODUCER_SHA256 = sha256_hex((_ASSETS / "sup11_stock_observer.py.txt").read_bytes())
+GENERAL_PRODUCER_SHA256 = sha256_hex((_ASSETS / "sup11_general_observer.py.txt").read_bytes())
+_GENERAL_METADATA_SHA256 = {name: sha256_hex(raw) for name, raw in GENERAL_METADATA.items()}
 _READER = supervised_source((_ASSETS / "sup11_stock_readback.py.txt").read_text(encoding="utf-8"))
 _INVENTORY = supervised_source((_ASSETS / "sup11_stock_inventory.py.txt").read_text(encoding="utf-8"))
 _ROLE_ROWS = [("service", None), ("worker", 0), ("worker", 1)]
@@ -33,6 +37,9 @@ _PROCESS_FIELDS = {"role", "rank", "pid", "start_ticks", "python_optimize", "anc
 _OWNER_KEYS = ("namespace_uid", "pod_uid", "container_id", "started_at")
 _OFFLINE = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"}
 _OBSERVER_ENV = {"PYTHONPATH": "/guard-sup11", "VLLM_WORKER_MULTIPROC_METHOD": "spawn"}
+_GENERAL_OBSERVER_ENV = {"PYTHONPATH": "/guard-sup11"}
+_GENERAL_STOCK_ENV = {"PYTHONNOUSERSITE", "PYTHONSAFEPATH", "PYTHONUSERBASE", "VLLM_PLUGINS",
+                      "VLLM_WORKER_MULTIPROC_METHOD", "VLLM_TRACE_FUNCTION"}
 _LAUNCH_OPTIONS = {"--served-model-name", "--host", "--port", "--max-model-len", "--max-num-seqs",
                    "--gpu-memory-utilization", "--tensor-parallel-size", "--pipeline-parallel-size",
                    "--data-parallel-size", "--distributed-executor-backend"}
@@ -87,7 +94,7 @@ def _timestamp(value):
     return stamp.astimezone(timezone.utc)
 
 
-def _owned_pod(transport, target):
+def _owned_pod(transport, target, *, general=False):
     pod = transport._verify(capture_snapshot=True)["engine"]
     spec = pod["spec"]
     container, = spec["containers"]
@@ -99,8 +106,12 @@ def _owned_pod(transport, target):
         raise ValueError(_PROOF_ERROR)
     env = container.get("env", [])
     by_name = {row["name"]: row for row in env}
-    if (len(by_name) != len(env) or {"PYTHONHOME", "PYTHONOPTIMIZE", "LD_PRELOAD"} & by_name.keys()
-            or any(by_name.get(key) != {"name": key, "value": value} for key, value in (_OFFLINE | _OBSERVER_ENV).items())):
+    forbidden = {"PYTHONHOME", "PYTHONOPTIMIZE", "LD_PRELOAD"}
+    if general:
+        forbidden |= _GENERAL_STOCK_ENV
+    expected = _OFFLINE | (_GENERAL_OBSERVER_ENV if general else _OBSERVER_ENV)
+    if (len(by_name) != len(env) or forbidden & by_name.keys()
+            or any(by_name.get(key) != {"name": key, "value": value} for key, value in expected.items())):
         raise ValueError(_PROOF_ERROR)
     mounts = container["volumeMounts"]
     paths = {row["mountPath"]: row for row in mounts}
@@ -124,8 +135,8 @@ def _owned_pod(transport, target):
     return pod, container
 
 
-def _ready(transport, target):
-    pod, container = _owned_pod(transport, target)
+def _ready(transport, target, *, general=False):
+    pod, container = _owned_pod(transport, target, general=general)
     state, = pod["status"]["containerStatuses"]
     condition, = (row for row in pod["status"]["conditions"] if row.get("type") == "Ready")
     readiness = container["readinessProbe"]
@@ -161,20 +172,34 @@ def _load(path):
 
 
 def _processes(readback, profile, profile_digest):
-    if (type(readback) is not dict or set(readback) != {"profile_sha256", "producer_sha256", "processes"}
-            or readback["profile_sha256"] != profile_digest or readback["producer_sha256"] != PRODUCER_SHA256):
+    general = profile["schema"] == GENERAL_PROFILE_SCHEMA
+    producer = GENERAL_PRODUCER_SHA256 if general else PRODUCER_SHA256
+    readback_fields = {"profile_sha256", "producer_sha256", "processes"}
+    process_fields = _PROCESS_FIELDS
+    if general:
+        readback_fields |= {"plugin_metadata"}
+        process_fields = process_fields | {"activation_sha256", "sitecustomize_sha256", "general_plugins"}
+    if (type(readback) is not dict or set(readback) != readback_fields
+            or readback["profile_sha256"] != profile_digest or readback["producer_sha256"] != producer
+            or (general and readback["plugin_metadata"] != _GENERAL_METADATA_SHA256)):
         raise ValueError(_PROOF_ERROR)
     rows = readback["processes"]
     if type(rows) is not list or len(rows) != len(_ROLE_ROWS):
         raise ValueError(_PROOF_ERROR)
     for row, (role, rank) in zip(rows, _ROLE_ROWS, strict=True):
-        if (type(row) is not dict or set(row) != _PROCESS_FIELDS or row["role"] != role
+        if (type(row) is not dict or set(row) != process_fields or row["role"] != role
                 or type(row["rank"]) is not type(rank) or row["rank"] != rank
                 or type(row["python_optimize"]) is not int or row["python_optimize"] != 0
                 or type(row["pid"]) is not int or not 0 < row["pid"] < 2**23
                 or type(row["start_ticks"]) is not int or row["start_ticks"] <= 0
-                or row["producer_sha256"] != PRODUCER_SHA256):
+                or row["producer_sha256"] != producer):
             raise ValueError(_PROOF_ERROR)
+        if general:
+            qualification = profile["qualification"]
+            if (row["activation_sha256"] != qualification[f"{role}_activation_sha256"]
+                    or row["sitecustomize_sha256"] != qualification["sitecustomize_sha256"]
+                    or row["general_plugins"] != GENERAL_PLUGIN_NAMES):
+                raise ValueError(_PROOF_ERROR)
         service = profile["service"]
         selected = (service["module"], service["sha256"], service["module"], service["sha256"]) if rank is None else (
             LOADER, profile["worker_loader_sha256"], MODEL, profile["model_source_sha256"])
@@ -193,6 +218,9 @@ def prepared_provenance(document, env, binding_sha):
         raise ValueError(_PROOF_ERROR)
     profile = document["profile"]
     validate_observer_profile(profile, env)
+    if (profile["schema"] == GENERAL_PROFILE_SCHEMA
+            and document["oci_source_qualification_sha256"] != profile["qualification"]["oci_source_qualification_sha256"]):
+        raise ValueError(_PROOF_ERROR)
     digest = sha256_hex(canonical_json(profile))
     if document["profile_sha256"] != digest:
         raise ValueError(_PROOF_ERROR)
@@ -200,16 +228,16 @@ def prepared_provenance(document, env, binding_sha):
     return document
 
 
-def _readback(transport, target, source):
+def _readback(transport, target, source, *, general=False):
     engine = transport.binding["engine"]
-    _owned_pod(transport, target)
+    _owned_pod(transport, target, general=general)
     budget = min(5, transport.deadline - transport.clock())
     if budget <= 0:
         raise ValueError(_PROOF_ERROR)
     receipt = transport._call([f"--namespace={engine['namespace']}", "exec", engine["pod"],
         f"--container={engine['container']}", "--", "python3", "-I", "-S", "-B", "-c", source, str(budget)],
         cap=8192, budget=budget)
-    _owned_pod(transport, target)
+    _owned_pod(transport, target, general=general)
     return receipt
 
 
@@ -268,25 +296,29 @@ class KubernetesNormalPythonModeExecutor:
         target, provenance, transport = self._inputs(env, self._target_pin, self._provenance_pin)
         ready_before = ready_after = installed = inventory = rows = None
         error = None
+        profile = provenance["profile"]
+        general = profile["schema"] == GENERAL_PROFILE_SCHEMA
         try:
-            ready_before = _ready(transport, target)
-            before = _readback(transport, target, _READER)
-            inventory = _readback(transport, target, _INVENTORY)
-            after = _readback(transport, target, _READER)
-            ready_after = _ready(transport, target)
+            ready_before = _ready(transport, target, general=general)
+            before = _readback(transport, target, _READER, general=general)
+            inventory = _readback(transport, target, _INVENTORY, general=general)
+            after = _readback(transport, target, _READER, general=general)
+            ready_after = _ready(transport, target, general=general)
             if (before != after or before != provenance["readback"]
                     or any(ready_before[key] != ready_after[key] for key in ready_before.keys() - {"observed_at"})):
                 raise ValueError(_PROOF_ERROR)
             _validate_inventory(inventory)
-            verified = _processes(before, provenance["profile"], provenance["profile_sha256"])
+            verified = _processes(before, profile, provenance["profile_sha256"])
             if verified[0]["start_ticks"] != inventory["pid1_start_ticks"]:
                 raise ValueError(_PROOF_ERROR)
             rows = verified
-            profile = provenance["profile"]
             installed = {"binding_sha256": provenance["binding_sha256"], "service": profile["service"],
                          "worker_loader_sha256": profile["worker_loader_sha256"],
                          "model_source_sha256": profile["model_source_sha256"],
                          "profile_sha256": provenance["profile_sha256"]}
+            if general:
+                installed["general_plugin"] = {"qualification": profile["qualification"],
+                                               "metadata_sha256": _GENERAL_METADATA_SHA256}
         except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
             error = _PROOF_ERROR
         cleanup = transport.report()["cleanup_errors"]

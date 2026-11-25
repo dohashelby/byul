@@ -1,0 +1,198 @@
+"""Observe reviewed stock vLLM startup through the general plugin lifecycle."""
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import sys
+import time
+
+
+ROOT = Path("/guard-sup11")
+DESTINATION = Path("/cache/guard-sup11")
+LOADER = "vllm.model_executor.model_loader.default_loader"
+MODEL = "vllm.model_executor.models.qwen2_vl"
+SERVICE = "vllm.entrypoints.launchers.api_server.entry"
+PLUGIN = "vllm.plugins"
+MODULE_PATH = ROOT / "guard_sup11_lifecycle_observer.py"
+OBSERVATION_PLUGIN = "guard_sup11_lifecycle_observer"
+PROFILE_SECONDS = 540
+STOCK_PLUGINS = {
+    "lora_filesystem_resolver": ("vllm.plugins.lora_resolvers.filesystem_resolver", "register_filesystem_resolver"),
+    "lora_hf_hub_resolver": ("vllm.plugins.lora_resolvers.hf_hub_resolver", "register_hf_hub_resolver"),
+}
+ENTRYPOINTS = {
+    ("vllm.engine.arg_utils", "AsyncEngineArgs.add_cli_args"): ("service", "service_activation_sha256"),
+    ("vllm.v1.worker.worker_base", "WorkerWrapperBase.init_worker"): ("worker", "worker_activation_sha256"),
+}
+
+
+def read_file(path, limit):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        first = os.fstat(stream.fileno())
+        if not stat.S_ISREG(first.st_mode) or not 0 < first.st_size <= limit:
+            raise ValueError()
+        raw = stream.read(first.st_size + 1)
+        if len(raw) != first.st_size or os.fstat(stream.fileno()).st_ctime_ns != first.st_ctime_ns:
+            raise ValueError()
+        return raw
+
+
+def source_digest(filename, module):
+    path = Path(filename)
+    relative = module.replace(".", "/") + ("/__init__.py" if module == PLUGIN else ".py")
+    expected = Path("/usr/local/lib/python3.12/dist-packages") / relative
+    if not path.is_absolute() or ".." in path.parts or path != expected or path.resolve(strict=True) != expected:
+        raise ValueError()
+    return hashlib.sha256(read_file(path, 1024**2)).hexdigest()
+
+
+def start_ticks():
+    line = read_file_proc("/proc/self/stat")
+    return int(line.rsplit(b") ", 1)[1].split()[19])
+
+
+def read_file_proc(path):
+    with open(path, "rb") as stream:
+        return stream.read(4096)
+
+
+def loaded_module(name):
+    module = sys.modules.get(name)
+    if module is None:
+        raise ValueError()
+    return vars(module)
+
+
+def verified_frame(frame, module, expected):
+    return (frame.f_globals is loaded_module(module)
+            and source_digest(frame.f_code.co_filename, module) == expected)
+
+
+def vendor_site_digest(qualification):
+    vendor = loaded_module("sitecustomize")
+    origin = qualification["sitecustomize_origin"]
+    target = qualification["sitecustomize_target"]
+    if (origin != "/usr/lib/python3.12/sitecustomize.py" or target != "/etc/python3.12/sitecustomize.py"
+            or vendor["__file__"] != origin or vendor["__spec__"].origin != origin
+            or Path(origin).resolve(strict=True) != Path(target)):
+        raise ValueError()
+    digest = hashlib.sha256(read_file(target, 32768)).hexdigest()
+    if digest != qualification["sitecustomize_sha256"]:
+        raise ValueError()
+    return digest
+
+
+def general_plugins(loader):
+    loaded = loader.f_locals.get("plugins")
+    if (type(loaded) is not dict or set(loaded) != {OBSERVATION_PLUGIN, *STOCK_PLUGINS}
+            or loaded[OBSERVATION_PLUGIN] is not activate):
+        raise ValueError()
+    for name, (module, function) in STOCK_PLUGINS.items():
+        if loaded_module(module).get(function) is not loaded[name]:
+            raise ValueError()
+    return sorted(loaded)
+
+
+def observe(frame, event, profile, role, startup):
+    if event != "call":
+        return
+    name = frame.f_globals.get("__name__")
+    function = frame.f_code.co_qualname
+    service = role == "service" and name == SERVICE and function == "run_server"
+    worker = role == "worker" and name == LOADER and function == "DefaultModelLoader.load_weights"
+    if not service and not worker:
+        return
+    try:
+        # End the observation window at the first matching startup boundary,
+        # including when its provenance cannot be collected.
+        sys.setprofile(None)
+        if sys.flags.optimize != 0 or frame.f_globals is not loaded_module(name):
+            return
+        anchor_digest = source_digest(frame.f_code.co_filename, name)
+        if service:
+            if anchor_digest != profile["service"]["sha256"]:
+                return
+            role, rank, module, module_digest = "service", None, name, anchor_digest
+        else:
+            if anchor_digest != profile["worker_loader_sha256"]:
+                return
+            model_class = type(frame.f_locals.get("model"))
+            if (model_class.__module__ != MODEL or model_class.__name__ != "Qwen2VLForConditionalGeneration"
+                    or loaded_module(MODEL).get(model_class.__name__) is not model_class):
+                return
+            actual = loaded_module(MODEL)
+            module_digest = source_digest(actual["__file__"], MODEL)
+            if module_digest != profile["model_source_sha256"]:
+                return
+            group = loaded_module("vllm.distributed.parallel_state").get("_TP")
+            rank = vars(group).get("rank_in_group")
+            if type(rank) is not int or rank not in {0, 1}:
+                return
+            role, module = "worker", MODEL
+        row = {"role": role, "rank": rank, "pid": os.getpid(), "start_ticks": start_ticks(),
+               "python_optimize": sys.flags.optimize, "anchor_module": name, "anchor_sha256": anchor_digest,
+               "module": module, "module_sha256": module_digest, **startup}
+        label = role if rank is None else f"worker-{rank}"
+        path = DESTINATION / (label + ".json")
+        flags = os.O_WRONLY | os.O_NOFOLLOW | os.O_CREAT | os.O_EXCL
+        with os.fdopen(os.open(path, flags, 0o600), "wb") as stream:
+            stream.write(json.dumps(row, sort_keys=True, separators=(",", ":")).encode())
+    except Exception:
+        # Observation errors leave the engine call and its own result alone.
+        return
+
+
+def activate():
+    """Enable one bounded startup receipt after the stock site initialization."""
+    try:
+        loader = sys._getframe(1)
+        if (loader.f_code.co_qualname != "load_general_plugins"
+                or loader.f_globals is not loaded_module(PLUGIN)):
+            return
+        entry = loader.f_back
+        name = entry.f_globals.get("__name__")
+        role, field = ENTRYPOINTS[(name, entry.f_code.co_qualname)]
+        if entry.f_globals is not loaded_module(name):
+            return
+        if (Path(__file__) != MODULE_PATH or MODULE_PATH.resolve(strict=True) != MODULE_PATH
+                or not os.statvfs(ROOT).f_flag & os.ST_RDONLY
+                or sys.flags.no_site or sys.flags.optimize != 0
+                or sys.getprofile() is not None or sys.gettrace() is not None
+                or os.environ.get("PYTHONPATH") != str(ROOT)
+                or os.environ.get("VLLM_WORKER_MULTIPROC_METHOD") != "spawn"
+                or "VLLM_PLUGINS" in os.environ):
+            return
+        profile = json.loads(read_file(ROOT / "profile.json", 8192))
+        if (profile["schema"] != "guard-sup11-vllm-general-observer/1"
+                or profile["service"]["module"] != SERVICE
+                or profile["installed_root"] != "/usr/local/lib/python3.12/dist-packages"):
+            return
+        qualification = profile["qualification"]
+        if not verified_frame(loader, PLUGIN, qualification["plugin_loader_sha256"]):
+            return
+        if not verified_frame(entry, name, qualification[field]):
+            return
+        startup = {
+            "general_plugins": general_plugins(loader),
+            "activation_sha256": qualification[field],
+            "sitecustomize_sha256": vendor_site_digest(qualification),
+            "producer_sha256": hashlib.sha256(read_file(MODULE_PATH, 65536)).hexdigest(),
+        }
+        deadline = time.monotonic() + PROFILE_SECONDS
+
+        def on_profile(frame, event, _value):
+            if time.monotonic() >= deadline:
+                try:
+                    sys.setprofile(None)
+                except Exception:
+                    return
+            else:
+                observe(frame, event, profile, role, startup)
+
+        sys.setprofile(on_profile)
+    except Exception:
+        # The stock loader invokes general plugin registrations directly.
+        return

@@ -5,6 +5,9 @@ import json
 import os
 import stat
 
+GENERAL_MODULE = "guard_sup11_lifecycle_observer.py"
+GENERAL_METADATA = "guard_sup11_lifecycle_observer-1.0.dist-info"
+
 
 def directory(*parts):
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -38,7 +41,22 @@ def observe():
     try:
         if not (os.fstatvfs(mount).f_flag & os.ST_RDONLY):
             raise ValueError()
-        if set(os.listdir(mount)) != {"sitecustomize.py", "profile.json"}:
+        names = set(os.listdir(mount))
+        extra = {}
+        if names == {GENERAL_MODULE, GENERAL_METADATA, "profile.json"}:
+            producer = GENERAL_MODULE
+            metadata = directory("guard-sup11", GENERAL_METADATA)
+            try:
+                if (not (os.fstatvfs(metadata).f_flag & os.ST_RDONLY)
+                        or set(os.listdir(metadata)) != {"METADATA", "entry_points.txt"}):
+                    raise ValueError()
+                extra["plugin_metadata"] = {name: hashlib.sha256(read(metadata, name, 4096)).hexdigest()
+                                            for name in ("METADATA", "entry_points.txt")}
+            finally:
+                os.close(metadata)
+        elif names == {"sitecustomize.py", "profile.json"}:
+            producer = "sitecustomize.py"
+        else:
             raise ValueError()
         labels = ["service.json", "worker-0.json", "worker-1.json"]
         if set(os.listdir(receipt)) != set(labels):
@@ -52,9 +70,9 @@ def observe():
                 record = stream.read(4096)
             if int(record.rsplit(b") ", 1)[1].split()[19]) != row["start_ticks"]:
                 raise ValueError()
-        return {"producer_sha256": hashlib.sha256(read(mount, "sitecustomize.py", 65536)).hexdigest(),
+        return {"producer_sha256": hashlib.sha256(read(mount, producer, 65536)).hexdigest(),
                 "profile_sha256": hashlib.sha256(read(mount, "profile.json", 8192)).hexdigest(),
-                "processes": rows}
+                "processes": rows, **extra}
     finally:
         os.close(receipt)
         os.close(mount)

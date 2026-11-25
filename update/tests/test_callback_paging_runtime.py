@@ -160,3 +160,42 @@ def test_profiled_gateway_keeps_both_owned_generations_and_uses_page_reader():
     assert response['outcome'] == 200 and isinstance(transport, KubernetesHTTP)
     assert type(transport).engine_callback_events is KubernetesHTTP.engine_callback_events
     assert transport.report()['principal_authenticity_verified'] is False
+
+
+def _capture_pages(root, capture_id):
+    read, snapshot, cursor = reader(), None, None
+    for _ in range(20):
+        value = read(root, snapshot, cursor, capture_id=capture_id)
+        yield value
+        if value['done']:
+            return
+        snapshot, cursor = value['snapshot'], value['cursor']
+    raise AssertionError('EXAMPLE pages did not terminate')
+
+
+def test_synchronous_legacy_writer_needs_no_capture_checkpoint(tmp_path):
+    # The default engine callback Sink writes each row inside the callback: no queue, no state file.
+    for pid in (11, 12):
+        (tmp_path / f'callbacks-{pid}.jsonl').write_text(
+            ''.join(json.dumps({'EXAMPLE_pid': pid, 'seq': n}) + '\n' for n in range(5)))
+    sequence = list(_capture_pages(tmp_path, 'c' * 32))
+    assert all(page['gaps'] == [] for page in sequence)
+    result = assemble(sequence)
+    assert not result['truncated'] and result['source_events'] == 10
+
+
+def test_unacknowledged_journal_writer_still_blocks_a_legacy_peer(tmp_path):
+    (tmp_path / 'callbacks-11.jsonl').write_text(json.dumps({'EXAMPLE': 1}) + '\n')
+    (tmp_path / 'callbacks-12-0000.jsonl').write_text(json.dumps({'EXAMPLE': 2}) + '\n')
+    (tmp_path / 'callbacks-12.state.json').write_text(json.dumps({
+        'schema': 'guard-observer-journal/3', 'accepted': 1, 'written': 1, 'processed': 1,
+        'dropped': 0, 'errors': 0, 'closed': False}))
+    result = assemble(_capture_pages(tmp_path, 'd' * 32))
+    assert result['truncated'] and 'CALLBACK_CHECKPOINT_UNAVAILABLE' in result['diagnostic_codes']
+
+
+def test_legacy_torn_last_row_is_still_loss_with_a_capture_id(tmp_path):
+    (tmp_path / 'callbacks-11.jsonl').write_bytes(b'{"EXAMPLE":1}\n{"EXAMPLE":')
+    result = assemble(_capture_pages(tmp_path, 'e' * 32))
+    assert result['truncated'] and 'CALLBACK_ROW_INCOMPLETE' in result['diagnostic_codes']
+    assert result['processes'][0]['events'] == [{'EXAMPLE': 1}]

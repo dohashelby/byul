@@ -357,7 +357,12 @@ def test_pinned_redeployment_executes_only_with_the_prebound_update_plan(
 
     monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", collect)
     monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
-    evidence, = run_locked_update_trial(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=side)
+    settings = application.run_config(deepcopy(cfg))
+    if mode == "audit":
+        from guard.core.run import run_plan
+        evidence, = run_plan(store, pack, plan, settings)
+    else:
+        evidence, = run_locked_update_trial(store, pack, plan, settings, only_side=side)
     if mode == "prebound":
         assert evidence.execution.status == ExecStatus.COMPLETED
     else:

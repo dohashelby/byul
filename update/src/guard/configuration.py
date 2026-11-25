@@ -131,13 +131,48 @@ _RECORD_INPUTS = frozenset({
 })
 
 
+_STAGED_OBSERVER_OWNERS = {
+    **{cid: executor for cid, (executor, _, _) in _NORMAL_ONLY_CASES.items() if cid != "SUP-05"},
+    "OBS-04": "boundary_egress", "PLT-02": "unix_ipc", "PLT-06": "unix_ipc",
+}
+
+
+def staged_observer_executors(candidate):
+    """Only explicitly scoped observers can bind a new candidate Pod after baseline."""
+    options = candidate.get("update", {})
+    if options.get("mode", "external") != "external" or options.get("kubernetes_candidate_binding") != "after_baseline":
+        return set()
+    allowed = options.get("allowed_checks")
+    overlays = candidate.get(CHECK_CONFIG, {})
+    implementations = candidate.get("executors", {})
+    if (type(allowed) is not list or not allowed or type(overlays) is not dict
+            or type(implementations) is not dict or candidate.get("lab_activation") or candidate.get("record_attestation")):
+        return set()
+    executors = set()
+    for cid in allowed:
+        if type(cid) is not str or cid not in _STAGED_OBSERVER_OWNERS:
+            return set()
+        check_config = overlays.get(cid)
+        option = KUBERNETES_BOUND_CHECK_OPTIONS[cid]
+        if type(check_config) is not dict or set(check_config) != {option} or check_config[option] is not True:
+            return set()
+        executor = _STAGED_OBSERVER_OWNERS[cid]
+        settings = candidate.get(executor)
+        if implementations.get(executor) != "kubernetes" or type(settings) is not dict or set(settings) != {"target"}:
+            return set()
+        executors.add(executor)
+    return executors
+
+
 def requested_input_paths(config, *, base_dir=None):
     """Yield approved local input paths and whether discovery is deferred."""
     validate_requested_config(config)
     normal_file_reads = normal_file_reads_requested(config)
     deferred_paths = set()
+    staged_observers = set()
     if config.get("update", {}).get("kubernetes_candidate_binding") == "after_baseline":
         candidate = for_side(config, "candidate")
+        staged_observers = staged_observer_executors(candidate)
         implementations = candidate.get("executors", {})
         for executor in ("request_binding", "input_validation"):
             path = candidate.get(executor, {}).get("target")
@@ -182,7 +217,7 @@ def requested_input_paths(config, *, base_dir=None):
                             or key == "environment" and "generations" in location):
                         path = Path(item)
                         deferred = (key == "target" and location[:2] == ("sides", "candidate")
-                                    and path in deferred_paths)
+                                    and (path in deferred_paths or len(location) == 3 and location[2] in staged_observers))
                         yield field, path, deferred
                         if key in _MANIFEST_FILES:
                             for asset in manifest_assets(path):

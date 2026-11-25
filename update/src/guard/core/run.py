@@ -31,7 +31,8 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, COLLECTION_ST
                                  RETRY_RECORD_SNAPSHOT_SCOPE_ERROR, UPDATE_CHECK_OUTSIDE_SCOPE,
                                  bounded_metadata_scopes, collection_status_snapshot_requested, merge_config,
                                  normal_serving_readiness_requested,
-                                 normal_token_input_requested, retry_record_snapshot_requested, update_allowed_checks)
+                                 normal_token_input_requested, retry_record_snapshot_requested, staged_observer_executors,
+                                 update_allowed_checks)
 from guard.models import (
     ORIGIN_STRENGTH,
     CheckDef,
@@ -150,8 +151,6 @@ def run_plan_locked(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
                     only_side: Side | None = None) -> list[Evidence]:
     """Dispatch under the PLAN lock held by the caller across lifecycle transitions."""
     from .execution_recipe import configuration_sha256, validate_policy_time
-    policy = store.resolve(plan.inputs.policy)
-    validate_policy_time(policy)
     requested = cfg.requested if cfg.requested is not None else cfg.raw
     if plan.mode != Mode.update:
         configurations = (requested, cfg.raw, *(side.raw for side in cfg.side_configs.values()))
@@ -179,6 +178,8 @@ def run_plan_locked(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
             raise ValueError(RETRY_RECORD_SNAPSHOT_SCOPE_ERROR)
         if any(collection_status_snapshot_requested(config) for config in configurations):
             raise ValueError(COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR)
+    policy = store.resolve(plan.inputs.policy)
+    validate_policy_time(policy)
     environments = [store.resolve(r) for r in plan.inputs.environments]
     software_digests: dict[Path, tuple[bytes, str]] = {}
 
@@ -230,6 +231,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
             (merge_config(requested, requested.get("sides", {}).get(side, {})) for side in sides), pack, allowed_checks)
         if actual != expected:
             raise ValueError("OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID")
+    staged_observers = (staged_observer_executors(merge_config(requested, requested.get("sides", {}).get("candidate", {})))
+                        if plan.mode == Mode.update else set())
     passive_hop = passive_api_hop.validate_run_scope(pack, plan, cfg, allowed_checks)
     bound_external_update = (plan.mode == Mode.update and plan.inputs.execution_recipe_sha256 is not None
                              and requested.get('update', {}).get('mode', 'external') == 'external')
@@ -305,6 +308,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
                                policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks,
                                passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
                                source_ref=source_refs.get(side),
+                               staged_observer=side == Side.candidate and item.executor in staged_observers,
                                transition_manifests=transition_manifests, initialization_digests=initialization_digests,
                                prebound_external_update=prebound_external_update,
                                response_route_digests=response_route_digests, supply_record_digests=supply_record_digests,
@@ -337,7 +341,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
 
 
 def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
-             policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None,
+             policy_validity=(None, None), *, allowed_checks=None, passive_hop=False, source_ref=None, staged_observer=False,
              transition_manifests=None, initialization_digests=None, response_route_digests=None,
              supply_record_digests=None, native_route_prepared_absent=False, rank_common_files=None,
              record_access_digests=None, record_target_bytes=None, retry_snapshot_files=None,
@@ -514,6 +518,14 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)
+
+    if staged_observer:
+        # The candidate file did not exist at selection. Only a trusted
+        # coordinator can supply the observed generation's target digest.
+        pins = raw.get("_kubernetes_target_sha256_by_executor", {})
+        pin = pins.get(item.executor) if type(pins) is dict else None
+        if not isinstance(pin, str) or re.fullmatch(r"[0-9a-f]{64}", pin) is None:
+            return stopped(ExecStatus.NOT_RUN, "KUBERNETES_STAGED_TARGET_UNVERIFIED")
 
     started = utcnow()
     info_stub: ExecutorInfo | None = None

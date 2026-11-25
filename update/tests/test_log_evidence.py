@@ -148,9 +148,13 @@ def test_ordinary_log_metadata_is_readable_in_a_paired_report_with_passive_hops(
     plan = store.resolve(hops[Side.baseline].plan)
 
     def publish_revised(evd, **updates):
-        store.put(evd.model_copy(update={"revision": evd.revision + 1, **updates}).seal())
-        judge_plan(store, pack, plan, T0)
-        revised = build_report(store, pack, plan, T0)
+        changed_evidence = evd.model_copy(update={"revision": evd.revision + 1, **updates}).seal()
+        store.put(changed_evidence)
+        attempt_id = changed_evidence.execution.attempt_id
+        trial = [item for item in pinned if item.id != evd.id and item.execution.attempt_id == attempt_id]
+        trial.append(changed_evidence)
+        judged = judge_plan(store, pack, plan, T0, evidence=trial, attempt_id=attempt_id)
+        revised = build_report(store, pack, plan, T0, evidence=trial, judged=judged, attempt_id=attempt_id)
         store.put(revised)
         return f"{revised.id}@{revised.revision}"
 
@@ -164,12 +168,23 @@ def test_ordinary_log_metadata_is_readable_in_a_paired_report_with_passive_hops(
     assert "OBS-03/baseline: saved ordinary log summary differs from its pinned fixture" in analyze_saved_logs(
         store.root, bad_summary)["problems"]
 
+    # Both sources are in this report, but the candidate hop cannot use the baseline's evidence.
+    hop = hops[Side.candidate]
+    other_source = next(evd.ref() for evd in pinned if evd.check_id == "PLT-01" and evd.side == Side.baseline)
+    binding = hop.execution.run_binding
+    wrong_binding = {**binding, "values": {**binding["values"], "source_evidence": other_source.model_dump(mode="json")}}
+    wrong_side = publish_revised(hop, refs=[hop.plan, hop.environment, other_source],
+                                 execution=hop.execution.model_copy(update={"run_binding": wrong_binding}))
+    with pytest.raises(ValueError, match="^PASSIVE_API_HOP_SOURCE_SCOPE_UNVERIFIED$"):
+        analyze_saved_logs(store.root, wrong_side)
+
+    # The new attempt's report omits the old attempt's PLT-01 source entirely.
     hop = hops[Side.baseline]
     wrong_attempt = "ATTEMPT-EXAMPLE-OTHER"
     execution = hop.execution.model_copy(update={"attempt_id": wrong_attempt,
         "run_binding": {**hop.execution.run_binding, "attempt_id": wrong_attempt}})
     bad_link = publish_revised(hop, execution=execution)
-    with pytest.raises(ValueError, match="PASSIVE_API_HOP_SOURCE_SCOPE_UNVERIFIED"):
+    with pytest.raises(ValueError, match="^saved passive API hop source is absent from the original report$"):
         analyze_saved_logs(store.root, bad_link)
     assert analyze_saved_logs(store.root, original)["checks"] == audit["checks"]
 

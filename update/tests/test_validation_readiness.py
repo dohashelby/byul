@@ -42,14 +42,17 @@ def test_kubernetes_only_readiness_keeps_unconfigured_input_without_docker(monke
     }
     result = application.update_readiness(pack, envs, pol, cfg)
     checks = {row["check"]: row for row in result["checks"]}
-    assert set(checks) == {"inputs", "kubernetes-static-preparation"}
-    assert checks["inputs"]["ok"] is False and "baseline/SUP-03" in checks["inputs"]["detail"]
+    assert set(checks) == {"inputs", "inputs:baseline/SUP-03", "inputs:candidate/SUP-03", "kubernetes-static-preparation"}
+    assert checks["inputs"]["ok"] is False
+    for side in ("baseline", "candidate"):
+        row = checks[f"inputs:{side}/SUP-03"]
+        assert row["ok"] is False and row["detail"] == "real executor is required"
     assert result["ready"] is False
     assert {(row["side"], row["status"]) for row in result["check_support"]} == {
         ("baseline", "UNSUPPORTED"), ("candidate", "UNSUPPORTED")}
 
 
-def test_external_kubernetes_and_real_side_override_keeps_docker_inspection(monkeypatch):
+def test_invalid_external_side_override_stops_before_docker_inspection(monkeypatch):
     calls = []
 
     class Local:
@@ -68,8 +71,9 @@ def test_external_kubernetes_and_real_side_override_keeps_docker_inspection(monk
     }
     result = application.update_readiness(pack, [environment(), environment()], policy(pack.ref()), cfg)
     checks = {row["check"]: row for row in result["checks"]}
-    assert calls == ["docker"]
-    assert set(checks) == {"inputs", "docker", "image-pair"}
+    assert calls == []
+    assert set(checks) == {"inputs"}
+    assert checks["inputs"]["detail"] == "request_binding: both update sides must use real executors"
     assert checks["inputs"]["ok"] is False and result["ready"] is False
 
 

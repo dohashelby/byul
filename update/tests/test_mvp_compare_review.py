@@ -320,7 +320,8 @@ def test_not_applicable_requires_two_original_environment_conditions(monkeypatch
     assert result['rows']['REQ-03']['status'] == 'ORIGINAL_ROW_MISSING'
 
 
-@pytest.mark.parametrize('damage', [None, 'different-rpt-original', 'changed-digest', 'changed-trial', 'malformed-ref', 'changed-files'])
+@pytest.mark.parametrize('damage', [None, 'different-rpt-original', 'changed-digest', 'changed-trial', 'malformed-ref',
+                                    'changed-files', 'foreign-executor-version'])
 def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_path, monkeypatch, damage):
     originals = paired_controls(tmp_path, monkeypatch, review_fixture=True)
     pack_path = tool.ROOT / 'packs/PACK-BASELINE'
@@ -347,7 +348,8 @@ def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_pat
         binding = {'schema': run_binding.SCHEMA_2, 'check_id': 'PLT-08', 'side': side.value,
                    'attempt_id': scope['attempt_id'], 'environment_sha256': source.environment.sha256,
                    'files': files, 'validity': None, 'issued_at': draft.started_at.isoformat(), 'values': values}
-        execution = Execution(status=draft.status, executor={'name': 'api_transport', 'version': '0.1.0+passive-api-hop',
+        version = '0.1.0+unreviewed' if side == 'baseline' and damage == 'foreign-executor-version' else passive_api_hop.VERSION
+        execution = Execution(status=draft.status, executor={'name': passive_api_hop.EXECUTOR, 'version': version,
                               'config_sha256': sha256_hex(canonical_json(draft.config))}, adapter=source.execution.adapter,
                               started_at=draft.started_at, finished_at=draft.finished_at,
                               attempt_id=scope['attempt_id'], run_binding=binding)
@@ -377,6 +379,9 @@ def test_passive_hop_requires_original_same_report_source_and_attachment(tmp_pat
     assert row['candidate']['security_failure_tags'] and 'CONFIRMED_VIOLATION' not in row['candidate']['security_failure_tags']
     assert (row['baseline']['verdicts'] or {}).get('security') == ('FAIL' if damage is None else None)
     assert ('PASSIVE_API_HOP_PROVENANCE_INVALID' in row['baseline']['blocking_codes']) is (damage is not None)
+    if damage == 'foreign-executor-version':
+        assert 'PLT-08' in result['execution_coverage']['baseline']['unverified']
+        assert 'PLT-08' in result['execution_coverage']['candidate']['verified_measured']
     if damage is None:
         assert row['status'] == 'ORIGINAL_ROW_UNRESOLVED'
         assert row['blocking_codes'] == ['SECURITY_PASS_NOT_ESTABLISHED']

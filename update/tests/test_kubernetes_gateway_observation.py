@@ -216,7 +216,7 @@ def test_canonical_snapshot_reads_one_owned_file_without_http(
     def unexpected(*args, **kwargs):
         raise AssertionError("audit snapshot cannot run requests or activate the target")
 
-    monkeypatch.setattr(module.GatewayRecordReader, "read_file", read_file)
+    monkeypatch.setattr(module.FixedRecordReader, "read_file", read_file)
     monkeypatch.setattr(KubernetesHTTP, "__call__", unexpected)
     executor = module.KubernetesGatewayRecordSnapshotExecutor(
         {"target": str(target_file), module.SNAPSHOT_OPTION: True, module.SNAPSHOT_SOURCE: source},

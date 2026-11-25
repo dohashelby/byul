@@ -1027,7 +1027,7 @@ def test_obs06_rejects_changed_plan_inputs_before_collection(
 
 
 @pytest.mark.parametrize('scope', ['selected', 'unselected', 'staged', 'legacy'])
-def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_access_context, scope):
+def test_obs06_recipe_seals_requested_bytes_and_scopes_canonical_binding(tmp_path, record_access_context, scope):
     from guard.core.execution_recipe import configuration_sha256
     from guard.core.select import select
     from guard.executors.run_binding import stages_for
@@ -1049,7 +1049,8 @@ def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_acces
             item.model_copy(update={'check_revision': legacy.revision}) if item.check_id == legacy.id else item
             for item in plan.items
         ]}).seal()
-    original = configuration_sha256(cfg, envs, plan=plan)
+    before = {}
+    original = configuration_sha256(cfg, envs, plan=plan, record_access_digests=before)
     path = tmp_path / 'candidate-subjects.json'
     if scope == 'selected':
         replacement = path.read_bytes() + b'\n'
@@ -1058,4 +1059,7 @@ def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_acces
         subjects['subjects'][0]['username'] = 'example-replacement'
         replacement = canonical_json(subjects)
     path.write_bytes(replacement)
-    assert configuration_sha256(cfg, envs, plan=plan) == original
+    after = {}
+    assert configuration_sha256(cfg, envs, plan=plan, record_access_digests=after) != original
+    assert before == after
+    assert set(after) == ({'baseline', 'candidate'} if scope == 'selected' else set())

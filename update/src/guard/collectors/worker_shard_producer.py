@@ -9,6 +9,7 @@ PID·시작 ticks를 읽지 못하거나 rank가 확인되지 않은 프로세�
 """
 from __future__ import annotations
 
+import hashlib
 
 from guard.adapters import vllm_worker_shard_callback as callback
 from . import gpu_common_inputs as contract

@@ -52,6 +52,8 @@ def _passive_hop_values(evd):
 def _verify_passive_hop(evd, source, env, policy, plan, artifact_store, values):
     """Recheck the verified same-report source artifact without a live target."""
     if (artifact_store is None or source is None or evd.artifacts
+            or evd.execution.executor is None or evd.execution.executor.name != passive_api_hop.EXECUTOR
+            or evd.execution.executor.version != passive_api_hop.VERSION
             or set(values) != {'profile', 'source_evidence', 'source_artifact_sha256', 'target_sha256'}
             or evd.execution.run_binding.get('schema') != run_binding.SCHEMA_2
             or evd.execution.run_binding.get('files') != {

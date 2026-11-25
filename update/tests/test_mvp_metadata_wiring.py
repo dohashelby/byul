@@ -160,7 +160,7 @@ def test_shared_template_siblings_stop_before_any_target_or_transport_access(tmp
         def forbidden(*args, **kwargs):
             raise AssertionError('unsupported siblings may never access or dispatch to a target')
         with monkeypatch.context() as guard:
-            guard.setattr(template_executor.Path, 'open', forbidden)
+            guard.setattr(template_executor, 'load_bounded_json', forbidden)
             guard.setattr(template_executor, 'KubernetesHTTP', forbidden)
             decision = checks['SUP-03']['shared_executor_checks']['SUP-13'][side]
             assert decision == {'expected_if_invoked': 'NOT_RUN', 'reason': 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE',
@@ -628,6 +628,13 @@ def test_staged_candidate_cilium_gap_does_not_abort_other_admitted_checks(tmp_pa
     expected[envs[1].id] = sha256_hex(canonical_json(current))
     with pytest.raises(ValueError, match=f'^{reason}$'):
         tool.revalidate_candidate(staged, envs[1], preliminary_ref)
+    if gap == 'missing':
+        # Publishing the candidate declaration alone cannot authorize a collector.
+        unbound = {row.check_id: row for row in run_locked_update_trial(store, pack, plan, run, only_side=Side.candidate)}
+        for check_id in ('OBS-04', 'PLT-06'):
+            assert unbound[check_id].execution.status == ExecStatus.NOT_RUN
+            assert unbound[check_id].execution.abort_reason == 'KUBERNETES_STAGED_TARGET_UNVERIFIED'
+        assert not any(env_id == envs[1].id for _, env_id in dispatched)
     assert tool.bind_staged_candidate(run, envs[1], preliminary_ref) == {'PLT-07': reason}
     candidate = run.side_configs['candidate']
     assert candidate.raw['_kubernetes_target_sha256_by_executor'] == {'unix_ipc': expected[envs[1].id]}
@@ -1687,7 +1694,10 @@ def test_startup_tools_check_exact_declared_provider_source(tmp_path, sources, m
     for check_id, reason in required.items():
         assert decisions[check_id]['sides'] == {'baseline': None, 'candidate': reason}
     prepared = application.update_readiness(pack, envs, pol, cfg)
-    assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['detail'] == 'KUBERNETES_SCOPED_TARGET_INVALID'
+    failures = {row['check']: row['detail'] for row in prepared['checks'] if not row['ok']}
+    assert failures['inputs'] == '2 preparation input errors are listed below'
+    assert {key for key, reason in failures.items() if reason == 'KUBERNETES_SCOPED_TARGET_INVALID'} == {
+        'inputs:candidate/' + check_id for check_id in required}
 
     configuration = tmp_path / 'guard.toml'
     tool.write_config(cfg, configuration)

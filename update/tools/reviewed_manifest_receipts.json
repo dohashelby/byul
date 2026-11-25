@@ -795,6 +795,11 @@
       "manifest_sha256": "7e8c2845ac3d7c136e9242cac0703424cd41f9aa74b78cfa9c8f7c64249fa7de",
       "reviewed_by": "Codex / BYUL SUP-11 ordinary Python path source review",
       "reviewed_at": "2026-11-25T21:00:20+09:00"
+    },
+    {
+      "manifest_sha256": "0a8272378310d5a9d60ba61a29418f710ec849334cb9fd149e47aad55c596eb5",
+      "reviewed_by": "Codex / BYUL SUP-11 ordinary Python path source review",
+      "reviewed_at": "2026-11-25T21:11:57+09:00"
     }
   ]
 }

@@ -51,7 +51,30 @@ GENERAL_METADATA = {
 
 # Only reviewed complete installed-OCI qualifications belong here. The public
 # source tree's release tags are supporting material, not installation pins.
-_GENERAL_QUALIFICATIONS = {}
+_GENERAL_QUALIFICATIONS = {
+    "0.30.0": {
+        "oci_source_qualification_sha256": "c72ac6c6b0c0ff3ce6b4a8eda7c8d844bd7251f2906b2b38875358462abf6c38",
+        "plugin_discovery_sha256": "d42004bbe581ac3f8da7d895e5721890f0542767138dcc198286efe9b3354abd",
+        "site_roster_sha256": "30db11fb0521c46c9195a4c5a416d7883f8633abc3f74b007eb1159a324be68e",
+        "ordinary_import_path_sha256": {
+            "service": "a5184f6d7933eadf2166f1060325d60726cbaaeea757e0ef0274e0c87b7f604e",
+            "worker-0": "a5184f6d7933eadf2166f1060325d60726cbaaeea757e0ef0274e0c87b7f604e",
+            "worker-1": "a5184f6d7933eadf2166f1060325d60726cbaaeea757e0ef0274e0c87b7f604e",
+        },
+        "ordinary_interpreter_context_sha256": "b4826706c7721401606150339ed7030e4683bf5a5c5a7f7697f7d8b9808a5385",
+    },
+    "0.31.0": {
+        "oci_source_qualification_sha256": "d3a4af9e47c65f1f21382a7835ca540293d8b614a732175d1d0bdf1a6f6bb328",
+        "plugin_discovery_sha256": "1e52a1034e3ca9a66660653dd6bec857f484807ba74399166898163a987e6326",
+        "site_roster_sha256": "0f69d86850ebfa80b0846a690e0e65ddc022decd45d2281e44290eb29275822d",
+        "ordinary_import_path_sha256": {
+            "service": "a5184f6d7933eadf2166f1060325d60726cbaaeea757e0ef0274e0c87b7f604e",
+            "worker-0": "a5184f6d7933eadf2166f1060325d60726cbaaeea757e0ef0274e0c87b7f604e",
+            "worker-1": "a5184f6d7933eadf2166f1060325d60726cbaaeea757e0ef0274e0c87b7f604e",
+        },
+        "ordinary_interpreter_context_sha256": "b4826706c7721401606150339ed7030e4683bf5a5c5a7f7697f7d8b9808a5385",
+    },
+}
 _GENERAL_QUALIFICATION_ERROR = "SUP11_GENERAL_OBSERVER_OCI_QUALIFICATION_UNAVAILABLE"
 _GENERAL_QUALIFICATION_KEYS = {
     "oci_source_qualification_sha256", "plugin_discovery_sha256", "site_roster_sha256",

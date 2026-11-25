@@ -251,7 +251,7 @@
   "update/src/guard/adapters/vllm_safe_open_mapping_sensor.py": "8753a0d6cb06229ab0661e1e7548c6213c368a76243543851baf385cc207f3da",
   "update/src/guard/adapters/vllm_scoped_consumption_callback.py": "ed38038464bfc2280779be5fd8793f5d3d246776588ba83c8bdf7a6e4a9c13c9",
   "update/src/guard/adapters/vllm_slot_mask.py": "659d615f133cdc96ef54163678753a60e6b8ee51aa0e78e0560e0d308f7f50da",
-  "update/src/guard/adapters/vllm_stock_python_mode.py": "3cc88f6704c2e8b8e6f0fd957b35b08a7398e353df99c72ac793ceafd27c01c6",
+  "update/src/guard/adapters/vllm_stock_python_mode.py": "a6efaa33e3dee51ba73765ceee69ed974f879ce9d1c09c7428f03da04c26c257",
   "update/src/guard/adapters/vllm_stored_responses.py": "778afebbe1a3e095d40b97b4faa9d8696c59f74d298b1920ae8035b4368bef7a",
   "update/src/guard/adapters/vllm_stream_buffer_metadata.py": "80ad3e2b5e4b1363d468b70841b307286336e397e4fd65a7efab8ff39e2c94f4",
   "update/src/guard/adapters/vllm_stream_buffer_sensor.py": "c224517c891bf73b2eb1be20d55edfc95416d7938175932ba2bb9fa1ec31b93c",

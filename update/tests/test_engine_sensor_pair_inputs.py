@@ -150,3 +150,24 @@ def test_target_for_another_environment_and_bad_inputs_are_reported(tmp_path):
         pair.pair({'baseline': baseline, 'candidate': candidate}, tmp_path / 'out', checks=('REQ-14',))
     with pytest.raises(ValueError, match='ENGINE_SENSOR_PAIR_CHECKS_INVALID'):
         pair.pair({'baseline': baseline, 'candidate': candidate}, tmp_path / 'out3', checks=('REQ-20',))
+
+
+def test_paired_engine_sensor_inputs_pass_update_readiness_inputs(tmp_path):
+    """Formal preparation calls executor.keys() for every executor; engine_sensor must answer it."""
+    from guard import application
+    from tests.builders import policy
+
+    sides = {'baseline': side(tmp_path, 'b'), 'candidate': side(tmp_path, 'c')}
+    report = pair.pair(sides, tmp_path / 'out', checks=('REQ-14', 'REQ-18'))
+    assert report['ready_static_both_sides'] == ['REQ-14', 'REQ-18']
+    assert engine_sensor.EngineSensorExecutor({}).keys() == {}
+    pack = load_pack(UPDATE / 'packs/PACK-BASELINE')
+    envs = [load_environment(sides[name]['env']) for name in pair.SIDES]
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {'engine_sensor': 'kubernetes'},
+           'update': {'mode': 'external', 'allowed_checks': ['REQ-14', 'REQ-18']},
+           'sides': {name: {'check_config': {c: report['rows'][name][c]['executor'] for c in ('REQ-14', 'REQ-18')}}
+                     for name in pair.SIDES}}
+    pol = policy(pack.ref(), scope={'include': ['REQ-14', 'REQ-18']}, values={})
+    data = application.update_readiness(pack, envs, pol, cfg)
+    inputs_rows = [row for row in data['checks'] if row['check'] == 'inputs' or row['check'].startswith('inputs:')]
+    assert inputs_rows and all(row['ok'] for row in inputs_rows), inputs_rows

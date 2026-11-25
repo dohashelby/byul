@@ -221,6 +221,14 @@ class EngineSensorExecutor:
                 'profile_available': state.get('profile_available', state['implemented'] if env is not None else None),
                 'runtime_qualified': False}
 
+    def keys(self):
+        """Readiness role-key contract (`update_readiness` calls it for every executor).
+
+        Callback trials send no role keys. REQ-15 Gateway principal tokens are read per case from
+        `principal_token_env` at run time, and a missing token is recorded there as a gap.
+        """
+        return {}
+
     def validate_policy(self, check, values):
         if check.executor != self.name:
             raise ValueError('ENGINE_SENSOR_EXECUTOR_MISMATCH')

@@ -1,0 +1,206 @@
+"""Hash a closed passive callback mount before and after the existing page read."""
+from contextlib import contextmanager
+import hashlib
+from itertools import islice
+import json
+import os
+import re
+import stat
+import sys
+
+CODE = '/guard-lifecycle/engine-callbacks'
+DATA = '/guard-lifecycle/data'
+PRINCIPAL = (2000, 0)
+SCHEMA = 'guard-mounted-callback-sources/1'
+ERROR = 'NORMAL_TP2_CALLBACK_SOURCE_UNVERIFIED'
+FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
+NAME = re.compile(r'(?:manifest\.json|settings\.json|sitecustomize\.py|guard_engine_callbacks/(?:[a-z0-9_]+\.py|assets/[a-z0-9_]+\.json))')
+
+
+def _digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def _input_layout(files):
+    if (type(files) is not dict or not 3 <= len(files) <= 64
+            or not {'manifest.json', 'settings.json', 'sitecustomize.py'} <= files.keys()
+            or any(not NAME.fullmatch(name) or type(item) is not dict or set(item) != {'bytes', 'sha256'}
+                   or type(item['bytes']) is not int or not 0 <= item['bytes'] <= 262144
+                   or type(item['sha256']) is not str or not re.fullmatch('[0-9a-f]{64}', item['sha256'])
+                   for name, item in files.items())
+            or sum(item['bytes'] for item in files.values()) > 2 * 1024**2):
+        raise ValueError(ERROR)
+    result = {}
+    for name, item in files.items():
+        directory = result
+        components = name.split('/')
+        for part in components[:-1]:
+            directory = directory.setdefault(part, {})
+        directory[components[-1]] = item
+    return result
+
+
+@contextmanager
+def _directory(path):
+    fd = os.open('/', FLAGS | os.O_DIRECTORY)
+    try:
+        for part in path.split('/')[1:]:
+            next_fd = os.open(part, FLAGS | os.O_DIRECTORY, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def _identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid, info.st_nlink,
+            info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _secure_code(info, owner_mode):
+    return ((info.st_uid, info.st_gid) == PRINCIPAL
+            and stat.S_IMODE(info.st_mode) in {owner_mode, owner_mode | owner_mode >> 3})
+
+
+def _file(directory, name, expected):
+    fd = os.open(name, FLAGS, dir_fd=directory)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or not _secure_code(info, 0o400)
+                or info.st_size != expected['bytes']):
+            raise ValueError(ERROR)
+        digest, length = hashlib.sha256(), 0
+        while length <= expected['bytes']:
+            raw = os.read(fd, min(65536, expected['bytes'] + 1 - length))
+            if not raw:
+                break
+            digest.update(raw)
+            length += len(raw)
+        if length != expected['bytes'] or digest.hexdigest() != expected['sha256']:
+            raise ValueError(ERROR)
+        identity = _identity(info)
+        if (_identity(os.fstat(fd)) != identity
+                or _identity(os.stat(name, dir_fd=directory, follow_symlinks=False)) != identity):
+            raise ValueError(ERROR)
+        return identity
+    finally:
+        os.close(fd)
+
+
+def _names(fd, limit):
+    listing = os.open('.', FLAGS | os.O_DIRECTORY, dir_fd=fd)
+    try:
+        with os.scandir(listing) as entries:
+            return {entry.name for entry in islice(entries, limit + 1)}
+    finally:
+        os.close(listing)
+
+
+def _tree(fd, layout):
+    info = os.fstat(fd)
+    if not _secure_code(info, 0o500) or _names(fd, len(layout)) != layout.keys():
+        raise ValueError(ERROR)
+    children = {}
+    for name, item in sorted(layout.items()):
+        if set(item) == {'bytes', 'sha256'}:
+            children[name] = _file(fd, name, item)
+            continue
+        child = os.open(name, FLAGS | os.O_DIRECTORY, dir_fd=fd)
+        try:
+            children[name] = _tree(child, item)
+        finally:
+            os.close(child)
+        if _identity(os.stat(name, dir_fd=fd, follow_symlinks=False)) != children[name]['identity']:
+            raise ValueError(ERROR)
+    identity = _identity(info)
+    if _identity(os.fstat(fd)) != identity or _names(fd, len(layout)) != layout.keys():
+        raise ValueError(ERROR)
+    return {'identity': identity, 'children': children}
+
+
+def _proc_bytes(path):
+    with open(path, 'rb') as stream:
+        raw = stream.read(262145)
+    if not 0 < len(raw) <= 262144 or not raw.endswith(b'\n'):
+        raise ValueError(ERROR)
+    return raw
+
+
+def _mounts():
+    selected = {}
+    for row in _proc_bytes('/proc/self/mountinfo').splitlines():
+        fields = row.split()
+        if len(fields) < 6:
+            raise ValueError(ERROR)
+        path = fields[4]
+        if any(path.startswith(root.encode() + b'/') for root in (CODE, DATA)):
+            raise ValueError(ERROR)
+        for root, mode in ((CODE, b'ro'), (DATA, b'rw')):
+            if path != root.encode():
+                continue
+            if root in selected or {b'ro', b'rw'} & set(fields[5].split(b',')) != {mode}:
+                raise ValueError(ERROR)
+            selected[root] = (fields[0], hashlib.sha256(row).hexdigest())
+    if selected.keys() != {CODE, DATA} or selected[CODE][0] == selected[DATA][0]:
+        raise ValueError(ERROR)
+    return {name: item[1] for name, item in selected.items()}
+
+
+def _principal():
+    actual = (os.geteuid(), os.getegid())
+    rows = [row.split() for row in _proc_bytes('/proc/1/status').splitlines()
+            if row.startswith((b'Uid:', b'Gid:'))]
+    if actual != PRINCIPAL or len(rows) != 2 or [row[0] for row in rows] != [b'Uid:', b'Gid:']:
+        raise ValueError(ERROR)
+    if any(len(row) != 5 or int(row[2]) != expected for row, expected in zip(rows, PRINCIPAL)):
+        raise ValueError(ERROR)
+    return actual
+
+
+def snapshot(files):
+    layout = _input_layout(files)
+    principal, mounts = _principal(), _mounts()
+    with _directory(CODE) as code, _directory(DATA) as data:
+        if not os.fstatvfs(code).f_flag & os.ST_RDONLY or os.fstatvfs(data).f_flag & os.ST_RDONLY:
+            raise ValueError(ERROR)
+        journal = os.fstat(data)
+        if (journal.st_uid, journal.st_gid) != principal or stat.S_IMODE(journal.st_mode) != 0o700:
+            raise ValueError(ERROR)
+        code_info = os.fstat(code)
+        if (code_info.st_dev, code_info.st_ino) == (journal.st_dev, journal.st_ino):
+            raise ValueError(ERROR)
+        tree = _tree(code, layout)
+    with _directory(CODE) as code, _directory(DATA) as data:
+        journal_after = os.fstat(data)
+        journal_identity = (journal.st_dev, journal.st_ino, journal.st_mode, journal.st_uid, journal.st_gid)
+        if (_identity(os.fstat(code)) != tree['identity'] or journal_identity != (
+                journal_after.st_dev, journal_after.st_ino, journal_after.st_mode, journal_after.st_uid, journal_after.st_gid)
+                or mounts != _mounts() or principal != _principal()):
+            raise ValueError(ERROR)
+    return {'schema': SCHEMA, 'files_sha256': _digest(files), 'file_count': len(files),
+            'filesystem_sha256': _digest({'mounts': mounts, 'code': tree, 'journal': journal_identity}),
+            'uid': principal[0], 'gid': principal[1]}
+
+
+def attested_page(page_source, raw_spec):
+    """Keep the existing checkpoint/page operation inside the source observation."""
+    try:
+        spec = json.loads(raw_spec)
+        session = spec['session']
+        if not re.fullmatch('[0-9a-f]{32}', session):
+            raise ValueError(ERROR)
+        files = spec['normal_callback_assets']
+        before = snapshot(files)
+        callbacks = {'__name__': 'guard_callback_page'}
+        exec(compile(page_source, 'guard_callback_page', 'exec'), callbacks)
+        page = callbacks['page'](DATA + '/' + session, spec.get('snapshot'), spec.get('cursor'),
+                                 spec.get('capture_id'), spec.get('seek_end', False), session=session,
+                                 terminal_epochs=spec.get('normal_worker_terminal_epochs'))
+        page['container_start_monotonic_ns'] = callbacks['container_start']()
+        if snapshot(files) != before:
+            raise ValueError(ERROR)
+        page['normal_callback_sources'] = before
+    except (IndexError, KeyError, OSError, TypeError, ValueError):
+        raise SystemExit(ERROR) from None
+    print(json.dumps(page, separators=(',', ':')))

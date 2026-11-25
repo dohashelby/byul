@@ -67,6 +67,8 @@ def materialize(policy, pack, environments, targets, inventory):
         mapping = validate_model_mapping(env, target.get('model_mapping'))
         if row['served_model_name'] != mapping['served_model_name']:
             raise ValueError('MVP_MODEL_GRANT_ALIAS_MISMATCH')
+    if len({row['gateway_policy_sha256'] for row in inventory['sides'].values()}) != 1:
+        raise ValueError('MVP_MODEL_GRANT_GATEWAY_POLICY_PAIR_MISMATCH')
     grant = f'{principal}:{sha256_hex(model.encode())}:{sha256_hex(revision.encode())}'
     return fill_runtime_values(policy, CHECK, {GRANT: [grant]})
 

@@ -25,14 +25,17 @@ from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
+                                 NORMAL_CODE_SELECTION_OPTION, NORMAL_CODE_SELECTION_SCOPE_ERROR,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR,
                                  NORMAL_FILE_READS_OPTION, NORMAL_FILE_READS_SCOPE_ERROR,
                                  NORMAL_GRAPH_CAPTURE_OPTION, NORMAL_GRAPH_CAPTURE_SCOPE_ERROR,
+                                 NORMAL_MODEL_CODE_OPTION, NORMAL_MODEL_CODE_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION, NORMAL_REQUEST_LATENCY_SCOPE_ERROR,
                                  NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_OPTION, NORMAL_STARTUP_LOAD_SCOPE_ERROR,
-                                 NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION)
+                                 NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION,
+                                 NORMAL_WORKER_SHARDS_OPTION, NORMAL_WORKER_SHARDS_SCOPE_ERROR)
 
 from .base import Executor
 from .container_config import ContainerConfigExecutor
@@ -50,6 +53,8 @@ from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
 from .kubernetes_input_validation import KubernetesInputValidationExecutor
 from .kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
+from .kubernetes_normal_code_selection import KubernetesNormalCodeSelectionExecutor
+from .kubernetes_normal_model_code import KubernetesNormalModelCodeExecutor
 from .kubernetes_normal_request_latency import KubernetesNormalRequestLatencyExecutor
 from .kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
 from .kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
@@ -100,6 +105,16 @@ from .lab_activation import activated
 from .record_attestation import attested
 from .lifecycle_transition import LifecycleTransitionExecutor
 
+
+def _with_kubernetes_config(cfg, section, constructor, **pins):
+    return constructor(
+        cfg.get(section, {}),
+        environ=cfg.get("_runtime_environ"),
+        expected_target_sha256=cfg.get("_kubernetes_target_sha256"),
+        **pins,
+    )
+
+
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "rank_failure:common-input": lambda cfg: _rank_record_input(cfg),
@@ -109,61 +124,66 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
         cfg.get("lifecycle_transition", {}), expected_target_sha256=cfg.get("_kubernetes_target_sha256"),
         expected_manifest_sha256=cfg.get("_transition_generation_manifest_sha256")),
     "profiler_observation:source-cpu": lambda cfg: KubernetesProfilerObservationExecutor(cfg.get("profiler_observation", {}), implementation="source-cpu"),
-    "boundary_egress:kubernetes": lambda cfg: kubernetes_boundary_egress(cfg.get("boundary_egress", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "native_route:kubernetes": lambda cfg: KubernetesNativeRouteExecutor(cfg.get("native_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "unix_ipc:kubernetes": lambda cfg: KubernetesIPCProductExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "observation_identity:kubernetes": lambda cfg: KubernetesObservationIdentityExecutor(cfg.get("observation_identity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "profiler_observation:kubernetes": lambda cfg: KubernetesProfilerObservationExecutor(cfg.get("profiler_observation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "rank_failure:kubernetes": lambda cfg: KubernetesRankFailureExecutor(cfg.get("rank_failure", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "initialization:kubernetes": lambda cfg: KubernetesInitializationExecutor(cfg.get("initialization", {}),
-        environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256"),
+    "boundary_egress:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "boundary_egress", kubernetes_boundary_egress),
+    "native_route:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "native_route", KubernetesNativeRouteExecutor),
+    "unix_ipc:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "unix_ipc", KubernetesIPCProductExecutor),
+    "observation_identity:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "observation_identity", KubernetesObservationIdentityExecutor),
+    "profiler_observation:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "profiler_observation", KubernetesProfilerObservationExecutor),
+    "rank_failure:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "rank_failure", KubernetesRankFailureExecutor),
+    "initialization:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "initialization", KubernetesInitializationExecutor,
         expected_prepared_sha256=cfg.get("_initialization_prepared_sha256")),
-    "resource_recovery:kubernetes": lambda cfg: KubernetesResourceRecoveryExecutor(cfg.get("resource_recovery", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "session_revocation:kubernetes": lambda cfg: KubernetesSessionRevocationExecutor(cfg.get("session_revocation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "credential_revocation:kubernetes": lambda cfg: KubernetesCredentialRevocationExecutor(cfg.get("credential_revocation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "stream_buffer:kubernetes": lambda cfg: KubernetesStreamBufferExecutor(cfg.get("stream_buffer", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "stored_responses:kubernetes": lambda cfg: KubernetesStoredResponsesExecutor(cfg.get("stored_responses", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "forwarded_identity:kubernetes": lambda cfg: KubernetesForwardedIdentityExecutor(cfg.get("forwarded_identity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "observation_state:kubernetes": lambda cfg: KubernetesObservationStateExecutor(cfg.get("observation_state", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "required_event_record:kubernetes": lambda cfg: KubernetesRequiredEventExecutor(cfg.get("required_event_record", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "request_termination:kubernetes": lambda cfg: KubernetesRequestTerminationExecutor(cfg.get("request_termination", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "model_authorization:kubernetes": lambda cfg: KubernetesModelAuthorizationExecutor(cfg.get("model_authorization", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "record_access:kubernetes": lambda cfg: KubernetesRecordAccessExecutor(cfg.get("record_access", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "supply_boot:kubernetes": lambda cfg: KubernetesSupplyBootExecutor(cfg.get("supply_boot", {}),
-        environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256"),
+    "resource_recovery:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "resource_recovery", KubernetesResourceRecoveryExecutor),
+    "session_revocation:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "session_revocation", KubernetesSessionRevocationExecutor),
+    "credential_revocation:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "credential_revocation", KubernetesCredentialRevocationExecutor),
+    "stream_buffer:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "stream_buffer", KubernetesStreamBufferExecutor),
+    "stored_responses:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "stored_responses", KubernetesStoredResponsesExecutor),
+    "forwarded_identity:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "forwarded_identity", KubernetesForwardedIdentityExecutor),
+    "observation_state:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "observation_state", KubernetesObservationStateExecutor),
+    "required_event_record:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "required_event_record", KubernetesRequiredEventExecutor,
+        expected_copy_target_file_sha256=cfg.get("_copy_snapshot_target_file_sha256")),
+    "request_termination:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "request_termination", KubernetesRequestTerminationExecutor,
+        expected_target_file_sha256=cfg.get("_retry_snapshot_target_file_sha256")),
+    "model_authorization:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "model_authorization", KubernetesModelAuthorizationExecutor),
+    "record_access:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "record_access", KubernetesRecordAccessExecutor),
+    "supply_boot:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "supply_boot", KubernetesSupplyBootExecutor,
         expected_prepared_sha256_by_role=cfg.get("_supply_prepared_sha256_by_role")),
-    "route_record:kubernetes": lambda cfg: KubernetesRouteRecordExecutor(cfg.get("route_record", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "route_record:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "route_record", KubernetesRouteRecordExecutor),
     "fake": lambda cfg: FakeExecutor(cfg.get("fake", {}).get("scenario", "pass"), cfg.get("fake", {}).get("scenarios", {})),
     "direct_route:real": lambda cfg: DirectRouteExecutor(cfg.get("direct_route", {}), environ=cfg.get("_runtime_environ")),
     "role_route:real": lambda cfg: RoleRouteExecutor(cfg.get("role_route", {}), environ=cfg.get("_runtime_environ")),
-    "direct_route:kubernetes": lambda cfg: KubernetesDirectRouteExecutor(cfg.get("direct_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
-    "role_route:kubernetes": lambda cfg: KubernetesRoleRouteExecutor(cfg.get("role_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "direct_route:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "direct_route", KubernetesDirectRouteExecutor),
+    "role_route:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "role_route", KubernetesRoleRouteExecutor),
     "container_config:real": lambda cfg: ContainerConfigExecutor(cfg.get("container_config", {})),
-    "container_config:kubernetes": lambda cfg: KubernetesContainerConfigExecutor(cfg.get("container_config", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "container_config:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "container_config", KubernetesContainerConfigExecutor),
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),
-    "credential_exposure:kubernetes": lambda cfg: KubernetesCredentialExposureExecutor(cfg.get("credential_exposure", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "credential_exposure:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "credential_exposure", KubernetesCredentialExposureExecutor),
     "input_validation:real": lambda cfg: InputValidationExecutor(cfg.get("input_validation", {})),
-    "input_validation:kubernetes": lambda cfg: KubernetesMatrixInputValidationExecutor(cfg.get("input_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "input_validation:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "input_validation", KubernetesMatrixInputValidationExecutor),
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
     "sampling_validation:kubernetes": lambda cfg: KubernetesSamplingExecutor(cfg.get("sampling_validation", {}),
         environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),
-    "response_content:kubernetes": lambda cfg: KubernetesResponseContentExecutor(cfg.get("response_content", {}),
-        environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256"),
-        expected_route_target_sha256=cfg.get("_response_route_target_sha256")),
+    "response_content:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "response_content", KubernetesResponseContentExecutor,
+        expected_route_target_sha256=cfg.get("_response_route_target_sha256"),
+        expected_target_file_sha256=cfg.get("_response_snapshot_target_file_sha256"),
+        expected_manifest_sha256=cfg.get("_response_snapshot_manifest_sha256"),
+        expected_policy_sha256=cfg.get("_response_snapshot_policy_sha256"),
+        expected_policy_validity=cfg.get("_response_snapshot_policy_validity")),
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
     "log_analysis:kubernetes": lambda cfg: KubernetesLogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),
-    "template_validation:kubernetes": lambda cfg: KubernetesTemplateSupplyExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "template_validation:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "template_validation", KubernetesTemplateSupplyExecutor),
     "template_validation:source-cpu": lambda cfg: TemplateSourceCPUExecutor(cfg.get("template_validation", {})),
     "request_binding:real": lambda cfg: RequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ")),
-    "request_binding:kubernetes": lambda cfg: KubernetesRequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "request_binding:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "request_binding", KubernetesRequestBindingExecutor,
+        expected_target_file_sha256=cfg.get("_request_binding_target_file_sha256")),
     "log_integrity:real": lambda cfg: LogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ")),
-    "log_integrity:kubernetes": lambda cfg: KubernetesLogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "log_integrity:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "log_integrity", KubernetesLogIntegrityExecutor,
+        expected_target_file_sha256=cfg.get("_collection_status_target_file_sha256")),
     "unix_ipc:real": lambda cfg: UnixIPCExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ")),
     "boundary_egress:real": lambda cfg: BoundaryEgressDispatch(cfg.get("boundary_egress", {})),
     "api_transport:real": lambda cfg: APITransportExecutor(cfg.get("api_transport", {})),
-    "api_transport:kubernetes": lambda cfg: KubernetesAPITransportExecutor(cfg.get("api_transport", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "api_transport:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "api_transport", KubernetesAPITransportExecutor),
     "structured_tools_cpu:reference-cpu": lambda cfg: StructuredToolsCPUExecutor(cfg.get("structured_tools_cpu", {})),
     "structured_tools_target031_cpu:source031": lambda cfg: StructuredToolsTarget031CPUExecutor(cfg.get("structured_tools_target031_cpu", {})),
 }
@@ -220,13 +240,16 @@ def resolve_executor(executor: str, impl: str, *, engine=None, version=None) -> 
     return EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
 
 
-def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None, version=None) -> Executor:
+def build_executor(
+    executor: str, impl: str, cfg: dict[str, Any], *,
+    engine=None, version=None, factory: Callable[[dict[str, Any]], Executor] | None = None,
+) -> Executor:
     """실행 설정에 lab_activation·record_attestation이 있으면 해당 계층을 덧씌운다."""
-    bound_engine, bound_version = _ENVIRONMENT.get()
-    engine, version = engine or bound_engine, version or bound_version
-    factory = resolve_executor(executor, impl, engine=engine, version=version)
     if factory is None:
-        raise ValueError('EXECUTOR_UNAVAILABLE')
+        bound_engine, bound_version = _ENVIRONMENT.get()
+        factory = resolve_executor(executor, impl, engine=engine or bound_engine, version=version or bound_version)
+        if factory is None:
+            raise ValueError('EXECUTOR_UNAVAILABLE')
     if impl == "kubernetes" and '_kubernetes_target_sha256_by_executor' in cfg:
         # A mixed update also has collectors with their own targets and
         # generations. Only the explicitly bound executors receive its hash.
@@ -255,6 +278,11 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
                 settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
     if executor == "input_validation":
         settings = cfg.get(executor)
+        if type(settings) is dict and NORMAL_CODE_SELECTION_OPTION in settings:
+            if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
+                raise ValueError(NORMAL_CODE_SELECTION_SCOPE_ERROR)
+            return KubernetesNormalCodeSelectionExecutor(
+                settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
         if type(settings) is dict and NORMAL_TOKEN_INPUT_OPTION in settings:
             if impl != "kubernetes" or cfg.get("lab_activation") or cfg.get("record_attestation"):
                 raise ValueError("NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID")
@@ -272,8 +300,10 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
         if type(settings) is dict:
             modes = {
                 NORMAL_FILE_READS_OPTION: (KubernetesSupplyBootExecutor, NORMAL_FILE_READS_SCOPE_ERROR),
+                NORMAL_WORKER_SHARDS_OPTION: (KubernetesSupplyBootExecutor, NORMAL_WORKER_SHARDS_SCOPE_ERROR),
                 NORMAL_STARTUP_LOAD_OPTION: (KubernetesNormalStartupLoadExecutor, NORMAL_STARTUP_LOAD_SCOPE_ERROR),
                 NORMAL_COMPILE_CACHE_OPTION: (KubernetesNormalCompileCacheExecutor, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
+                NORMAL_MODEL_CODE_OPTION: (KubernetesNormalModelCodeExecutor, NORMAL_MODEL_CODE_SCOPE_ERROR),
                 NORMAL_SAFETENSORS_READER_OPTION: (
                     KubernetesNormalSafetensorsReaderExecutor, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
                 INSTALLED_PLUGIN_INVENTORY_OPTION: (

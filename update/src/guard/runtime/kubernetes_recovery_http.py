@@ -4,6 +4,7 @@ from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import re,threading
 from guard.models import canonical_json,sha256_hex
+from .response_evidence import complete_body, lifecycle_http_report
 from .bounded import strict_json
 from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
 
@@ -44,12 +45,11 @@ class KubernetesRecoveryHTTP:
                 if (value.get('id'),value.get('method'),value.get('mode'))!=(request['id'],'POST','json'):raise ValueError
                 status=value.get('outcome')
                 if not(type(status) is int and 100<=status<=599 or type(status) is str and status in {'refused','timeout','unreachable','dns_error','error','probe_error'}):raise ValueError
-                text=value.get('body');complete=(type(text) is str and len(text.encode())<=131072 and value.get('capture_complete') is True
-                    and value.get('eof') is True and value.get('utf8_valid') is True and value.get('body_truncated') is False
-                    and type(value.get('body_bytes')) is int and value['body_bytes']==len(text.encode()) and value.get('body_sha256')==sha256_hex(text.encode()))
+                body_bytes = complete_body(value)
+                complete = body_bytes is not None
                 shape=False
                 if complete and status==200:
-                    body=strict_json(text.encode(),limit=131072)
+                    body=strict_json(body_bytes,limit=131072)
                     choices=body.get('choices') if type(body) is dict else None
                     shape=(type(body) is dict and body.get('model')==self.api_model and type(choices) is list and 1<=len(choices)<=8
                         and all(type(c) is dict and type(c.get('text')) is str for c in choices))
@@ -76,6 +76,4 @@ class KubernetesRecoveryHTTP:
         return {'pod_ready':True if conditions[0]=='True' else False if conditions[0]=='False' else None,'container_ready':states[0]['ready']}
 
     def report(self):
-        return {'profile':PROFILE,'target_sha256':self.target_sha256,'binding':deepcopy(self.binding),'environment_ref':deepcopy(self.base.environment_ref),
-            'probe_source_sha256':self.base.source_sha256,'requests':deepcopy(self.rows),'collection_gap':self.failed or bool(self.base.cleanup_errors),
-            'cleanup_errors':list(self.base.cleanup_errors),'faults_injected':False,'producer_authenticated':False}
+        return lifecycle_http_report(PROFILE, self)

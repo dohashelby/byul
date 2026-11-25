@@ -119,6 +119,46 @@ def test_prepared_sensor_selects_scoped_observers_without_overwriting_legacy_fla
         engine_callbacks.prepare_assets(tmp_path / 'bad', scoped_runner_consumption=True, runner_consumption=True)
 
 
+@pytest.mark.parametrize('module_name', [callback.INPUT, sensor.consumption_v2.RUNNER])
+def test_mounted_scoped_observers_accept_reviewed_baseline_methods_only_in_scoped_mode(module_name):
+    from pathlib import Path
+    from types import CodeType, FunctionType, ModuleType
+
+    fixture = Path(__file__).parent / 'fixtures' / 'vllm-0.30.0'
+    source = fixture / (module_name.replace('.', '/') + '.py.txt')
+    raw = source.read_bytes()
+    expected = SCOPED_RELEASES['0.30.0'][1 if module_name == callback.INPUT else 2]
+    assert hashlib.sha256(raw).hexdigest() == expected
+    points = (callback.TARGETS if module_name == callback.INPUT else sensor.consumption_v2.TARGETS)[module_name]
+
+    # Build only the exact code objects needed by the installer. No engine
+    # module initialization or method body runs for this fixture.
+    module = ModuleType(module_name)
+    module.__file__ = str(source)
+    code = compile(raw, str(source), 'exec', dont_inherit=True, optimize=0)
+    owner_name = points[0].split('.')[0]
+    owner_code = next(child for child in code.co_consts
+                      if type(child) is CodeType and child.co_qualname == owner_name)
+    codes = {child.co_qualname: child for child in owner_code.co_consts if type(child) is CodeType}
+    methods = {point.split('.')[1]: FunctionType(codes[point], vars(module)) for point in points}
+    owner = type(owner_name, (), methods)
+    setattr(module, owner_name, owner)
+
+    def offline_callbacks(**options):
+        return sensor.EngineCallbacks('a' * 32, b'k' * 32, lambda row: None,
+                                      context_provider=lambda: {'EXAMPLE': True}, **options)
+
+    legacy = offline_callbacks(runner_consumption=True)
+    assert legacy.instrument(module) is False
+    assert all(vars(owner)[method] is original for method, original in methods.items())
+
+    mounted = offline_callbacks(scoped_runner_consumption=True)
+    assert mounted.instrument(module) is True
+    observer = mounted.consumption if module_name == callback.INPUT else mounted.consumption_v2
+    assert observer._source_pins[module_name] == expected
+    assert all(vars(owner)[method].__wrapped__ is original for method, original in methods.items())
+
+
 def test_scoped_observer_preserves_actual_rank_and_changes_admission_only_after_native_return(monkeypatch):
     from guard.adapters import vllm_scoped_consumption_callback as native
     rows = []
@@ -151,3 +191,101 @@ def test_planned_scope_cannot_be_narrowed_to_the_rows_that_survived(monkeypatch,
     else:
         value['bindings'][-1]['start_ticks'] = None
     assert not scoped.validate(value, **SCOPE)['complete']
+
+
+# Independently reviewed source identities, with synthetic calls and values.
+SCOPED_RELEASES = {
+    '0.30.0': (
+        'vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40',
+        'c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813',
+        '174c93db921c23cf0396eee4764be25b2bd2d4b6a06e9fa41ce3598b884ce8ce',
+    ),
+    '0.31.0': (
+        'docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b',
+        'd79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b',
+        '725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c',
+    ),
+}
+
+
+def _reviewed_api_rows(rows, api_pin, *, label='input'):
+    calls = {row['point']: row for row in rows if row['phase'] == 'CALL'}
+    ids = {point: hashlib.sha256((label + point).encode()).hexdigest() for point in calls}
+    parent = ids['InputProcessor.process_inputs']
+    for row in rows:
+        point = row['point']
+        row.update(source_file_sha256=api_pin, call_sha256=ids[point],
+                   parent_call_sha256=None if point == 'InputProcessor.process_inputs' else parent,
+                   operation_started_ns=calls[point]['operation_started_ns'])
+    return rows
+
+
+@pytest.mark.parametrize('version', SCOPED_RELEASES)
+@pytest.mark.parametrize('change', [None, 'other-worker', 'other-return', 'other-image'])
+def test_reviewed_v2_scoped_capture_projects_each_release_and_its_own_rank_calls(version, change):
+    from guard.adapters import vllm_consumption_v2_callback as v2
+
+    processes = native([{'pid': 1, 'start_ticks': 1, 'events': api_rows()},
+                        {'pid': 112, 'start_ticks': 2, 'rank': 0, 'events': worker_rows(logit_bias=0)},
+                        {'pid': 113, 'start_ticks': 3, 'rank': 1, 'events': worker_rows(logit_bias=0)}])
+    image, api_pin, worker_pin = SCOPED_RELEASES[version]
+    other_image, _, other_worker_pin = next(value for release, value in SCOPED_RELEASES.items() if release != version)
+    _reviewed_api_rows(processes[0]['events'], api_pin)
+    points = {'GPUModelRunner._update_states': 'GPUModelRunner.add_requests',
+              'GPUModelRunner._sample': 'GPUModelRunner.sample'}
+    for worker in processes[1:]:
+        for row in worker['events']:
+            pin = worker_pin
+            if worker['rank'] == 1 and (change == 'other-worker' or change == 'other-return' and row['phase'] == 'RETURN'):
+                pin = other_worker_pin
+            row.update(schema=v2.SCHEMA, point=points[row['point']], source_file_sha256=pin)
+    scope = {**EXAMPLE_SCOPE, 'engine_version': version,
+             'image_digest': other_image if change == 'other-image' else image}
+    options = dict(pod=POD, qualification_scope=scope, expected_requests=[R1], reviewed_scoped_sources=True,
+                   expected_stage_ranks={'runner_received': [0, 1], 'sampler_applied': [0, 1]}, **SCOPE)
+    if change == 'other-image':
+        with pytest.raises(legacy.GpuInputError, match='^GPU_INPUT_SCOPED_SOURCE_SCOPE_UNREVIEWED$'):
+            scoped.record(processes, **options)
+        return
+    record, validation = scoped.record(processes, **options)
+    assert [row['event'] for row in record['events'] if record['bindings'][row['binding']]['role'] == 'api'] == ['api_validated']
+    ranks = [0, 1] if change is None else [0]
+    for stage in ('runner_received', 'sampler_applied'):
+        assert [record['bindings'][row['binding']]['rank'] for row in record['events'] if row['event'] == stage] == ranks
+    assert record['completeness']['diagnostic_codes'] == (['NATIVE_CALL_UNQUALIFIED'] if change else [])
+    assert record['completeness']['source_ended'] is False
+    assert not validation['supported'] and not validation['complete']
+
+
+@pytest.mark.parametrize('version', SCOPED_RELEASES)
+@pytest.mark.parametrize('validated_parent', [True, False])
+def test_reviewed_api_validation_stays_with_its_recorded_parent(version, validated_parent):
+    image, api_pin, _ = SCOPED_RELEASES[version]
+    first, second = native([{'pid': 1, 'start_ticks': 1, 'events': api_rows()} for _ in range(2)])
+    first_rows = _reviewed_api_rows(first['events'], api_pin, label='first')
+    second_rows = _reviewed_api_rows(second['events'], api_pin, label='second')
+    # The first API invocation is still in flight when a second normal call
+    # reuses the outer HMAC. Each has distinct closed validation calls.
+    first_rows[-1]['operation_finished_ns'] = 20
+    for row in second_rows:
+        row['operation_started_ns'] += 6
+        row['operation_finished_ns'] += 6
+    for rows, temperature in ((first_rows, 125), (second_rows, 875)):
+        params = next(row for row in rows if row['point'] == 'InputProcessor._validate_params' and row['phase'] == 'CALL')
+        params['fields']['params']['temperature_milli'] = temperature
+    if not validated_parent:
+        for row in second_rows[1:-1]:
+            row['parent_call_sha256'] = None
+
+    process = {**first, 'events': first_rows[:-1] + second_rows + first_rows[-1:]}
+    scope = {**EXAMPLE_SCOPE, 'engine_version': version, 'image_digest': image}
+    record, validation = scoped.record([process], pod=POD, expected_requests=[R1],
+                                       reviewed_scoped_sources=True, qualification_scope=scope, **SCOPE)
+    actual = [(row['source_call']['call_sha256'], row['temperature_milli']) for row in record['events']]
+    first_result = (first_rows[0]['call_sha256'], 125)
+    second_result = (second_rows[0]['call_sha256'], 875)
+    assert actual == ([second_result, first_result] if validated_parent else [first_result])
+    assert record['completeness']['diagnostic_codes'] == (
+        [] if validated_parent else ['API_VALIDATION_UNOBSERVED', 'NATIVE_API_VALIDATION_NOT_LINKED'])
+    assert record['completeness']['source_ended'] is False
+    assert validation['complete'] is validation['producer_authenticated'] is False

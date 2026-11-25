@@ -28,6 +28,7 @@ from guard.judges.rule_table import RuleTableJudge
 from guard.models import Ref, canonical_json, sha256_hex, weakest_origin
 from guard.models.objects import object_from_dict
 from guard.report.log_integrity import render_log_integrity, verify_log_display
+from guard.store.integrity import ref_key as _key
 from guard.validation_evidence import _ARTIFACT, _DIGEST, _directory, _unlinked, inventory_tree, read_objects, verify_store_files
 
 SCHEMA = "guard-log-evidence-audit/1"
@@ -37,10 +38,6 @@ _K8S_NATIVE_RECEIPT_VERSION = "0.3.1+k8s.2"
 _K8S_NATIVE_RECEIPT_FILES = frozenset({"probe_log.jsonl", "log_integrity_samples.json", "log_integrity_events.json",
                                       "log_integrity_display.html"})
 MAX_JSON_BYTES = 16 * 1024**2
-
-
-def _key(ref):
-    return ref.kind, ref.id, ref.revision, ref.sha256
 
 
 def _artifact(store, evd, name):

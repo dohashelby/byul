@@ -14,8 +14,8 @@ from guard.core.select import select
 from guard.executors.kubernetes_normal_startup_load import capture_startup_log_prefix
 from guard.models import Environment, canonical_json, sha256_hex
 from tests.builders import policy
-from tests.test_kubernetes_normal_safetensors_reader import ReaderAdapter, ReaderWorld
-from tests.test_kubernetes_normal_startup_load import STARTED
+from tests.test_kubernetes_normal_safetensors_reader import ReaderWorld
+from tests.test_kubernetes_normal_startup_load import STARTED, Adapter
 from tests.test_mvp_metadata_wiring import sources
 
 
@@ -97,7 +97,7 @@ def test_prebound_mixed_supply_snapshots_pin_each_check_independently(tmp_path, 
         stock["environment_ref"] = stock["model_mapping"]["environment_ref"] = owner
         stock["kubernetes"]["engine"]["started_at"] = STARTED
         modern = env.engine.version == "0.31.0"
-        fixture = ReaderWorld(stock, ReaderAdapter(5354 if modern else 5416), modern, None)
+        fixture = ReaderWorld(stock, env, Adapter(5354 if modern else 5416), modern, None)
         stock["startup_log_prefix"] = capture_startup_log_prefix(stock, env, runner=fixture.runner)
         entry["target"].write_bytes(canonical_json(stock))
 

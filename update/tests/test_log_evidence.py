@@ -148,9 +148,12 @@ def test_ordinary_log_metadata_is_readable_in_a_paired_report_with_passive_hops(
     plan = store.resolve(hops[Side.baseline].plan)
 
     def publish_revised(evd, **updates):
-        store.put(evd.model_copy(update={"revision": evd.revision + 1, **updates}).seal())
-        judge_plan(store, pack, plan, T0)
-        revised = build_report(store, pack, plan, T0)
+        revised_evd = evd.model_copy(update={"revision": evd.revision + 1, **updates}).seal()
+        store.put(revised_evd)
+        evidence = [revised_evd if original.ref() == evd.ref() else original for original in pinned]
+        judged = judge_plan(store, pack, plan, T0, evidence=evidence)
+        revised = build_report(store, pack, plan, T0, evidence=evidence, judged=judged)
+        assert revised_evd.ref() in revised.inputs_manifest
         store.put(revised)
         return f"{revised.id}@{revised.revision}"
 

@@ -5,10 +5,12 @@ from pathlib import Path
 import tomllib
 
 from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES
-from guard.configuration import SUP05_PREPARATION_RECEIPT, bounded_metadata_scopes, merge_config, update_allowed_checks
+from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, RESPONSE_SNAPSHOT_INPUT, RESPONSE_SNAPSHOT_OPTION,
+                                 SUP05_PREPARATION_RECEIPT, bounded_metadata_scopes, merge_config, update_allowed_checks)
 from guard.core.execution_recipe import validate_policy_time
 from guard.core.select import _in_scope
 from guard.executors import lifecycle_transition as transition, run_binding
+from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE
 from guard.executors.kubernetes_sup05_normal_preparation import read_normal_preparation
 from guard.executors.owned_capture import MAX_BYTES as MAX_RECORD_SCOPE_BYTES
 from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
@@ -134,7 +136,7 @@ def _prepared_sides(selection, check, releases, issued_at, captured):
         yield side, {'executor': settings, 'run_binding': binding}, {**before_pointer, 'path': before_path}
 
 
-def _snapshot_record_settings(side_settings, records, target_pointer, target_binding, captured):
+def _snapshot_record_settings(side_settings, records, target_pointer, target_binding, captured, *, gateway_target=None):
     bindings = side_settings.get('run_binding') if type(side_settings) is dict else None
     if type(bindings) is not dict or bindings.keys() != records.keys():
         raise ValueError(_METADATA_INVALID)
@@ -148,15 +150,18 @@ def _snapshot_record_settings(side_settings, records, target_pointer, target_bin
         if type(binding) is not dict or binding.keys() != keys:
             raise ValueError(_METADATA_INVALID)
         session = run_binding._session(binding['record_session'])
-        digests = {'target_file_sha256': target_pointer['sha256'],
+        gateway_snapshot = check_id == 'OBS-01' and gateway_target is not None
+        declared_target = gateway_target if gateway_snapshot else target_pointer
+        digests = {'target_file_sha256': declared_target['sha256'],
                    'record_session_sha256': sha256_hex(session.encode('ascii'))}
         expected_keys = digests.keys() | (set(files[1:]) if files else set())
         if check_id == 'OBS-01':
             actors = binding['test_actors']
-            if type(actors) is not dict or actors.keys() != {'allowed', 'denied'}:
+            if (type(actors) is not dict or (actors.keys() != {'allowed', 'denied'}
+                    and not (gateway_snapshot and actors.keys() == {'allowed'}))):
                 raise ValueError(_METADATA_INVALID)
             digests.update({f'observation_{role}_actor_sha256': value for role, value in actors.items()})
-            expected_keys = readiness.OBSERVATION_RECORD_DIGESTS
+            expected_keys = digests.keys() | {'observation_expected_source_sha256'}
         if (type(pins) is not dict or pins.keys() != expected_keys
                 or any(pins[key] != digest for key, digest in digests.items())):
             raise ValueError(_RECORD_INPUT_MISMATCH)
@@ -197,6 +202,63 @@ def _sup05_settings(side_settings, env, ordinary_target, captured):
     return {'normal': normal, SUP05_PREPARATION_RECEIPT: receipt}, target
 
 
+def _gateway_record_settings(side_settings, row, ordinary_target, ordinary_pointer, captured):
+    from tools.mvp_gateway_preparation import GATEWAY_ENV, GATEWAY_IMAGE, IMAGE_CONFIG_SHA256
+    from tools.mvp_metadata_wiring import gateway_response_target_matches
+
+    overlays = side_settings.get('check_config')
+    settings = overlays.get('OBS-01') if type(overlays) is dict else None
+    explicit_target = 'target' in row
+    fields = {SNAPSHOT_SOURCE, 'target'} if explicit_target else {SNAPSHOT_SOURCE}
+    if (type(settings) is not dict or settings.keys() != fields
+            or type(settings[SNAPSHOT_SOURCE]) is not dict
+            or settings[SNAPSHOT_SOURCE].get('environment') != GATEWAY_ENV):
+        raise ValueError(_METADATA_INVALID)
+    if explicit_target:
+        pointer = row['target']
+        path, target = _selected_file(pointer, _FILE_LIMITS['target'], captured)
+        if settings['target'] != path or not gateway_response_target_matches(ordinary_target, target):
+            raise ValueError(_METADATA_INVALID)
+    else:
+        pointer, target = ordinary_pointer, ordinary_target
+    gateway = target.get('kubernetes_gateway')
+    if (type(gateway) is not dict or gateway.get('image') != GATEWAY_IMAGE
+            or gateway.get('image_id') not in (
+                GATEWAY_IMAGE, f'docker-pullable://{GATEWAY_IMAGE}', f'sha256:{IMAGE_CONFIG_SHA256}')):
+        raise ValueError(_METADATA_INVALID)
+    return settings, pointer
+
+
+def _response_snapshot_settings(settings, row, ordinary_target, captured):
+    from tools.mvp_metadata_wiring import gateway_response_target_matches
+
+    if (type(settings) is not dict or settings.keys() != {'target', RESPONSE_SNAPSHOT_INPUT}
+            or type(settings['target']) is not str or not settings['target']):
+        raise ValueError(_METADATA_INVALID)
+    selection = settings[RESPONSE_SNAPSHOT_INPUT]
+    pointer = row[RESPONSE_SNAPSHOT_INPUT]
+    target_path, target = _selected_file(row['target'], MAX_SCOPE_BYTES, captured)
+    _pinned_bytes(pointer, MAX_SCOPE_BYTES, captured)
+    if (type(selection) is not dict or selection.get('path') != pointer['path']
+            or selection.get('sha256') != pointer['sha256']
+            or selection.get('target_file_sha256') != row['target']['sha256']
+            or _plain_path(Path(settings['target'])) != Path(target_path)
+            or not gateway_response_target_matches(ordinary_target, target)):
+        raise ValueError(_METADATA_INVALID)
+    return settings
+
+
+def _startup_prefix_reference(entries, checks, side, ordinary_path):
+    references = [entries[check_id, side].get('target') for check_id in checks]
+    for pointer in references:
+        if (type(pointer) is dict and type(pointer.get('path')) is str and pointer['path']
+                and _plain_path(Path(pointer['path'])) != Path(ordinary_path)):
+            if any(ref != pointer for ref in references):
+                raise ValueError(_METADATA_INVALID)
+            return pointer
+    return None
+
+
 def _prebound_metadata(source, pack, policy, primary_refs, captured):
     from tools import mvp_metadata_wiring as metadata
 
@@ -209,7 +271,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     index_path, raw = _pinned_bytes(source['index'], 262144, captured)
     index = strict_json(raw, limit=262144)
     ordinary = set(metadata.CHECK_EXECUTORS) - set(metadata.RECORD_SNAPSHOT_OPTIONS) - set(metadata.PREBOUND_RECORD_EXECUTORS)
-    supported = ordinary | _RECORD_CHECKS | {'SUP-05'}
+    supported = ordinary | _RECORD_CHECKS | {'SUP-05', 'REQ-13'}
     if (type(index) is not dict or index.keys() != {'schema', 'pack_ref', 'inputs'}
             or index['schema'] != readiness.SCHEMA or index['pack_ref'] != pack.ref().model_dump(mode='json')
             or type(index['inputs']) is not list or not 2 <= len(index['inputs']) <= 2 * len(supported)):
@@ -222,7 +284,9 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         fields = {'check_id', 'side', 'environment', 'policy', 'configuration'}
         if item['check_id'] in _RECORD_CHECKS:
             fields.add('record_inputs')
-        optional = {'target'} if item['check_id'] in ordinary else set()
+        if item['check_id'] == 'REQ-13':
+            fields.update({'target', RESPONSE_SNAPSHOT_INPUT})
+        optional = {'target'} if item['check_id'] in ordinary or item['check_id'] == 'OBS-01' else set()
         if item.keys() - optional != fields or type(item['side']) is not str or item['side'] not in sides:
             raise ValueError(_METADATA_INVALID)
         key = item['check_id'], item['side']
@@ -242,7 +306,7 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
             or update.get('kubernetes_candidate_binding', 'prebound') != 'prebound'):
         raise ValueError('MVP_TRANSITION_PREBOUND_METADATA_REQUIRED')
     allowed = update_allowed_checks(config, pack)
-    executors = {**metadata.CHECK_EXECUTORS, 'SUP-05': 'supply_boot'}
+    executors = {**metadata.CHECK_EXECUTORS, 'SUP-05': 'supply_boot', 'REQ-13': 'response_content'}
     if (not allowed or not allowed <= supported or set(entries) != {(check_id, side) for check_id in allowed for side in sides}
             or config.keys() - {'store', 'adapter', 'update', 'executors', 'sides', 'check_config'}
             or update.keys() - {'mode', 'allowed_checks', 'kubernetes_candidate_binding'}
@@ -256,8 +320,22 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     if ('SUP-04' in allowed and type(node) is dict and node.keys() == {'node_image_verification'}
             and node['node_image_verification'] in metadata.NODE_IMAGE_PROFILES):
         expected['SUP-04'] = node
-    if overrides != expected or any(overrides[check_id][option] is not True
-                                      for check_id, option in metadata.CHECK_OPTIONS.items() if check_id in allowed):
+    declared_observation = overrides.get('OBS-01') if type(overrides) is dict else None
+    gateway_observation = ('OBS-01' in allowed and type(declared_observation) is dict
+                           and declared_observation.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True)
+    observation_targets = {side for side in sides if 'target' in entries.get(('OBS-01', side), {})}
+    if gateway_observation:
+        if observation_targets and observation_targets != sides:
+            raise ValueError(_METADATA_INVALID)
+        expected['OBS-01'][GATEWAY_RECORD_SNAPSHOT_OPTION] = True
+    elif observation_targets:
+        raise ValueError(_METADATA_INVALID)
+    if 'REQ-13' in allowed:
+        expected['REQ-13'] = {RESPONSE_SNAPSHOT_OPTION: True}
+    if (overrides != expected
+            or any(overrides[check_id][option] is not True
+                   for check_id, option in metadata.CHECK_OPTIONS.items() if check_id in allowed)
+            or ('REQ-13' in allowed and overrides['REQ-13'][RESPONSE_SNAPSHOT_OPTION] is not True)):
         raise ValueError(_METADATA_INVALID)
 
     _, policy_doc = _selected_file(policy_pointer, 262144, captured)
@@ -265,6 +343,8 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
     if not saved_policy.hash_ok() or saved_policy.ref() != policy.ref():
         raise ValueError('MVP_TRANSITION_METADATA_POLICY_MISMATCH')
     target_pointers, sup05_targets, sup05_receipts = {}, {}, {}
+    startup_checks = metadata.startup_prefix_checks(allowed)
+    startup_targets, startup_owners = {}, {}
     for side in readiness.SIDES:
         _, env_doc = _selected_file(env_pointers[side], 262144, captured)
         env = Environment.model_validate(env_doc)
@@ -278,11 +358,25 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         side_settings = config['sides'][side]
         expected_side = {name: {'target': path} for name in config['executors']}
         target_pointers[side] = {'path': path, 'sha256': source['targets'][side]['sha256']}
+        prefix_ref = _startup_prefix_reference(entries, startup_checks, side, path)
+        if prefix_ref is not None:
+            prefix_path, prefixed = _selected_file(prefix_ref, metadata.STARTUP_PREFIX_LIMIT, captured)
+            startup = metadata.startup_prefix_transport(target, prefixed, env)
+            startup_targets[side] = {'path': prefix_path, 'sha256': prefix_ref['sha256']}
+            startup_owners[side] = startup.binding['engine']
+            for check_id in startup_checks:
+                expected_side[executors[check_id]] = {'target': prefix_path}
         records = {check_id: entries[check_id, side]['record_inputs'] for check_id in sorted(allowed & _RECORD_CHECKS)}
+        gateway_target = None
+        if gateway_observation:
+            gateway_settings, gateway_target = _gateway_record_settings(
+                side_settings, entries['OBS-01', side], target, target_pointers[side], captured)
         if records:
             target_binding = {'environment_ref': primary_refs[side], 'target_sha256': transport.target_sha256}
             expected_side.update(_snapshot_record_settings(
-                side_settings, records, target_pointers[side], target_binding, captured))
+                side_settings, records, target_pointers[side], target_binding, captured, gateway_target=gateway_target))
+        if gateway_target is not None:
+            expected_side.setdefault('check_config', {})['OBS-01'] = gateway_settings
         if 'SUP-05' in allowed:
             sup05, sup05_targets[side] = _sup05_settings(side_settings, env, path, captured)
             sup05_receipts[side] = (sup05[SUP05_PREPARATION_RECEIPT], env)
@@ -291,7 +385,12 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
             overlays['SUP-05'] = sup05
             for check_id in sorted(allowed - {'SUP-05'}):
                 if executors[check_id] == 'supply_boot':
-                    overlays[check_id] = {'target': path}
+                    selected = startup_targets[side]['path'] if prefix_ref is not None and check_id in startup_checks else path
+                    overlays[check_id] = {'target': selected}
+        if 'REQ-13' in allowed:
+            response = executors['REQ-13']
+            expected_side[response] = _response_snapshot_settings(
+                side_settings.get(response), entries['REQ-13', side], target, captured)
         if side_settings != expected_side:
             raise ValueError(_METADATA_INVALID)
         for check_id in allowed & ordinary:
@@ -299,11 +398,31 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
             if 'target' not in entry:
                 continue
             pointer = entry['target']
+            selected = startup_targets[side] if prefix_ref is not None and check_id in startup_checks else target_pointers[side]
             if (type(pointer) is not dict or pointer.keys() != {'path', 'sha256'}
                     or type(pointer['path']) is not str or not pointer['path']
-                    or pointer['sha256'] != target_pointers[side]['sha256']
-                    or _plain_path(Path(pointer['path'])) != Path(path)):
+                    or pointer['sha256'] != selected['sha256']
+                    or _plain_path(Path(pointer['path'])) != Path(selected['path'])):
                 raise ValueError('MVP_TRANSITION_METADATA_TARGET_REFERENCE_MISMATCH')
+
+    if startup_targets:
+        if startup_targets.keys() != sides:
+            raise ValueError(_METADATA_INVALID)
+        metadata.validate_startup_prefix_owners(startup_owners)
+
+    if gateway_observation:
+        baseline, candidate = (config['sides'][side] for side in readiness.SIDES)
+        first, second = (settings['check_config']['OBS-01'][SNAPSHOT_SOURCE] for settings in (baseline, candidate))
+        if (any(first.get(key) != second.get(key) for key in ('runtime_policy_sha256', 'target_id'))
+                or first.get('request_sha256') == second.get('request_sha256')
+                or baseline['run_binding']['OBS-01']['record_session'] == candidate['run_binding']['OBS-01']['record_session']):
+            raise ValueError(_METADATA_INVALID)
+
+    if 'REQ-13' in allowed:
+        first, second = (config['sides'][side][executors['REQ-13']][RESPONSE_SNAPSHOT_INPUT]
+                         for side in readiness.SIDES)
+        if not metadata.gateway_response_pair_matches(first, second):
+            raise ValueError(_METADATA_INVALID)
 
     if 'LIF-12' in allowed:
         retry_target_presence = {RETRY_TARGET_BINDING in settings['check_config']['LIF-12']
@@ -319,8 +438,13 @@ def _prebound_metadata(source, pack, policy, primary_refs, captured):
         raise ValueError('MVP_TRANSITION_METADATA_READINESS_UNVERIFIED')
     if any(admitted['SUP-05', side].get('sup05_normal_preparation') != receipt for side, receipt in sup05_refs.items()):
         raise ValueError('MVP_TRANSITION_METADATA_READINESS_UNVERIFIED')
-    pinned_entries = [{**row, 'target': (sup05_targets if check == 'SUP-05' else target_pointers)[side]}
-                      for (check, side), row in entries.items()]
+    pinned_entries = [
+        row if check == 'REQ-13' or (check == 'OBS-01' and gateway_observation)
+        else {**row, 'target': (sup05_targets if check == 'SUP-05'
+                                else startup_targets if startup_targets and check in startup_checks
+                                else target_pointers)[side]}
+        for (check, side), row in entries.items()
+    ]
     return config, pinned_entries, index_path.parent, sup05_receipts
 
 
@@ -335,7 +459,9 @@ def prepare_many(policy_path, selections, output, *, pack, store=None, prebound_
     A prebound metadata input provides its standard source index pointer under
     ``index`` and one independently pinned target per side under ``targets``.
     OBS-01, OBS-11, LIF-12 and PLT-12 rows must also carry their verified snapshot input digests.
+    A Gateway OBS-01 row may use its own pinned same-owner target.
     SUP-05 uses the preparation receipt and separate target held by the pinned configuration.
+    REQ-13 uses its own pinned same-owner Gateway target and retained response manifest.
     A pinned file pointer to that declaration is also accepted.
     """
     if (not isinstance(selections, (list, tuple)) or not 1 <= len(selections) <= len(transition.REDEPLOY_CHECKS)

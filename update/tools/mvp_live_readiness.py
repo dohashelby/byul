@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from datetime import datetime, timezone
+from functools import partial
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -28,21 +29,27 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNA
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_COMPILE_CACHE_OPTION,
                                  NORMAL_FILE_READS_OPTION, NORMAL_GRAPH_CAPTURE_OPTION,
+                                 NORMAL_REQUEST_BINDING_OPTION, NORMAL_REQUEST_BINDING_SCOPE_ERROR,
                                  NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION,
                                  NORMAL_STARTUP_LOAD_OPTION,
                                  NORMAL_TOKEN_INPUT_OPTION,
-                                 SUP05_PREPARATION_RECEIPT,
+                                 RESPONSE_SNAPSHOT_INPUT, RESPONSE_SNAPSHOT_OPTION, RESPONSE_SNAPSHOT_SCOPE_ERROR,
+                                 SUP05_PREPARATION_RECEIPT, SUP13_NORMAL_OPTION,
                                  bounded_metadata_scopes, cilium_egress_status_requested, collection_status_snapshot_requested,
                                  for_check, merge_config,
-                                 installed_plugin_inventory_requested, normal_request_latency_requested,
+                                 installed_plugin_inventory_requested, normal_request_binding_requested,
+                                 normal_request_latency_requested,
                                  normal_compile_cache_requested, normal_file_reads_requested,
                                  normal_graph_capture_requested,
                                  normal_safetensors_reader_requested,
                                  normal_serving_readiness_requested,
                                  normal_startup_load_requested,
-                                 normal_token_input_requested, retry_record_snapshot_requested, validate_sup05_preparation_receipt)
+                                 normal_token_input_requested, response_snapshot_is_prebound, response_snapshot_requested,
+                                 retry_record_snapshot_requested, sup13_normal_requested,
+                                 validate_normal_request_binding, validate_requested_config, validate_sup05_preparation_receipt)
+from guard.core.execution_recipe import validate_policy_time
 from guard.core.select import _in_scope, check_policy_value
 from guard.executors import passive_api_hop, registry, resource_recovery_contract, run_binding
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
@@ -75,7 +82,8 @@ SCHEMA = 'guard-mvp-live-input-sources/1'
 SIDES = ('baseline', 'candidate')
 _INPUT_FILES = ('environment', 'policy', 'configuration')
 _INPUT_ROW_FIELDS = {'check_id', 'side', *_INPUT_FILES}
-_INPUT_FILE_LIMITS = {'route_target': _RESPONSE_TARGET_BYTE_LIMIT, 'initialization_prepared': MAX_SCOPE_BYTES}
+_INPUT_FILE_LIMITS = {'route_target': _RESPONSE_TARGET_BYTE_LIMIT, 'initialization_prepared': MAX_SCOPE_BYTES,
+                      RESPONSE_SNAPSHOT_INPUT: MAX_SCOPE_BYTES}
 _INITIALIZATION_PREPARED_PROFILES = {
     ('vllm', '0.30.0'): vllm_initialization_release_sensor.PROFILE,
     ('vllm', '0.31.0'): vllm_initialization_sensor.PROFILE,
@@ -87,7 +95,7 @@ _GATEWAY_ALLOWED_RECORD_DIGESTS = OBSERVATION_RECORD_DIGESTS - {_OBSERVATION_DEN
 _RETRY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'retry_scope_sha256', 'retry_record_source_sha256'}
 _COPY_RECORD_DIGESTS = _COLLECTION_STATUS_DIGESTS | {'copy_inventory_sha256', 'copy_record_source_sha256'}
 STARTUP_OBSERVERS = {
-    'LIF-01': ('startup_load_source', normal_startup_load_transport, 'NORMAL_STARTUP_LOAD'),
+    'LIF-01': ('startup_load_source', partial(normal_startup_load_transport, allow_ranked=True), 'NORMAL_STARTUP_LOAD'),
     'SUP-07': ('compile_cache_source', normal_compile_cache_transport, 'NORMAL_COMPILE_CACHE'),
 }
 
@@ -211,6 +219,8 @@ def _generation_manifest_snapshot(cfg, bound_files):
 
 
 def _paired_normal_control_requested(raw):
+    if sup13_normal_requested(raw):
+        return True
     overlays = raw.get('check_config')
     for check_id, executor in (('REQ-10', 'sampling_validation'), ('LIF-04', 'stream_buffer')):
         overlay = overlays.get(check_id) if type(overlays) is dict else None
@@ -248,14 +258,14 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     raw_env = json.loads(files['environment'], object_pairs_hook=_pairs)
     if raw_env.get('kind') != 'ENV':
         raise ValueError('MVP_SEALED_ENV_REQUIRED')
-    env = load_environment(Path(source['environment']['path']))
+    env = load_environment(Path(source['environment']['path']), raw=files['environment'])
     expected = versions()[source['side']]
     if (env.engine.name, env.engine.version, env.engine.image_digest) != (
             expected['engine'], expected['version'], expected['image']):
         raise ValueError('MVP_ENGINE_SIDE_MISMATCH')
     if not env.runtime.gpu_count or not env.runtime.gpu_model or not env.runtime.driver:
         raise ValueError('MVP_GPU_FACTS_REQUIRED')
-    policy = load_policy(Path(source['policy']['path']), pack)
+    policy = load_policy(Path(source['policy']['path']), pack, raw=files['policy'])
     if not _in_scope(check.id, policy):
         raise ValueError('MVP_POLICY_SCOPE_MISMATCH')
     values = policy.values.get(check.id) or {}
@@ -272,6 +282,14 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     if allowed is not None and check.id not in allowed:
         raise ValueError(UPDATE_CHECK_OUTSIDE_SCOPE)
     side_configs = {side: merge_config(config, config.get('sides', {}).get(side, {})) for side in SIDES}
+    if response_snapshot_requested(config):
+        validate_requested_config(config)
+        if not response_snapshot_is_prebound(config):
+            raise ValueError(RESPONSE_SNAPSHOT_SCOPE_ERROR)
+    if normal_request_binding_requested(config):
+        validate_requested_config(config)
+        validate_normal_request_binding(config, policy)
+        validate_policy_time(policy, as_of=issued_at)
     if any(_paired_normal_control_requested(raw)
            or cilium_egress_status_requested(raw) or installed_plugin_inventory_requested(raw)
            or collection_status_snapshot_requested(raw)
@@ -279,10 +297,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
            or normal_file_reads_requested(raw)
            or normal_graph_capture_requested(raw)
            or normal_safetensors_reader_requested(raw)
+           or normal_request_binding_requested(raw)
            or normal_request_latency_requested(raw)
            or normal_serving_readiness_requested(raw)
            or normal_startup_load_requested(raw)
            or normal_token_input_requested(raw)
+           or response_snapshot_requested(raw)
            or retry_record_snapshot_requested(raw) for raw in side_configs.values()):
         bounded_metadata_scopes(side_configs.values(), pack, allowed)
     passive_hop = check.id == passive_api_hop.CHECK and passive_api_hop.validate_scope(
@@ -304,6 +324,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     external_kubernetes = implementation == 'kubernetes' and requested_update.get('mode', 'external') == 'external'
     prebound_kubernetes = (external_kubernetes
                            and requested_update.get('kubernetes_candidate_binding', 'prebound') == 'prebound')
+    node_image_verification = (prebound_kubernetes and check.id == 'SUP-04' and check.executor == 'container_config'
+                               and 'node_image_verification' in cfg)
     prebound_record_stages = prebound_kubernetes and run_binding.stages_for(check) == (1, 2, 3, 4)
     prebound_gateway_snapshot = (gateway_snapshot and prebound_record_stages
                                  and check.executor == 'required_event_record')
@@ -387,7 +409,13 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     protected_paths = (prebound_kubernetes and check.id == 'PLT-02' and check.executor == 'unix_ipc'
                        and cfg.get(KUBERNETES_BOUND_CHECK_OPTIONS['PLT-02']) is True
                        and not config.get('record_attestation') and not config.get('lab_activation'))
-    gateway_response = (check.id == 'REQ-13' and check.executor == 'response_content'
+    gateway_response_snapshot = (prebound_kubernetes and check.id == 'REQ-13'
+                                 and check.executor == 'response_content'
+                                 and cfg.get(RESPONSE_SNAPSHOT_OPTION) is True)
+    if (gateway_response_snapshot != (RESPONSE_SNAPSHOT_INPUT in source)
+            or gateway_response_snapshot and 'target' not in source):
+        raise ValueError('MVP_RESPONSE_SNAPSHOT_REFERENCE_SCOPE_INVALID')
+    gateway_response = (not gateway_response_snapshot and check.id == 'REQ-13' and check.executor == 'response_content'
                         and implementation == 'kubernetes' and 'gateway' in values['required_targets']
                         and config.get('update', {}).get('kubernetes_candidate_binding', 'prebound') == 'prebound')
     pinned_route = 'route_target' in source
@@ -403,6 +431,9 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
     normal_request_latency = check.id == 'LIF-03' and cfg.get(NORMAL_REQUEST_LATENCY_OPTION) is True
     normal_serving_readiness = check.id == 'OBS-02' and cfg.get(NORMAL_SERVING_READINESS_OPTION) is True
     normal_token_input = check.id == 'REQ-09' and cfg.get(NORMAL_TOKEN_INPUT_OPTION) is True
+    normal_request_binding = check.id == 'REQ-11' and cfg.get(NORMAL_REQUEST_BINDING_OPTION) is True
+    if normal_request_binding and (not prebound_kubernetes or 'target' not in source):
+        raise ValueError(NORMAL_REQUEST_BINDING_SCOPE_ERROR)
     target = cfg['normal']['target'] if normal_file_reads else cfg.get('target')
     if 'target' in source:
         other_targets = {'generations', 'native_route', 'challenge', 'target' if normal_file_reads else 'normal'}
@@ -444,7 +475,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         generation_manifest = _generation_manifest_snapshot(cfg, bound_files)
     elif target is not None:
         if 'target' in source:
-            raw_target, identity = _read_input(source['target'], configured_target=target)
+            bounds = {'max_bytes': MAX_SCOPE_BYTES} if gateway_response_snapshot else {}
+            if normal_request_binding:
+                bounds = {'max_bytes': 65536}
+            raw_target, identity = _read_input(source['target'], configured_target=target, **bounds)
             files['target'], identities['target'] = raw_target, identity
         else:
             raw_target, identity = _read(target)
@@ -485,6 +519,12 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             normal_hashes = preparation['expected_normal_file_sha256']
         binding_options['expected_target_sha256'] = target_sha256
         binding_options['expected_normal_file_sha256'] = normal_hashes
+    if gateway_response_snapshot:
+        pointer = source[RESPONSE_SNAPSHOT_INPUT]
+        raw, identity = _read_input(pointer, configured_target=cfg[RESPONSE_SNAPSHOT_INPUT]['path'],
+                                    max_bytes=MAX_SCOPE_BYTES)
+        files[RESPONSE_SNAPSHOT_INPUT], identities[RESPONSE_SNAPSHOT_INPUT] = raw, identity
+        config = {**config, '_response_snapshot_target_file_sha256': sha256_hex(raw_target)}
     if gateway_response and 'route_target' in cfg:
         path = cfg['route_target']
         if pinned_route:
@@ -546,12 +586,19 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             normal_input_transports(target_data, env, duration=1)
         except (KubernetesBindingError, ValueError):
             raise ValueError('NORMAL_TOKEN_INPUT_TARGET_UNAVAILABLE') from None
+    route_record_only = False
     if passive_hop:
         passive_api_hop.validate_policy(check, values)
         passive_api_hop.validate_target(target_data, env)
         binding = None  # The source evidence belongs to a future run attempt.
     else:
         run_cfg = run_binding.run_config(config, check.id)
+        route_record_only = prebound_kubernetes and run_binding.native_route_record_only_preflight(check, cfg, run_cfg)
+        if route_record_only:
+            native_target = cfg['native_route']['target']
+            raw, identity = _read(native_target)
+            bound_files.append((native_target, raw, identity))
+            binding_options['native_route_prepared_absent'] = True
         if record_source_key is not None and type(run_cfg) is dict and set(run_cfg) == run_binding.config_keys(check):
             path = run_cfg['record_producer']
             raw, identity = _read(path, min_bytes=0, max_bytes=run_binding._MAX_PRODUCER_BYTES)
@@ -611,12 +658,22 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
                 if effective['observation_expected_source_sha256'] != PRODUCER_SHA256:
                     raise ValueError('GATEWAY_REVIEWED_PRODUCER_REQUIRED')
         # Use the same executor configuration and policy validation as runtime.
+        if node_image_verification:
+            config = {**config, '_kubernetes_target_sha256_by_executor': {
+                check.executor: sha256_hex(canonical_json(target_data)),
+            }}
         try:
             executor = registry.build_executor(check.executor, implementation, config,
                 engine=env.engine.name, version=env.engine.version)
             executor.validate_policy(check, effective)
         except (ValueError, TypeError, KeyError):
             raise ValueError('MVP_EXECUTOR_POLICY_INVALID') from None
+        if node_image_verification:
+            executor.prepared_container_configuration(check, env)
+        if route_record_only:
+            if effective['route_target_sha256'] != sha256_hex(canonical_json(target_data)):
+                raise ValueError('MVP_INPUT_FILE_CHANGED')
+            executor.prepared_route_record_only(check, env, effective)
         if prebound_gateway_snapshot:
             if effective['observation_target_sha256'] != gateway_target_sha256:
                 raise ValueError('MVP_INPUT_FILE_CHANGED')
@@ -625,6 +682,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
                 executor._transport(engine_target, env, REQUEST_BINDING_PROFILE)
             except (KubernetesBindingError, OverflowError):
                 raise ValueError('GATEWAY_AUDIT_TARGET_UNVERIFIED') from None
+        if (prebound_kubernetes and check.id == "SUP-13" and check.executor == "template_validation"
+                and cfg.get(SUP13_NORMAL_OPTION) is True):
+            executor.prepared_sup13_normal(check, env, effective, get_provider(env.engine.name).adapter(),
+                                           expected_target_sha256=sha256_hex(canonical_json(target_data)))
         if normal_file_reads:
             executor.normal_file_read_inputs(env, effective)
         if supply_record_roles:
@@ -681,6 +742,10 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
                 and getattr(check, 'collection_profile', None) == INPUT_MATRIX):
             executor.prepared_normal_token_input(check, env, effective,
                                                  expected_target_sha256=sha256_hex(canonical_json(target_data)))
+        if normal_request_binding:
+            executor.prepared_normal_control(check, env, effective,
+                expected_target_sha256=sha256_hex(canonical_json(target_data)),
+                expected_target_file_sha256=sha256_hex(raw_target))
         if normal_sampling or normal_stream:
             expected = sha256_hex(canonical_json(target_data))
             if normal_sampling:
@@ -708,13 +773,20 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         if protected_paths:
             executor.prepared_protected_paths(check, env, effective,
                                               expected_target_sha256=sha256_hex(canonical_json(target_data)))
-        if gateway_response:
+        if gateway_response_snapshot:
+            executor.prepared_response_snapshot(check, env, effective,
+                expected_target_sha256=sha256_hex(canonical_json(target_data)),
+                expected_manifest_sha256=sha256_hex(files[RESPONSE_SNAPSHOT_INPUT]),
+                expected_policy_sha256=policy.ref().sha256, policy_validity=(policy.valid_from, policy.valid_until))
+        elif gateway_response:
             executor.prepared_gateway(env, expected_target_sha256=sha256_hex(canonical_json(target_data)))
     if requires_native_matrix and not normal_token_input:
         _check_native_prepared(cfg.get('native_input_capture'), target_data, env)
     for role, identity in identities.items():
         path = source[role]['path']
-        limit = _INPUT_FILE_LIMITS.get(role)
+        limit = MAX_SCOPE_BYTES if role == 'target' and gateway_response_snapshot else _INPUT_FILE_LIMITS.get(role)
+        if role == 'target' and normal_request_binding:
+            limit = 65536
         after, current = _read(path, max_bytes=limit) if limit is not None else _read(path)
         if current != identity or after != files[role]:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
@@ -727,12 +799,16 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
         after, current = _read(path, min_bytes=0, max_bytes=run_binding._MAX_PRODUCER_BYTES)
         if after != before or current != identity:
             raise ValueError('MVP_INPUT_FILE_CHANGED')
+    if route_record_only and not run_binding.native_route_preparation_missing(cfg):
+        raise ValueError('MVP_INPUT_FILE_CHANGED')
     if generation_inputs and check.id in REDEPLOY_CHECKS:
         declared_identities = {generation_identity(row.target, row.env, row.prepared) for row in generations.values()}
         if redeployment_side_reuse(redeployment_identities, declared_identities):
             raise ValueError(REDEPLOY_SIDE_REUSE)
         redeployment_identities.update(declared_identities)
     blockers = ['LIVE_EXECUTOR_PREFLIGHT_REQUIRED']
+    if route_record_only:
+        blockers.append('NATIVE_ROUTE_PREPARATION_ABSENT')
     if passive_hop:
         blockers.append('SAME_ATTEMPT_PLT01_CONTROL_REQUIRED')
     if env.data_origin.value == 'EXAMPLE':
@@ -742,6 +818,7 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             'binding_schema': binding['schema'] if binding else None,
             'files': {role: source[role] for role in files}, 'blocking_codes': blockers,
             **({'record_inputs': source['record_inputs']} if 'record_inputs' in source else {}),
+            **({'node_image_verification': cfg['node_image_verification']} if node_image_verification else {}),
             **({NORMAL_FILE_READS_OPTION: True} if normal_file_reads else {}),
             **({'sup05_normal_preparation': sup05_normal_preparation} if sup05_normal_preparation is not None else {}),
             **({NORMAL_GRAPH_CAPTURE_OPTION: True} if normal_graph_capture else {}),
@@ -752,7 +829,8 @@ def _inspect(source, check, pack, issued_at, redeployment_identities, *, sup05_n
             **({INSTALLED_PLUGIN_INVENTORY_OPTION: True} if installed_plugin_inventory else {}),
             **({NORMAL_REQUEST_LATENCY_OPTION: True} if normal_request_latency else {}),
             **({NORMAL_SERVING_READINESS_OPTION: True} if normal_serving_readiness else {}),
-            **({NORMAL_TOKEN_INPUT_OPTION: True} if normal_token_input else {})}
+            **({NORMAL_TOKEN_INPUT_OPTION: True} if normal_token_input else {}),
+            **({NORMAL_REQUEST_BINDING_OPTION: True} if normal_request_binding else {})}
 
 
 def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_preparations=None, expected_record_inputs=None):
@@ -773,7 +851,8 @@ def audit(index_file, *, pack=None, issued_at=None, side=None, sup05_normal_prep
     sources = {}
     for item in index['inputs']:
         if (type(item) is not dict
-                or set(item) - {'target', 'route_target', 'record_inputs', 'initialization_prepared'} != _INPUT_ROW_FIELDS
+                or set(item) - {'target', 'route_target', 'record_inputs', 'initialization_prepared',
+                                RESPONSE_SNAPSHOT_INPUT} != _INPUT_ROW_FIELDS
                 or item['check_id'] not in active or item['side'] not in SIDES):
             raise ValueError('MVP_SOURCE_INDEX_INVALID')
         if item['side'] not in selected_sides:

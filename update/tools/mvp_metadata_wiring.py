@@ -12,12 +12,16 @@ from types import SimpleNamespace
 from guard.adapters.engine_profiles import supports
 from guard.adapters.engine_provider import get_provider
 from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS, NORMAL_FILE_READS_OPTION,
-                                 RECORD_SNAPSHOT_OPTIONS, SUP05_PREPARATION_RECEIPT, bounded_metadata_scopes, merge_config,
-                                 normal_file_reads_requested, update_allowed_checks)
+                                 NORMAL_REQUEST_BINDING_SCOPE_ERROR,
+                                 RECORD_SNAPSHOT_OPTIONS, RESPONSE_SNAPSHOT_INPUT, RESPONSE_SNAPSHOT_OPTION,
+                                 SUP05_PREPARATION_RECEIPT, SUP13_NORMAL_SCOPE_ERROR, UPDATE_CHECK_OUTSIDE_SCOPE,
+                                 bounded_metadata_scopes, for_check, merge_config,
+                                 normal_file_reads_requested, sup13_normal_requested, update_allowed_checks)
 from guard.core.execution_recipe import validate_policy_time
-from guard.core.run import RunConfig, _blocked_reason
+from guard.core.run import RunConfig
 from guard.core.select import _in_scope, select
-from guard.executors import passive_api_hop, registry, run_binding, template_supply_approval as template_supply
+from guard.executors import (kubernetes_response_snapshot as response_snapshot, passive_api_hop, registry,
+                             run_binding, template_supply_approval as template_supply)
 from guard.executors.retry_record_contract import TARGET_BINDING_KEY as RETRY_TARGET_BINDING
 from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE, snapshot_owner
 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
@@ -27,11 +31,12 @@ from guard.executors.kubernetes_normal_graph_capture import normal_graph_capture
 from guard.executors.kubernetes_normal_request_latency import normal_request_latency_transport
 from guard.executors.kubernetes_normal_safetensors_reader import normal_safetensors_reader_transport
 from guard.executors.kubernetes_normal_serving_readiness import normal_serving_readiness_transport
+from guard.executors.kubernetes_normal_startup_load import STARTUP_READY_WINDOW, normal_startup_load_transport
 from guard.executors.kubernetes_normal_token_input import normal_input_transports
 from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
 from guard.executors.kubernetes_passive_egress_policy import passive_egress_policy_transport
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
-from guard.models import Environment, Policy, load_pack, utcnow
+from guard.models import Environment, Policy, canonical_json, load_pack, utcnow
 from guard.models.artifacts import model_closure_sha256
 from guard.runtime.bounded import strict_json
 from guard.runtime.comparison import execution_conditions
@@ -50,19 +55,24 @@ _RECORD_FILE_DIGESTS = {
 }
 CHECK_EXECUTORS = {'SUP-04': 'container_config', 'PLT-01': 'container_config', 'PLT-04': 'credential_exposure',
                    'SUP-03': 'template_validation', 'SUP-07': 'supply_boot', 'SUP-10': 'supply_boot', 'SUP-12': 'supply_boot',
-                   'REQ-07': 'template_validation', 'OBS-03': 'log_analysis',
+                   'REQ-07': 'template_validation', 'SUP-13': 'template_validation', 'OBS-03': 'log_analysis',
                    'OBS-04': 'boundary_egress', 'PLT-07': 'boundary_egress', 'PLT-06': 'unix_ipc',
                    'OBS-01': 'required_event_record', 'OBS-02': 'observation_state',
                    'PLT-12': 'required_event_record', 'PLT-02': 'unix_ipc',
                    'LIF-01': 'supply_boot', 'LIF-03': 'stream_buffer', 'LIF-04': 'stream_buffer',
-                   'REQ-09': 'input_validation', 'REQ-10': 'sampling_validation', 'REQ-20': 'engine_sensor',
+                   'REQ-09': 'input_validation', 'REQ-10': 'sampling_validation',
+                   'REQ-11': 'request_binding', 'REQ-20': 'engine_sensor',
                    passive_api_hop.CHECK: passive_api_hop.EXECUTOR, **PREBOUND_RECORD_EXECUTORS}
 CHECKS = tuple(cid for cid in CHECK_EXECUTORS
                if cid not in {*RECORD_SNAPSHOT_OPTIONS, *PREBOUND_RECORD_EXECUTORS, 'OBS-02', 'PLT-02', 'LIF-01', 'LIF-03', 'LIF-04',
-                              'PLT-07', 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-07', 'SUP-10', 'SUP-12', passive_api_hop.CHECK})
+                              'PLT-07', 'REQ-09', 'REQ-10', 'REQ-11', 'REQ-20', 'SUP-07', 'SUP-10', 'SUP-12', 'SUP-13',
+                              passive_api_hop.CHECK})
 NODE_IMAGE_PROFILES = ('local-containerd-v1', 'local-k3s-containerd-v1')
 METADATA_EXECUTORS = frozenset(name for cid, name in CHECK_EXECUTORS.items() if cid not in PREBOUND_RECORD_EXECUTORS)
 CHECK_OPTIONS = {**KUBERNETES_BOUND_CHECK_OPTIONS, 'REQ-07': 'req07_normal_only'}
+STARTUP_PREFIX_CHECKS = frozenset({'LIF-01', 'REQ-20', 'SUP-07', 'SUP-12'})
+STARTUP_PREFIX_LIMIT = 65536
+_STARTUP_PREFIX_INPUTS_ERROR = 'STARTUP_PREFIX_INPUTS_UNVERIFIED'
 
 
 def _source(path):
@@ -83,6 +93,67 @@ def _transport(target, env):
     if target['lab'] is not False:
         raise ValueError('METADATA_MEASUREMENT_TARGET_REQUIRED')
     return transport
+
+
+def startup_prefix_checks(check_ids):
+    """Preserve the existing shared target within the ordinary supply executor."""
+    selected = STARTUP_PREFIX_CHECKS.intersection(check_ids)
+    if selected - {'REQ-20'} and 'SUP-10' in check_ids:
+        return selected | {'SUP-10'}
+    return selected
+
+
+def startup_prefix_transport(ordinary_target, prefixed_target, env):
+    """Check the exact Ready owner and the one addition made by startup-prefix."""
+    if (type(ordinary_target) is not dict or type(prefixed_target) is not dict
+            or env.runtime.tp_size != 2 or ordinary_target.get('synthetic', False) is not False
+            or STARTUP_READY_WINDOW not in ordinary_target or 'startup_log_prefix' in ordinary_target
+            or canonical_json({key: value for key, value in prefixed_target.items() if key != 'startup_log_prefix'})
+            != canonical_json(ordinary_target)):
+        raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR)
+    try:
+        transport = normal_startup_load_transport(prefixed_target, env, duration=1, runner=_detached_runner,
+                                                  allow_ranked=True)
+        if transport.binding['engine']['restart_count'] != 0:
+            raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR)
+        return transport
+    except (KeyError, KubernetesBindingError, TypeError, ValueError):
+        raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR) from None
+
+
+def validate_startup_prefix_owners(owners):
+    first, second = (owners[side] for side in readiness.SIDES)
+    if any(first[key] == second[key] for key in ('pod_uid', 'container_id')):
+        raise ValueError('STARTUP_PREFIX_PAIR_OWNERS_REUSED')
+
+
+def _read_startup_source(pointer):
+    path = _plain_path(Path(pointer['path']))
+    raw, _ = readiness._read_input(pointer, configured_target=path, max_bytes=STARTUP_PREFIX_LIMIT)
+    return raw, {'path': str(path), 'sha256': pointer['sha256']}
+
+
+def _startup_prefix_sides(inputs, ordinary_sides):
+    if type(inputs) is not dict or inputs.keys() != set(readiness.SIDES):
+        raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR)
+    result = {}
+    for side, entry in inputs.items():
+        if type(entry) is not dict or entry.keys() != {'environment', 'target', 'prefixed_target'}:
+            raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR)
+        env, ordinary_target, _, env_pointer, target_pointer = ordinary_sides[side]
+        try:
+            for key, primary in (('environment', env_pointer), ('target', target_pointer)):
+                _, pointer = _read_startup_source(entry[key])
+                if pointer != {**primary, 'path': str(_plain_path(Path(primary['path'])))}:
+                    raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR)
+            raw, selection = _read_startup_source(entry['prefixed_target'])
+            target = strict_json(raw, limit=STARTUP_PREFIX_LIMIT)
+            transport = startup_prefix_transport(ordinary_target, target, env)
+        except (KeyError, OSError, TypeError, ValueError):
+            raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR) from None
+        result[side] = env, target, transport, env_pointer, selection
+    validate_startup_prefix_owners({side: row[2].binding['engine'] for side, row in result.items()})
+    return result
 
 
 def _paired_record_inputs(value, check_id, *, prebound_copy_records=False, prebound_observation_records=False):
@@ -131,13 +202,15 @@ def _record_scope_settings(check_id, run_cfg):
     return settings
 
 
-def _gateway_record_inputs(value):
+def _gateway_record_inputs(value, ordinary_sides):
     from tools.mvp_gateway_preparation import GATEWAY_ENV, PRODUCER_SHA256
 
     fields = {'environment', 'target_id', 'runtime_policy_sha256', 'request_sha256'}
     if type(value) is not dict or set(value) != set(readiness.SIDES):
         raise ValueError('GATEWAY_PAIRED_RECORD_INPUTS_REQUIRED')
+    has_targets = any(type(entry) is dict and 'target' in entry for entry in value.values())
     inputs = {}
+    gateway_sides = {}
     for side, entry in value.items():
         if type(entry) is not dict or type(entry.get(SNAPSHOT_SOURCE)) is not dict:
             raise ValueError('GATEWAY_PAIRED_RECORD_INPUTS_INVALID')
@@ -145,6 +218,8 @@ def _gateway_record_inputs(value):
         source = inputs[side].pop(SNAPSHOT_SOURCE)
         if set(source) != fields or source['environment'] != GATEWAY_ENV:
             raise ValueError('GATEWAY_PAIRED_RECORD_INPUTS_INVALID')
+        if has_targets:
+            gateway_sides[side] = _gateway_record_side(inputs[side].pop('target', None), ordinary_sides[side])
     inputs = _paired_record_inputs(inputs, 'OBS-01')
     if any(run_binding.producer_sha256(row['record_producer']) != PRODUCER_SHA256 for row in inputs.values()):
         raise ValueError('GATEWAY_REVIEWED_PRODUCER_REQUIRED')
@@ -155,7 +230,90 @@ def _gateway_record_inputs(value):
         raise ValueError('GATEWAY_DISTINCT_PAIRED_RECORDS_REQUIRED')
     for side, entry in inputs.items():
         entry[SNAPSHOT_SOURCE] = value[side][SNAPSHOT_SOURCE]
-    return inputs
+    return inputs, gateway_sides
+
+
+def gateway_response_target_matches(ordinary_target, response_target):
+    """Accept the same target or an extension that adds only its Gateway role."""
+    if type(ordinary_target) is not dict or type(response_target) is not dict:
+        return False
+    ordinary_bytes = canonical_json(ordinary_target)
+    if canonical_json(response_target) == ordinary_bytes:
+        return True
+    without_gateway = {key: value for key, value in response_target.items() if key != 'kubernetes_gateway'}
+    return 'kubernetes_gateway' not in ordinary_target and canonical_json(without_gateway) == ordinary_bytes
+
+
+def gateway_response_pair_matches(first, second):
+    """Check that independently pinned sides use comparable, distinct requests."""
+    scope = first.get('source_scope')
+    requests = first.get('request_sha256'), second.get('request_sha256')
+    if (scope != second.get('source_scope') or requests[0] == requests[1]
+            or not all(readiness._is_sha256(request) for request in requests)):
+        return False
+    if scope == response_snapshot.RESPONSE_ONLY_SCHEMA:
+        origin = first.get('transport_origin')
+        return (origin == second.get('transport_origin')
+                and (origin is None or origin == response_snapshot.GATEWAY_LOOPBACK_RESPONSE_ORIGIN))
+    return (scope is None and first.get('record_session') != second.get('record_session')
+            and all(first.get(key) == second.get(key) for key in ('runtime_policy_sha256', 'runtime_target_id')))
+
+
+def _gateway_record_side(reference, ordinary_side):
+    env, ordinary_target, _, env_pointer, _ = ordinary_side
+    error = 'GATEWAY_RECORD_TARGETS_UNVERIFIED'
+    try:
+        path = _plain_path(Path(reference['path']))
+        raw, _ = readiness._read_input(reference, configured_target=path, max_bytes=65536)
+        target = strict_json(raw)
+        if not gateway_response_target_matches(ordinary_target, target) or 'kubernetes_gateway' not in target:
+            raise ValueError(error)
+        transport = _transport(target, env)
+    except (KeyError, OSError, TypeError, ValueError):
+        raise ValueError(error) from None
+    return env, target, transport, env_pointer, {'path': str(path), 'sha256': reference['sha256']}
+
+
+def _gateway_response_settings(selections, sides, check, policy):
+    """Use both original selection files and independently pinned raw side targets."""
+    error = 'GATEWAY_RESPONSE_SELECTIONS_UNVERIFIED'
+    if (type(selections) is not dict or set(selections) != set(readiness.SIDES)
+            or check.executor != 'response_content' or not _in_scope(check.id, policy)):
+        raise ValueError(error)
+    selected = {}
+    for side, (env, ordinary_target, _, _, _) in sides.items():
+        try:
+            ref = selections[side]
+            if (type(ref) is not dict or ref.keys() != {'path', 'sha256', 'target_file_sha256'}
+                    or type(ref['path']) is not str or not ref['path']
+                    or not all(readiness._is_sha256(ref[key]) for key in ('sha256', 'target_file_sha256'))):
+                raise ValueError(error)
+            settings = strict_json(response_snapshot._read(ref['path'], ref['sha256']))
+            if (type(settings) is not dict or settings.keys() != {'target', RESPONSE_SNAPSHOT_OPTION, RESPONSE_SNAPSHOT_INPUT}
+                    or settings[RESPONSE_SNAPSHOT_OPTION] is not True
+                    or type(settings['target']) is not str or not settings['target']):
+                raise ValueError(error)
+            target_path = _plain_path(Path(settings['target']))
+            target_file_sha256 = ref['target_file_sha256']
+            response_target = strict_json(response_snapshot._read(target_path, target_file_sha256))
+            if not gateway_response_target_matches(ordinary_target, response_target):
+                raise ValueError(error)
+            response_bytes = canonical_json(response_target)
+            manifest = settings[RESPONSE_SNAPSHOT_INPUT]
+            settings['target'] = str(target_path)
+            executor = registry.build_executor(check.executor, 'kubernetes', {check.executor: settings,
+                '_response_snapshot_target_file_sha256': target_file_sha256}, engine=env.engine.name, version=env.engine.version)
+            executor.prepared_response_snapshot(check, env, policy.values.get(check.id, {}),
+                expected_target_sha256=sha256(response_bytes).hexdigest(), expected_manifest_sha256=manifest['sha256'],
+                expected_policy_sha256=policy.ref().sha256, policy_validity=(policy.valid_from, policy.valid_until))
+            selected[side] = {'target': str(target_path), RESPONSE_SNAPSHOT_INPUT: {
+                **manifest, 'target_file_sha256': target_file_sha256}}
+        except (AttributeError, KeyError, OSError, TypeError, ValueError):
+            raise ValueError(error) from None
+    first, second = (selected[side][RESPONSE_SNAPSHOT_INPUT] for side in readiness.SIDES)
+    if not gateway_response_pair_matches(first, second):
+        raise ValueError(error)
+    return selected
 
 
 def _sup05_normal_inputs(pointer, check, env, policy, *, side, ordinary_target):
@@ -194,6 +352,8 @@ def staged_config(config, fresh_candidate_target):
         raise ValueError('METADATA_FRESH_CANDIDATE_PATH_REQUIRED')
     if config.get('check_config', {}).get('OBS-01', {}).get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True:
         raise ValueError('GATEWAY_RECORDS_REQUIRE_PREBOUND_PAIR')
+    if config.get('check_config', {}).get('REQ-13', {}).get(RESPONSE_SNAPSHOT_OPTION) is True:
+        raise ValueError('GATEWAY_RESPONSE_SELECTIONS_REQUIRE_PREBOUND_PAIR')
     if normal_file_reads_requested(config):
         raise ValueError('SUP05_NORMAL_PREPARATIONS_REQUIRE_PREBOUND_PAIR')
     if any(name in config['executors'] for name in PREBOUND_RECORD_EXECUTORS.values()):
@@ -221,7 +381,8 @@ def bind_staged_candidate(run: RunConfig, env, preliminary_ref):
     candidate = run.side_configs['candidate']
     hashes, abort_reasons = _revalidate_candidate(config, env, preliminary_ref, allow_check_gaps=True)
     # Checks sharing an affected executor receive independent target pins.
-    affected_executors = {CHECK_EXECUTORS[check_id] for check_id in abort_reasons}
+    # SUP-13 preflight is stricter than its peers: keep their verified shared target pin.
+    affected_executors = {CHECK_EXECUTORS[check_id] for check_id in abort_reasons if check_id != "SUP-13"}
     separated = {name: hashes.pop(name) for name in affected_executors}
     check_hashes = {check_id: None if check_id in abort_reasons else separated[CHECK_EXECUTORS[check_id]]
                     for check_id in (config['update'].get('allowed_checks') or ())
@@ -260,7 +421,12 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=Fals
             _paired_record_inputs({side: {**settings['run_binding'][check_id],
                 **(settings['check_config'][check_id] if check_id == 'PLT-12' else {})}
                 for side, settings in settings_by_side.items()}, check_id)
-    restricted_executors = {CHECK_EXECUTORS[cid] for cid in KUBERNETES_BOUND_CHECK_OPTIONS if cid in CHECK_EXECUTORS}
+    restricted_executors = {CHECK_EXECUTORS[cid] for cid in KUBERNETES_BOUND_CHECK_OPTIONS
+                            if cid in CHECK_EXECUTORS and cid != "SUP-13"}
+    sup13_selected = type(allowed) is list and "SUP-13" in allowed
+    if (sup13_normal_requested(config) != sup13_selected
+            or sup13_selected and (config.get("lab_activation") or config.get("record_attestation"))):
+        raise ValueError(SUP13_NORMAL_SCOPE_ERROR)
     if allowed is None:
         if restricted_executors.intersection(executors):
             raise ValueError('METADATA_STAGED_EXECUTION_SCOPE_INVALID')
@@ -334,6 +500,17 @@ def _revalidate_candidate(config, env, preliminary_ref, *, allow_check_gaps=Fals
     if 'template_validation' in executors and (current.get('observed_version') != env.engine.version
             or current['engine'].get('command') != preliminary['engine'].get('command')):
         raise ValueError('METADATA_CANDIDATE_TEMPLATE_LAUNCH_CHANGED')
+    if sup13_selected:
+        scoped = for_check(merge_config(config, candidate), 'template_validation', 'SUP-13')
+        try:
+            executor = registry.build_executor('template_validation', 'kubernetes', scoped,
+                                               engine=env.engine.name, version=env.engine.version)
+            executor.prepared_sup13_target(env, get_provider(env.engine.name).adapter(),
+                                           expected_target_sha256=new.target_sha256)
+        except (KeyError, OSError, TypeError, ValueError) as error:
+            if not allow_check_gaps:
+                raise
+            gaps['SUP-13'] = _code(error)
     for check_id in readiness.STARTUP_OBSERVERS:
         if check_id not in (allowed or ()):
             continue
@@ -409,6 +586,8 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
     try:
         target_path = target_pointer['path']
         config = {check.executor: {CHECK_OPTIONS[check.id]: True} if check.id in CHECK_OPTIONS else {}}
+        if check.id == 'SUP-13':
+            config[check.executor]['target'] = target_path
         if check.id in readiness.STARTUP_OBSERVERS:
             config[check.executor]['target'] = target_path
             reason = readiness.startup_observer_reason(check.id, target, env, runner=_detached_runner)
@@ -460,6 +639,13 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
                 normal_serving_readiness_transport(target, env, duration=1, runner=_detached_runner)
             except (KubernetesBindingError, ValueError):
                 return 'NORMAL_SERVING_READINESS_TARGET_UNAVAILABLE'
+        if check.id == 'REQ-11':
+            config[check.executor]['target'] = target_path
+            executor = registry.build_executor(check.executor, 'kubernetes', config,
+                                               engine=env.engine.name, version=env.engine.version)
+            executor.prepared_normal_control(check, env, values, expected_target_sha256=transport.target_sha256,
+                                             expected_target_file_sha256=target_pointer['sha256'])
+            return None
         if check.id == 'REQ-09':
             config[check.executor]['target'] = target_path
             try:
@@ -517,6 +703,12 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
     if check.id in {'PLT-02', 'PLT-06'} and (type(executor) is not KubernetesIPCProductExecutor
                                           or not supports(env.engine.name, env.engine.version, 'unix_ipc')):
         return 'IPC_PATH_METADATA_EXECUTOR_UNAVAILABLE' if check.id == 'PLT-02' else 'WORKER_TRUST_EXECUTOR_UNAVAILABLE'
+    if check.id == 'SUP-13':
+        try:
+            executor.prepared_sup13_normal(check, env, values, get_provider(env.engine.name).adapter(),
+                                           expected_target_sha256=transport.target_sha256)
+        except (KeyError, OSError, TypeError, ValueError) as error:
+            return _code(error)
     if check.id in ('SUP-03', 'REQ-07'):
         if type(executor) is not KubernetesTemplateSupplyExecutor:
             return 'CONFIGURED_TEMPLATE_EXECUTOR_UNAVAILABLE'
@@ -536,12 +728,19 @@ def _check_reason(check, env, target, transport, values, *, policy, side, target
 def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, expected=None, passive_plt08=False,
              protected_ipc_metadata=False, observation_run_bindings=None, copy_record_inputs=None,
              gateway_record_inputs=None, normal_stream_buffer=False, normal_sampling=False, normal_token_input=False,
+             normal_request_binding=False,
              normal_serving_readiness=False, normal_request_latency=False, installed_plugin_inventory=False,
              cilium_egress_status=False, normal_startup_load=False, normal_compile_cache=False,
              normal_safetensors_reader=False, normal_graph_capture=False, sup05_normal_preparations=None,
+             sup13_normal=False,
              retry_record_inputs=None, collection_status_bindings=None, prebound_copy_records=False,
-             prebound_observation_records=False, prebound_target_pins=True):
+             prebound_observation_records=False, prebound_target_pins=True, gateway_response_selections=None,
+             startup_prefix_inputs=None):
     """Return product TOML settings, hash-pinned index rows and the paired input decisions."""
+    if type(normal_request_binding) is not bool or normal_request_binding and not prebound_target_pins:
+        raise ValueError(NORMAL_REQUEST_BINDING_SCOPE_ERROR)
+    if type(sup13_normal) is not bool:
+        raise ValueError(SUP13_NORMAL_SCOPE_ERROR)
     if node_image_verification is not None and node_image_verification not in NODE_IMAGE_PROFILES:
         raise ValueError('METADATA_NODE_IMAGE_PROFILE_INVALID')
     if prebound_observation_records:
@@ -582,31 +781,43 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                for check_id, value in
                (('OBS-01', observation_run_bindings), ('PLT-12', copy_record_inputs),
                 ('LIF-12', retry_record_inputs), ('OBS-11', collection_status_bindings)) if value is not None}
+    gateway_sides = {}
     if gateway_record_inputs is not None:
         if 'OBS-01' in records:
             raise ValueError('GATEWAY_RECORD_INPUT_MODE_CONFLICT')
-        records['OBS-01'] = _gateway_record_inputs(gateway_record_inputs)
+        records['OBS-01'], gateway_sides = _gateway_record_inputs(gateway_record_inputs, sides)
     optional = {passive_api_hop.CHECK: passive_plt08, 'PLT-02': protected_ipc_metadata,
                 'LIF-01': normal_startup_load,
                 'LIF-03': normal_request_latency, 'LIF-04': normal_stream_buffer,
-                'REQ-10': normal_sampling, 'REQ-09': normal_token_input,
+                'REQ-10': normal_sampling, 'REQ-09': normal_token_input, 'REQ-11': normal_request_binding,
                 'REQ-20': normal_graph_capture,
                 'OBS-02': normal_serving_readiness,
                 'SUP-07': normal_compile_cache,
                 'SUP-10': installed_plugin_inventory,
                 'SUP-12': normal_safetensors_reader,
+                'SUP-13': sup13_normal,
                 'PLT-07': cilium_egress_status,
                 **dict.fromkeys(records, True)}
     check_ids = (*CHECKS, *(cid for cid, requested in optional.items() if requested))
+    startup_sides = {}
+    if startup_prefix_inputs is not None:
+        if not prebound_target_pins or not STARTUP_PREFIX_CHECKS.intersection(check_ids):
+            raise ValueError('STARTUP_PREFIX_INPUTS_REQUIRE_PREBOUND_STARTUP_CHECKS')
+        startup_sides = _startup_prefix_sides(startup_prefix_inputs, sides)
     for check_id in check_ids:
         check = pack.checks[check_id]
         values = policy.values.get(check_id) or {}
         record_pins = {}
+        check_sides = sides
+        if check_id == 'OBS-01' and gateway_sides:
+            check_sides = gateway_sides
+        elif check_id in STARTUP_PREFIX_CHECKS and startup_sides:
+            check_sides = startup_sides
         reasons = {side: _check_reason(check, env, target, transport, values, policy=policy, side=side,
                                        target_pointer=target_pointer, record_inputs=records.get(check_id, {}).get(side),
                                         record_pins=record_pins, prebound_copy_records=prebound_copy_records,
                                         prebound_observation_records=prebound_observation_records)
-                   for side, (env, target, transport, _, target_pointer) in sides.items()}
+                   for side, (env, target, transport, _, target_pointer) in check_sides.items()}
         candidates[check_id] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
         if record_pins.keys() == set(readiness.SIDES):
             candidates[check_id]['prepared_record_input_sha256_by_side'] = record_pins
@@ -618,6 +829,13 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
             normal_file_read_settings[side], reasons[side] = _sup05_normal_inputs(
                 references[side], pack.checks['SUP-05'], env, policy, side=side, ordinary_target=target_pointer['path'])
         candidates['SUP-05'] = {'configuration_enabled': not any(reasons.values()), 'sides': reasons}
+    response_settings = {}
+    if gateway_response_selections is not None:
+        response_settings = _gateway_response_settings(gateway_response_selections, sides, pack.checks['REQ-13'], policy)
+        candidates['REQ-13'] = {'configuration_enabled': True, 'sides': dict.fromkeys(readiness.SIDES),
+                                'selection_refs': deepcopy(gateway_response_selections)}
+        config['update']['kubernetes_candidate_binding'] = 'prebound'
+        config.setdefault('check_config', {})['REQ-13'] = {RESPONSE_SNAPSHOT_OPTION: True}
     passive = candidates.get(passive_api_hop.CHECK)
     if passive and not candidates[passive_api_hop.SOURCE_CHECK]['configuration_enabled']:
         passive['configuration_enabled'] = False
@@ -625,16 +843,21 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                             for side, reason in passive['sides'].items()}
     bindings = []
     sup05_enabled = candidates.get('SUP-05', {}).get('configuration_enabled')
+    paired_startup = startup_prefix_checks({cid for cid, row in candidates.items() if row['configuration_enabled']})
     for check_id, decision in candidates.items():
         if not decision['configuration_enabled']:
             continue
         check = pack.checks[check_id]
         config['executors'][check.executor] = 'kubernetes'
-        for side, (_, _, _, env_pointer, target_pointer) in sides.items():
+        check_sides = startup_sides if startup_sides and check_id in paired_startup else sides
+        for side, (_, _, _, env_pointer, target_pointer) in check_sides.items():
             settings = config['sides'][side]
+            gateway_pointer = gateway_sides[side][-1] if check_id == 'OBS-01' and gateway_sides else None
             if sup05_enabled and check.executor == 'supply_boot':
                 source = normal_file_read_settings[side] if check_id == 'SUP-05' else {'target': target_pointer['path']}
                 settings.setdefault('check_config', {})[check_id] = source
+            elif check_id == 'REQ-13':
+                settings[check.executor] = response_settings[side]
             else:
                 settings[check.executor] = {'target': target_pointer['path']}
             if check_id in records:
@@ -643,11 +866,21 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                     run_cfg.pop('input_sha256', None)
                     settings.setdefault('check_config', {})[check_id] = _record_scope_settings(check_id, run_cfg)
                 if check_id == 'OBS-01' and SNAPSHOT_SOURCE in run_cfg:
-                    settings.setdefault('check_config', {})[check_id] = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
+                    gateway_settings = {SNAPSHOT_SOURCE: run_cfg.pop(SNAPSHOT_SOURCE)}
+                    if gateway_pointer is not None:
+                        gateway_settings['target'] = gateway_pointer['path']
+                    settings.setdefault('check_config', {})[check_id] = gateway_settings
                 settings.setdefault('run_binding', {})[check_id] = run_cfg
             binding = {'check_id': check_id, 'side': side, 'environment': env_pointer, 'policy': policy_pointer}
-            if (prebound_target_pins and check_id not in RECORD_SNAPSHOT_OPTIONS
-                    and check_id not in PREBOUND_RECORD_EXECUTORS and check_id != 'SUP-05'):
+            if check_id == 'REQ-13':
+                response = response_settings[side]
+                manifest = response[RESPONSE_SNAPSHOT_INPUT]
+                binding['target'] = {'path': response['target'], 'sha256': manifest['target_file_sha256']}
+                binding[RESPONSE_SNAPSHOT_INPUT] = {key: manifest[key] for key in ('path', 'sha256')}
+            elif gateway_pointer is not None:
+                binding['target'] = dict(gateway_pointer)
+            elif (prebound_target_pins and check_id not in RECORD_SNAPSHOT_OPTIONS
+                  and check_id not in PREBOUND_RECORD_EXECUTORS and check_id != 'SUP-05'):
                 binding['target'] = dict(target_pointer)
             if 'prepared_record_input_sha256_by_side' in decision:
                 binding['record_inputs'] = dict(decision['prepared_record_input_sha256_by_side'][side])
@@ -661,13 +894,12 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
     config['update']['allowed_checks'] = [cid for cid, decision in candidates.items() if decision['configuration_enabled']]
     allowed = update_allowed_checks(config, pack)
     bounded_metadata_scopes((merge_config(config, settings) for settings in config['sides'].values()), pack, allowed)
-    shared_checks = ('SUP-03', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03',
-                     'LIF-04', 'REQ-09', 'REQ-20',
+    shared_checks = ('SUP-03', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12', 'SUP-13', 'OBS-04', 'PLT-06', 'PLT-07', 'LIF-01', 'LIF-03',
+                     'LIF-04', 'REQ-09', 'REQ-11', 'REQ-20',
                      *RECORD_SNAPSHOT_OPTIONS, *PREBOUND_RECORD_EXECUTORS, passive_api_hop.CHECK)
     anchors = [cid for cid in shared_checks if candidates.get(cid, {}).get('configuration_enabled')]
     if anchors:
         plan = select(pack, [base, candidate], policy, mode='update')
-        run = RunConfig(executors=config['executors'])
         for anchor in anchors:
             siblings = {}
             for check in pack.active_checks():
@@ -676,10 +908,9 @@ def assemble(inputs, policy_path, *, pack, store, node_image_verification=None, 
                 row = plan.item(check.id)
                 siblings[check.id] = {
                     side: {'expected_if_invoked': 'NOT_RUN' if row.selected else 'NOT_SELECTED',
-                           'reason': _blocked_reason(row, run, env, allowed_checks=allowed) if row.selected
-                                     else row.not_selected_reason.value,
+                           'reason': UPDATE_CHECK_OUTSIDE_SCOPE if row.selected else row.not_selected_reason.value,
                            'transport_dispatched': False}
-                    for side, (env, _, _, _, _) in sides.items()
+                    for side in sides
                 }
             candidates[anchor]['shared_executor_checks'] = siblings
     return config, bindings, candidates
@@ -690,7 +921,8 @@ def _write_input_sources(index, pack, bindings, config_ref):
         'inputs': [{**entry, 'configuration': config_ref} for entry in bindings]}, indent=2), encoding='utf-8')
 
 
-def _publish_prebound(output, *, config, bindings, checks, pack, preparations, record_checks):
+def _publish_prebound(output, *, config, bindings, checks, pack, preparations, record_checks,
+                      startup_prefix_inputs=None):
     with TemporaryDirectory(dir=output, prefix='.prebound-preflight-') as directory:
         staging = Path(directory)
         config_path = staging / 'guard.toml'
@@ -705,6 +937,14 @@ def _publish_prebound(output, *, config, bindings, checks, pack, preparations, r
         verified = {(row['check_id'], row['side']) for row in result['rows'] if row['file_binding_valid']}
         if record_pins.keys() - verified:
             raise ValueError('METADATA_RECORD_INPUT_PUBLICATION_UNVERIFIED')
+        response_rows = {(row['check_id'], row['side']) for row in bindings if RESPONSE_SNAPSHOT_INPUT in row}
+        if response_rows - verified:
+            raise ValueError('GATEWAY_RESPONSE_SELECTIONS_PUBLICATION_UNVERIFIED')
+        for ref in checks.get('REQ-13', {}).get('selection_refs', {}).values():
+            try:
+                response_snapshot._read(ref['path'], ref['sha256'])
+            except (OSError, ValueError):
+                raise ValueError('GATEWAY_RESPONSE_SELECTIONS_PUBLICATION_UNVERIFIED') from None
         if preparations is not None:
             verified_sup05 = {row['side'] for row in result['rows'] if row['check_id'] == 'SUP-05'
                               and row['file_binding_valid'] and row.get('sup05_normal_preparation') == preparations[row['side']]}
@@ -728,8 +968,24 @@ def _publish_prebound(output, *, config, bindings, checks, pack, preparations, r
                 row['files']['configuration'] = config_ref
         result['source_index_sha256'] = sha256(index.read_bytes()).hexdigest()
         result['metadata_wiring'] = checks
+        if startup_prefix_inputs is not None:
+            result['startup_prefix_inputs'] = startup_prefix_inputs
         report = staging / 'readiness.json'
         report.write_text(json.dumps(result, indent=2), encoding='utf-8')
+        shared_pins = {(row[role]['path'], row[role]['sha256'])
+                       for row in bindings for role in ('environment', 'policy')}
+        for path, digest in shared_pins:
+            try:
+                readiness._read_input({'path': path, 'sha256': digest})
+            except (OSError, ValueError):
+                raise ValueError('MVP_INPUT_FILE_CHANGED') from None
+        if startup_prefix_inputs is not None:
+            try:
+                for entry in startup_prefix_inputs.values():
+                    for pointer in entry.values():
+                        _read_startup_source(pointer)
+            except (OSError, ValueError):
+                raise ValueError('STARTUP_PREFIX_INPUTS_PUBLICATION_UNVERIFIED') from None
         for path in (index, report, config_path):
             (output / path.name).hardlink_to(path)
 
@@ -752,23 +1008,32 @@ def main():
     parser.add_argument('--prebound-observation-records', action='store_true',
                         help='Publish the independently pinned pair of existing engine-owned OBS-01 record inputs')
     parser.add_argument('--gateway-record-inputs', type=Path,
-                        help='Paired prebound OBS-01 inputs for one selected, already recorded normal Gateway request')
+                        help='Paired prebound OBS-01 inputs for already recorded normal Gateway requests. Both sides '
+                             'may include a target pointer with path and sha256.')
+    parser.add_argument('--gateway-response-selections', type=Path,
+                        help='Paired REQ-13 selection.json references, each with path, sha256 and target_file_sha256')
     parser.add_argument('--normal-stream-buffer', action='store_true',
                         help='Observe only ordinary SSE framing and fixed owned container memory for LIF-04')
     parser.add_argument('--normal-request-latency', action='store_true',
                         help='Observe client timing for one ordinary owned LIF-03 completion')
     parser.add_argument('--normal-sampling', action='store_true',
                         help='Observe one ordinary completion using the approved REQ-10 sampling options')
+    parser.add_argument('--normal-request-binding', action='store_true',
+                        help='Prepare the fixed ordinary REQ-11 control for both owned targets')
     parser.add_argument('--normal-token-input', action='store_true',
                         help='Observe an ordinary REQ-09 completion using the bound tokenizer result')
     parser.add_argument('--normal-serving-readiness', action='store_true',
                         help='Observe the owned Pod readiness and ordinary serving correspondence for OBS-02')
     parser.add_argument('--installed-plugin-inventory', action='store_true',
                         help='Read installed plugin entry-point metadata in the owned SUP-10 container')
+    parser.add_argument('--sup13-normal', action='store_true',
+                        help='Prepare the fixed owned normal template observation for SUP-13')
     parser.add_argument('--sup05-normal-preparations', type=Path,
                         help='Paired SUP-05 preparation receipt pointers with independent SHA-256 pins')
     parser.add_argument('--cilium-egress-status', action='store_true',
                         help='Read reported egress policy state for the owned PLT-07 endpoint')
+    parser.add_argument('--startup-prefix-inputs', type=Path,
+                        help='Paired environment, target and prefixed_target file references with path and SHA-256')
     parser.add_argument('--normal-startup-load', action='store_true',
                         help='Read the source-checked model load timing for LIF-01')
     parser.add_argument('--normal-compile-cache', action='store_true',
@@ -790,11 +1055,16 @@ def main():
     args = parser.parse_args()
     if args.prebound_observation_records and args.candidate_target_after_baseline is not None:
         parser.error('--prebound-observation-records requires both targets before baseline execution')
+    if args.gateway_response_selections is not None and args.candidate_target_after_baseline is not None:
+        parser.error('--gateway-response-selections requires both targets before baseline execution')
     inputs = {side: {role: getattr(args, f'{side}_{role}') for role in ('environment', 'target')}
               for side in readiness.SIDES}
     pack = load_pack(readiness.ROOT / 'packs/PACK-BASELINE')
     observation = _source(args.observation_run_bindings)[0] if args.observation_run_bindings else None
     gateway = _source(args.gateway_record_inputs)[0] if args.gateway_record_inputs else None
+    responses = _source(args.gateway_response_selections)[0] if args.gateway_response_selections else None
+    if args.gateway_response_selections is not None and responses is None:
+        raise ValueError('GATEWAY_RESPONSE_SELECTIONS_UNVERIFIED')
     copies = _source(args.copy_record_inputs)[0] if args.copy_record_inputs else None
     retries = _source(args.retry_record_inputs)[0] if args.retry_record_inputs else None
     collection_status = _source(args.collection_status_bindings)[0] if args.collection_status_bindings else None
@@ -802,12 +1072,19 @@ def main():
     if args.sup05_normal_preparations is not None:
         raw, _ = _read(_plain_path(args.sup05_normal_preparations), max_bytes=65536)
         sup05_preparations = readiness._sup05_preparation_refs(strict_json(raw, limit=65536))
+    startup_prefix_inputs = None
+    if args.startup_prefix_inputs is not None:
+        raw, _ = _read(_plain_path(args.startup_prefix_inputs), max_bytes=STARTUP_PREFIX_LIMIT)
+        startup_prefix_inputs = strict_json(raw, limit=STARTUP_PREFIX_LIMIT)
+        if startup_prefix_inputs is None:
+            raise ValueError(_STARTUP_PREFIX_INPUTS_ERROR)
     config, bindings, checks = assemble(inputs, args.policy, pack=pack, store=args.store,
                                         node_image_verification=args.node_image_verification, passive_plt08=args.passive_plt08,
                                         protected_ipc_metadata=args.protected_ipc_metadata, observation_run_bindings=observation,
                                         copy_record_inputs=copies, gateway_record_inputs=gateway,
                                         normal_stream_buffer=args.normal_stream_buffer, normal_sampling=args.normal_sampling,
                                         normal_token_input=args.normal_token_input,
+                                        normal_request_binding=args.normal_request_binding,
                                         normal_serving_readiness=args.normal_serving_readiness,
                                         normal_request_latency=args.normal_request_latency,
                                         installed_plugin_inventory=args.installed_plugin_inventory,
@@ -816,11 +1093,13 @@ def main():
                                         normal_compile_cache=args.normal_compile_cache,
                                         normal_safetensors_reader=args.normal_safetensors_reader,
                                         normal_graph_capture=args.normal_graph_capture,
-                                        sup05_normal_preparations=sup05_preparations, retry_record_inputs=retries,
+                                        sup05_normal_preparations=sup05_preparations, sup13_normal=args.sup13_normal,
+                                        retry_record_inputs=retries,
                                         collection_status_bindings=collection_status,
                                         prebound_copy_records=args.candidate_target_after_baseline is None,
                                         prebound_observation_records=args.prebound_observation_records,
-                                        prebound_target_pins=args.candidate_target_after_baseline is None)
+                                        prebound_target_pins=args.candidate_target_after_baseline is None,
+                                        gateway_response_selections=responses, startup_prefix_inputs=startup_prefix_inputs)
     if args.prebound_observation_records and not checks['OBS-01']['configuration_enabled']:
         raise ValueError('OBSERVATION_PREBOUND_RECORD_INPUTS_UNVERIFIED')
     staged = staged_config(config, args.candidate_target_after_baseline) if args.candidate_target_after_baseline else None
@@ -828,10 +1107,17 @@ def main():
     protected = [args.policy, args.store, *(path for side in inputs.values() for path in side.values())]
     if staged is not None:
         protected.append(args.candidate_target_after_baseline)
+    if startup_prefix_inputs is not None:
+        protected.extend([args.startup_prefix_inputs, *(Path(row['prefixed_target']['path'])
+                                                       for row in startup_prefix_inputs.values())])
     if observation is not None:
         protected.extend([args.observation_run_bindings, *(Path(row['record_producer']) for row in observation.values())])
     if gateway is not None:
         protected.extend([args.gateway_record_inputs, *(Path(row['record_producer']) for row in gateway.values())])
+        protected.extend(Path(row['target']['path']) for row in gateway.values() if 'target' in row)
+    if responses is not None:
+        protected.extend([args.gateway_response_selections, *(Path(row['path']).parent for row in responses.values())])
+        protected.extend(Path(row['target']['path']) for row in bindings if row['check_id'] == 'REQ-13')
     if copies is not None:
         protected.extend([args.copy_record_inputs, *(Path(row[key]) for row in copies.values()
                          for key in ('record_producer', 'copy_inventory'))])
@@ -849,7 +1135,8 @@ def main():
                          and 'prepared_record_input_sha256_by_side' in check}
         enabled_preparations = (sup05_preparations if checks.get('SUP-05', {}).get('configuration_enabled') else None)
         _publish_prebound(output, config=config, bindings=bindings, checks=checks, pack=pack,
-                          preparations=enabled_preparations, record_checks=bound_records)
+                          preparations=enabled_preparations, record_checks=bound_records,
+                          startup_prefix_inputs=startup_prefix_inputs)
         return
     config_path = output / 'preliminary-guard.toml'
     write_config(config, config_path)

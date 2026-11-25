@@ -732,6 +732,51 @@
       "reviewed_at": "2026-11-18T06:36:44+00:00"
     },
     {
+      "manifest_sha256": "22ac51aad1b4b3169585b369484fa52e1a4854a0dc793d5ea0bbce5fc6db2914",
+      "reviewed_by": "Codex / lifecycle release asset declaration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-23T08:01:00+00:00"
+    },
+    {
+      "manifest_sha256": "6083a0b4c8ad7f4fffe25d951b6ba214831d190da5e9d0050cbf36fc02801c13",
+      "reviewed_by": "Codex / effective readiness check configuration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T05:10:22+00:00"
+    },
+    {
+      "manifest_sha256": "582a242dcb6951832e8a04209372c39132c20723ec605b687615aca5455326b0",
+      "reviewed_by": "Codex / execution recipe byte-verified digest reuse; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T05:16:35+00:00"
+    },
+    {
+      "manifest_sha256": "1f18e43e062557790c4c552474fc10219a9d2c4009c628237037c84d6ecf3604",
+      "reviewed_by": "Codex / optional readiness profile compatibility; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T06:00:26+00:00"
+    },
+    {
+      "manifest_sha256": "78b88709dba4f2fae2471107063bad5e3bac92cd028f67e56f55a89c35ac3ada",
+      "reviewed_by": "Codex / combined lifecycle and update preparation sources; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T06:42:54+00:00"
+    },
+    {
+      "manifest_sha256": "64a51b5e696477a5e6d76e390c0c34b13522ec178a431023f3aaaf2705d34533",
+      "reviewed_by": "Codex / preparation input consolidation; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T07:26:58+00:00"
+    },
+    {
+      "manifest_sha256": "49e22edf14565ca377ae51cce33baedba74c9872fd02339879d1b0a0d0af5de9",
+      "reviewed_by": "Codex / customer handoff and scoped collection reuse / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T09:47:10.991Z"
+    },
+    {
+      "manifest_sha256": "a54124c70be27948c147ba4f5bf44185486da1571b553fef92d9235ab6a27bcf",
+      "reviewed_by": "Codex / exact report replay refs / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T10:11:15.352Z"
+    },
+    {
+      "manifest_sha256": "78506292a2c36694ff67130f3f41f3adf82c2f384669709248f87929e9db4c0c",
+      "reviewed_by": "Codex / Linux CI handoff regression fixes / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T10:21:35.366Z"
+    },
+    {
       "manifest_sha256": "3f88c4dbfca9c266a2a6ff83f62138816a3cb2b5f2690790779e4b1b41c91d9d",
       "reviewed_by": "Codex / pinned vLLM 0.31.0 GPU launch metadata and HTTP lookup boundary; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-18T07:50:51+00:00"
@@ -1222,31 +1267,6 @@
       "reviewed_at": "2026-11-24T08:14:37.419Z"
     },
     {
-      "manifest_sha256": "22ac51aad1b4b3169585b369484fa52e1a4854a0dc793d5ea0bbce5fc6db2914",
-      "reviewed_by": "Codex / lifecycle release asset declaration; B 검토 면제(사용자 결정 5, 2026-11-12)",
-      "reviewed_at": "2026-11-23T08:01:00+00:00"
-    },
-    {
-      "manifest_sha256": "6083a0b4c8ad7f4fffe25d951b6ba214831d190da5e9d0050cbf36fc02801c13",
-      "reviewed_by": "Codex / effective readiness check configuration; B 검토 면제(사용자 결정 5, 2026-11-12)",
-      "reviewed_at": "2026-11-24T05:10:22+00:00"
-    },
-    {
-      "manifest_sha256": "582a242dcb6951832e8a04209372c39132c20723ec605b687615aca5455326b0",
-      "reviewed_by": "Codex / execution recipe byte-verified digest reuse; B 검토 면제(사용자 결정 5, 2026-11-12)",
-      "reviewed_at": "2026-11-24T05:16:35+00:00"
-    },
-    {
-      "manifest_sha256": "1f18e43e062557790c4c552474fc10219a9d2c4009c628237037c84d6ecf3604",
-      "reviewed_by": "Codex / optional readiness profile compatibility; B 검토 면제(사용자 결정 5, 2026-11-12)",
-      "reviewed_at": "2026-11-24T06:00:26+00:00"
-    },
-    {
-      "manifest_sha256": "78b88709dba4f2fae2471107063bad5e3bac92cd028f67e56f55a89c35ac3ada",
-      "reviewed_by": "Codex / combined lifecycle and update preparation sources; B 검토 면제(사용자 결정 5, 2026-11-12)",
-      "reviewed_at": "2026-11-24T06:42:54+00:00"
-    },
-    {
       "manifest_sha256": "503cc9d7bc64b22471de6bb34bbd86e5193a3305883f6d8e3eb16d419564b385",
       "reviewed_by": "Codex / merge reviewed UPDATE changes into development; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T08:21:54+00:00"
@@ -1270,6 +1290,286 @@
       "manifest_sha256": "47bef0cce1641b3a794eddbef48a92f6f0367a736bca1c7f037b1bfdd0f37244",
       "reviewed_by": "Codex / canonical Gateway snapshot actor binding; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T09:59:24+00:00"
+    },
+    {
+      "manifest_sha256": "8bdc8d9b45a600603649593b954629e5bc475e6aa8dfac72b6ad3de846e0c7fa",
+      "reviewed_by": "Codex / #301 UPDATE reconciliation / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T11:15:59+00:00"
+    },
+    {
+      "manifest_sha256": "05c37066c19b25174813ec308bbce40fe212bf65df0e29a69062db64a033407f",
+      "reviewed_by": "Codex / retained ordinary Gateway response / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T11:39:42+00:00"
+    },
+    {
+      "manifest_sha256": "960dcf9a46652b3ea145508283ce7e4773b08ec60881a558f4eb084e37fb45a8",
+      "reviewed_by": "Codex / retained Gateway response validity / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T11:47:53+00:00"
+    },
+    {
+      "manifest_sha256": "dc1b0976747e24942ee516cf3f7f4ec2c9c84e40d96aa652701f4971c6929b88",
+      "reviewed_by": "Codex / retained Gateway sources and defensive evidence / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T12:05:54+00:00"
+    },
+    {
+      "manifest_sha256": "fa0542d4e2d93308f71d688f5332cec6a06f7d3a639bb3ec67149e0435ae74db",
+      "reviewed_by": "Codex / 원본 관측과 읽기 유효기간 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T12:24:30+00:00"
+    },
+    {
+      "manifest_sha256": "b7503d5ab8903c5cc3d3fffad7dab5bf3989d7b6c015062d83c3be48437209ec",
+      "reviewed_by": "Codex / 봉인 입력 연속성과 관측 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T12:36:32+00:00"
+    },
+    {
+      "manifest_sha256": "03756f9af6e8b5acd230c57df75936723e37827b8e3aa22943d354adfe6adf01",
+      "reviewed_by": "Codex / 요청 파일 바이트 봉인 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T12:41:22+00:00"
+    },
+    {
+      "manifest_sha256": "b085a21ba92d673ff9da27e0a3e5490725eec42f2a9a618c90fac7e8c0561655",
+      "reviewed_by": "Codex / 사용 보고와 원본 판정 시각 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T13:59:05+00:00"
+    },
+    {
+      "manifest_sha256": "c55220c5fd7cf3c64bd82b39af1da69d8757aa15a667eb0a0711f6f5314c30bc",
+      "reviewed_by": "Codex / 원본 Gateway 시각·소유 기록 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:38:21+00:00"
+    },
+    {
+      "manifest_sha256": "6eba8cf66d9c3779768c17bb31657bf68cf81663a94dfe5bafbed70e49949e8a",
+      "reviewed_by": "Codex / 사전검사 원본과 소유 기록 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:50:48+00:00"
+    },
+    {
+      "manifest_sha256": "283c6f9911ecf5112a2bb6267350e7970ab9fc30669187ef272078072fae5541",
+      "reviewed_by": "Codex / 양쪽 저장 응답 준비와 원본 기록 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T15:05:53+00:00"
+    },
+    {
+      "manifest_sha256": "80c359261358fc5e94b3f9019f62b1c139f5e94d7d6268701bed82207c1a4463",
+      "reviewed_by": "Codex / 발행된 원본 대상과 수집 파일 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T15:21:19+00:00"
+    },
+    {
+      "manifest_sha256": "108e3baf505fe3a017d25c1c6f78e512cac31d5712dc231f54b0949ea0e5bf27",
+      "reviewed_by": "Codex / 발행된 원본 대상과 수집 파일 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T15:29:43+00:00"
+    },
+    {
+      "manifest_sha256": "8505579a7f854d2cf6b146461c96bccf0bed45bf616bc46c5d14446c48eab6e6",
+      "reviewed_by": "Codex / 저장 경로 기록과 정상 입력 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T15:42:25+00:00"
+    },
+    {
+      "manifest_sha256": "9b9e70e247d29a8a1a5eb4e2d8939f9467d5536997baa15bfbf46424c2ffb0ab",
+      "reviewed_by": "Codex / 공동 준비의 Gateway 입력과 수집 종료 확인 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T15:54:08+00:00"
+    },
+    {
+      "manifest_sha256": "e5381fc5930dc515039c592044e8f5ed9a33be3b4cf1c4d37154bb1ef5e67796",
+      "reviewed_by": "Codex / 보관 수집의 관측 시각과 소유 범위 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T16:32:04+00:00"
+    },
+    {
+      "manifest_sha256": "ecad6ee307512bb70202bff43806b768f9453bb28c54d6359f2a4cffb37827b5",
+      "reviewed_by": "Codex / REQ-10 정상 대상 및 SUP-12 기동 로그 시간 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T16:47:41+00:00"
+    },
+    {
+      "manifest_sha256": "1edfab1f42e9c505ac56855a9b1bbfe1ae33f81d3210a198611014260030def9",
+      "reviewed_by": "Codex / OBS-11 소유 읽기 기록 및 SUP-06 callback 진단 보존 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T16:59:45+00:00"
+    },
+    {
+      "manifest_sha256": "2f5baad3c864f335275826d192bbe245813bb572f519f95ed422594315c927c5",
+      "reviewed_by": "Codex / OBS-02 대상 파일과 SUP-15 소유 캐시 재사용 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T17:14:29+00:00"
+    },
+    {
+      "manifest_sha256": "41d80b188b9d369ee3aaa3ae7452d0224d014a8dcf3a204eaba48c42e09518b1",
+      "reviewed_by": "Codex / OBS-05 수신 원본과 SUP-16 종료된 관측 진단 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T17:27:19+00:00"
+    },
+    {
+      "manifest_sha256": "057db0c0a3ed7dee90d4b81b60d7c5591b668caf8cd01f5def8fec9919cff9ee",
+      "reviewed_by": "Codex / execution and record reader dedup / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T12:55:35.362Z"
+    },
+    {
+      "manifest_sha256": "251340907a2b8c587b529b81f511015b4f070ed826e1bae3181502888036c0a3",
+      "reviewed_by": "Codex / observer projection and scoped record reuse / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:32:25.837Z"
+    },
+    {
+      "manifest_sha256": "692f3084a38367f2685f73898e9a7c62209edc949132824e4bd87dec3ea5fda8",
+      "reviewed_by": "Codex / CI import resolution / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:36:51.652Z"
+    },
+    {
+      "manifest_sha256": "88731956412f0721a7c53420bd6808f3cc5a5724389e1d3d14ebeb7f8c93af61",
+      "reviewed_by": "Codex / evidence collection completion / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:40:29.430Z"
+    },
+    {
+      "manifest_sha256": "bd8772e46f61ad4fb2c45c57aebc95a50852b8a0b44374c623cfa17a0de75833",
+      "reviewed_by": "Codex / collector dependencies / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T14:57:17.985Z"
+    },
+    {
+      "manifest_sha256": "1d1f1090366a291f63d1c0c422fa2064e4cdfaea32155f2ddabb061820396e4b",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T17:47:19.421Z"
+    },
+    {
+      "manifest_sha256": "d714334144ef4339af8a349987f06be1e9ef53a13df3f1abb813762db5c49dee",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T18:11:50.049Z"
+    },
+    {
+      "manifest_sha256": "aa059e6dd3b4dab61a48192d2e44188b391dd6cf8c005629751952fa421e45fc",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T18:28:48.105Z"
+    },
+    {
+      "manifest_sha256": "7b2f6e920cebfe6bf279dfc3b27e5d7f897b2856e2e5d7ccbbb19500d74c222a",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T18:39:57.763Z"
+    },
+    {
+      "manifest_sha256": "85a93b5fd0fa95491f7bb369291fb5fdf627167522d84a72fff1d643702093be",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T18:53:18.812Z"
+    },
+    {
+      "manifest_sha256": "93a6527b6984dc362c18d6575847291d7fac4ca9a2aa2ca8979242179c21d2c2",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T19:08:57.586Z"
+    },
+    {
+      "manifest_sha256": "4b590adcb81322ee3d6913d4e2c496a1366b2f1e36d88230b441e4d580efca10",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T19:21:55.786Z"
+    },
+    {
+      "manifest_sha256": "2067ab3368f1b28cedc470fb9c07840e271fad61731e80787ee6b47642a5345c",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T19:36:56.297Z"
+    },
+    {
+      "manifest_sha256": "48c0e9a26402ca03aa7cf256440fb230ad41db8a950b662b8fdd386b049e036a",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T19:54:48.027Z"
+    },
+    {
+      "manifest_sha256": "7bd9b7fe774bc091d87cfaa3fba871e9149cff18808063c61e2af00e5de4552f",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T20:12:10.425Z"
+    },
+    {
+      "manifest_sha256": "fa55d47f926accd058d4d44fcf6084e8e0d5f754593c5a93029590bef95008ba",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T20:30:58.201Z"
+    },
+    {
+      "manifest_sha256": "a37d45c41dc6803997f8df41492e20e326dfe4e4c944811979222ae2e1b23943",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T20:51:31.596Z"
+    },
+    {
+      "manifest_sha256": "260bbf4e8e0cc4bc5e3fe8de955d347336205f1f64b6d4c4b8f37d6d5cc404d7",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T21:08:44.857Z"
+    },
+    {
+      "manifest_sha256": "69b1026bb7d84fb0dce910d4cbdfd2087ff3c18f7406f106f63f972ee300c3f4",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T21:24:55.670Z"
+    },
+    {
+      "manifest_sha256": "051b005791575b88821e251787d11d33f78997104a7f24ad390446e53b6d83e7",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T21:43:34.986Z"
+    },
+    {
+      "manifest_sha256": "f3cc2224bb7a9fbeb111197eda415490879f31497621b654d8a583a61cb8d1a5",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T22:02:03.110Z"
+    },
+    {
+      "manifest_sha256": "b8765e6c1e3c1c58a4c764e05787e868360e9a3b720515bad5e9a6ecb6a86326",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T22:25:30.023Z"
+    },
+    {
+      "manifest_sha256": "788c0bd0887a302f769d186067e6271b6388aa3d956e322e87831c2b41ee40ba",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T22:52:21.608Z"
+    },
+    {
+      "manifest_sha256": "4ee6099fd2c49ce72e341cf9a0e9da30ee844b06da583791ca143ec62e409710",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T23:18:02.288Z"
+    },
+    {
+      "manifest_sha256": "77152e1601a86b6aad91943fc01864593e8f0d424348055aeb79f8105f2bb53c",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T23:35:57.535Z"
+    },
+    {
+      "manifest_sha256": "3a0524e15cc93fa6885f90e87c84a84c82c8795da0ce2ca81aa3a13c2d4efaaa",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-24T23:49:52.466Z"
+    },
+    {
+      "manifest_sha256": "143cea9b539612d03580d20680462c7a77d55a3135b490ecca004fd5f5b44cee",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T00:11:43.325Z"
+    },
+    {
+      "manifest_sha256": "a2850daad06ea21f47f894a88fe5f961452412b0748ccc99b27333d275ef259f",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T00:25:56.537Z"
+    },
+    {
+      "manifest_sha256": "4f91eda3efa5190896846ed2a7d47d8376d16705cfac79aff79f7920b45e8c15",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T00:39:41.996Z"
+    },
+    {
+      "manifest_sha256": "35b63b720fed7640dfa1ef3c611281c5a2d55e3c313b2d32d94a7a81fb007167",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T01:08:22.055Z"
+    },
+    {
+      "manifest_sha256": "e6da34e2cedf410e748f8a210efd4e07d4e61cba2035490cd57233583d600568",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T01:27:05.875Z"
+    },
+    {
+      "manifest_sha256": "2d076344455f0974601e13ea14371587c668199065f05e1ebc22f4ffdab22463",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T01:44:25.811Z"
+    },
+    {
+      "manifest_sha256": "4ba406b97b8fb3d8d755e6b0d605698740776830db9206a45914ea4c34f5ed0f",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T01:57:06.262Z"
+    },
+    {
+      "manifest_sha256": "1688246f36a4303bb89e64df83936e3d6a28c28e37c13ff2e96d0521d6197bcf",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T05:48:29.913Z"
+    },
+    {
+      "manifest_sha256": "886976ae7af3604c8a75ee3d436d0134d2ec1eb5a1b63c0df9fcf3475b9e0409",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T06:27:13.679Z"
+    },
+    {
+      "manifest_sha256": "e9a534ca50044a8ec38812cd0f0bf193d5e4c5dddd6b2150b9c01aacb1561ef4",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T06:56:13.440Z"
     }
   ]
 }

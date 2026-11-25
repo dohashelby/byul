@@ -216,7 +216,9 @@ def test_product_execution_saves_exact_safe_bytes_and_never_overwrites(group,mon
     assert result.exit_code==0,result.output
     raw=output.read_bytes();summary=json.loads(result.output)
     assert summary["artifact_saved"] and summary["sha256"]==hashlib.sha256(raw).hexdigest() and summary["bytes"]==len(raw)
-    assert len(json.loads(raw)["recordings"])==2 and CANARY.encode() not in raw
+    attachment = json.loads(raw)
+    assert raw == (json.dumps(attachment, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    assert len(attachment["recordings"]) == 2 and CANARY.encode() not in raw
     second=CliRunner().invoke(app,arguments(group,output)+["--execute"])
     assert second.exit_code==2 and output.read_bytes()==raw
 

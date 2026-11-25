@@ -741,7 +741,7 @@ def test_lif01_keeps_only_bound_reported_stage_costs(tmp_path, monkeypatch, cond
         assert normal["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"]
 
 
-@pytest.mark.parametrize("condition", ["valid", "bad_type", "wrong_source", "unverified_owner"])
+@pytest.mark.parametrize("condition", ["valid", "bad_type", "wrong_source", "unverified_owner", "parent_cleanup"])
 def test_lif02_preserves_only_bound_normal_fetch_attempt_facts(tmp_path, monkeypatch, condition):
     env = environment(model={"id": "test"})
     executor, values, digest = role_inputs(tmp_path, monkeypatch, "LIF-02", env)
@@ -763,7 +763,8 @@ def test_lif02_preserves_only_bound_normal_fetch_attempt_facts(tmp_path, monkeyp
         return raw, {"capture_sha256": sha256_hex(raw), "owner_binding_verified": condition != "unverified_owner"}
 
     monkeypatch.setattr(FakeReader, "read_file", read_file)
-    monkeypatch.setattr(FakeReader, "report", lambda self: {})
+    monkeypatch.setattr(FakeReader, "report", lambda self: {"parent_cleanup_unverified": True}
+                        if condition == "parent_cleanup" else {})
     draft = executor.run(PACK.checks["LIF-02"], env, values, None, tmp_path)
     summary, = draft.artifacts
     assert summary.name == "supply_boot_summary.json"
@@ -772,11 +773,87 @@ def test_lif02_preserves_only_bound_normal_fetch_attempt_facts(tmp_path, monkeyp
     assert json.loads(saved)["sessions"] == [normal, missing_challenge]
     assert missing_challenge["diagnostic_codes"] == ["SUPPLY_BOOT_INPUT_UNAVAILABLE"]
     assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.cleanup_errors == (["SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"] if condition == "parent_cleanup" else [])
     assert draft.observations["supply_boot_record_authenticated"].value is False
     assert draft.observations["supply_boot_complete"].value is False
     assert "EXAMPLE unretained outcome detail" not in saved and '"outcome"' not in saved
+    verification = draft.observations["supply_boot_normal_verified"]
     if condition == "valid":
         assert normal["reported_fetch_attempts"] == attempts
         assert normal["record_sha256"] == sha256_hex(raw)
+        assert normal["collected"] and normal["owner_binding_verified"]
+        assert draft.normal_control.attempted and draft.normal_control.succeeded is True
+        assert verification.collected and verification.value is True
     else:
-        assert "reported_fetch_attempts" not in normal
+        assert "reported_fetch_attempts" not in normal and normal["record_sha256"] is None
+        assert not normal["collected"] and not normal["owner_binding_verified"]
+        assert normal["diagnostic_codes"] == ["SUPPLY_BOOT_RECORD_UNAVAILABLE"]
+        assert not draft.normal_control.attempted and draft.normal_control.succeeded is None
+        assert not verification.collected and verification.value is None
+        assert "normal:boot_record_unavailable" in draft.observations["supply_boot_missing"].value
+
+
+@pytest.mark.parametrize(("case", "normal_verified"), [
+    ("compatible-reuse", True), ("ordinary-only", True), ("miss", False),
+    ("unverified-compatibility", False), ("unverified-owner", None),
+])
+def test_sup15_requires_owned_compatible_baseline_reuse(tmp_path, monkeypatch, case, normal_verified):
+    from guard.core.run import _normalize
+    from guard.judges.rule_table import RuleTableJudge
+    from guard.models import Verdict
+    from tests.builders import evidence
+    from tests.test_b3_supply_records import retained
+
+    _, _, archived = retained("SUP-15", tmp_path)
+    env = environment(model={"id": "test"})
+    check = PACK.checks["SUP-15"]
+    executor, values, digest = role_inputs(tmp_path, monkeypatch, check.id, env)
+    packet = good_packet(env.ref().model_dump(mode="json"), digest, check.id)
+    packet["change"] = change(applied=False)
+    packet["rows"] = deepcopy(archived["normal"]["packet"]["rows"])
+    if case == "ordinary-only":
+        # The original writer publishes its surviving compatible same-condition row
+        # when a later change case is unavailable.
+        packet["rows"] = packet["rows"][:1]
+        assert packet["rows"][0]["relevant_change"] is False
+    for row in packet["rows"]:
+        if row["relevant_change"] is False:
+            if case == "miss":
+                row["reused"] = False
+            elif case == "unverified-compatibility":
+                row["compatibility_verified"] = False
+    raw = canonical_json(packet)
+    owner_verified = case != "unverified-owner"
+
+    def read_file(self, client, target, *, container, image, path):
+        assert path == boot.record_path("a" * 32)
+        return raw, {"capture_sha256": sha256_hex(raw), "owner_binding_verified": owner_verified}
+
+    monkeypatch.setattr(FakeReader, "read_file", read_file)
+    monkeypatch.setattr(FakeReader, "report", lambda self: {})
+    collected = {role: executor._collect_role(check, env, values, role) for role in contract.ROLES}
+    draft = executor._draft(check, env, values, tmp_path / "evidence", utcnow(), collected)
+    normal, _ = draft.observations["supply_boot_sessions"].value
+    assert normal["owner_binding_verified"] is owner_verified
+    assert draft.status is ExecStatus.ABORTED and draft.data_origin is DataOrigin.EXAMPLE
+    assert draft.normal_control.succeeded is normal_verified
+    assert draft.observations["supply_boot_normal_verified"].value is normal_verified
+    missing = (
+        ["challenge:boot_record_unavailable"] if owner_verified
+        else ["challenge:boot_record_unavailable", "normal:boot_record_unavailable"])
+    if case == "ordinary-only":
+        missing.append("normal:relevant_change_not_attempted")
+        assert draft.observations["supply_boot_complete"].value is False
+        assert draft.observations["supply_boot_change_applied"].value is False
+    assert draft.observations["supply_boot_missing"].value == missing
+    assert draft.observations["supply_boot_record_authenticated"].value is False
+    artifacts = {artifact.name: artifact.path for artifact in draft.artifacts}
+    if owner_verified:
+        assert artifacts["supply_boot_normal_record.json"].read_bytes() == raw
+        assert normal["reported_boot_record"] == packet
+    else:
+        assert "supply_boot_normal_record.json" not in artifacts and normal["record_sha256"] is None
+    projected = _normalize(check, draft)
+    evd = evidence(check_id=check.id, status=draft.status, data_origin=draft.data_origin,
+                   normal=projected["normal_control"], observations=projected["observations"])
+    assert RuleTableJudge().judge(check, evd, check.judge.params, values).verdicts["security"] is Verdict.UNKNOWN

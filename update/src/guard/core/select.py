@@ -194,8 +194,7 @@ def select(
         if not_selected is None:
             if check.executor is None:
                 gaps.append(Gap.NO_EXECUTOR)
-            values = policy.values.get(cid, {})
-            if any(p.required and p.key not in values for p in check.policy_params):
+            if any(p.required and p.key not in given for p in check.policy_params):
                 gaps.append(Gap.NO_POLICY_VALUE)
 
         carried = None

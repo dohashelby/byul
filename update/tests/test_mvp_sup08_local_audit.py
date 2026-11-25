@@ -108,6 +108,38 @@ def test_example_environment_contracts_are_not_actual_environment_proof(tmp_path
     assert not result['ready_for_final_assembly'] and not result['input_preflight_passed']
 
 
+@pytest.mark.parametrize('changed', [None, 'candidate/policy.yaml', 'control-image.txt'])
+def test_launch_conditions_and_input_assembly_share_verified_bytes(tmp_path, monkeypatch, changed):
+    fixture, launch, envs, targets = local_assets(tmp_path, monkeypatch)
+    old_read_text = Path.read_text
+    old_conditions = tool._launch_conditions
+    control_file = launch.parent / 'control-image.txt'
+
+    def no_unverified_control_read(path, *args, **kwargs):
+        if path == control_file:
+            pytest.fail('Control image must come from verified launch bytes')
+        return old_read_text(path, *args, **kwargs)
+
+    def conditions(folder, *args):
+        if changed is not None:
+            path = folder / changed
+            path.write_bytes(path.read_bytes() + b'\n')
+        return old_conditions(folder, *args)
+
+    monkeypatch.setattr(Path, 'read_text', no_unverified_control_read)
+    monkeypatch.setattr(tool, '_launch_conditions', conditions)
+    result = tool.audit(fixture, launch, environments=envs, targets=targets)
+
+    if changed is None:
+        assert result['local_assets_valid'] and result['final_input_contracts_valid'] is True
+        assert not result['errors']
+    else:
+        assert not result['local_assets_valid'] and not result['launch_plan_valid']
+        assert result['final_input_contracts_valid'] is None
+        assert result['errors'] == ['LOCAL_LAUNCH_INPUT_CHANGED']
+    assert not result['engine_executed'] and result['actual_comparison'] is None
+
+
 @pytest.fixture
 def example_engine_selector(monkeypatch):
     from guard.adapters.engine_provider import VllmProvider

@@ -32,7 +32,8 @@ def producer():
              Path(cache.__file__), Path(cache.base.__file__)]
     for name in ('observer_runtime', 'vllm_worker_generation_contract', 'vllm_worker_startup_contract', 'vllm_worker_shard_callback'):
         paths.append(Path(scoped.__file__).with_name(name + '.py'))
-    paths.extend((Path(cache.__file__).with_name('vllm_observer_pin_rows.py'),
+    paths.extend((Path(cache.__file__).with_name('vllm_runner_capture.py'),
+                  Path(cache.__file__).with_name('vllm_observer_pin_rows.py'),
                   Path(cache.__file__).parent / 'assets/vllm_observer_pin_rows.json'))
     return {'name': NAME, 'version': VERSION, 'source_sha256': release_digest(SCHEMA, paths)}
 
@@ -171,8 +172,68 @@ def validate(value, *, environment_ref, target_sha256, prepared_sha256, session,
             'violation_candidates': candidates}
 
 
-def record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, expected_stage_ranks=None, qualification_scope=None, truncated=False, requests=None, expected_requests=None):
+_API_INPUT = 'InputProcessor.process_inputs'
+_API_VALIDATIONS = {'InputProcessor._validate_model_input', 'InputProcessor._validate_params'}
+
+
+def _reviewed_call_in_process(call, end, process):
+    # Both callback phases must bind to the captured process epoch.
+    pid, ticks = process['pid'], process['start_ticks']
+    if not (_uint(pid) and pid > 0 and _uint(ticks)):
+        return False
+    for row in (call, end):
+        scope = row.get('consumption_scope')
+        if (type(scope) is not dict or not _uint(scope.get('pid')) or scope['pid'] != pid
+                or not _uint(scope.get('start_ticks')) or scope['start_ticks'] != ticks):
+            return False
+    started, finished = call.get('operation_started_ns'), end.get('operation_finished_ns')
+    return (_uint(started) and _uint(finished) and started <= finished
+            and call.get('operation_finished_ns') == end.get('operation_started_ns') == started
+            and end.get('entry_qualified_before') is True
+            and call.get('parent_call_sha256') == end.get('parent_call_sha256'))
+
+
+def _note_api_validation(pending, key, fields, rejected):
+    current = pending.setdefault(key, {'values': {}, 'rejected': False})
+    current['values'].update(fields.get('params') or {k: fields.get(k) for k in ('prompt_tokens', 'max_token_id')})
+    current['rejected'] |= rejected
+
+
+def _reviewed_api_validations(ordered, diagnostics):
+    # Validations execute inside the input call. The writer records that parent
+    # directly, even when separate calls reuse the same external request ID.
+    parents = {(binding, call['process_sha256'], call['call_sha256']): (call, end)
+               for _, _, binding, call, end in ordered if call['point'] == _API_INPUT}
+    pending = {}
+    for _, _, binding, call, end in ordered:
+        if call['point'] not in _API_VALIDATIONS:
+            continue
+        parent_sha256 = call.get('parent_call_sha256')
+        key = binding, call['process_sha256'], parent_sha256
+        parent = parents.get(key) if _sha(parent_sha256) else None
+        fields = call.get('fields')
+        parent_fields = parent[0].get('fields') if parent else None
+        if (type(fields) is not dict or type(parent_fields) is not dict or not _sha(fields.get('request_sha256'))
+                or parent_fields.get('request_sha256') != fields['request_sha256']
+                or not parent[0]['operation_started_ns'] <= call['operation_started_ns']
+                    <= end['operation_finished_ns'] <= parent[1]['operation_finished_ns']):
+            diagnostics.add('NATIVE_API_VALIDATION_NOT_LINKED')
+            continue
+        _note_api_validation(pending, key, fields, end['phase'] == 'RAISE')
+    return pending
+
+
+def record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session,
+           expected_stage_ranks=None, qualification_scope=None, truncated=False, requests=None,
+           expected_requests=None, reviewed_scoped_sources=False, retain_request_links=False):
     """Closed native calls -> scoped events; no cross-worker deduplication."""
+    reviewed_sources = None
+    if reviewed_scoped_sources is True:
+        from guard.adapters.vllm_runner_capture import scoped_record_sources
+
+        reviewed_sources = scoped_record_sources(qualification_scope)
+        if reviewed_sources is None:
+            raise legacy.GpuInputError('GPU_INPUT_SCOPED_SOURCE_SCOPE_UNREVIEWED')
     events, bindings, diagnostics, api_pending = [], [], set(), {}
     ordered = []
     for process in processes:
@@ -191,9 +252,11 @@ def record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, s
             call = next(r for r in pair if r['phase'] == 'CALL'); end = next(r for r in pair if r['phase'] != 'CALL')
             callback = v1 if call.get('schema') == v1.SCHEMA else v2
             module = next((name for name, points in callback.TARGETS.items() if key[2] in points), None)
-            sources = getattr(callback, 'SOURCES', v1.cache.base.SOURCE_SHA)
+            sources = reviewed_sources if reviewed_sources is not None else getattr(callback, 'SOURCES', v1.cache.base.SOURCE_SHA)
+            source = sources.get(module)
             if (not _sha(key[0]) or not _sha(key[1]) or call.get('entry_qualified_before') is not True or end.get('entry_qualified_after') is not True
-                    or module is None or call.get('source_file_sha256') != sources[module] or end.get('source_file_sha256') != sources[module]
+                    or source is None or call.get('source_file_sha256') != source or end.get('source_file_sha256') != source
+                    or (reviewed_sources is not None and end['schema'] != call['schema'])
                     or call.get('entry_code_sha256') != end.get('entry_code_sha256') or not _sha(call.get('entry_code_sha256'))
                     or call.get('session_sha256') != hashlib.sha256(session.encode()).hexdigest()
                     or end.get('session_sha256') != call.get('session_sha256')
@@ -219,7 +282,13 @@ def record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, s
                 binding[identity] = len(bindings)
                 bindings.append({'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
                     'restart_count': pod['restart_count'], 'worker_pid': pid, 'start_ticks': ticks, 'role': role, 'rank': rank})
+            if reviewed_sources is not None and role == 'api' and not _reviewed_call_in_process(call, end, process):
+                diagnostics.add('NATIVE_API_CALL_UNBOUND')
+                continue
             ordered.append((end.get('operation_finished_ns') or 0, len(ordered), binding[identity], call, end))
+    ordered.sort()
+    if reviewed_sources is not None:
+        api_pending = _reviewed_api_validations(ordered, diagnostics)
     def add(event, binding, request, call, values, admission=None):
         if requests is None or request in requests:
             if len(events) >= legacy.MAX_EVENTS:
@@ -227,17 +296,18 @@ def record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, s
             events.append({'seq': len(events), 'event': event, 'binding': binding, 'request_sha256': request,
                 'admission_sha256': admission, 'source_call': {k: call[k] for k in ('process_sha256', 'call_sha256', 'point')},
                 **{name: values.get(name) for name in FIELDS}})
-    for _, _, binding, call, end in sorted(ordered):
+    for _, _, binding, call, end in ordered:
         point = call['point']; f = call.get('fields') or {}; scope = end.get('consumption_scope') or call.get('consumption_scope') or {}
         if type(f) is not dict or type(scope) is not dict or type(scope.get('admissions', {})) is not dict:
             diagnostics.add('NATIVE_SCOPE_MALFORMED'); continue
         request = f.get('request_sha256')
         pending_key = call['process_sha256'], request
-        if point in ('InputProcessor._validate_model_input', 'InputProcessor._validate_params'):
-            current = api_pending.setdefault(pending_key, {'values': {}, 'rejected': False})
-            current['values'].update(f.get('params') or {k: f.get(k) for k in ('prompt_tokens', 'max_token_id')})
-            current['rejected'] |= end['phase'] == 'RAISE'
-        elif point == 'InputProcessor.process_inputs':
+        if point in _API_VALIDATIONS:
+            if reviewed_sources is None:
+                _note_api_validation(api_pending, pending_key, f, end['phase'] == 'RAISE')
+        elif point == _API_INPUT:
+            if reviewed_sources is not None:
+                pending_key = binding, call['process_sha256'], call['call_sha256']
             current = api_pending.pop(pending_key, None)
             if current is None:
                 diagnostics.add('API_VALIDATION_UNOBSERVED'); continue
@@ -252,6 +322,14 @@ def record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, s
         diagnostics.add('NATIVE_READ_TRUNCATED')
     value = {'schema': SCHEMA, 'kind': KIND, 'producer': producer(), 'environment_ref': deepcopy(environment_ref),
         'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256, 'session': session, 'bindings': bindings, 'events': events,
-        'expected_stage_ranks': deepcopy(expected_stage_ranks), 'expected_requests': deepcopy(expected_requests), 'qualification_scope': deepcopy(qualification_scope), 'completeness': {'source_ended': not truncated and not diagnostics,
+        'expected_stage_ranks': deepcopy(expected_stage_ranks), 'expected_requests': deepcopy(expected_requests), 'qualification_scope': deepcopy(qualification_scope),
+        # A reviewed checkpointed range closes calls, without proving the writer ended.
+        'completeness': {'source_ended': reviewed_sources is None and not truncated and not diagnostics,
         'dropped': 0, 'diagnostic_codes': sorted(diagnostics)}}
-    return value, validate(value, environment_ref=environment_ref, target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+    result = validate(value, environment_ref=environment_ref, target_sha256=target_sha256,
+                      prepared_sha256=prepared_sha256, session=session)
+    if retain_request_links and reviewed_sources is not None and not truncated:
+        from .scoped_request_links import project
+
+        result['native_request_links'] = project(processes, ordered, value)
+    return value, result

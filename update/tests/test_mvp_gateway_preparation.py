@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
+from pathlib import Path
 import socket
 import subprocess
 import sys
@@ -123,11 +124,12 @@ def _gateway_owner(gateway_pair, side):
     namespace = {'metadata': {'name': engine['namespace'], 'uid': engine['namespace_uid'],
                               'labels': {'byul.lab/owned': 'true'}}}
     pod = deepcopy(prepared['deployment']['pod'])
-    pod['metadata']['uid'] = '12345678-1234-1234-1234-0123456789ab'
+    owner_suffix = 'a' if side == 'baseline' else 'b'
+    pod['metadata']['uid'] = '12345678-1234-1234-1234-0123456789a' + owner_suffix
     pod['spec']['nodeName'] = engine['node']
     pod['status'] = {'phase': 'Running', 'podIP': '10.1.4.77', 'conditions': [{'type': 'Ready', 'status': 'True'}],
                      'containerStatuses': [{'name': 'gateway', 'imageID': tool.GATEWAY_IMAGE,
-                                            'containerID': 'containerd://' + '9' * 64, 'restartCount': 0,
+                                            'containerID': 'containerd://' + owner_suffix * 64, 'restartCount': 0,
                                             'ready': True, 'state': {'running': {'startedAt': START}}}]}
     config = deepcopy(prepared['deployment']['configuration'])
     return env, target_path, target, prepared, {'namespace': namespace, 'pod': pod, 'configuration': config}
@@ -147,7 +149,7 @@ def test_only_verified_saved_gateway_configuration_binds_the_target(gateway_pair
         bind()
 
 
-def _ordinary_receipts(directory, env, bound, prepared, owner):
+def _ordinary_receipts(directory, env, bound, prepared, owner, *, recorded_at=None):
     from serving_runtime.gateway.request_records import RequestRecords
     from serving_runtime.gateway.validator import Decision
 
@@ -166,7 +168,7 @@ def _ordinary_receipts(directory, env, bound, prepared, owner):
     decision = Decision('ALLOWED', 200, 'ALLOWED', None, 'allowed', MODEL, 1)
     final = writer.build('final', request_id, decision, attempted=True, backend_receipt='not_available',
                          response='completed', error_code=None, final_outcome='completed')
-    final['recorded_at'] = (NOW + timedelta(seconds=1)).isoformat()
+    final['recorded_at'] = recorded_at or (NOW + timedelta(seconds=1)).isoformat()
     assert writer.append(final)
     journal = directory / 'gateway_records.jsonl'
     journal_raw = journal.read_bytes()
@@ -267,3 +269,249 @@ def test_bind_publishes_only_same_owner_normal_gateway_fact(tmp_path, gateway_pa
     assert json.loads((legacy / 'target.json').read_bytes()) == bound
     assert json.loads((legacy / 'gateway-source.json').read_bytes()) == {
         key: value for key, value in source.items() if key != 'request_sha256'}
+
+
+@pytest.mark.parametrize('changed', [None, 'missing-side', 'journal', 'policy', 'owner'])
+def test_retained_pair_reads_original_runtime_sources_without_new_authority(tmp_path, gateway_pair, monkeypatch, changed):
+    def forbidden(*args, **kwargs):
+        pytest.fail('Historical readback cannot start processes or make network requests')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    archived, revoked, revoked_sha256 = gateway_pair
+    sources = {'schema': tool.RETAINED_INPUT_SCHEMA, 'revocations': {'path': str(revoked), 'sha256': revoked_sha256},
+               'sides': {}}
+    captured, originals = {}, {}
+    source_recorded_at = '2026-11-19T00:00:00.000000650Z'
+
+    for side, settings in archived.items():
+        env, engine_target, _, prepared, owner = _gateway_owner(gateway_pair, side)
+        bound = tool.bind_gateway(engine_target, env, prepared, **owner)
+        saved = tmp_path / (side + '-saved')
+        saved.mkdir()
+        response, audit, journal = _ordinary_receipts(saved, env, bound, prepared, owner, recorded_at=source_recorded_at)
+        response['observed_started_ns'] += 100
+        response['observed_finished_ns'] = response['observed_started_ns'] + 400
+        if changed == 'owner' and side == 'candidate':
+            # Keep all raw pins valid but omit the actual captured generation.
+            bound['kubernetes_gateway']['container_id'] = 'containerd://' + '7' * 64
+            audit['gateway_target_sha256'] = sha256(canonical_json(bound)).hexdigest()
+        selection = {key: {'path': str(saved / (key + '.json')), 'sha256': _write(saved / (key + '.json'), value)}
+                     for key, value in [('response_receipt', response), ('audit_receipt', audit)]}
+        selection['journal'] = {'path': str(journal), 'sha256': audit['journal_sha256']}
+        observation, target = saved / 'selection.json', saved / 'target.json'
+        env_path = Path(settings['environment'])
+        entry = {'environment': {'path': str(env_path), 'sha256': sha256(env_path.read_bytes()).hexdigest()},
+                 'target': {'path': str(target), 'sha256': _write(target, bound)},
+                 'observation': {'path': str(observation), 'sha256': _write(observation, selection)},
+                 'bundle': {'path': settings['bundle'], 'sha256': settings['bundle_sha256']}}
+        sources['sides'][side] = entry
+        originals.update({path: path.read_bytes() for path in (env_path, target, observation, journal)})
+        captured[side] = (response, audit, selection)
+        if changed == 'journal' and side == 'candidate':
+            journal.write_bytes(originals[journal] + b'\n')
+        if changed == 'policy' and side == 'candidate':
+            policy = Path(settings['bundle']) / 'gateway_policy.json'
+            policy.write_bytes(policy.read_bytes() + b'\n')
+    if changed == 'missing-side':
+        sources['sides'].pop('candidate')
+
+    inputs = tmp_path / 'inputs.json'
+    output = tmp_path / 'historical'
+    inputs_sha256 = _write(inputs, sources)
+    monkeypatch.setattr(sys, 'argv', ['mvp_gateway_preparation', 'audit-retained', '--inputs', str(inputs),
+                                     '--inputs-sha256', inputs_sha256, '--output', str(output)])
+    if changed is not None:
+        with pytest.raises(SystemExit, match='2'):
+            tool.main()
+        assert not output.exists()
+        return
+
+    tool.main()
+    evidence, = output.iterdir()
+    assert evidence.name == 'obs01-retained-audit.json' and evidence.stat().st_mode & 0o777 == 0o600
+    result = json.loads(evidence.read_bytes())
+    assert result['schema'] == tool.RETAINED_AUDIT_SCHEMA
+    assert result['inputs_sha256'] == inputs_sha256 and result['revocations_sha256'] == revoked_sha256
+    assert result['official_evidence'] is False and result['current_authority'] is False
+    for side, verified in result['sides'].items():
+        response, audit, selection = captured[side]
+        assert verified['input_sha256'] == {key: row['sha256'] for key, row in selection.items()}
+        assert verified['observed_actor_sha256'] == audit['actor_sha256']
+        assert verified['observed_session_sha256'] == sha256(audit['session'].encode()).hexdigest()
+        assert verified['request_sha256'] == response['request_sha256']
+        assert verified['selected_row_sha256'] == audit['selected_row_sha256']
+        assert verified['source_recorded_at'] == source_recorded_at
+        assert verified['response_status'] == 200 and verified['environment_ref'] == audit['environment_ref']
+        assert evidence.read_bytes().find(response['request_id'].encode()) == -1
+    assert {path: path.read_bytes() for path in originals} == originals
+
+
+def test_observation_time_checks_use_full_owner_and_policy_precision():
+    epoch = int(NOW.timestamp()) * 10**9
+    policy = {'valid_from': '2026-11-19T00:00:00.000000100Z', 'valid_until': '2026-11-19T00:00:00.000000900Z'}
+    target = {'kubernetes': {'engine': {'started_at': START}},
+              'kubernetes_gateway': {'started_at': '2026-11-19T00:00:00.000000123Z'}}
+    response = {'observed_started_ns': epoch + 123, 'observed_finished_ns': epoch + 345}
+    tool._check_observation_times(response, '2026-11-19T00:00:00.000000899Z', target, policy)
+    with pytest.raises(ValueError, match='GATEWAY_ORDINARY_OBSERVATION_INVALID'):
+        tool._check_observation_times(response, policy['valid_until'], target, policy)
+    response['observed_started_ns'] -= 1
+    with pytest.raises(ValueError, match='GATEWAY_ORDINARY_OBSERVATION_INVALID'):
+        tool._check_observation_times(response, '2026-11-19T00:00:00.000000899Z', target, policy)
+
+
+@pytest.mark.parametrize("side", ["baseline", "candidate"])
+@pytest.mark.parametrize("fault", [None, "namespace", "other-run", "late-owner", "incomplete"])
+@pytest.mark.parametrize("loopback", [False, True], ids=["probe-pod", "gateway-loopback"])
+def test_owned_normal_response_capture_keeps_the_gateway_interval(gateway_pair, monkeypatch, tmp_path, side, fault, loopback):
+    from guard.models import load_pack, sha256_hex
+    from guard.runtime import kubernetes_http as http
+    from tests.builders import policy
+    from tests.test_kubernetes_response_snapshot import VALUES
+    from tests.test_model_preparation_integration import FullWorld
+    from tools import mvp_req13_gateway_inputs as intake
+
+    env, target_path, target, prepared, owned = _gateway_owner(gateway_pair, side)
+    gateway = tool.bind_gateway(target_path, env, prepared, **owned)["kubernetes_gateway"]
+    env = env.model_copy(update={"data_origin": DataOrigin.EXAMPLE}).seal()
+    target["environment_ref"] = env.ref().model_dump(mode="json")
+    target["model_mapping"]["environment_ref"] = target["environment_ref"]
+    world = FullWorld(target)
+    auth = "Bearer EXAMPLE-private-auth"
+    request_id = "fixture-request-" + side
+    body = canonical_json({"id": request_id, "model": MODEL, "object": "chat.completion",
+        "choices": [{"message": {"role": "assistant", "content": "fixture-ordinary-response"}, "finish_reason": "length"}],
+        "usage": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}}).decode("utf-8")
+    reply = {
+        "id": "obs01-before", "mode": "json", "method": "POST", "outcome": 200,
+        "body": body, "body_bytes": len(body), "body_sha256": sha256_hex(body.encode()),
+        "body_truncated": False, "utf8_valid": True, "capture_complete": fault != "incomplete",
+        "eof": fault != "incomplete", "content_type": "application/json",
+        "response_headers": {"x-request-id": request_id},
+    }
+    calls = []
+
+    def runner(argv, **kwargs):
+        if "get" in argv and "namespace" in argv:
+            value = {"kind": "Namespace", **deepcopy(owned["namespace"])}
+            if fault == "namespace":
+                value["metadata"]["uid"] = "00000000-0000-0000-0000-000000000000"
+            calls.append("namespace")
+        elif "get" in argv and gateway["pod"] in argv:
+            value = {"kind": "Pod", **deepcopy(owned["pod"])}
+            if fault == "other-run":
+                value["metadata"]["labels"]["guard.run"] = "fixture-unselected-run"
+            if fault == "late-owner" and "response" in calls:
+                value["status"]["containerStatuses"][0]["containerID"] = "containerd://" + "f" * 64
+            calls.append("gateway")
+        elif "exec" in argv:
+            request, = json.loads(kwargs["input_bytes"])["requests"]
+            sender = gateway if loopback else target["kubernetes"]["probe"]
+            assert argv[3:9] == [f"--namespace={sender['namespace']}", "exec", "-i", sender["pod"],
+                                 f"--container={sender['container']}", "--"]
+            python = ["python3", "-I", "-S", "-B", "-c"] if loopback else ["python3", "-c"]
+            assert argv[9:9 + len(python)] == python
+            host = "127.0.0.1" if loopback else gateway["pod_ip"]
+            assert request["url"] == f"http://{host}:8080/v1/chat/completions"
+            assert request["method"] == "POST" and request["headers"] == {"Authorization": auth}
+            assert request["body"] == {"model": MODEL, "messages": [{"role": "user", "content": "hello"}],
+                                       "max_tokens": 1, "stream": False}
+            calls.append("response")
+            value = [reply]
+        elif "get" in argv and "namespaces" in argv:
+            value = {"kind": "Namespace", **deepcopy(owned["namespace"])}
+        else:
+            assert "get" in argv
+            reviewed = world.runner(argv, **kwargs)
+            value = json.loads(reviewed["stdout_bytes"])
+            value["metadata"]["labels"]["guard.run"] = target["kubernetes"]["run_id"]
+        return {"returncode": 0, "stdout_bytes": canonical_json(value), "capture": {"complete": True}}
+
+    def no_external_io(*args, **kwargs):
+        pytest.fail("Only the test runner may interact with the Gateway capture")
+
+    monkeypatch.setattr(socket, "socket", no_external_io)
+    monkeypatch.setattr(subprocess, "Popen", no_external_io)
+    base = int(NOW.timestamp()) * 10**9
+    before, start, finish, after = range(base, base + 4)
+    monkeypatch.setattr(http.time, "time_ns", iter((before, start, finish, after)).__next__)
+    collector = http.KubernetesHTTP(target, env, duration=10, runner=runner,
+                                    profile=http.GATEWAY_EVENT_PROFILE, retain_gateway_response=True)
+    capture_options = {"loopback": True} if loopback else {}
+    if fault is not None:
+        with pytest.raises(http.KubernetesBindingError):
+            collector.capture_retained_gateway_response(gateway, auth, timeout=1, **capture_options)
+        assert collector.report()["collection_gap"]
+        assert calls.count("response") == (0 if fault in {"namespace", "other-run"} else 1)
+        return
+
+    if loopback:
+        wrong_image = "docker.io/library/byul-gateway-codex@sha256:" + "f" * 64
+        with pytest.raises(http.KubernetesBindingError):
+            collector.capture_retained_gateway_response({**gateway, "image": wrong_image}, auth,
+                                                        timeout=1, loopback=True)
+        assert not calls
+        collector = http.KubernetesHTTP(target, env, duration=10, runner=runner,
+                                        profile=http.GATEWAY_EVENT_PROFILE, retain_gateway_response=True)
+    captured = collector.capture_retained_gateway_response(gateway, auth, timeout=1, **capture_options)
+    assert calls == ["namespace", "gateway", "response", "namespace", "gateway"]
+    projection = verify_owned_pod(owned["pod"], owned["namespace"]["metadata"], gateway,
+                                  target["kubernetes"]["run_id"])
+    assert captured["gateway_owners"] == {
+        "before": {"observed_at_ns": before, "owner": projection},
+        "after": {"observed_at_ns": after, "owner": projection},
+    }
+    assert set(captured) == {"response", "transport_report", "gateway_owners"}
+    row, = captured["transport_report"]["requests"]
+    receipt = row["retained_normal_response"]
+    assert receipt["observed_started_ns"] == start and receipt["observed_finished_ns"] == finish
+    assert receipt["response_sha256"] == sha256_hex(canonical_json(captured["response"]))
+    assert receipt["data_origin"] == "EXAMPLE"
+    if loopback:
+        assert receipt["schema"] == http.GATEWAY_LOOPBACK_RESPONSE_RECEIPT
+        assert receipt["transport_origin"] == http.GATEWAY_LOOPBACK_RESPONSE_ORIGIN
+        assert receipt["source_owner_sha256"] == sha256_hex(canonical_json(projection))
+    else:
+        assert receipt["schema"] == http.GATEWAY_NORMAL_RESPONSE_RECEIPT
+        assert "transport_origin" not in receipt
+    assert auth.encode() not in canonical_json(captured)
+    assert body.encode() not in canonical_json(captured["transport_report"])
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    pol = policy(pack.ref(), scope={"include": ["REQ-13"]}, values={"REQ-13": {**VALUES,
+                    "allowed_response_fields": [*VALUES["allowed_response_fields"], "object"]}},
+                 status="CONFIRMED", confirmed_by="EXAMPLE approver", confirmed_at=NOW - timedelta(minutes=2),
+                 valid_from=NOW - timedelta(minutes=1), valid_until=NOW + timedelta(minutes=1))
+
+    def save(name, value):
+        path = tmp_path / name
+        return {"path": str(path), "sha256": _write(path, value)}
+
+    prep = {**prepared, "environment_ref": target["environment_ref"], "engine_target": save("engine.json", target)}
+    inputs = {"environment": env.to_dict(), "target": {**target, "kubernetes_gateway": gateway},
+              "guard_policy": pol.to_dict(), "preparation": {"image": tool.GATEWAY_IMAGE,
+              "archive_sha256": tool.ARCHIVE_SHA256, "producer_sha256": tool.PRODUCER_SHA256,
+              "gateway_environment": tool.GATEWAY_ENV, "sides": {side: prep}}, **captured}
+    refs = {name: save(name + ".json", value) for name, value in inputs.items()}
+    source = save("source.json", {
+        "schema": intake.RESPONSE_ONLY_SOURCE_SCHEMA, "files": refs, "side": side,
+        "request_sha256": sha256_hex(request_id.encode()),
+    })
+    output = tmp_path / "captured-response-only"
+    selected = intake.prepare(source["path"], source["sha256"], output, pack=pack)
+    manifest = json.loads((output / "manifest.json").read_bytes())
+    assert manifest["response"] == refs["response"] and manifest["gateway_owners"] == refs["gateway_owners"]
+    selection = selected["gateway_response_inputs"]
+    assert selection["request_sha256"] == sha256_hex(request_id.encode())
+    assert selection.get("transport_origin") == (http.GATEWAY_LOOPBACK_RESPONSE_ORIGIN if loopback else None)
+    if loopback:
+        drifted_report = deepcopy(captured["transport_report"])
+        drifted_report["requests"][0]["retained_normal_response"]["source_owner_sha256"] = "0" * 64
+        changed = save("changed-source.json", {
+            "schema": intake.RESPONSE_ONLY_SOURCE_SCHEMA, "side": side, "request_sha256": selection["request_sha256"],
+            "files": {**refs, "transport_report": save("changed-transport.json", drifted_report)},
+        })
+        rejected = tmp_path / "rejected-loopback"
+        with pytest.raises(ValueError, match="^REQ13_GATEWAY_CAPTURE_SOURCE_INVALID$"):
+            intake.prepare(changed["path"], changed["sha256"], rejected, pack=pack)
+        assert not rejected.exists()

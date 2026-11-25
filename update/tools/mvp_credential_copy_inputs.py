@@ -71,20 +71,34 @@ def materialize(policy, pack, environments, selection):
 
 
 def prepare(policy_path, environment_paths, selection_path, expected_selection_sha256, output, *, store=None):
-    policy_raw, _ = _read(policy_path)
-    policy = Policy.model_validate(strict_json(policy_raw, limit=POLICY_MAX_BYTES))
-    selection_raw, _ = _read(selection_path)
+    sources = []
+
+    def read(path):
+        path = Path(path)
+        inspected = _read(path)
+        sources.append((path, inspected))
+        return inspected[0]
+
+    policy = Policy.model_validate(strict_json(read(policy_path), limit=POLICY_MAX_BYTES))
+    selection_raw = read(selection_path)
     selection_sha256 = sha256_hex(selection_raw)
     if selection_sha256 != expected_selection_sha256:
         raise ValueError('COPY_SELECTION_SOURCE_CHANGED')
     selection = strict_json(selection_raw)
-    environments = {side: Environment.model_validate(strict_json(_read(path)[0]))
+    environments = {side: Environment.model_validate(strict_json(read(path)))
                     for side, path in environment_paths.items()}
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     bound_policy, inventory = materialize(policy, pack, environments, selection)
     output = Path(output)
     if output.exists():
         raise FileExistsError(output)
+    for path, inspected in sources:
+        try:
+            unchanged = _read(path) == inspected
+        except (OSError, ValueError):
+            unchanged = False
+        if not unchanged:
+            raise ValueError('COPY_SELECTION_SOURCE_CHANGED')
     bound_policy = seed_run_store(store, policy, bound_policy)
     outputs = {'policy.json': canonical_json(bound_policy.to_dict()), 'copy-inventory.json': canonical_json(inventory)}
     manifest = {

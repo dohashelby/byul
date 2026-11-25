@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime
+from guard.executors.record_time import is_record_time as _timestamp
 import math
 import re
 import time
@@ -16,11 +16,14 @@ from guard.runtime.comparison import model_request_conditions
 from .content_common import content_request, control_state, json_body, sample_artifact
 from .engine_identity import owned_template_snapshot
 from .http_common import mask
+from .stream_probe import MAX_BODY
 
 
 PROFILE = "fixed-template-supply-v1"
+SUP13_NORMAL_PROFILE = "fixed-template-sandbox-normal-v1"
 POLICY_KEY = "allowed_template_sha256"
 NORMAL_TEXT = "guard template control"
+_SUP13_NORMAL_TEXT = "guard sandbox control"
 DEFAULTS = {"max_output_tokens": 1, "max_total_requests": 3, "max_probe_tokens": 4096,
             "max_total_probe_tokens": 16384, "max_input_bytes": 4096, "max_duration_seconds": 30}
 _SHA = re.compile(r"[0-9a-f]{64}")
@@ -45,12 +48,14 @@ def settings(cfg):
     return result
 
 
-def validate_policy(check, values, cfg):
+def validate_policy(check, values, cfg, *, sup13_normal=False):
     """승인 목록은 명시 입력만 받는다. REQ-07 값이나 관측에서 채우지 않는다."""
-    approved = values.get(POLICY_KEY)
-    if (type(approved) is not list or any(type(value) is not str or not _SHA.fullmatch(value) for value in approved)
-            or len(approved) != len(set(approved))):
-        raise ValueError("allowed_template_sha256 must be an explicit unique lowercase SHA-256 list")
+    if not sup13_normal:
+        approved = values.get(POLICY_KEY)
+        if (type(approved) is not list or any(type(value) is not str or not _SHA.fullmatch(value) for value in approved)
+                or len(approved) != len(set(approved))):
+            raise ValueError("allowed_template_sha256 must be an explicit unique lowercase SHA-256 list")
+    normal_text = _SUP13_NORMAL_TEXT if sup13_normal else NORMAL_TEXT
     limits = settings(cfg)
     if len(check.functional_probes) != 1:
         raise ValueError("one fixed engine chat fixture is required")
@@ -58,19 +63,10 @@ def validate_policy(check, values, cfg):
     if (probe.via != "engine" or probe.method != "POST" or probe.path != "/v1/chat/completions"
             or probe.expect != [200] or type((probe.body or {}).get("max_tokens")) is not int
             or probe.body != {"model": "{model}", "messages": [
-                {"role": "user", "content": NORMAL_TEXT}], "max_tokens": 1}):
+                {"role": "user", "content": normal_text}], "max_tokens": 1}):
         raise ValueError("only the fixed single-user template supply fixture is supported")
-    if len(NORMAL_TEXT.encode("utf-8")) > limits["max_input_bytes"]:
+    if len(normal_text.encode("utf-8")) > limits["max_input_bytes"]:
         raise ValueError("fixed normal fixture exceeds input byte budget")
-
-
-def _timestamp(value):
-    if type(value) is not str or len(value) > 40:
-        return False
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).tzinfo is not None
-    except ValueError:
-        return False
 
 
 def _target(ctx, *, profile_support=None, kubernetes=False):
@@ -169,10 +165,27 @@ def _tokens(value, maximum):
             and all(type(token) is int and 0 <= token < 2**31 for token in value))
 
 
-def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None):
+def _sup13_response_capture(response):
+    text, size = response.get("body"), response.get("body_bytes")
+    if (response.get("method") != "POST" or response.get("mode") != "json"
+            or response.get("capture_complete") is not True or response.get("eof") is not True
+            or response.get("utf8_valid") is not True or response.get("body_truncated") is not False
+            or type(text) is not str or type(size) is not int or not 0 < size <= MAX_BODY):
+        return None
+    try:
+        raw = text.encode("utf-8", "strict")
+    except UnicodeError:
+        return None
+    if len(raw) != size or response.get("body_sha256") != sha256_hex(raw):
+        return None
+    return {"body_bytes": size, "body_sha256": response["body_sha256"]}
+
+
+def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None, sup13_normal=False):
     """최대 세 번의 무해 요청. 원문 challenge와 독립 소비는 미수집이다."""
     ctx._native_artifact_written = False
-    validate_policy(ctx.check, ctx.policy_values, executor.cfg)
+    validate_policy(ctx.check, ctx.policy_values, executor.cfg, sup13_normal=sup13_normal)
+    profile = SUP13_NORMAL_PROFILE if sup13_normal else PROFILE
     limits = settings(executor.cfg)
     deadline = time.monotonic() + limits["max_duration_seconds"]
     target = _target(ctx, kubernetes=kubernetes)
@@ -206,7 +219,14 @@ def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None):
             errors.append("TEMPLATE_SUPPLY_PROBE_UNAVAILABLE")
         # 원문 body/detail/preview·token ID·호스트 경로를 artifact에 남기지 않는다.
         projection = {"outcome": response.get("outcome")}
-        ctx.record("trusted", PROFILE, label, "allowed", projection)
+        if sup13_normal and projection["outcome"] == 200:
+            capture = _sup13_response_capture(response)
+            if capture is None:
+                errors.append("TEMPLATE_SUP13_RESPONSE_CAPTURE_UNVERIFIED")
+                response = projection.copy()
+            else:
+                projection["response_capture"] = capture
+        ctx.record("trusted", profile, label, "allowed", projection)
         responses.append({"case": label, **projection})
         return response
 
@@ -229,7 +249,7 @@ def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None):
             tokenize_response_tokens = len(rendered["tokens"])
         if rendered_valid and normal_input_limit is not None and tokenize_response_tokens > normal_input_limit:
             errors.append("TEMPLATE_NORMAL_INPUT_BUDGET_EXCEEDED")
-        elif rendered_valid and normal_input_limit is not None and _snapshot(
+        elif rendered_valid and (normal_input_limit is not None or sup13_normal) and _snapshot(
                 executor, ctx, target, deadline, kubernetes=kubernetes) != before:
             errors.append("TEMPLATE_NORMAL_IDENTITY_CHANGED_BEFORE_INFERENCE")
         elif rendered_valid and tokenize_response_tokens > limits["max_total_probe_tokens"] - accepted_tokens:
@@ -262,21 +282,26 @@ def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None):
         stable = after is not None and before == after
         if not stable:
             errors.append("TEMPLATE_SUPPLY_IDENTITY_CHANGED_OR_UNAVAILABLE")
-        approved = before["sha256"] in ctx.policy_values[POLICY_KEY] if stable else None
+        if stable and not sup13_normal:
+            approved = before["sha256"] in ctx.policy_values[POLICY_KEY]
         normal_ok = bool(stable and exact)
+        if sup13_normal:
+            attempted = any(row["case"] == "before" for row in responses)
+            report = ctx.cprobe.report()
+            normal_ok = bool(attempted and normal_ok and not report["cleanup_errors"] and not report["collection_gap"])
         functional[ctx.check.functional_probes[0].id] = "pass" if normal_ok else "no_response"
 
     observations = {
         "selected_template_sha256": {"value": before["sha256"] if stable else None, "collected": stable},
         "template_identity_verified": {"value": stable, "collected": True},
-        "selected_template_approved": {"value": approved, "collected": stable},
+        "selected_template_approved": {"value": approved, "collected": stable and not sup13_normal},
         "input_projection_exact_match": {"value": exact and stable, "collected": True},
         "template_consumer_verified": {"value": False, "collected": True},
         "supply_scope_complete": {"value": False, "collected": True},
         "functional_probes_planned": {"value": list(functional), "collected": True},
         "functional_probe_results": {"value": functional, "collected": attempted},
     }
-    fixture = {"profile": PROFILE, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
+    fixture = {"profile": profile, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
                "settings": limits, "endpoints": ["/tokenize", "/v1/chat/completions"]}
     if normal_input_limit is not None:
         fixture.update(profile="fixed-template-normal-input-v1", declared_normal_input_limit=normal_input_limit)
@@ -297,14 +322,26 @@ def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None):
             "Exact token correspondence is an engine-reported API input projection, not independent worker file consumption.",
             "Token admission is checked after each bounded response; over-budget replies are rejected and no further inference is dispatched.",
             "Current readonly mount bytes may differ from a template cached at startup; no actual supply violation is established.",
-            "Approval membership is an operator policy comparison, not authenticated corporate approval.",
-            "Neither approval membership nor API input projection establishes full security or functional PASS.",
             "Only the reviewed fixed template, full pinned ENV image, matching model and bounded normal chat are supported.",
-            "Manual PASS is outside the existing REQ-07 bounded manual policy contract; declared FAIL and UNKNOWN are preserved.",
         ],
         "fixture": {"profile": fixture["profile"], "normal_sha256": sha256_hex(canonical_json(fixture["normal"])),
                     "settings": limits, "endpoints": fixture["endpoints"]},
     }
+    if sup13_normal:
+        summary["normal_only_scope"] = {
+            "target_sha256": ctx.cprobe.target_sha256,
+            "environment_sha256": ctx.env.ref().sha256,
+            "owned_api_input_projection_verified": normal_ok,
+        }
+        summary["not_exercised"] = ["independent_renderer_witness", "forbidden_template_attributes",
+                                     "template_sandbox_enforcement"]
+    else:
+        summary["limitations"][3:3] = [
+            "Approval membership is an operator policy comparison, not authenticated corporate approval.",
+            "Neither approval membership nor API input projection establishes full security or functional PASS.",
+        ]
+        summary["limitations"].append(
+            "Manual PASS is outside the existing REQ-07 bounded manual policy contract; declared FAIL and UNKNOWN are preserved.")
     if normal_input_limit is not None:
         summary["fixture"]["declared_normal_input_limit"] = normal_input_limit
         summary["not_exercised"] = ["independent_worker_consumption", "input_limit_enforcement", "request_template_override"]
@@ -341,5 +378,5 @@ def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None):
     sample_artifact(ctx, "template_samples.json", {"summary": summary})
     return observations, {"attempted": attempted, "succeeded": normal_ok,
                           "detail": "bounded normal chat and exact API input projection; independent consumer unverified"}, [
-        {"step": step, "attempted": False, "observations": {"profile": PROFILE, "scope": "not exercised"}}
+        {"step": step, "attempted": False, "observations": {"profile": profile, "scope": "not exercised"}}
         for step in ctx.check.challenge_steps], summary

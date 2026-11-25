@@ -44,6 +44,7 @@ def collect(ctx,*,containerd_address=None):
             raise ValueError('NODE_IMAGE_PROOF_UNVERIFIED')
         receipt = proof.public_receipt()
         engine = transport.binding['engine']
+        selected_digest = node_image_proof.image_digest(engine['image'])
         if (node_image_proof.validate_node(node_after, engine['node'], node_image_proof.kernel_identity()) != receipt['node']
                 or receipt['schema'] != 'guard-node-image-proof/1'
                 or receipt['profile'] != node_image_proof.PROFILE
@@ -51,7 +52,8 @@ def collect(ctx,*,containerd_address=None):
                     (containerd_address or '/run/containerd/containerd.sock')
                 or not all(receipt[key] is True for key in
                     ('image_chain_verified', 'snapshot_chain_verified', 'live_root_mount_verified'))
-                or 'sha256:' + engine['image'].partition('@sha256:')[2] != receipt['root_digest']):
+                # A runtime index may enclose the exact approved platform manifest.
+                or selected_digest not in (receipt['root_digest'], receipt['manifest_digest'])):
             raise ValueError('NODE_IMAGE_PROOF_UNVERIFIED')
         verified = True
     except Exception:

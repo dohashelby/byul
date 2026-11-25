@@ -27,6 +27,10 @@ def _sources():
     return values
 
 
+def _source_hashes(sources):
+    return {name: hashlib.sha256(raw).hexdigest() for name, raw in sorted(sources.items())}
+
+
 def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request_attempts=False, generation_transitions=False,
                    health_causal=False, profiler_control=False, runner_consumption=False, supply_roots=None, supply_watch=False,
                    worker_shards=False, transition_dispatches=False, execution_links=False, scoped_runner_consumption=False, execution_link_content_hashes=False, baseline_slot_sampling=False, baseline_piecewise_graph=False, baseline_attention_metadata=False,
@@ -62,7 +66,7 @@ def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request
     for name, data in values.items():
         (output / name).parent.mkdir(parents=True, exist_ok=True)
         (output / name).write_bytes(data)
-    (output / 'settings.json').write_text(json.dumps({'session': session, 'secret': secrets.token_hex(32), 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
+    options = {'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
         # #196 request-attempt 관측(P1). 켜면 매 단계 scheduler를 감싼다.
         'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
         'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
@@ -72,29 +76,39 @@ def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request
         'worker_shards': worker_shards is True, 'transition_dispatches': transition_dispatches is True,
         'execution_links': execution_links is True, 'execution_link_content_hashes': execution_link_content_hashes is True, 'scoped_runner_consumption': scoped_runner_consumption is True,
         'baseline_slot_sampling': baseline_slot_sampling is True, 'baseline_piecewise_graph': baseline_piecewise_graph is True, 'baseline_attention_metadata': baseline_attention_metadata is True,
-        'baseline_profiler_local': baseline_profiler_local is True, 'baseline_profiler_local_image': baseline_profiler_local_image}), encoding='utf-8')
-    manifest = {'schema': SCHEMA, 'profile': sensor.PROFILE, 'session': session, 'engine_started': False, 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
-        'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
-        'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
-        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots, 'supply_watch': supply_watch is True,
-        'worker_shards': worker_shards is True, 'transition_dispatches': transition_dispatches is True,
-        'execution_links': execution_links is True, 'execution_link_content_hashes': execution_link_content_hashes is True,
-        'scoped_runner_consumption': scoped_runner_consumption is True,
-        'baseline_slot_sampling': baseline_slot_sampling is True, 'baseline_piecewise_graph': baseline_piecewise_graph is True, 'baseline_attention_metadata': baseline_attention_metadata is True,
-        'baseline_profiler_local': baseline_profiler_local is True, 'baseline_profiler_local_image': baseline_profiler_local_image,
-        'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
+        'baseline_profiler_local': baseline_profiler_local is True, 'baseline_profiler_local_image': baseline_profiler_local_image}
+    settings = {'session': session, 'secret': secrets.token_hex(32), **options}
+    (output / 'settings.json').write_text(json.dumps(settings), encoding='utf-8')
+    manifest = {'schema': SCHEMA, 'profile': sensor.PROFILE, 'session': session,
+        'engine_started': False, **options, 'assets': _source_hashes(values)}
     (output / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True), encoding='utf-8')
     return manifest
 
 
-def load_prepared(path):
-    """Accept only assets built from this product's exact callback sources."""
-    root = Path(path)
-    root = root if root.is_dir() else root.parent
-    manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+def load_prepared(path, *, bounded_read=None):
+    """Accept exact shipped callback sources; a bounded reader pins the named manifest path."""
+    path = Path(path)
+    if bounded_read is None:
+        root = path if path.is_dir() else path.parent
+        manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+    else:
+        from guard.runtime.bounded import strict_json
+
+        if path.name != 'manifest.json':
+            raise ValueError('ENGINE_CALLBACK_PREPARED_INVALID')
+        root = path.parent
+        manifest = strict_json(bounded_read(path, limit=262144), limit=262144)
+        if type(manifest) is not dict:
+            raise ValueError('ENGINE_CALLBACK_PREPARED_INVALID')
+
+    def read_asset(name, length):
+        return (root / name).read_bytes() if bounded_read is None else bounded_read(root / name, limit=length)
+
+    sources = _sources()
     if (manifest.get('schema') != SCHEMA or manifest.get('profile') != sensor.PROFILE
-            or manifest.get('assets') != {n: hashlib.sha256(d).hexdigest() for n, d in sorted(_sources().items())}
-            or any(hashlib.sha256((root / n).read_bytes()).hexdigest() != d for n, d in manifest['assets'].items())):
+            or manifest.get('assets') != _source_hashes(sources)
+            or any(hashlib.sha256(read_asset(name, len(sources[name]))).hexdigest() != digest
+                   for name, digest in manifest['assets'].items())):
         raise ValueError('ENGINE_CALLBACK_PREPARED_INVALID')
     return manifest
 

@@ -11,7 +11,8 @@ from guard.runtime.comparison import execution_conditions
 from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesBindingError, KubernetesHTTP
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_normal_startup_load import (
-    _read_logs, _ready_window, _source_profile, _stamp, _verify_launch, normal_startup_load_transport,
+    _RANKED_PROCESS_FILES, _read_logs, _ready_window, _source_profile, _verify_launch, _window_stamp,
+    normal_startup_load_transport,
 )
 
 NORMAL_OPTION = "normal_safetensors_reader_only"
@@ -20,17 +21,22 @@ _CHECK_PROFILE = "supply-boot-reader-v1"
 _VALUES = {"supply_allowed_readers": ["safetensors"]}
 _SOURCES = {"model_executor/model_loader/weight_utils.py", "model_executor/model_loader/default_loader.py"}
 _CALLS = {"filesystem_call_linenumber", "default_strategy_call_linenumber", "loader_completion_call_linenumber"}
+_LOW_RAM_CALL = "low_ram_strategy_call_linenumber"
 _SHA = re.compile(r"[0-9a-f]{64}")
 _LOG_LINE = re.compile(rb"(?P<time>[0-9T:.Z-]{20,30}) "
                        rb"(?:(?P<process>\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\)) )?"
                        rb"INFO [0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} "
                        rb"\[(?P<module>weight_utils|default_loader)\.py:(?P<line>[0-9]{1,5})\] (?P<message>[^\r\n]+)")
 _FS_LABEL = rb"(unknown|[A-Z][A-Z0-9_-]{0,23})"
+_GIB = rb"([0-9]{1,6}\.[0-9]{2})"
 _FILESYSTEM = re.compile(rb"Filesystem type for checkpoints: " + _FS_LABEL + rb"\. "
-                         rb"Checkpoint size: ([0-9]{1,6}\.[0-9]{2}) GiB\. Available RAM: [0-9]{1,6}\.[0-9]{2} GiB\.")
+                         rb"Checkpoint size: " + _GIB + rb" GiB\. Available RAM: " + _GIB + rb" GiB\.")
 _READER_DEFAULT = re.compile(rb"Auto-prefetch is disabled because the filesystem \(" + _FS_LABEL + rb"\) "
                               rb"is not a recognized network FS \(NFS/Lustre\)\. If you want to force prefetching, "
                               rb"start vLLM with --safetensors-load-strategy=prefetch\.")
+_READER_LOW_RAM = re.compile(rb"Auto-prefetch is disabled because the filesystem \(" + _FS_LABEL + rb"\) "
+                              rb"is not a recognized network FS \(NFS/Lustre\) and the checkpoint size "
+                              rb"\(" + _GIB + rb" GiB\) exceeds 90% of available RAM \(" + _GIB + rb" GiB\)\.")
 _LOADER_RETURN = re.compile(rb"Loading weights took [0-9]{1,6}\.[0-9]{2} seconds")
 _ALTERNATE = (b"Loading safetensors checkpoint shards (eager)", b"Multi-thread loading shards",
               b"Loading safetensors using Runai Model Streamer", b"Loading safetensors using InstantTensor loader",
@@ -45,17 +51,21 @@ _MISSING = ["direct_safe_open_call_and_file_identity", "file_format_magic_and_de
 
 def normal_safetensors_reader_transport(target, env, *, duration, binary="kubectl", runner=None):
     """Validate the closed same-boot selector without contacting the cluster."""
-    return normal_startup_load_transport(target, env, duration=duration, binary=binary, runner=runner)
+    return normal_startup_load_transport(target, env, duration=duration, binary=binary,
+                                         runner=runner, allow_ranked=True)
 
 
 def _reader_profile(adapter, env):
     method = getattr(adapter, "safetensors_reader_source", None)
     profile = (method(env) if callable(method) else
                get_provider(env.engine.name).evidence_contract("safetensors_reader_source", env))
-    if (type(profile) is not dict or profile.keys() != {"file_sha256", *_CALLS}
+    required = {"file_sha256", *_CALLS}
+    if (type(profile) is not dict or profile.keys() not in (required, required | {_LOW_RAM_CALL})
             or type(profile["file_sha256"]) is not dict or profile["file_sha256"].keys() != _SOURCES
             or any(type(sha) is not str or not _SHA.fullmatch(sha) for sha in profile["file_sha256"].values())
-            or any(type(profile[key]) is not int or not 1 <= profile[key] <= 99999 for key in _CALLS)):
+            or any(type(profile[key]) is not int or not 1 <= profile[key] <= 99999 for key in profile.keys() - {"file_sha256"})
+            or (_LOW_RAM_CALL in profile and profile[_LOW_RAM_CALL] in {
+                profile["filesystem_call_linenumber"], profile["default_strategy_call_linenumber"]})):
         raise ValueError("SUP12_READER_SOURCE_UNQUALIFIED")
     return profile
 
@@ -72,6 +82,8 @@ def _verify_reader_launch(target, container, startup):
 
 def _verify_sources(transport, startup, profile):
     expected = {name: startup["file_sha256"][name] for name in ("logger.py", "logging_utils/formatter.py")}
+    if "ranked_load" in startup:
+        expected.update({name: startup["file_sha256"][name] for name in _RANKED_PROCESS_FILES})
     expected.update(profile["file_sha256"])
     files = [{"root": 0, "relative": name} for name in sorted(expected)]
     rows = transport.engine_supply_hashes([startup["source_root"]], files)
@@ -82,51 +94,58 @@ def _verify_sources(transport, startup, profile):
     return observed
 
 
-def _reader_observation(raw, window, profile):
-    started, ready = (_stamp(window[key]) for key in ("container_started_at", "ready_at"))
+def _reader_observation(raw, window, profile, *, worker=None):
+    label = b"(" + worker.encode("ascii") + b" pid=" if worker is not None else None
+    started, ready = (_window_stamp(window[key]) for key in ("container_started_at", "ready_at"))
     events = {}
     markers = {
         (b"weight_utils", profile["filesystem_call_linenumber"]): ("filesystem", _FILESYSTEM),
         (b"weight_utils", profile["default_strategy_call_linenumber"]): ("strategy", _READER_DEFAULT),
         (b"default_loader", profile["loader_completion_call_linenumber"]): ("loader_return", _LOADER_RETURN),
     }
+    if _LOW_RAM_CALL in profile:
+        markers[b"weight_utils", profile[_LOW_RAM_CALL]] = ("strategy", _READER_LOW_RAM)
     for line in raw.split(b"\n")[:-1]:
         timestamp, _, _ = line.partition(b" ")
         if any(marker in line for marker in _ALTERNATE):
-            if not timestamp or started <= _stamp(timestamp.decode("ascii")) <= ready:
+            if not timestamp or started <= _window_stamp(timestamp.decode("ascii")) <= ready:
                 raise ValueError("SUP12_READER_CONTRADICTORY_BOOT_REPORT")
         log = _LOG_LINE.fullmatch(line)
-        if log is None:
+        if log is None or label is not None and not (log["process"] or b"").startswith(label):
             continue
-        event_at = _stamp(log["time"].decode("ascii"))
+        event_at = _window_stamp(log["time"].decode("ascii"))
         location = (log["module"], int(log["line"]))
         if not started <= event_at <= ready or location not in markers:
             continue
-        label, pattern = markers[location]
+        event_name, pattern = markers[location]
         match = pattern.fullmatch(log["message"])
-        if not match or label in events:
+        if not match or event_name in events:
             raise ValueError("SUP12_READER_BOOT_REPORT_UNVERIFIED")
-        events[label] = event_at, log["process"], match.groups()
+        events[event_name] = event_at, log["process"], match.groups(), sha256_hex(line)
 
     if tuple(events) != ("filesystem", "strategy", "loader_return"):
         raise ValueError("SUP12_READER_BOOT_REPORT_UNVERIFIED")
-    (fs_at, fs_process, (filesystem, checkpoint_size)) = events["filesystem"]
-    (strategy_at, strategy_process, (strategy_filesystem,)) = events["strategy"]
-    (returned_at, return_process, _) = events["loader_return"]
+    fs_at, fs_process, (filesystem, checkpoint_size, available_ram), _ = events["filesystem"]
+    strategy_at, strategy_process, (strategy_filesystem, *strategy_sizes), _ = events["strategy"]
+    returned_at, return_process, _, _ = events["loader_return"]
     size = int(Decimal(checkpoint_size.decode("ascii")) * 100)
     if (not fs_at <= strategy_at <= returned_at or fs_process != strategy_process or fs_process != return_process
-            or not size or filesystem != strategy_filesystem or filesystem in {b"NFS", b"NFS4", b"LUSTRE"}):
+            or not size or filesystem != strategy_filesystem or filesystem in {b"NFS", b"NFS4", b"LUSTRE"}
+            or strategy_sizes and strategy_sizes != [checkpoint_size, available_ram]):
         raise ValueError("SUP12_READER_BOOT_REPORT_UNVERIFIED")
     filesystem_reported = filesystem != b"unknown"
-    return {"scope": "native_ordinary_safetensors_default_iterator",
+    observation = {"scope": "native_ordinary_safetensors_default_iterator",
             "observed_reader_family": "safetensors",
             "load_strategy_branch": ("automatic_local_no_prefetch" if filesystem_reported
                                      else "automatic_no_prefetch_filesystem_unreported"),
             "source_indicated_iterator_call": "safe_open", "direct_safe_open_call_observed": False,
             "filesystem_type": filesystem.decode("ascii") if filesystem_reported else None,
             "reported_checkpoint_size_centi_gib": size,
-            "iterator_report_at": fs_at.isoformat(), "strategy_report_at": strategy_at.isoformat(),
-            "loader_return_report_at": returned_at.isoformat(), "same_process_label_observed": fs_process is not None}
+            "iterator_report_at": fs_at[0].isoformat(), "strategy_report_at": strategy_at[0].isoformat(),
+            "loader_return_report_at": returned_at[0].isoformat(), "same_process_label_observed": fs_process is not None}
+    if label is not None:
+        observation.update(reported_tp_rank=0, report_line_sha256={name: item[3] for name, item in events.items()})
+    return observation
 
 
 class KubernetesNormalSafetensorsReaderExecutor:
@@ -164,13 +183,16 @@ class KubernetesNormalSafetensorsReaderExecutor:
         source_reader.deadline = logs.deadline
         return logs, source_reader
 
-    def prepared_normal_reader(self, check, env, values, *, expected_target_sha256=None):
-        """Check saved default-reader declarations without inspecting the live launch."""
+    def _saved_target(self):
         from guard.adapters.vllm_file_read_sensor import dependency
 
+        return strict_json(dependency(self.cfg["target"], None), limit=65536)
+
+    def prepared_normal_reader(self, check, env, values, *, expected_target_sha256=None):
+        """Check saved default-reader declarations without inspecting the live launch."""
         self.validate_policy(check, values)
         try:
-            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            target = self._saved_target()
             self._target_sha256(target, expected_target_sha256)
             adapter = get_provider(env.engine.name).adapter()
             startup = _source_profile(adapter, env)
@@ -188,8 +210,7 @@ class KubernetesNormalSafetensorsReaderExecutor:
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 20)
         try:
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = self._saved_target()
             target_sha = self._target_sha256(target)
             startup = _source_profile(adapter, env)
             profile = _reader_profile(adapter, env)
@@ -212,7 +233,9 @@ class KubernetesNormalSafetensorsReaderExecutor:
             if len(raw) != prefix["byte_count"] or sha256_hex(raw) != prefix["sha256"]:
                 raise ValueError
             failure = "SUP12_READER_BOOT_REPORT_UNVERIFIED"
-            reader = _reader_observation(raw, window, profile)
+            ranked = startup.get("ranked_load")
+            worker = ranked["process_names"][0] if ranked else None
+            reader = _reader_observation(raw, window, profile, worker=worker)
             failure = "SUP12_READER_OWNER_AFTER_UNVERIFIED"
             after, container = _ready_window(logs)
             _verify_reader_launch(target, container, startup)
@@ -224,6 +247,8 @@ class KubernetesNormalSafetensorsReaderExecutor:
 
         cleanup = sorted({item for t in (logs, source_reader) for item in t.report()["cleanup_errors"]})
         missing = _MISSING + ([] if observed else ["ordinary_boot_reader_selection"])
+        if "ranked_load" in startup:
+            missing.append("other_tp_rank_reader_selection")
         if observed and reader["filesystem_type"] is None:
             missing.append("checkpoint_filesystem_type")
         settings = {"profile": PROFILE, "max_duration_seconds": duration}

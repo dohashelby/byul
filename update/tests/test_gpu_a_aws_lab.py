@@ -8,44 +8,66 @@ import yaml
 
 from guard.runtime.kubernetes_binding import verify_owned_pod
 from tools import gpu_a_aws_lab as lab
+from tools.mvp_versions import versions
 
 HANDOFF = Path(__file__).parent / 'fixtures/aws-handoff-20261026'
 IMAGE = 'docker.io/vllm/vllm-openai@sha256:' + 'a' * 64
 REVISION = '7ae557604adf67be50417f59c2c2f167def9a775'
 
 
-def rendered(generation, **options):
+def rendered(generation, *, engine_image=IMAGE, **options):
     if 'code-selection' in generation:
         options = {'engine_version': '0.30.0', 'model_id': 'microsoft/Phi-3-vision-128k-instruct',
                    'code_revision': 'b' * 40, **options}
     engine, probe, record = lab.render(HANDOFF, generation=generation, profile=options.pop('profile', 'dev'), run_id='a-run-1',
-        engine_image=IMAGE, model_revision=REVISION, host_root='/srv/byul-a', **options)
+        engine_image=engine_image, model_revision=REVISION, host_root='/srv/byul-a', **options)
     deployment, service = yaml.safe_load_all(engine)
     return deployment, service, yaml.safe_load(probe), record
 
 
 @pytest.mark.parametrize('generation', sorted(lab.GENERATIONS))
 def test_overlay_keeps_the_handoff_engine_and_adds_only_a_requirements(generation):
-    deployment, service, probe, record = rendered(generation)
+    eager_tp2 = generation == lab.NORMAL_TP2_V1_EAGER_GENERATION
+    image = IMAGE
+    options = {}
+    if eager_tp2:
+        release = versions()['candidate']
+        image = release['image']
+        options = {'engine_version': release['version'], 'release_launch': True, 'normal_tp2': True}
+    deployment, service, probe, record = rendered(generation, engine_image=image, **options)
     original, original_service = yaml.safe_load_all(lab._fill((HANDOFF / 'engine.yaml.template').read_text(), {
-        'ENGINE_IMAGE': IMAGE, 'MODEL_REVISION': REVISION, 'CACHE_PATH': record['cache_path'], 'LAB_PROFILE': 'dev',
+        'ENGINE_IMAGE': image, 'MODEL_REVISION': REVISION, 'CACHE_PATH': record['cache_path'], 'LAB_PROFILE': 'dev',
         'ENGINE_CPU_REQUEST': '2', 'ENGINE_CPU_LIMIT': '4', 'ENGINE_MEMORY_REQUEST': '8Gi', 'ENGINE_MEMORY_LIMIT': '16Gi'}))
     assert service == original_service and deployment['spec']['strategy'] == {'type': 'Recreate'}
     pod, base = deployment['spec']['template'], original['spec']['template']
     engine, = pod['spec']['containers']; base_engine, = base['spec']['containers']
-    assert engine['image'] == IMAGE and engine['resources'] == base_engine['resources']
+    base_args = base_engine['args']
+    if eager_tp2:
+        for key in ('requests', 'limits'):
+            base_engine['resources'][key]['nvidia.com/gpu'] = '2'
+        tp = base_args.index('--tensor-parallel-size')
+        assert base_args[tp:tp + 2] == ['--tensor-parallel-size', '1']
+        base_args = base_args[:tp] + base_args[tp + 2:]
+        shm, = [volume for volume in pod['spec']['volumes'] if volume['name'] == 'shm']
+        assert shm['emptyDir'] == {'medium': 'Memory', 'sizeLimit': '4Gi'}
+        assert engine['command'] == base_engine['command']
+        assert 'sup05_first_import' not in record
+    assert engine['image'] == image and engine['resources'] == base_engine['resources']
     assert engine['securityContext'] == base_engine['securityContext'] and pod['spec']['securityContext'] == base['spec']['securityContext']
-    command_prefix = []
-    assert engine['args'][:len(base_engine['args']) + len(command_prefix)] == [*command_prefix, *base_engine['args']]
+    assert engine['args'][:len(base_args)] == base_args
     assert engine['env'][:len(base_engine['env'])] == base_engine['env']
     assert pod['metadata']['labels'] == {**base['metadata']['labels'], 'guard.run': 'a-run-1', 'byul.a/generation': generation}
     assert pod['spec']['enableServiceLinks'] is False and 'enableServiceLinks' not in base['spec']
-    added = engine['args'][len(base_engine['args']) + len(command_prefix):]
+    added = engine['args'][len(base_args):]
     expected = lab.GENERATIONS[generation]['args']
     if 'code-selection' in generation:
         expected = [*expected, '--code-revision', 'b' * 40]
+    if eager_tp2:
+        expected = [*expected, *lab.NORMAL_TP2_ARGS]
     assert added == expected
     env = {e['name']: e['value'] for e in engine['env']}
+    if eager_tp2:
+        assert env['VLLM_USE_V2_MODEL_RUNNER'] == '0'
     if 'code-selection' in generation:
         assert env['BYUL_CODE_MARKER_ROOT'] == record['code_marker_root']
         assert record['engine_version'] == '0.30.0' and record['cache_path'].endswith('/dev-a-run-1')
@@ -63,7 +85,7 @@ def test_overlay_keeps_the_handoff_engine_and_adds_only_a_requirements(generatio
         assert '--no-async-scheduling' in engine['args']
     # REQ-14 세대는 워커 프로세스 지점이 불리도록 MP backend로 띄운다.
     mp = engine['args'][engine['args'].index('--distributed-executor-backend') + 1] if '--distributed-executor-backend' in engine['args'] else None
-    assert mp == ('mp' if generation in ('v1-callback', 'v1-callback-sync') else None)
+    assert mp == ('mp' if eager_tp2 or generation in ('v1-callback', 'v1-callback-sync') else None)
     assert (lab.PROFILES_DIR in mounts) is generation.startswith('v1-producers')
     if generation.startswith('v1-producers'):
         assert env['VLLM_SERVER_DEV_MODE'] == '1' and json.loads(engine['args'][engine['args'].index('--profiler-config') + 1])['torch_profiler_dir'] == lab.PROFILES_DIR

@@ -17,7 +17,7 @@ def recipe_source_files(cfg):
         if (type(descriptor) is not dict or descriptor['prepared'] != cfg['prepared']
                 or type(descriptor['records']) is not dict or set(descriptor['records']) != {'rank-fault'}):
             return None
-        paths = {'prepared': cfg['prepared'], 'record': descriptor['records']['rank-fault']}
+        paths = {'target': cfg['target'], 'prepared': cfg['prepared'], 'record': descriptor['records']['rank-fault']}
         files = {}
         for key, path in paths.items():
             path = str(Path(path).absolute())
@@ -34,13 +34,15 @@ def recipe_source_files(cfg):
 def run_records(check, env, values, cfg, workdir, *, expected_target_sha256=None, expected_files=None):
     started = utcnow()
     start, end = normalize_policy(values)
+    prepared_reads = {}
     try:
         if (type(cfg) is not dict or set(cfg) != {'input_mode', 'target', 'prepared', 'common_inputs'}
                 or cfg['input_mode'] != 'common-records' or not env.hash_ok()):
             raise ValueError
-        target, _ = _read(cfg['target'])
+        expected_target = expected_files.get('target') if expected_files is not None else None
+        target, _ = _read(cfg['target'], expected_file=expected_target)
         expected = expected_files['prepared'] if expected_files is not None else None
-        prepared, _ = _read(cfg['prepared'], expected_file=expected)
+        prepared, _ = _read(cfg['prepared'], reads=prepared_reads, expected_file=expected)
         descriptor = cfg['common_inputs']
         if (type(target) is not dict or target.get('environment_ref') != env.ref().model_dump(mode='json')
                 or type(prepared) is not dict or type(descriptor) is not dict
@@ -72,6 +74,6 @@ def run_records(check, env, values, cfg, workdir, *, expected_target_sha256=None
         started_at=started, abort_reason='RANK_RECORD_INPUT_QUESTION_SCOPE_INCOMPLETE')
     # 선언된 준비물을 runtime 자격으로 넘기지 않는다. 현재 owner는 재관측하지 않았다.
     draft = attach_inputs(draft, check, env, target, descriptor, Path(workdir), prepared=None, owner=None,
-                          expected_files=expected_files)
+                          prepared_reads=prepared_reads, expected_files=expected_files)
     draft.finished_at = utcnow()
     return draft

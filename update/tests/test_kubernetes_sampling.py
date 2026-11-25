@@ -17,6 +17,7 @@ from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.runtime import kubernetes_http as kube
 from guard.runtime.bounded import capture_pipes
 from guard.store import Store
+from guard.store.packs import PackNotStoredError, get_pack
 from tests.builders import baseline_pack, environment, policy
 from tests.test_sampling_validation import cfg, check, judge, summary, VALUES
 
@@ -251,11 +252,15 @@ def test_product_cli_stores_exact_binding_judges_reports_and_verifies(tmp_path, 
         '[sampling_validation]\n' + '\n'.join(f'{k} = {json.dumps(v)}' for k, v in {**cfg(), "target": str(path)}.items()), encoding="utf-8")
     cli = CliRunner()
     pack_path = Path(__file__).resolve().parents[1] / "reference/pack-seeds/PACK-BASELINE-31"
+    with pytest.raises(PackNotStoredError):
+        get_pack(store, plan.inputs.pack)
     for command in (["run", "--plan", plan.id, "--pack", str(pack_path)],
                     ["judge", "--plan", plan.id, "--pack", str(pack_path)],
                     ["report", "--plan", plan.id, "--pack", str(pack_path), "--json", str(tmp_path / "report.json")], ["verify"]):
         result = cli.invoke(app, [*command, "--config", str(config), "--store", str(store_path)])
         assert result.exit_code == 0, result.output + repr(result.exception)
+        if command[0] == "run":
+            assert get_pack(store, plan.inputs.pack).ref() == plan.inputs.pack
     row, = [r for r in json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["by_check"] if r["check_id"] == "REQ-10"]
     assert {axis: row["single"][axis] for axis in ("security", "functional", "performance")} == {
         "security": "UNKNOWN", "functional": "PASS", "performance": "UNKNOWN"}
@@ -314,7 +319,7 @@ def normal_sampling_inputs(tmp_path, version):
     ('0.30.0', None), ('0.31.0', None),
     ('0.30.0', 'model'), ('0.31.0', 'schema'), ('0.31.0', 'duration'),
     ('0.30.0', 'synthetic'), ('0.30.0', 'missing-pin'),
-    ('0.31.0', 'caller-pin'), ('0.31.0', 'executor-pin'),
+    ('0.31.0', 'caller-pin'), ('0.31.0', 'executor-pin'), ('0.30.0', 'target-alias'),
 ])
 def test_req10_prepares_only_the_saved_normal_target_without_building_requests(tmp_path, monkeypatch, version, damage):
     from guard.executors import kubernetes_sampling as sampling
@@ -348,12 +353,20 @@ def test_req10_prepares_only_the_saved_normal_target_without_building_requests(t
     monkeypatch.setattr(sampling.KubernetesHTTP, '__call__', forbidden)
     monkeypatch.setattr(sampling.KubernetesHTTP, 'declare_input_contract', forbidden)
     executor = KubernetesSamplingExecutor(cfg, runner=forbidden,
-        expected_target_sha256='e' * 64 if damage == 'executor-pin' else None)
+        expected_target_sha256={'executor-pin': 'e' * 64, 'target-alias': target_sha256}.get(damage))
     expected = None if damage == 'missing-pin' else 'f' * 64 if damage == 'caller-pin' else target_sha256
-    if damage is None:
+    if damage in {None, 'target-alias'}:
         executor.prepared_normal_sampling(check, env, APPROVED_NORMAL, expected_target_sha256=expected)
         assert executor.keys() == {}
-    else:
+    if damage == 'target-alias':
+        original = path.rename(tmp_path / 'same-normal-target.json')
+        path.symlink_to(original.name)
+        assert path.read_bytes() == raw
+        with pytest.raises(ValueError, match='^KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED$'):
+            executor.prepared_normal_sampling(check, env, APPROVED_NORMAL, expected_target_sha256=expected)
+        with pytest.raises(ValueError, match='^KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED$'):
+            executor.run(check, env, APPROVED_NORMAL, VllmAdapter(), tmp_path / 'work')
+    if damage not in {None, 'target-alias'}:
         with pytest.raises(ValueError, match='^KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED$'):
             executor.prepared_normal_sampling(check, env, APPROVED_NORMAL, expected_target_sha256=expected)
 
@@ -440,6 +453,87 @@ def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combinatio
         assert PRIVATE not in raw and "guard sampling control" not in raw
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)
+
+
+@pytest.mark.parametrize(('version', 'fault'), [
+    ('0.30.0', None), ('0.31.0', None), ('0.30.0', 'wrong-method'),
+    ('0.31.0', 'wrong-mode'), ('0.31.0', 'missing-mode'), ('0.30.0', 'late-owner'),
+    ('0.31.0', 'archive-exists'),
+])
+def test_req10_normal_only_binds_response_labels_and_owner_before_retaining(tmp_path, version, fault):
+    from guard.executors.kubernetes_sampling import NORMAL_LABEL
+    from guard.models import canonical_json, sha256_hex
+
+    selected, target, check_, path = normal_sampling_inputs(tmp_path, version)
+    path.write_bytes(canonical_json(target))
+    world = World(target)
+    owner_reads = []
+    observations = []
+    body = None
+
+    def runner(argv, **kwargs):
+        nonlocal body
+        result = world.runner(argv, **kwargs)
+        if 'engine-pod' in argv and 'get' in argv:
+            owner_reads.append(world.after_exec)
+            if fault == 'late-owner' and world.after_exec:
+                pod = json.loads(result['stdout_bytes'])
+                pod['metadata']['uid'] = 'replacement'
+                result['stdout_bytes'] = canonical_json(pod)
+        if 'exec' in argv:
+            row, = json.loads(result['stdout_bytes'])
+            assert row['id'] == NORMAL_LABEL and row['method'] == 'POST'
+            payload = json.loads(row['body'])
+            payload['id'] = 'cmpl-private-fixture'
+            payload['usage'] = {'prompt_tokens': 4, 'completion_tokens': 1, 'total_tokens': 5}
+            body = canonical_json(payload)
+            row.update(body=body.decode(), mode='json', capture_complete=True, eof=True, utf8_valid=True, body_truncated=False,
+                       body_bytes=len(body), body_sha256=sha256_hex(body))
+            if fault == 'wrong-method':
+                row['method'] = 'GET'
+            elif fault == 'wrong-mode':
+                row['mode'] = 'sse'
+            elif fault == 'missing-mode':
+                del row['mode']
+            result['stdout_bytes'] = canonical_json([row])
+        return result
+
+    executor = KubernetesSamplingExecutor({'target': str(path), 'normal_sampling_only': True},
+                                          runner=runner, expected_target_sha256=sha256_hex(path.read_bytes()))
+    work = tmp_path / 'work'
+    if fault == 'archive-exists':
+        work.mkdir()
+        (work / 'normal_sampling.json').write_bytes(b'earlier receipt')
+    draft = executor.run(check_, selected, APPROVED_NORMAL, VllmAdapter(), work,
+                         normal_response_observer=lambda **observation: observations.append(observation))
+    assert owner_reads == [False, True]
+    assert len(world.execs) == 1 and world.execs[0]['method'] == 'POST' and world.execs[0]['mode'] == 'json'
+    assert draft.data_origin == DataOrigin.EXAMPLE
+    assert not draft.observations['runner_consumption_verified'].value and not any(c.attempted for c in draft.challenges)
+    if fault == 'archive-exists':
+        assert draft.status == ExecStatus.ABORTED
+        assert draft.abort_reason == 'SAMPLING_NORMAL_ARTIFACT_UNAVAILABLE'
+        assert not draft.artifacts and not observations
+        assert (work / 'normal_sampling.json').read_bytes() == b'earlier receipt'
+        return
+    saved_bytes = draft.artifacts[0].path.read_bytes()
+    summary = json.loads(saved_bytes)
+    if fault is None:
+        assert draft.status == ExecStatus.COMPLETED and draft.normal_control.succeeded is True
+        assert summary['ownership_verified_before_after'] and summary['normal_completion_shape_verified']
+        assert summary['response_capture']['original_body_sha256'] == sha256_hex(body)
+        assert observations == [{
+            'body_bytes': body,
+            'summary_sha256': sha256_hex(saved_bytes),
+            'environment_ref': selected.ref().model_dump(mode='json'),
+            'data_origin': 'EXAMPLE',
+        }]
+        assert b'cmpl-private-fixture' not in saved_bytes
+    else:
+        assert draft.status == ExecStatus.ABORTED and draft.normal_control.succeeded is None
+        assert draft.abort_reason == 'SAMPLING_NORMAL_OBSERVATION_INCOMPLETE'
+        assert not summary['normal_completion_shape_verified'] and summary['response_capture'] is None
+        assert not observations
 
 
 @pytest.mark.parametrize("fault", ["missing-hash", "wrong-env", "unknown-option", "missing-max-tokens", "roles", "wrong-check",

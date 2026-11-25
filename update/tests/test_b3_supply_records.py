@@ -49,7 +49,7 @@ def test_draft_artifact_error_keeps_actual_cpu_record_details(tmp_path,monkeypat
     else:
         original=Path.open
         def write(path,*a,**kw):
-            if path.name=='supply_boot_summary.json' and a and a[0] in ('x','w'):
+            if path.name=='supply_boot_summary.json' and a and a[0].startswith(('x','w')):
                 raise OSError('EXAMPLE-B3-SUMMARY-WRITE')
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,'open',write)
@@ -127,7 +127,7 @@ def test_cpu_record_replay_factory_contract_refs_and_saved_pack(tmp_path,monkeyp
     if mode=='summary-error':
         original=Path.open
         def open_file(path,*a,**kw):
-            if path.name=='supply_boot_summary.json' and a and a[0]=='x':raise OSError('EXAMPLE-B3-summary')
+            if path.name=='supply_boot_summary.json' and a and a[0].startswith('x'):raise OSError('EXAMPLE-B3-summary')
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,'open',open_file)
     pack=load_pack(ROOT/'packs/PACK-BASELINE');now=utcnow()
@@ -161,6 +161,12 @@ def test_cpu_record_replay_factory_contract_refs_and_saved_pack(tmp_path,monkeyp
     assert evd.execution.executor.name=='supply_boot' and evd.data_origin.value=='EXAMPLE'
     assert res.verdicts.security.value=='UNKNOWN' and rpt.official is False
     assert not evd.observations['supply_boot_complete'].value
+    if check_id == 'SUP-15' and mode != 'missing-normal':
+        normal = evd.observations['supply_boot_sessions'].value[0]
+        assert normal['owner_binding_verified'] is False
+        assert normal['reported_boot_record'] == parts['normal']['packet']
+        assert evd.observations['supply_boot_normal_verified'].value is False
+        assert evd.normal_control.succeeded is False
     challenge=evd.observations['supply_boot_sessions'].value[1]['reported_boot_record']
     assert challenge==parts['challenge']['packet']
     assert not evd.observations['supply_boot_record_authenticated'].value

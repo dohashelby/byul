@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import threading
 
 from . import vllm_cache_callback as cache
@@ -129,15 +130,22 @@ class JournalSink:
     MAX_BYTES = 16 * 1024**2
     SEGMENT_BYTES = 1024**2
 
-    def __init__(self, directory):
+    def __init__(self, directory, *, terminal_session=None):
         self.directory = Path(directory)
         self.pid = os.getpid()
         self.queue = queue.Queue(maxsize=512)
         self.lock, self.state_lock = threading.Lock(), threading.Lock()
         self.accepted = self.written = self.processed = self.dropped = self.errors = 0
         self.closed = False
+        self._startup_sealed = False
         self.offsets = {}
         self.pending_checkpoint = None
+        self._drained = False
+        self._terminal_context = None
+        self._terminal_hashes = {}
+        if type(terminal_session) is str and re.fullmatch('[0-9a-f]{32}', terminal_session):
+            self._terminal_context = self._self_context()
+            self._terminal_session_sha256 = cache.base.sha(terminal_session.encode())
         self.state = self.directory / f'callbacks-{self.pid}.state.json'
         self.thread = threading.Thread(target=self._run, name='guard-observer-journal', daemon=True)
         self._state(); self.thread.start()
@@ -147,6 +155,8 @@ class JournalSink:
             raise ValueError('OBSERVER_JOURNAL_PROCESS_CHANGED')
         error = None
         with self.lock:
+            if self._startup_sealed:
+                return  # The dedicated startup recorder has reached its native cut.
             if self.closed or os.getpid() != self.pid:
                 self.dropped += 1; error = 'OBSERVER_JOURNAL_CLOSED'
             else:
@@ -196,30 +206,56 @@ class JournalSink:
             os.replace(tmp, ack)
         self.pending_checkpoint = None
 
+    def _self_context(self):
+        try:
+            context = cache.base._context()
+        except (OSError, ValueError, IndexError):
+            return None
+        if (context['pid'] == self.pid and type(context['start_ticks']) is int
+                and context['start_ticks'] > 0):
+            return context
+
+    def _close_segment(self, fd):
+        try:
+            if self._terminal_context is not None:
+                os.fsync(fd)
+        finally:
+            os.close(fd)
+
     def _run(self):
         segment, segment_bytes, total, fd = 0, 0, 0, None
+        drained = False
         try:
             while True:
                 self._checkpoint()
                 try: row = self.queue.get(timeout=0.05)
                 except queue.Empty: continue
                 try:
-                    if row is None: return
+                    if row is None:
+                        drained = True
+                        return
                     raw = (json.dumps(row, sort_keys=True, separators=(',', ':')) + '\n').encode()
                     if total + len(raw) > self.MAX_BYTES or len(raw) > 256 * 1024:
                         with self.lock: self.dropped += 1
                         continue
                     if fd is None or segment_bytes + len(raw) > self.SEGMENT_BYTES:
-                        if fd is not None: os.close(fd); segment += 1
+                        if fd is not None:
+                            previous, fd = fd, None
+                            self._close_segment(previous)
+                            segment += 1
                         path = self.directory / f'callbacks-{self.pid}-{segment:04d}.jsonl'
                         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
                         segment_bytes = 0
+                        if self._terminal_context is not None:
+                            self._terminal_hashes[path.name] = hashlib.sha256()
                     offset = 0
                     while offset < len(raw):
                         written = os.write(fd, raw[offset:])
                         if written <= 0: raise OSError('OBSERVER_SHORT_WRITE')
                         offset += written
                     total += len(raw); segment_bytes += len(raw)
+                    if self._terminal_context is not None:
+                        self._terminal_hashes[path.name].update(raw)
                     with self.lock:
                         self.written += 1; self.offsets[path.name] = segment_bytes
                 except Exception:
@@ -231,17 +267,72 @@ class JournalSink:
         except Exception:
             with self.lock: self.errors += 1
         finally:
-            if fd is not None: os.close(fd)
+            if fd is not None:
+                try:
+                    self._close_segment(fd)
+                except OSError:
+                    with self.lock: self.errors += 1
             self._state()
+            self._drained = drained
+
+    def _publish_terminal(self):
+        if self._terminal_context is None or not self._drained or self.thread.is_alive():
+            return
+        context = self._self_context()
+        if context != self._terminal_context:
+            return
+        with self.lock:
+            if (not self.accepted or self.accepted != self.processed or self.accepted != self.written
+                    or self.dropped or self.errors or self.offsets.keys() != self._terminal_hashes.keys()):
+                return
+            segments = [{'name': name, 'bytes': size, 'sha256': self._terminal_hashes[name].hexdigest()}
+                        for name, size in sorted(self.offsets.items())]
+            value = dict(schema='guard-observer-journal-terminal/1', pid=self.pid,
+                         start_ticks=context['start_ticks'],
+                         process_sha256=cache.base.sha(json.dumps(context, sort_keys=True, separators=(',', ':')).encode()),
+                         session_sha256=self._terminal_session_sha256, accepted=self.accepted,
+                         processed=self.processed, written=self.written, segments=segments)
+            raw = (json.dumps(value, sort_keys=True, separators=(',', ':')) + '\n').encode()
+            if not 1 <= len(segments) <= 32 or len(raw) > 4096:
+                return
+            marker = self.directory / f'callbacks-{self.pid}.terminal.json'
+            temporary = marker.with_suffix('.tmp')
+            try:
+                fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                try:
+                    with os.fdopen(fd, 'wb') as stream:
+                        stream.write(raw)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.link(temporary, marker, follow_symlinks=False)
+                finally:
+                    temporary.unlink()
+            except OSError:
+                # An unavailable optional receipt leaves the existing journal state usable.
+                return
+
+    def seal_startup(self):
+        """End the dedicated observer's startup stream without waiting in the engine callback."""
+        if os.getpid() != self.pid or self._terminal_context is None:
+            return
+        with self.lock:
+            if self.closed:
+                return
+            self.closed = self._startup_sealed = True
+        threading.Thread(target=self._finish_close, name='guard-observer-seal', daemon=True).start()
 
     def close(self):
         if os.getpid() != self.pid: return
         with self.lock:
             if self.closed: return
             self.closed = True
+        self._finish_close()
+
+    def _finish_close(self):
         try:
             self.queue.put(None, timeout=1); self.thread.join(timeout=5)
         except queue.Full: pass
         if self.thread.is_alive():
             with self.lock: self.errors += 1
         self._state()
+        self._publish_terminal()

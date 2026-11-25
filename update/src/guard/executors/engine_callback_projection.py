@@ -332,6 +332,24 @@ def project_cache_timing(cases, rows, elapsed, policy):
         'full_scope': not missing and not violation, 'missing': missing}
 
 
+def _rank_model_facts(steps):
+    """A missing or ambiguous rank fingerprint cannot prove a mismatch."""
+    mismatch = incomplete = False
+    for field in range(2):  # Configured model and revision are separate facts.
+        by_rank = {}
+        for step in steps:
+            rank, digest = step["rank"], step["model"][field]
+            if type(digest) is str and re.fullmatch("[0-9a-f]{64}", digest):
+                by_rank.setdefault(rank, set()).add(digest)
+            else:
+                incomplete = True
+        if any(len(values) != 1 for values in by_rank.values()):
+            incomplete = True
+        observed = {next(iter(values)) for values in by_rank.values() if len(values) == 1}
+        mismatch |= len(observed) > 1
+    return mismatch, incomplete
+
+
 def project_distributed(events, secret, tags):
     """REQ-14: worker 배치와 출력 귀속, TP rank별 실행·중간 전송·출력 rank를 대조한다.
 
@@ -392,6 +410,7 @@ def project_distributed(events, secret, tags):
                 violations.append({'point': point, 'reason': 'unselected_rank_output'})
     complete = wanted <= seen and checked > 0
     missing = []
+    generation_incomplete = False
     if not complete:
         missing.append('distributed_batches_incomplete')
     tp = len(set(ranks.values())) >= 2
@@ -400,12 +419,16 @@ def project_distributed(events, secret, tags):
     else:
         by_batch = {}
         for step in steps:
-            if step['requests'] & wanted:
+            if step['requests'] & wanted and type(step['rank']) is int and step['rank'] >= 0:
                 by_batch.setdefault(step['requests'], []).append(step)
         bound = [group for group in by_batch.values() if len({s['rank'] for s in group}) >= 2]
         for group in bound:
-            if len({s['model'] for s in group}) != 1 or None in {m for s in group for m in s['model']}:
+            mismatch, incomplete = _rank_model_facts(group)
+            generation_incomplete |= incomplete
+            if mismatch:
                 violations.append({'reason': 'rank_model_generation_mismatch'})
+        if generation_incomplete:
+            missing.append('rank_model_generation_binding_unobserved')
         if not bound or {r for group in bound for r in group[0]['requests'] if r in wanted} < wanted:
             missing.append('rank_batch_binding_incomplete')
         transfers = [s for group in bound for s in group]
@@ -415,7 +438,8 @@ def project_distributed(events, secret, tags):
             missing.append('intermediate_buffer_completion_unobserved')
         missing.append('model_generation_consumption_unobserved')  # 설정 지문은 가중치 실제 소비의 증명이 아니다
     return {'batches_checked': checked, 'ranks': len(set(ranks.values())), 'violations': violations,
-        'violation': True if violations else (False if complete else None), 'full_scope': False, 'missing': missing}
+        'violation': True if violations else (False if complete and not generation_incomplete else None),
+        'full_scope': False, 'missing': missing}
 
 
 def _baseline_slot_history(events):

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from guard.adapters.engine_profiles import supports
+from guard.adapters.vllm_file_read_sensor import dependency
 from guard.automation_policy import string_list
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -39,10 +40,11 @@ def _pod_ready_transition(value, engine_started_at, observed_at):
     return None
 
 
-def _owned_ready(transport):
+def _owned_ready(transport, *, pod=None):
     # The existing snapshot projection omits the probe and transition time. Read them from the
     # same identity-verified in-memory document and keep only the selected state.
-    pod = transport._verify(capture_snapshot=True)["engine"]
+    if pod is None:
+        pod = transport._verify(capture_snapshot=True)["engine"]
     engine = transport.binding["engine"]
     name = engine["container"]
     container, = [row for row in pod["spec"]["containers"] if row["name"] == name]
@@ -115,8 +117,6 @@ class KubernetesNormalServingReadinessExecutor:
 
     def prepared_normal_serving_readiness(self, check, env, values, *, expected_target_sha256=None):
         """Validate the selected target and effective transport settings without dispatching."""
-        from guard.adapters.vllm_file_read_sensor import dependency
-
         self.validate_policy(check, values)
         try:
             target = strict_json(dependency(self.cfg["target"], None), limit=65536)
@@ -128,8 +128,7 @@ class KubernetesNormalServingReadinessExecutor:
         self.validate_policy(check, values)
         started = utcnow()
         try:
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
             if adapter is None:
                 raise ValueError
             target_sha, transport = self._target_transport(target, env)

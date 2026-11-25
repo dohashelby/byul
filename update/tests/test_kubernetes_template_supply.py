@@ -17,9 +17,10 @@ from guard.cli import app
 from guard.executors import registry
 from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from guard.executors.reuse import preview_inputs
+from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, canonical_json, load_pack, sha256_hex
 from guard.store import Store
-from tests.builders import baseline_pack, policy, T0
+from tests.builders import baseline_pack, evidence, policy, T0
 from tests.test_model_preparation_integration import full_inputs, FullWorld
 from tests.test_template_supply_approval import SupplyWorld, SHA
 
@@ -32,6 +33,7 @@ class World(FullWorld):
     def __init__(self, topology, mode=None):
         super().__init__(topology)
         self.mode = mode
+        self.response_bytes = {}
         self.backend = SupplyWorld(context=topology["comparison_config"]["launch"]["max_model_len"],
             **({"different_consumed_ids": True} if mode == "tokens" else
                {"wrong_model": True} if mode == "wrong-model" else {}))
@@ -52,6 +54,13 @@ class World(FullWorld):
                 row.update(mode="json", method="POST", capture_complete=True, eof=True,
                     utf8_valid=True, body_truncated=False, body_bytes=len(row["body"].encode()),
                     body_sha256=sha256_hex(row["body"].encode()), detail=PRIVATE, body_preview=PRIVATE)
+            self.response_bytes[self.current_label] = rows[0]["body"].encode()
+            if self.mode == "tokenize-size" and self.current_label == "tokenize-A":
+                rows[0]["body_bytes"] += 1
+            if self.mode == "chat-digest" and self.current_label == "before":
+                rows[0]["body_sha256"] = "0" * 64
+            if self.mode == "chat-eof" and self.current_label == "before":
+                rows[0]["eof"] = False
             result = {"returncode": 0, "stdout_bytes": json.dumps(rows).encode(),
                       "stderr_bytes": PRIVATE.encode(), "capture": {"complete": True}}
             if self.current_label == "before":
@@ -65,7 +74,8 @@ class World(FullWorld):
         result = super().runner(argv, **kwargs)
         value = json.loads(result["stdout_bytes"])
         if "exec" in argv:
-            if self.mode == "file-change" and self.template_reads > 1:
+            if ((self.mode == "file-change" and self.template_reads > 1)
+                    or (self.mode == "middle-file-change" and self.template_reads == 2)):
                 value["sha256"] = "b" * 64
             if self.mode == "bytes-bool":
                 value["bytes"] = True
@@ -187,6 +197,135 @@ def test_req07_normal_limit_checked_before_one_fixed_inference(tmp_path, mode, l
         assert not draft.observations["rendered_prompt_tokens_exact_match"].collected
     assert detail["fixture"]["declared_normal_input_limit"] == limit
     assert not any(challenge.attempted for challenge in draft.challenges)
+
+
+def sup13_inputs(tmp_path, mode=None, version="0.31.0"):
+    env, topology, world, cfg = inputs(tmp_path, mode)
+    env = env.model_copy(update={"engine": env.engine.model_copy(update={"version": version})}).seal()
+    ref = env.ref().model_dump(mode="json")
+    topology.update(lab=False, environment_ref=ref, observed_version=version)
+    topology["model_mapping"]["environment_ref"] = ref
+    Path(cfg["target"]).write_bytes(canonical_json(topology))
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    return pack.checks["SUP-13"], env, topology, world, {**cfg, "sup13_normal_only": True}
+
+
+@pytest.mark.parametrize("version,mode,requests", [
+    ("0.30.0", None, 2), ("0.31.0", None, 2), ("0.31.0", "writable", 0),
+    ("0.31.0", "file-change", 1), ("0.31.0", "middle-file-change", 1),
+    ("0.31.0", "restart", 2), ("0.31.0", "cleanup", 2), ("0.31.0", "tokens", 2),
+    ("0.31.0", "tokenize-size", 1), ("0.31.0", "chat-digest", 2), ("0.31.0", "chat-eof", 2),
+])
+def test_sup13_observes_only_the_pinned_owned_normal_control(tmp_path, version, mode, requests):
+    check, env, target, world, cfg = sup13_inputs(tmp_path, mode, version)
+    values = {"forbidden_template_attributes": ["EXAMPLE-policy-attribute", "EXAMPLE-other-attribute"]}
+    pin = sha256_hex(canonical_json(target))
+    adapter = VllmAdapter()
+    executor = KubernetesTemplateSupplyExecutor(cfg, runner=world.runner, expected_target_sha256=pin)
+    assert executor.prepared_sup13_normal(check, env, values, adapter, expected_target_sha256=pin) == pin
+    assert executor.prepared_sup13_target(env, adapter, expected_target_sha256=pin) == pin
+    with pytest.raises(ValueError, match="^KUBERNETES_SUP13_NORMAL_CONFIGURATION_INVALID$"):
+        executor.prepared_sup13_normal(check, env, values, adapter, expected_target_sha256="0" * 64)
+    assert not world.calls and not world.packets
+    draft = executor.run(check, env, values, adapter, tmp_path / "work")
+    successful = mode is None
+    assert draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.status.value == ("COMPLETED" if successful else "ABORTED")
+    assert draft.normal_control.succeeded is successful
+    assert len(world.packets) == requests
+    calls = [request for packet in world.packets for request in packet]
+    assert [request["id"] for request in calls] == ["tokenize-A", "before"][:requests]
+    assert all(request["body"]["messages"] == [{"role": "user", "content": "guard sandbox control"}]
+               and "chat_template" not in request["body"] for request in calls)
+    assert not any(challenge.attempted for challenge in draft.challenges)
+    obs = draft.observations
+    identity_retained = mode in {None, "tokens", "tokenize-size", "chat-digest", "chat-eof"}
+    assert obs["template_identity_verified"].collected is identity_retained
+    assert obs["template_identity_verified"].value is (True if identity_retained else None)
+    assert obs["functional_probe_results"].collected is successful
+    assert obs["template_sandbox_scope_complete"].value is False
+    for key in ("template_render_witness_verified", "forbidden_template_type_reference_verified"):
+        assert not obs[key].collected and obs[key].value is None
+    detail = summary(draft)
+    assert detail["normal_only_scope"] == {"target_sha256": pin, "environment_sha256": env.ref().sha256,
+        "owned_api_input_projection_verified": successful}
+    if successful:
+        assert world.template_reads == 3
+        assert detail["identity_before"] == detail["identity_after"]
+        assert calls[-1]["body"]["max_tokens"] == 1
+        assert detail["responses"] == [
+            {"case": label, "outcome": 200,
+             "response_capture": {"body_bytes": len(raw), "body_sha256": sha256_hex(raw)}}
+            for label, raw in world.response_bytes.items()
+        ]
+    if mode == "tokens":
+        assert detail["identity_before"] == detail["identity_after"]
+        assert "TEMPLATE_SUPPLY_INPUT_PROJECTION_UNVERIFIED" in detail["collection_errors"]
+    if mode == "middle-file-change":
+        assert detail["identity_before"] == detail["identity_after"]
+        assert "TEMPLATE_NORMAL_IDENTITY_CHANGED_BEFORE_INFERENCE" in detail["collection_errors"]
+    if mode in {"tokenize-size", "chat-digest", "chat-eof"}:
+        assert "TEMPLATE_SUP13_RESPONSE_CAPTURE_UNVERIFIED" in detail["collection_errors"]
+        assert detail["responses"][-1] == {"case": calls[-1]["id"], "outcome": 200}
+    if mode == "cleanup":
+        assert draft.cleanup_errors == ["KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED"]
+    stored = "".join(artifact.path.read_text(encoding="utf-8") for artifact in draft.artifacts)
+    for private in (PRIVATE, "EXAMPLE-policy-attribute", "EXAMPLE-private-model-content", "prompt_token_ids"):
+        assert private not in stored
+    saved = evidence(status=draft.status, check_id=check.id, attempted=False, normal=draft.normal_control.model_dump(),
+                     observations={key: value.model_dump() for key, value in obs.items()})
+    assert RuleTableJudge().judge(check, saved, check.judge.params, values).verdicts["security"].value == "UNKNOWN"
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+def test_sup13_normal_admits_the_exact_budget_for_its_saved_control(tmp_path, version):
+    check, env, target, world, cfg = sup13_inputs(tmp_path, version=version)
+    prompt_tokens = len(world.backend.tokens(check.functional_probes[0].body))
+    exact_budget = 2 * prompt_tokens + 1
+    cfg.update(max_total_requests=2, max_total_probe_tokens=exact_budget)
+    values = {"forbidden_template_attributes": []}
+    pin = sha256_hex(canonical_json(target))
+    adapter = VllmAdapter()
+    executor = KubernetesTemplateSupplyExecutor(cfg, runner=world.runner, expected_target_sha256=pin)
+    assert executor.prepared_sup13_normal(check, env, values, adapter, expected_target_sha256=pin) == pin
+    assert not world.calls and not world.packets
+
+    draft = executor.run(check, env, values, adapter, tmp_path / "work")
+
+    assert draft.status.value == "COMPLETED" and draft.data_origin is DataOrigin.EXAMPLE
+    assert draft.normal_control.succeeded and not any(step.attempted for step in draft.challenges)
+    assert summary(draft)["accepted_tokens"] == exact_budget
+    assert [request["id"] for packet in world.packets for request in packet] == ["tokenize-A", "before"]
+
+
+@pytest.mark.parametrize("damage", ["missing-pin", "drift", "lab", "wrong-option", "unrelated-input",
+                                    "single-request", "no-chat-token"])
+def test_sup13_rejects_ineligible_saved_declarations_before_dispatch(tmp_path, damage):
+    check, env, target, world, cfg = sup13_inputs(tmp_path)
+    values = {"forbidden_template_attributes": []}
+    old_pin = sha256_hex(canonical_json(target))
+    if damage == "drift":
+        target["engine"]["command"] += ["EXAMPLE-command-argument"]
+    elif damage == "lab":
+        target["lab"] = True
+    elif damage == "wrong-option":
+        cfg["sup13_normal_only"] = 1
+    elif damage == "unrelated-input":
+        cfg["req07_normal_only"] = True
+    elif damage == "single-request":
+        cfg["max_total_requests"] = 1
+    elif damage == "no-chat-token":
+        cfg["max_total_probe_tokens"] = 2
+    Path(cfg["target"]).write_bytes(canonical_json(target))
+    pin = None if damage == "missing-pin" else old_pin if damage == "drift" else sha256_hex(canonical_json(target))
+    executor = KubernetesTemplateSupplyExecutor(cfg, runner=world.runner, expected_target_sha256=pin)
+    with pytest.raises(ValueError, match="^KUBERNETES_SUP13_NORMAL_CONFIGURATION_INVALID$"):
+        executor.prepared_sup13_normal(check, env, values, VllmAdapter())
+    with pytest.raises(ValueError, match="^KUBERNETES_SUP13_NORMAL_CONFIGURATION_INVALID$"):
+        executor.prepared_sup13_target(env, VllmAdapter(), expected_target_sha256=pin)
+    with pytest.raises(ValueError, match="^KUBERNETES_SUP13_NORMAL_CONFIGURATION_INVALID$"):
+        executor.run(check, env, values, VllmAdapter(), tmp_path / "work")
+    assert not world.calls and not world.packets
 
 
 @pytest.mark.parametrize("mode", ["tokens", "wrong-model", "wrong-id", "http-error", "http-exception", "cleanup"])

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
 
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from .base import EvidenceDraft
@@ -18,6 +19,8 @@ from . import supply_boot_contract as contract
 VERSION = "0.1.0"
 RECORD_DIRECTORY = "/guard-supply-boot/data/"
 CONFIG_KEYS = {"normal", "challenge", "kubectl_binary", "max_duration_seconds"}
+from guard.configuration import NORMAL_WORKER_SHARDS_OPTION, NORMAL_WORKER_SHARDS_SCOPE_ERROR
+
 NORMAL_FILE_READS_OPTION = "normal_file_reads_only"
 NORMAL_FILE_READS_PROFILE = "owned-normal-model-file-reads/1"
 _PREPARATION_RECEIPT = "preparation_receipt"
@@ -62,12 +65,44 @@ def _read_projection(captured, prepared, digest, prepared_sha256, analysis):
     return native
 
 
-def _approved_read_gap_recordings(captured):
-    """Retain verified recording digests even when no approved file reads were recorded."""
+def _retain_qualified_read_candidates(captured, prepared, analysis):
+    candidates = [row for row in analysis["candidates"] if (
+        row["declared_reference_comparison_observed"] and row["recording_closed"]
+        and row["path_fd_metadata_match_observed"] and row["close_observed"]
+        and captured["recordings"][row["recording"]]["capture"]["provenance"]["owner_binding_verified"] is True
+    )]
+    if not candidates:
+        return False
+    analysis["unjoined_read_count"] += len(analysis["candidates"]) - len(candidates)
+    analysis["candidates"] = candidates
+    declared_paths = {row["normalized_path_sha256"] for row in prepared["model_read_scope"]["files"]}
+    unread_paths = declared_paths - {row["normalized_path_sha256"] for row in candidates}
+    analysis["groups"] = [{"declared_paths_without_candidate_count": len(unread_paths)}]
+    if unread_paths:
+        analysis["missing"] = sorted(set(analysis["missing"]) | {"declared_scope_file_read_candidates_unavailable"})
+    return True
+
+
+def _persist_read_sources(workdir, captured, native, collector):
+    from .supply_boot_artifacts import persist_normal_file_read_sources
+
+    bindings = [row["source_binding"] for row in native["rows"]]
+    recording_numbers = [binding["source_events"][0][0] for binding in bindings]
+    artifacts, errors, names = persist_normal_file_read_sources(workdir, captured, recording_numbers, collector)
+    for recording, binding in zip(recording_numbers, bindings, strict=True):
+        if recording in names:
+            binding["recording_artifact"] = names[recording]
+    return artifacts, errors
+
+
+def _approved_read_gap_recordings(captured, *, exclude_recordings=frozenset()):
+    """Keep verified journal summaries for files outside the retained read evidence."""
     from guard.adapters.vllm_approved_file_read_composition import EVENT
 
     diagnostics = []
-    for recording in captured["recordings"]:
+    for index, recording in enumerate(captured["recordings"]):
+        if index in exclude_recordings:
+            continue
         capture = recording["capture"]
         provenance = capture["provenance"]
         if (capture["process_context_verified"] is not True or recording["session_owner_match"] is not True
@@ -170,6 +205,8 @@ class KubernetesSupplyBootExecutor:
         self.expected_prepared_sha256_by_role = dict(expected_prepared_sha256_by_role or {})
         if cfg.get(NORMAL_FILE_READS_OPTION) is True:
             self.version = "0.1.0+k8s-normal-model-file-reads"
+        elif cfg.get(NORMAL_WORKER_SHARDS_OPTION) is True:
+            self.version = "0.1.0+k8s-normal-worker-shards"
 
     def validate_policy(self, check, values):
         if check.id not in contract.CHECK_PROFILES or getattr(check, "collection_profile", None) != contract.CHECK_PROFILES[check.id]:
@@ -180,6 +217,12 @@ class KubernetesSupplyBootExecutor:
             self.validate_configuration(check)
             _normal_validity(values)
             return
+        if NORMAL_WORKER_SHARDS_OPTION in self.cfg:
+            from .sup06_normal_worker_shards import validity
+
+            self.validate_configuration(check)
+            validity(values)
+            return
         if _PREPARATION_RECEIPT in self.cfg:
             raise ValueError("SUPPLY_BOOT_NORMAL_CONFIGURATION_INVALID")
         contract.normalize_policy(check.id, values)
@@ -189,6 +232,13 @@ class KubernetesSupplyBootExecutor:
             raise ValueError("SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED")
 
     def validate_configuration(self, check):
+        if NORMAL_WORKER_SHARDS_OPTION in self.cfg:
+            if (self.cfg[NORMAL_WORKER_SHARDS_OPTION] is not True or check.id != "SUP-06"
+                    or check.executor != self.name or set(self.cfg) - {
+                        NORMAL_WORKER_SHARDS_OPTION, "target", "prepared", "kubectl_binary", "max_duration_seconds"}
+                    or any(type(self.cfg.get(key)) is not str or not self.cfg[key] for key in ("target", "prepared"))):
+                raise ValueError(NORMAL_WORKER_SHARDS_SCOPE_ERROR)
+            return
         if NORMAL_FILE_READS_OPTION not in self.cfg:
             return
         section = self.cfg.get("normal")
@@ -211,8 +261,7 @@ class KubernetesSupplyBootExecutor:
         if (type(section) is not dict or set(section) - {"target", "prepared", "worker_shard_input"}
                 or not {"target", "prepared"} <= set(section)):
             raise ValueError
-        with Path(section["target"]).open("rb") as stream:
-            target = strict_json(stream.read(65537), limit=65536)
+        target = load_bounded_json(section["target"])
         expected_prepared = self.expected_prepared_sha256_by_role.get(role)
         prepared = (load_prepared(section['prepared'], expected_sha256=expected_prepared)
                     if expected_prepared is not None else load_prepared(section['prepared']))
@@ -284,7 +333,7 @@ class KubernetesSupplyBootExecutor:
                                 binary=self.cfg.get("kubectl_binary", "kubectl"),
                                 duration=self.cfg.get("max_duration_seconds", 120))
 
-    def _worker_shard_callback_scope(self, config, env, lifecycle_target):
+    def _worker_shard_callback_scope(self, config, env, lifecycle_target, *, bounded=False, source_sha256=None):
         from guard.collectors.engine_callbacks import load_prepared
         from guard.runtime.engine_http import ENGINE_CALLBACK_PROFILE, KubernetesBindingError, KubernetesHTTP
 
@@ -293,9 +342,34 @@ class KubernetesSupplyBootExecutor:
             prepared_path = config.pop('callback_prepared')
             if any(type(path) is not str or not path for path in (target_path, prepared_path)):
                 raise ValueError
-            with Path(target_path).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
-            prepared = load_prepared(prepared_path)
+            if bounded:
+                from guard.adapters.vllm_approved_file_read_composition import PROFILES
+                from guard.adapters.vllm_lifecycle_catalog import row
+                from .cache_timing_group import read_regular
+
+                release = row(PROFILES.get(env.engine.version))
+                if env.engine.name != release['engine'] or env.engine.image_digest not in release['images']:
+                    raise ValueError
+                read = read_regular
+                if source_sha256 is not None:
+                    pins = {Path(target_path): source_sha256['target'], Path(prepared_path): source_sha256['prepared']}
+
+                    def read(path, *, limit):
+                        expected = pins.get(Path(path))
+                        if expected is None:
+                            return read_regular(path, limit=limit)
+                        return read_regular(path, limit=limit, expected_sha256=expected)
+
+                target = strict_json(read(target_path, limit=65536), limit=65536)
+                prepared = load_prepared(prepared_path, bounded_read=read)
+                if (type(target) is not dict or target.get('lab') is not False
+                        or target.get('synthetic', False) is not False
+                        or prepared.get('lab_faults') is not False or prepared.get('lab_kernel_checks') is not False):
+                    raise ValueError
+            else:
+                with Path(target_path).open('rb') as stream:
+                    target = strict_json(stream.read(65537), limit=65536)
+                prepared = load_prepared(prepared_path)
             if type(target) is not dict or prepared.get('worker_shards') is not True:
                 raise ValueError
             # The preflight constructor only validates the declared target.
@@ -303,7 +377,11 @@ class KubernetesSupplyBootExecutor:
             lifecycle = validate_target(lifecycle_target, env)
             if any(callback[key] != lifecycle[key] for key in ('context', 'run_id', 'engine')):
                 raise ValueError
-            return sha256_hex(canonical_json(target)), sha256_hex(canonical_json(prepared)), prepared["session"], callback['engine']
+            from .worker_shard_archive import mounted_source_expectation
+
+            mounted_source = mounted_source_expectation(target, prepared, callback, source_sha256)
+            return (sha256_hex(canonical_json(target)), sha256_hex(canonical_json(prepared)),
+                    prepared['session'], callback['engine'], mounted_source)
         except (KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
             raise ValueError('B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH') from None
 
@@ -313,9 +391,26 @@ class KubernetesSupplyBootExecutor:
         config = self.cfg[role]['worker_shard_input']
         prepared_sha256 = values[f'supply_{role}_prepared_sha256']
         owner = None
-        if type(config) is dict and {'callback_target', 'callback_prepared'} & config.keys():
+        archive = None
+        source_sha256 = None
+        mounted_source = None
+        callback_keys = {'callback_target', 'callback_prepared', 'capture_archive', 'callback_source_sha256'}
+        if type(config) is dict and callback_keys & config.keys():
             config = config.copy()
-            digest, prepared_sha256, callback_session, owner = self._worker_shard_callback_scope(config, env, target)
+            bounded = role == 'normal' and config.get('data_origin') == 'EXAMPLE'
+            if 'capture_archive' in config:
+                archive = config.pop('capture_archive')
+                if not bounded or type(archive) is not dict:
+                    raise ValueError('B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH')
+            if 'callback_source_sha256' in config:
+                from guard.adapters.vllm_file_read_sensor import fingerprint
+
+                source_sha256 = config.pop('callback_source_sha256')
+                if (archive is None or type(source_sha256) is not dict or source_sha256.keys() != {'target', 'prepared'}
+                        or any(not fingerprint(pin) for pin in source_sha256.values())):
+                    raise ValueError('B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH')
+            digest, prepared_sha256, callback_session, owner, mounted_source = self._worker_shard_callback_scope(
+                config, env, target, bounded=bounded, source_sha256=source_sha256)
         record, scope = load_input(config, environment_ref=env.ref().model_dump(mode='json'),
                                    target_sha256=digest, prepared_sha256=prepared_sha256)
         result = worker_shards(record, scope, values)
@@ -330,6 +425,15 @@ class KubernetesSupplyBootExecutor:
                 raise ValueError('B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH')
             # A supplied checkpoint can retain candidates without independent live owner proof.
             result = {**result, 'violations': []}
+            if archive is not None:
+                from .worker_shard_archive import replay_input
+
+                native = replay_input(archive, env, record=record, pod=owner, scope=scope,
+                                      mounted_source=mounted_source)
+                if native is not None:
+                    result['native_rank_witnesses'] = native
+                if source_sha256 is not None:
+                    result['callback_source_sha256'] = source_sha256.copy()
         return record, scope, result
 
     def _collect_role(self, check, env, values, role, *, role_inputs=None):
@@ -388,8 +492,11 @@ class KubernetesSupplyBootExecutor:
             packet = contract.validate_record(strict_json(raw, limit=MAX_BYTES), check_id=check.id, role=role,
                 environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
                 source_sha256=values["supply_record_source_sha256"])
-            if check.id in {"LIF-01", "SUP-15"} and provenance["owner_binding_verified"] is not True:
+            requires_owner = check.id in {"LIF-01", "SUP-15", "SUP-16"} or (check.id == "LIF-02" and role == "normal")
+            if requires_owner and provenance["owner_binding_verified"] is not True:
                 raise ValueError("SUPPLY_BOOT_RECORD_OWNER_UNVERIFIED")
+            if check.id == "LIF-02" and role == "normal" and reader.report().get("parent_cleanup_unverified"):
+                raise ValueError("SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED")
             row.update(collected=True, record_sha256=provenance["capture_sha256"],
                        owner_binding_verified=provenance["owner_binding_verified"])
             result["packet"] = packet
@@ -399,30 +506,54 @@ class KubernetesSupplyBootExecutor:
             if check.id == "LIF-01":
                 row["reported_stage_costs"] = [stage for stage in packet["rows"]
                                                if stage["stage"] in values["supply_stage_budget_ms"]]
-            if (check.id == "LIF-02" and role == "normal" and provenance["owner_binding_verified"] is True
-                    and packet["rows"]):
+            if check.id == "LIF-02" and role == "normal" and packet["rows"]:
                 fields = ("attempt", "at_ms", "bytes", "temporary_left")
                 row["reported_fetch_attempts"] = [{key: attempt[key] for key in fields} for attempt in packet["rows"]]
         except Exception:
             row["diagnostic_codes"].append("SUPPLY_BOOT_RECORD_UNAVAILABLE")
+        gap_recordings = []
         if check.id in contract.NATIVE_CHECKS:
+            from guard.adapters.vllm_lifecycle_catalog import approved_file_read
+
+            approved_normal = (check.id == "SUP-16" and role == "normal"
+                               and approved_file_read(prepared["profile"]))
             try:
-                row["sealed"] = reader.seal_session().get("sealed") is True
+                if not approved_normal:
+                    row["sealed"] = reader.seal_session().get("sealed") is True
                 captured = capture_session(reader, target, container=engine["container"], image=engine["image"], prepared=prepared,
                     owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)
                 row["native_files_covered"] = captured["recorded_files_covered"]
-                analysis = native_model_file_reads.analyze(captured, prepared)
-                if check.id == "SUP-05":
+                if approved_normal:
+                    from guard.collectors import approved_model_file_reads
+
+                    row["sealed"] = (captured["session"] == prepared["session"]
+                                     and captured["recorded_files_covered"] is True
+                                     and all(captured[key]["metadata"]["sealed"] is True for key in ("before", "after")))
+                    if not row["sealed"]:
+                        raise ValueError
+                    analysis = approved_model_file_reads.analyze(captured, prepared)
+                    if not _retain_qualified_read_candidates(captured, prepared, analysis):
+                        gap_recordings = _approved_read_gap_recordings(captured)
+                        raise ValueError
+                else:
+                    analysis = native_model_file_reads.analyze(captured, prepared)
+                if check.id == "SUP-05" or approved_normal:
                     result["native"] = _read_projection(captured, prepared, digest,
                                                         values[f"supply_{role}_prepared_sha256"], analysis)
+                    if approved_normal:
+                        result["approved_normal_capture"] = captured
                 else:
                     result["native"] = contract.native_consumption(analysis)
             except Exception:
-                row["diagnostic_codes"].append("SUPPLY_BOOT_NATIVE_UNAVAILABLE")
+                row["diagnostic_codes"].append("SUPPLY_BOOT_NORMAL_APPROVED_NATIVE_UNVERIFIED" if approved_normal
+                                               else "SUPPLY_BOOT_NATIVE_UNAVAILABLE")
         try:
             report = reader.report()
             if report.get("parent_cleanup_unverified"):
                 result["cleanup"] = "SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"
+            elif gap_recordings:
+                # The separate boot record may be absent while the native journal is verified.
+                row["normal_read_gap_recordings"] = gap_recordings
         except Exception:
             row["diagnostic_codes"].append("SUPPLY_BOOT_READER_REPORT_UNAVAILABLE")
             result["cleanup"] = "SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"
@@ -433,6 +564,12 @@ class KubernetesSupplyBootExecutor:
         self.validate_policy(check, policy_values)
         if NORMAL_FILE_READS_OPTION in self.cfg:
             return self._run_normal_read(check, env, policy_values, workdir, started)
+        if NORMAL_WORKER_SHARDS_OPTION in self.cfg:
+            from .sup06_normal_worker_shards import run_normal_worker_shards
+
+            return run_normal_worker_shards(check, env, policy_values, self.cfg, workdir, started,
+                                            collector=f"{self.name}/{self.version}", runner=self.runner,
+                                            expected_target=self.expected_target)
         self._validate_paired_configuration(env, policy_values)
         begin, end = contract.normalize_policy(check.id, policy_values)
         if not begin <= started <= end:
@@ -453,6 +590,12 @@ class KubernetesSupplyBootExecutor:
         else:
             collected = {role: self._collect_role(check, env, policy_values, role) for role in contract.ROLES}
         return self._draft(check, env, policy_values, workdir, started, collected)
+
+    def normal_worker_shard_inputs(self, env, values, *, expected_target=None):
+        from .sup06_normal_worker_shards import prepared_inputs
+
+        return prepared_inputs(self.cfg, env, values, runner=self.runner,
+                               expected_target=expected_target or self.expected_target)
 
     def normal_file_read_inputs(self, env, values):
         """Validate the local files and reader settings without contacting the workload."""
@@ -515,7 +658,7 @@ class KubernetesSupplyBootExecutor:
 
     def _run_normal_read(self, check, env, values, workdir, started):
         from guard.adapters import vllm_file_read_sensor as sensor
-        from .supply_boot_artifacts import persist, persist_normal_file_read_sources
+        from .supply_boot_artifacts import persist
 
         start, end = _normal_validity(values)
         if not start <= started <= end:
@@ -545,26 +688,18 @@ class KubernetesSupplyBootExecutor:
                     or any(captured[key]["metadata"]["sealed"] is not True for key in ("before", "after"))
                     or _model_mount(reader.snapshot()) != mount):
                 raise ValueError(gap)
+            if utcnow() > end:
+                gap = "SUPPLY_BOOT_NORMAL_CAPTURE_WINDOW_EXPIRED"
+                raise ValueError(gap)
             analysis = model_reads.analyze(captured, prepared)
-            candidates = [row for row in analysis["candidates"] if (
-                row["declared_reference_comparison_observed"] and row["recording_closed"]
-                and row["path_fd_metadata_match_observed"] and row["close_observed"]
-                and captured["recordings"][row["recording"]]["capture"]["provenance"]["owner_binding_verified"] is True
-            )]
-            if candidates:
-                analysis["unjoined_read_count"] += len(analysis["candidates"]) - len(candidates)
-                analysis["candidates"] = candidates
-                declared_paths = {row["normalized_path_sha256"] for row in prepared["model_read_scope"]["files"]}
-                unread_paths = declared_paths - {row["normalized_path_sha256"] for row in candidates}
-                analysis["groups"] = [{"declared_paths_without_candidate_count": len(unread_paths)}]
-                if unread_paths:
-                    analysis["missing"] = sorted(set(analysis["missing"]) | {"declared_scope_file_read_candidates_unavailable"})
+            if _retain_qualified_read_candidates(captured, prepared, analysis):
                 native = _read_projection(captured, prepared, target_sha256, prepared_sha256, analysis)
                 gap = None
             else:
                 gap = "SUPPLY_BOOT_NORMAL_OWNED_READ_UNAVAILABLE"
-                if prepared["profile"] != sensor.PROFILE:
-                    diagnostics = _approved_read_gap_recordings(captured)
+            if prepared["profile"] != sensor.PROFILE:
+                read_recordings = {row["recording"] for row in analysis["candidates"]} if native is not None else set()
+                diagnostics = _approved_read_gap_recordings(captured, exclude_recordings=read_recordings)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError, IndexError):
             pass
         try:
@@ -584,13 +719,7 @@ class KubernetesSupplyBootExecutor:
         collector = f"{self.name}/{self.version}"
         original_artifacts, source_errors = [], []
         if native is not None:
-            bindings = [row["source_binding"] for row in native["rows"]]
-            recording_numbers = [binding["source_events"][0][0] for binding in bindings]
-            original_artifacts, source_errors, names = persist_normal_file_read_sources(
-                workdir, captured, recording_numbers, collector)
-            for recording, binding in zip(recording_numbers, bindings, strict=True):
-                if recording in names:
-                    binding["recording_artifact"] = names[recording]
+            original_artifacts, source_errors = _persist_read_sources(workdir, captured, native, collector)
         rows = [{"role": "normal", **native}] if native is not None else []
         summary = {"profile": NORMAL_FILE_READS_PROFILE, "sessions": [session], "native": rows, "gap": gap,
                    "missing": sorted(set(missing + cleanup + source_errors))}
@@ -658,12 +787,32 @@ class KubernetesSupplyBootExecutor:
             normal_ok = bool(part and part["rows"] and normal["row"]["native_files_covered"] and not part["unread_declared_paths"]
                              and all(row["matches_approved"] for row in part["rows"]))
         else:
-            normal_ok = bool(normal["evaluated"] is not None and not normal["evaluated"][0] and not normal["evaluated"][1])
+            evaluation = normal["evaluated"]
+            normal_ok = bool(evaluation is not None and not evaluation[0] and not evaluation[1])
+            if check.id == "SUP-15" and evaluation is not None:
+                found, gaps = evaluation
+                rows = (normal["packet"] or {}).get("rows", ())
+                # Relevant-change coverage remains in the reported gaps.
+                normal_ok = (not found and (not gaps or gaps == ["relevant_change_not_attempted"])
+                             and normal["row"]["owner_binding_verified"] is True and any(
+                                 row["relevant_change"] is False and row["reused"] is True
+                                 and row["compatibility_verified"] is True for row in rows))
         complete = all(part["row"]["collected"] and part["row"]["owner_binding_verified"] and not part["row"]["diagnostic_codes"]
                        for part in collected.values())
         return violations, sorted(set(missing)), native_rows, normal_ok, complete, change
 
     def _draft(self, check, env, values, workdir, started, collected):
+        from .supply_boot_artifacts import persist
+
+        workdir = Path(workdir)
+        collector = f"{self.name}/{self.version}"
+        source_artifacts, source_errors = [], []
+        normal_record = collected["normal"]
+        if check.id == "SUP-16" and not normal_record.get("cleanup"):
+            captured = normal_record.get("approved_normal_capture")
+            if captured is not None:
+                source_artifacts, source_errors = _persist_read_sources(
+                    workdir, captured, normal_record["native"], collector)
         violations, missing, native_rows, normal_ok, complete, change = self._project(check, collected)
         b3 = check.id in {'SUP-15', 'SUP-16'}
         sessions = [{**part['row'], **({'reported_boot_record': part['packet'],
@@ -700,11 +849,11 @@ class KubernetesSupplyBootExecutor:
         for item in observations.values():
             if not item["collected"]:
                 item["value"] = None
-        workdir = Path(workdir)
-        summary = {"profile": check.collection_profile, "sessions": sessions, "violations": violations, "missing": missing,
-                   "native": native_rows, "producer_authenticated": False, "engine_started": False}
-        from .supply_boot_artifacts import persist
-        artifacts, artifact_errors = persist(workdir, summary, collected, f'{self.name}/{self.version}')
+        summary = {"profile": check.collection_profile, "sessions": sessions, "violations": violations,
+                   "missing": sorted(set(missing + source_errors)), "native": native_rows,
+                   "producer_authenticated": False, "engine_started": False}
+        artifacts, errors = persist(workdir, summary, collected, collector)
+        artifact_errors = source_errors + errors
         if artifact_errors:
             cleanup = sorted(set(cleanup + artifact_errors))
             observations['supply_boot_complete'] = {'value': False, 'collected': True}
@@ -718,7 +867,7 @@ class KubernetesSupplyBootExecutor:
             status=ExecStatus.ABORTED if gap else ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE
             if input_examples or self.runner is not None or env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
             normal_control=normal, challenges=[{"step": step, "attempted": bool(change and change["applied"])} for step in check.challenge_steps],
-            observations=observations, artifacts=artifacts,
+            observations=observations, artifacts=source_artifacts + artifacts,
             comparability={"fixture_sha256": sha256_hex(canonical_json({"profile": check.collection_profile})),
                            "model_inventory_sha256": env.model.inventory_sha256, "gpu": env.runtime.gpu_model,
                            "driver": env.runtime.driver, "cpu": env.runtime.cpu},

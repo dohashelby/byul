@@ -1,4 +1,5 @@
 """One normal completion, bound engine logs, and no retained source values."""
+from datetime import timedelta
 import json
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from guard.adapters.vllm import VllmAdapter
 from guard.core.judge import judge_evidence
 from guard.core.run import _normalize
+from guard.executors import kubernetes_log_analysis
 from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor, LIMIT_BYTES
 from guard.models import Evidence, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from tests.builders import T0, dummy_ref, policy
@@ -20,6 +22,12 @@ VALUES = {'required_sources': ['engine', 'gateway'], 'required_branches': ['norm
 PRIVATE = 'EXAMPLE-PRIVATE-LOG-BODY-CANNOT-BE-PERSISTED'
 STDERR = 'EXAMPLE-PRIVATE-STDERR-CANNOT-BE-PERSISTED'
 REQUEST_ID = 'cmpl-EXAMPLE-NORMAL-CORRELATION'
+WINDOW_STAMPS = {
+    'at-window-end': '2026-10-19T00:00:01.000000000Z',
+    'same-end-with-offset': '2026-10-19T01:00:01.000000000+01:00',
+    'one-nanosecond-after-window': '2026-10-19T00:00:01.000000001Z',
+    'unknown-window-offset': '2026-10-19T00:00:01.000000000-00:00',
+}
 
 
 class LogWorld(ProcessWorld):
@@ -37,7 +45,7 @@ class LogWorld(ProcessWorld):
             event = {'request_id': REQUEST_ID if self.log_mode != 'unlinked' else 'cmpl-unrelated-event', 'event': PRIVATE}
             if self.log_mode != 'clean':
                 event.update(prompt=PRIVATE, **{PRIVATE: PRIVATE})
-            stamp = utcnow().isoformat()
+            stamp = WINDOW_STAMPS.get(self.log_mode) or utcnow().isoformat()
             text = f'{stamp} {json.dumps(event)}\n' if self.log_mode != 'plain' else f'{stamp} {PRIVATE}\n'
             raw = text.encode()
             if self.log_mode == 'invalid-utf8':
@@ -74,8 +82,14 @@ class LogWorld(ProcessWorld):
                                             ('plain', 'UNKNOWN'), ('replaced', 'UNKNOWN'), ('nonzero', 'UNKNOWN'),
                                             ('unreaped', 'UNKNOWN'), ('normal-unavailable', 'UNKNOWN'),
                                             ('invalid-utf8', 'UNKNOWN'), ('unterminated', 'UNKNOWN'),
-                                            ('split-timestamp', 'UNKNOWN'), ('mixed-invalid', 'FAIL')])
-def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, mode, security):
+                                            ('split-timestamp', 'UNKNOWN'), ('mixed-invalid', 'FAIL'),
+                                            ('at-window-end', 'FAIL'), ('same-end-with-offset', 'FAIL'),
+                                            ('one-nanosecond-after-window', 'UNKNOWN'),
+                                            ('unknown-window-offset', 'UNKNOWN')])
+def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, mode, security, monkeypatch):
+    if mode in WINDOW_STAMPS:
+        bounds = iter((T0, T0 + timedelta(seconds=1)))
+        monkeypatch.setattr(kubernetes_log_analysis, 'utcnow', lambda: next(bounds))
     env, target = full_inputs()
     world = LogWorld(target, mode)
     path = tmp_path / 'target.json'
@@ -94,7 +108,9 @@ def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, m
     assert draft.abort_reason == ('OWNED_ENGINE_LOG_CAPTURE_INCOMPLETE' if log_unavailable else None)
     assert draft.cleanup_errors == []
     assert draft.observations['log_coverage_complete'].value is False
-    assert draft.observations['log_fields_seen'].collected is (mode in {'clean', 'forbidden', 'mixed-invalid'})
+    assert draft.observations['log_fields_seen'].collected is (mode in {
+        'clean', 'forbidden', 'mixed-invalid', 'at-window-end', 'same-end-with-offset',
+    })
     assert draft.observations['log_marker_contexts_seen'].collected is False
     evd = Evidence(id='EVD-OBS03-EXAMPLE', data_origin=draft.data_origin, check_id=check.id, side='single',
                    environment=env.ref(), plan=dummy_ref('PLAN'), execution={'status': draft.status},
@@ -127,6 +143,8 @@ def test_owned_log_projection_keeps_only_correlated_field_predicates(tmp_path, m
             'truncated': False, 'pipes_closed': not unreaped, 'child_reap_unverified': unreaped,
         }
     assert summary['source']['available'] == (not log_unavailable)
+    if mode in {'one-nanosecond-after-window', 'unknown-window-offset'}:
+        assert 'engine: exact trial event lies outside or has an invalid capture timestamp' in summary['gaps']
     if mode in {'invalid-utf8', 'unterminated', 'split-timestamp', 'mixed-invalid'}:
         assert 'ENGINE_LOG_FORMAT_PARTIAL' in summary['gaps']
     if log_unavailable:

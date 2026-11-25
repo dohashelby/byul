@@ -189,9 +189,13 @@ def test_invalid_or_unapproved_inputs_fail_before_collection(case, invalid):
         case['args']['target'].write_text(json.dumps(value))
     elif invalid == 'existing_output': case['args']['output'].mkdir()
     else:
-        changed = case['plan'].model_copy(update={'mode': Mode.update, 'revision': 2}).seal()
-        case['store'].put(changed)
-    with pytest.raises(ValueError): bridge.run(**case['args'], execute=True)
+        candidate = environment(id='ENV-RECORD-ACCESS-CANDIDATE', engine=case['env'].engine)
+        update_plan = select(case['pack'], [case['env'], candidate], case['policy'], mode=Mode.update)
+        case['store'].put_many([candidate, update_plan])
+        case['args']['plan_id'] = update_plan.id
+    error = '^RECORD_ACCESS_AUDIT_SINGLE_REQUIRED$' if invalid == 'mode' else None
+    with pytest.raises(ValueError, match=error):
+        bridge.run(**case['args'], execute=True)
     assert not case['calls']
 
 

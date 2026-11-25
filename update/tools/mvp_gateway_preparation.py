@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import io
 import json
@@ -20,7 +20,8 @@ from tempfile import TemporaryDirectory
 
 import yaml
 
-from guard.executors.kubernetes_gateway_observation import MAX_BYTES, final_records, snapshot_record
+from guard.executors.kubernetes_gateway_observation import MAX_BYTES, final_records, snapshot_owner, snapshot_record
+from guard.executors.kubernetes_response_snapshot import _epoch_ns
 from guard.models import DataOrigin, Environment, canonical_json, new_id, utcnow
 from guard.models.objects import FactValue
 from guard.runtime.bounded import strict_json
@@ -54,6 +55,10 @@ _AUDIT_FIELDS = _OWNER_PIN_FIELDS | {'event', 'gateway_target_sha256', 'owner_be
     'producer_sha256', 'runtime_policy_sha256', 'journal_bytes', 'journal_sha256', 'selected_row_sha256',
     'recorded_at', 'actor_sha256', 'session', 'independent_denied_event_observed'}
 _OBSERVATION_INVALID = 'GATEWAY_ORDINARY_OBSERVATION_INVALID'
+_RETAINED_INVALID = 'GATEWAY_RETAINED_PAIR_INVALID'
+_RETAINED_FIELDS = {'environment', 'target', 'bundle', 'observation'}
+RETAINED_INPUT_SCHEMA = 'guard.obs01-gateway-retained-inputs/1'
+RETAINED_AUDIT_SCHEMA = 'guard.obs01-gateway-retained-audit/1'
 
 
 def reviewed_producer(archive):
@@ -85,7 +90,7 @@ def _pinned_file(path, expected):
     return raw
 
 
-def _published_bundle(path, expected, revocations, issued_at):
+def _published_bundle(path, expected, revocations, issued_at, *, captured_at_ns=None):
     """Use Runtime's existing loaders on the same exact bytes we will mount."""
     from serving_runtime.policy.approval import HashListApprovalVerifier
     from serving_runtime.policy.policy import load_policy
@@ -137,8 +142,41 @@ def _published_bundle(path, expected, revocations, issued_at):
         if approval.state != 'verified' or not evaluate_policy(
                 policy_state, revocation, approval=approval, now=issued_at)['gateway_active']:
             raise ValueError('GATEWAY_PUBLISHED_POLICY_NOT_ACTIVE')
+        if captured_at_ns is not None:
+            validity = document['validity']
+            starts = (validity['valid_from'], document['approval']['approved_at'], approval.evidence['approved_at'])
+            bundle_end, approval_end = validity['valid_until'], approval.evidence.get('valid_until')
+            if (any(_epoch_ns(bound) > captured_at_ns for bound in starts if bound is not None)
+                    or bundle_end is not None and _epoch_ns(bundle_end) < captured_at_ns
+                    or approval_end is not None and _epoch_ns(approval_end) <= captured_at_ns):
+                raise ValueError('GATEWAY_PUBLISHED_POLICY_NOT_ACTIVE')
         registration = load_target(roles['target'])
     return paths, policy, registration, policy_state.sha256
+
+
+def _engine_transport(env, target, release):
+    transport = _transport(target, env)
+    if (not env.hash_ok() or env.data_origin == 'EXAMPLE' or not env.runtime.gpu_count
+            or (env.engine.name, env.engine.version, env.engine.image_digest)
+            != (release['engine'], release['version'], release['image'])
+            or target.get('observed_version') != env.engine.version or transport.endpoint.port != 8000
+            or 'kubernetes_gateway' in target
+            or any(transport.binding['engine'][key] != transport.binding['probe'][key]
+                   for key in ('namespace', 'namespace_uid'))):
+        raise ValueError('GATEWAY_SIDE_ENGINE_TARGET_MISMATCH')
+    return transport
+
+
+def _published_model(env, transport, policy, registered):
+    model = transport.api_model
+    if (registered.state != 'ok' or registered.target_id != policy.target_id
+            or (registered.engine_kind, registered.engine_version, registered.image_digest,
+                registered.model_id, registered.model_revision)
+            != (env.engine.name, env.engine.version, env.engine.image_digest.rsplit('@', 1)[1],
+                model, env.model.revision)
+            or list(policy.allowed_models) != [model]):
+        raise ValueError('GATEWAY_PUBLISHED_TARGET_MISMATCH')
+    return model
 
 
 def _deployment(template, binding, model, auth_secret, paths, revoked):
@@ -219,25 +257,10 @@ def prepare_pair(inputs, revocations, revocations_sha256, *, issued_at=None):
         document_paths = (settings['environment'], settings['target'])
         (document, _), (target, target_ref) = (_source(_plain_path(Path(item))) for item in document_paths)
         env = Environment.model_validate(document)
-        transport = _transport(target, env)
-        if (not env.hash_ok() or env.data_origin == 'EXAMPLE' or not env.runtime.gpu_count
-                or (env.engine.name, env.engine.version, env.engine.image_digest)
-                != (expected['engine'], expected['version'], expected['image'])
-                or target.get('observed_version') != env.engine.version or transport.endpoint.port != 8000
-                or 'kubernetes_gateway' in target
-                or any(transport.binding['engine'][key] != transport.binding['probe'][key]
-                       for key in ('namespace', 'namespace_uid'))):
-            raise ValueError('GATEWAY_SIDE_ENGINE_TARGET_MISMATCH')
+        transport = _engine_transport(env, target, expected)
         paths, policy, registered, digest = _published_bundle(settings['bundle'], settings['bundle_sha256'],
                                                             revoked, issued_at)
-        model = transport.api_model
-        if (registered.state != 'ok' or registered.target_id != policy.target_id
-                or (registered.engine_kind, registered.engine_version, registered.image_digest,
-                    registered.model_id, registered.model_revision)
-                != (env.engine.name, env.engine.version, env.engine.image_digest.rsplit('@', 1)[1],
-                    model, env.model.revision)
-                or list(policy.allowed_models) != [model]):
-            raise ValueError('GATEWAY_PUBLISHED_TARGET_MISMATCH')
+        model = _published_model(env, transport, policy, registered)
         models[side] = (model, env.model, digest)
         generations[side] = (transport.binding['context'], transport.binding['run_id'])
         deployments = _deployment(template, transport.binding, model, settings['auth_secret'], paths, revoked)
@@ -310,50 +333,59 @@ def _owner_sha256(binding):
     return sha256(canonical_json(owner)).hexdigest()
 
 
-def _check_observation_times(response, recorded_at, target, prepared):
-    def epoch_ns(value):
-        instant = datetime.fromisoformat(value)
-        if instant.tzinfo is None:
-            raise ValueError(_OBSERVATION_INVALID)
-        delta = instant - datetime(1970, 1, 1, tzinfo=timezone.utc)
-        return (delta.days * 86400 + delta.seconds) * 10**9 + delta.microseconds * 1000
+def _runtime_policy(documents, expected):
+    raw, = (raw for raw in documents if sha256(raw).hexdigest() == expected)
+    return strict_json(raw, limit=FILE_LIMIT)
 
-    config = prepared['deployment']['configuration']['data']
-    policy_raw, = (raw for raw in config.values() if sha256(raw.encode()).hexdigest() == prepared['runtime_policy_sha256'])
-    policy = strict_json(policy_raw.encode(), limit=FILE_LIMIT)
+
+def _response_times(response):
     start, finish = (response[key] for key in ('observed_started_ns', 'observed_finished_ns'))
-    valid_from, valid_until = (epoch_ns(policy[key]) for key in ('valid_from', 'valid_until'))
-    owner_started = max(epoch_ns(role['started_at'])
-                        for role in (target['kubernetes']['engine'], target['kubernetes_gateway']))
+    if type(start) is not int or type(finish) is not int or not 0 < start < finish < 2**63:
+        raise ValueError(_OBSERVATION_INVALID)
+    return start, finish
+
+
+def _check_observation_times(response, recorded_at, target, policy):
+    start, finish = _response_times(response)
+    try:
+        valid_from, valid_until = (_epoch_ns(policy[key]) for key in ('valid_from', 'valid_until'))
+        owner_started = max(_epoch_ns(role['started_at'])
+                            for role in (target['kubernetes']['engine'], target['kubernetes_gateway']))
+        recorded = _epoch_ns(recorded_at)
+    except ValueError:
+        raise ValueError(_OBSERVATION_INVALID) from None
     # The Runtime final can be appended after the client receives the response.
-    if (type(start) is not int or type(finish) is not int or not 0 < start < finish < 2**63
-            or not valid_from <= start < finish < valid_until or owner_started > start
-            or not start <= epoch_ns(recorded_at) < valid_until):
+    if not (valid_from <= start < finish < valid_until and owner_started <= start
+            and start <= recorded < valid_until):
         raise ValueError(_OBSERVATION_INVALID)
 
 
-def _observation_environment(env, target, prepared, observation, expected_sha256):
-    """Join existing owned receipts without reading response content or sending requests."""
-    if env.data_origin == DataOrigin.EXAMPLE or target.get('synthetic', False) is not False:
-        raise ValueError(_OBSERVATION_INVALID)
+def _valid_pointer(row):
+    return (type(row) is dict and row.keys() == {'path', 'sha256'}
+            and type(row['path']) is str and bool(row['path'])
+            and type(row['sha256']) is str and re.fullmatch('[0-9a-f]{64}', row['sha256']) is not None)
+
+
+def _observation_inputs(observation, expected_sha256):
     selection = strict_json(_pinned_file(observation, expected_sha256), limit=FILE_LIMIT)
     if (type(selection) is not dict or selection.keys() != _OBSERVATION_FILES or any(
-            type(row) is not dict or row.keys() != {'path', 'sha256'}
-            or type(row['path']) is not str or not row['path']
-            or type(row['sha256']) is not str or not re.fullmatch('[0-9a-f]{64}', row['sha256'])
-            for row in selection.values())):
+            not _valid_pointer(row) for row in selection.values())):
         raise ValueError(_OBSERVATION_INVALID)
     inputs = {}
     for key, row in selection.items():
         raw, _ = _read(_plain_path(Path(row['path'])), max_bytes=MAX_BYTES)
         if sha256(raw).hexdigest() != row['sha256']:
             raise ValueError(_OBSERVATION_INVALID)
-        inputs[key] = raw
-    response, audit = (strict_json(inputs[key], limit=MAX_BYTES) for key in ('response_receipt', 'audit_receipt'))
+        inputs[key] = raw if key == 'journal' else strict_json(raw, limit=MAX_BYTES)
+    return selection, inputs
+
+
+def _verified_observation(env, target, policy, policy_sha256, selection, inputs, expected_sha256):
+    """Join the existing owned receipts to the original native Runtime final."""
+    if env.data_origin == DataOrigin.EXAMPLE or target.get('synthetic', False) is not False:
+        raise ValueError(_OBSERVATION_INVALID)
+    response, audit = (inputs[key] for key in ('response_receipt', 'audit_receipt'))
     journal = inputs['journal']
-    gateway_fact = env.facts.get('gateway')
-    if gateway_fact is not None and (gateway_fact.value is not None or gateway_fact.conflict):
-        raise ValueError('GATEWAY_ENVIRONMENT_FACT_ALREADY_BOUND')
     if (type(response) is not dict or response.keys() != _RESPONSE_FIELDS or type(audit) is not dict
             or audit.keys() != _AUDIT_FIELDS or response['route'] != _ORDINARY_ROUTE or response['status'] != 200
             or type(response['status']) is not int or not isinstance(response['request_id'], str)
@@ -364,6 +396,7 @@ def _observation_environment(env, target, prepared, observation, expected_sha256
             or audit['independent_denied_event_observed'] is not False or type(audit['journal_bytes']) is not int
             or audit['journal_bytes'] != len(journal) or audit['journal_sha256'] != selection['journal']['sha256']
             or audit['producer_sha256'] != PRODUCER_SHA256 or not journal.endswith(b'\n')
+            or type(audit['actor_sha256']) is not str or re.fullmatch('[0-9a-f]{64}', audit['actor_sha256']) is None
             or not isinstance(audit['session'], str) or not re.fullmatch('[0-9a-f]{32}', audit['session'])):
         raise ValueError(_OBSERVATION_INVALID)
 
@@ -375,23 +408,44 @@ def _observation_environment(env, target, prepared, observation, expected_sha256
               'gateway_owner_sha256': _owner_sha256(target['kubernetes_gateway'])}
     if (any(response[key] != value or audit[key] != value for key, value in common.items())
             or response['run_sha256'] != sha256(run.encode()).hexdigest() or audit['gateway_target_sha256'] != target_sha256
-            or audit['runtime_policy_sha256'] != prepared['runtime_policy_sha256']):
+            or audit['runtime_policy_sha256'] != policy_sha256):
         raise ValueError(_OBSERVATION_INVALID)
     matches = [row for row in final_records(journal.decode('utf-8').split('\n'), run_id=run, session=audit['session'])
                if row.get('request_id') == response['request_id']]
     if len(matches) != 1 or matches[0].get('route') != _ORDINARY_ROUTE:
         raise ValueError(_OBSERVATION_INVALID)
-    source = {'environment': GATEWAY_ENV, 'target_id': prepared['runtime_target_id'],
-              'runtime_policy_sha256': prepared['runtime_policy_sha256'], 'request_sha256': common['request_sha256']}
+    source = {'environment': GATEWAY_ENV, 'target_id': policy['target_id'],
+              'runtime_policy_sha256': policy_sha256, 'request_sha256': common['request_sha256']}
     _, selected_sha256, recorded_at = snapshot_record(canonical_json(matches[0]) + b'\n', source=source, run_id=run,
         values={'observation_session': audit['session'], 'observation_allowed_actor_sha256': audit['actor_sha256']})
     if (selected_sha256, recorded_at) != (audit['selected_row_sha256'], audit['recorded_at']):
         raise ValueError(_OBSERVATION_INVALID)
-    _check_observation_times(response, recorded_at, target, prepared)
+    source_recorded_at = matches[0]['recorded_at']
+    _check_observation_times(response, source_recorded_at, target, policy)
 
     provenance = {**common, 'gateway_target_sha256': target_sha256,
         'runtime_policy_sha256': source['runtime_policy_sha256'], 'route': _ORDINARY_ROUTE, 'recorded_at': recorded_at,
         'observation_sha256': expected_sha256, 'input_sha256': {key: row['sha256'] for key, row in selection.items()}}
+    return provenance, {'source_recorded_at': source_recorded_at,
+        'observed_actor_sha256': audit['actor_sha256'], 'observed_session_sha256': sha256(audit['session'].encode()).hexdigest(),
+        'run_sha256': response['run_sha256'], 'selected_row_sha256': selected_sha256, 'producer_sha256': audit['producer_sha256'],
+        'journal_bytes': len(journal), 'reported_body_sha256': response['body_sha256'],
+        'reported_body_bytes': response['body_bytes'], 'response_status': response['status'],
+        'observed_started_ns': response['observed_started_ns'], 'observed_finished_ns': response['observed_finished_ns']}
+
+
+def _observation_environment(env, target, prepared, observation, expected_sha256):
+    """Join existing owned receipts without reading response content or sending requests."""
+    gateway_fact = env.facts.get('gateway')
+    if gateway_fact is not None and (gateway_fact.value is not None or gateway_fact.conflict):
+        raise ValueError('GATEWAY_ENVIRONMENT_FACT_ALREADY_BOUND')
+    selection, inputs = _observation_inputs(observation, expected_sha256)
+    config = prepared['deployment']['configuration']['data']
+    policy_sha256 = prepared['runtime_policy_sha256']
+    policy = _runtime_policy((raw.encode() for raw in config.values()), policy_sha256)
+    if policy['target_id'] != prepared['runtime_target_id']:
+        raise ValueError(_OBSERVATION_INVALID)
+    provenance, _ = _verified_observation(env, target, policy, policy_sha256, selection, inputs, expected_sha256)
     fact = FactValue(value=True, origin=DataOrigin.DECLARED,
                      source='gateway-observation.json#sha256=' + sha256(canonical_json(provenance)).hexdigest())
     result = env.model_copy(update={'id': new_id('ENV'), 'revision': 1, 'created_at': utcnow(),
@@ -400,6 +454,87 @@ def _observation_environment(env, target, prepared, observation, expected_sha256
     revised = {**target, 'environment_ref': ref, 'model_mapping': {**target['model_mapping'], 'environment_ref': ref}}
     _transport({key: value for key, value in revised.items() if key != 'kubernetes_gateway'}, result)
     return result, revised, provenance, [Path(observation), *(Path(row['path']) for row in selection.values())]
+
+
+def _retained_side(sources, release, revoked):
+    if (type(sources) is not dict or sources.keys() != _RETAINED_FIELDS
+            or not all(_valid_pointer(row) for row in sources.values())):
+        raise ValueError(_RETAINED_INVALID)
+    documents = {key: strict_json(_pinned_file(sources[key]['path'], sources[key]['sha256']), limit=FILE_LIMIT)
+                 for key in ('environment', 'target')}
+    env = Environment.model_validate(documents['environment'])
+    target = documents['target']
+    ref = env.ref().model_dump(mode='json')
+    if target['environment_ref'] != ref or target['model_mapping']['environment_ref'] != ref:
+        raise ValueError(_RETAINED_INVALID)
+    engine_target = {key: value for key, value in target.items() if key != 'kubernetes_gateway'}
+    transport = _engine_transport(env, engine_target, release)
+    gateway = snapshot_owner(target, transport.binding)
+    if gateway['image'] != GATEWAY_IMAGE or gateway['image_id'] not in {
+            GATEWAY_IMAGE, f'docker-pullable://{GATEWAY_IMAGE}', f'sha256:{IMAGE_CONFIG_SHA256}'}:
+        raise ValueError(_RETAINED_INVALID)
+
+    observation, bundle = (sources[key] for key in ('observation', 'bundle'))
+    selection, inputs = _observation_inputs(observation['path'], observation['sha256'])
+    start, _ = _response_times(inputs['response_receipt'])
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    files, policy, registration, digest = _published_bundle(
+        bundle['path'], bundle['sha256'], revoked, epoch + timedelta(microseconds=start // 1000),
+        captured_at_ns=start)
+    model = _published_model(env, transport, policy, registration)
+    policy_document = _runtime_policy(files.values(), digest)
+    provenance, observed = _verified_observation(
+        env, target, policy_document, digest, selection, inputs, observation['sha256'])
+    result = {**provenance, **observed, 'runtime_target_id': registration.target_id,
+              'runtime_policy_valid_from': policy_document['valid_from'],
+              'runtime_policy_valid_until': policy_document['valid_until'],
+              'environment_file_sha256': sources['environment']['sha256'],
+              'target_file_sha256': sources['target']['sha256'], 'bundle_sha256': bundle['sha256']}
+    bundle_path = Path(bundle['path'])
+    pins = [(Path(row['path']), row['sha256'], FILE_LIMIT) for key, row in sources.items() if key != 'bundle']
+    pins.extend((Path(row['path']), row['sha256'], MAX_BYTES) for row in selection.values())
+    pins.extend((bundle_path / name, sha256(raw).hexdigest(), FILE_LIMIT) for name, raw in files.items())
+    comparison = (model, env.model, digest, registration.target_id)
+    generation = (transport.binding['run_id'], gateway['pod_uid'], gateway['container_id'])
+    return result, pins, bundle_path, comparison, generation
+
+
+def audit_retained_pair(inputs_path, inputs_sha256, output):
+    """Read back both historical observations without creating an ENV or authorization."""
+    releases = versions()
+    inputs = strict_json(_pinned_file(inputs_path, inputs_sha256), limit=FILE_LIMIT)
+    if (type(inputs) is not dict or inputs.keys() != {'schema', 'revocations', 'sides'}
+            or inputs['schema'] != RETAINED_INPUT_SCHEMA or not _valid_pointer(inputs['revocations'])
+            or type(inputs['sides']) is not dict or inputs['sides'].keys() != releases.keys()):
+        raise ValueError(_RETAINED_INVALID)
+    revocations = inputs['revocations']
+    revoked = _pinned_file(revocations['path'], revocations['sha256'])
+    pins = [(inputs_path, inputs_sha256, FILE_LIMIT), (revocations['path'], revocations['sha256'], FILE_LIMIT)]
+    bundle_dirs, results, comparisons, generations = [], {}, {}, {}
+    for side, release in releases.items():
+        result, files, bundle, comp, generation = _retained_side(inputs['sides'][side], release, revoked)
+        results[side], comparisons[side], generations[side] = result, comp, generation
+        pins.extend(files)
+        bundle_dirs.append(bundle)
+    if comparisons['baseline'] != comparisons['candidate']:
+        raise ValueError('GATEWAY_PAIRED_POLICY_AND_MODEL_REQUIRED')
+    if any(a == b for a, b in zip(generations['baseline'], generations['candidate'])):
+        raise ValueError('GATEWAY_DISTINCT_RUN_LABELS_REQUIRED')
+    for path, digest, limit in pins:
+        raw, _ = _read(_plain_path(Path(path)), max_bytes=limit)
+        if sha256(raw).hexdigest() != digest:
+            raise ValueError(_RETAINED_INVALID)
+
+    document = {'schema': RETAINED_AUDIT_SCHEMA, 'inputs_sha256': inputs_sha256,
+                'revocations_sha256': revocations['sha256'], 'sides': results,
+                'current_authority': False, 'official_evidence': False}
+    output = reserve_output(Path(output), protected=[*bundle_dirs, *(Path(path) for path, _, _ in pins)])
+    output.chmod(0o700)
+    path = output / 'obs01-retained-audit.json'
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'wb') as stream:
+        stream.write(canonical_json(document))
+    return path
 
 
 def _prepare(args):
@@ -445,6 +580,16 @@ def _bind(args):
     (output / 'gateway-source.json').write_bytes(canonical_json(source))
 
 
+def _retain_response(args):
+    from tools.mvp_req13_gateway_inputs import prepare
+
+    prepare(args.inputs, args.inputs_sha256, args.output)
+
+
+def _audit_retained(args):
+    audit_retained_pair(args.inputs, args.inputs_sha256, args.output)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -459,11 +604,17 @@ def main():
     binding.add_argument('--observation-sha256', help='Independent raw SHA-256 of the observation pointers')
     for name in ('preparation', 'environment', 'namespace', 'pod', 'configuration', 'output'):
         binding.add_argument('--' + name, type=Path, required=True)
+    retained = commands.add_parser('retain-response', help='Prepare REQ-13 inputs from saved ordinary source records')
+    audit = commands.add_parser('audit-retained', help='Verify paired historical OBS-01 source receipts')
+    for command in (retained, audit):
+        command.add_argument('--inputs', type=Path, required=True)
+        command.add_argument('--inputs-sha256', required=True)
+        command.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if args.command == 'bind' and (args.observation is None) != (args.observation_sha256 is None):
         parser.error('--observation and --observation-sha256 are required together')
     try:
-        (_prepare if args.command == 'prepare' else _bind)(args)
+        {'prepare': _prepare, 'bind': _bind, 'retain-response': _retain_response, 'audit-retained': _audit_retained}[args.command](args)
     except (AttributeError, ImportError, KeyError, TypeError, OSError, ValueError) as error:
         reason = str(error)
         parser.error(reason if re.fullmatch(r'[A-Z][A-Z0-9_]{0,79}', reason) else 'GATEWAY_PREPARATION_INPUT_INVALID')

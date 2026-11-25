@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import uuid
+from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_initialization_sensor as initialization,vllm_rank_failure_sensor as rank
 from guard.adapters import vllm_initialization_release_sensor as initialization_release,vllm_release_observation_sensor as release_observation
 from guard.adapters import resource_recovery_probe as resource_probe
@@ -19,10 +20,15 @@ from .resource_recovery_contract import PROFILE,normalize_policy,stamp,validate_
 from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
 
 
-def _namespace_observations(censuses, selection, target_sha256, start, end):
+def _namespace_observations(censuses, selection, resource_selection, target_sha256, start, end):
     from guard.runtime import resource_group_source
 
     selection_sha256 = sha256_hex(canonical_json(selection))
+    selected_mappings = {}
+    for resource in resource_selection['resources']:
+        if resource['kind'] == 'posix-shm-fd':
+            key = (resource['owner_id'], resource['device'], resource['inode'])
+            selected_mappings.setdefault(key, set()).add(resource['id'])
     steps = []
     for row in censuses:
         try:
@@ -41,6 +47,7 @@ def _namespace_observations(censuses, selection, target_sha256, start, end):
         owners = {(owner['context']['pid'], owner['context']['start_ticks']): owner['id']
                   for owner in selection['owners'] if owner['id'] in matched}
         references = {}
+        mapped_resources = set()
         for ref in packet['references']:
             owner = owners.get((ref['pid'], ref['start_ticks']))
             if owner is None:
@@ -48,7 +55,11 @@ def _namespace_observations(censuses, selection, target_sha256, start, end):
             resource = sha256_hex(canonical_json([ref['kind'], ref['device'], ref['inode']]))
             form = 'memory-mapping' if ref['fd'] is None else 'file-descriptor'
             references.setdefault((owner, ref['kind'], resource), set()).add(form)
-        steps.append({'step': 'owned-namespace-held-resource-census', 'stage': row['stage'],
+            if ref['kind'] == 'posix-shm' and ref['fd'] is None:
+                # Join the selected kernel object without interpreting the FD's current status.
+                mapped_resources.update((id_, owner, resource) for id_ in
+                    selected_mappings.get((owner, ref['device'], ref['inode']), ()))
+        step = {'step': 'owned-namespace-held-resource-census', 'stage': row['stage'],
             'target_sha256': target_sha256, 'selection_sha256': selection_sha256,
             'probe_source_sha256': row['probe_source_sha256'], 'context_source_sha256': row['context_source_sha256'],
             'packet_sha256': sha256_hex(canonical_json(packet)), 'started_at': row['started_at'], 'finished_at': row['finished_at'],
@@ -56,7 +67,14 @@ def _namespace_observations(censuses, selection, target_sha256, start, end):
             'held_references': [{'owner_id': owner, 'kind': kind, 'resource_sha256': digest,
                                  'reference_forms': sorted(forms)}
                                 for (owner, kind, digest), forms in sorted(references.items())],
-            'global_release_verified': False, 'producer_authenticated': False})
+            'global_release_verified': False, 'producer_authenticated': False}
+        if mapped_resources:
+            step['resource_selection_sha256'] = sha256_hex(canonical_json(resource_selection))
+            step['selected_posix_shm_mappings'] = [
+                {'selected_resource_id': id_, 'owner_id': owner, 'resource_sha256': digest}
+                for id_, owner, digest in sorted(mapped_resources)
+            ]
+        steps.append(step)
     return steps
 
 
@@ -96,20 +114,24 @@ def _owned_gpu_references(censuses, target_sha256, start, end):
             continue
         devices = {device['uuid']: (device['major'], device['minor']) for device in packet['devices']}
         processes = {proc['host_pid']: proc for proc in packet['processes']}
-        compute = {(sample['host_pid'], sample['uuid']) for sample in packet['compute']}
-        confirmed = {(sample['host_pid'], sample['uuid']) for sample in packet['compute_confirm']}
+        confirmed = {(sample['host_pid'], sample['uuid']): sample['memory_used_mib']
+                     for sample in packet['compute_confirm']}
         devices_by_pid = {}
-        for pid, device in compute & confirmed:
-            devices_by_pid.setdefault(pid, []).append(device)
+        for sample in packet['compute']:
+            pid, device, memory = sample['host_pid'], sample['uuid'], sample['memory_used_mib']
+            if confirmed.get((pid, device)) == memory:
+                devices_by_pid.setdefault(pid, {})[device] = memory
         references = []
         for owner in gpu_probe.owner_matches(receipt['selection'], packet['processes']):
             if len(owner['host_pids']) != 1:
                 continue
             pid, = owner['host_pids']
             held = {(handle['major'], handle['minor']) for handle in processes[pid]['handles']}
-            for device in sorted(uuid for uuid in devices_by_pid.get(pid, ()) if devices[uuid] in held):
-                references.append({'owner_id': owner['id'],
-                                   'device_sha256': sha256_hex(canonical_json([target_sha256, device]))})
+            for device, memory in sorted(devices_by_pid.get(pid, {}).items()):
+                if devices[device] in held:
+                    references.append({'owner_id': owner['id'],
+                                       'device_sha256': sha256_hex(canonical_json([target_sha256, device])),
+                                       'process_memory_used_mib': memory})
         if references:
             steps.append({'step': 'owned-node-held-gpu-references', 'stage': row['stage'], 'target_sha256': target_sha256,
                           'selection_sha256': receipt['selection_sha256'], 'program_sha256': receipt['program_sha256'],
@@ -140,7 +162,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             if 'node_gpu_containerd_address'in self.cfg and(self.cfg.get('node_gpu_processes')is not True
                     or self.cfg['node_gpu_containerd_address']not in('/run/containerd/containerd.sock','/run/k3s/containerd/containerd.sock')):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg['target'])
             target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end,deadline=normalize_policy(policy_values)
             with Path(self.cfg['selection']).open('rb') as stream:selection=strict_json(stream.read(resource_probe.MAX_INPUT+1),limit=resource_probe.MAX_INPUT)
             validate_selected_policy(selection,policy_values)
@@ -283,17 +305,30 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         # The baseline pack consumes activation evidence. Retain the selected
         # census without turning its independent functional deadline into a
         # security finding about the entire failure and subsequent restart.
-        selected = [row for row in projection['rows'] if row['before_status'] == 'match'
+        sources = _selected_census_sources(before_census, after_census, ctx._recovery_selection,
+                                           ctx.policy_values['recovery_target_sha256'], start, end)
+        activation = projection
+        source_gap = False
+        if ctx.check.revision == 9:
+            stage_rows = {'before': before_census, 'after': after_census}
+            qualified_stages = {receipt['stage'] for receipt in sources}
+            source_gap = any(row and row.get('collected') is True and stage not in qualified_stages
+                             for stage, row in stage_rows.items())
+            if source_gap:
+                # Preserve the bound sibling and the original phase positions.
+                activation = project([row if stage in qualified_stages else {} for stage, row in stage_rows.items()],
+                                     ctx._recovery_selection, ctx.policy_values)
+        selected = [row for row in activation['rows'] if row['before_status'] == 'match'
                     or row['after_status'] in {'match', 'absent', 'replaced'}]
         steps = [{'step': 'selected-resource-census', 'resources': selected}] if selected else []
-        if steps:
-            sources = _selected_census_sources(before_census, after_census, ctx._recovery_selection,
-                                               ctx.policy_values['recovery_target_sha256'], start, end)
-            if sources:
-                steps[0]['source_censuses'] = sources
-        missing = list(projection['missing'])
+        if steps and sources:
+            steps[0]['source_censuses'] = sources
+        missing = list(activation['missing'])
+        if source_gap:
+            missing.append('selected_resource_census_source_binding_unverified')
         if self.cfg.get('namespace_resources', False):
-            held = _namespace_observations(groups, group_selection, ctx.policy_values['recovery_target_sha256'], start, end)
+            held = _namespace_observations(groups, group_selection, ctx._recovery_selection,
+                                           ctx.policy_values['recovery_target_sha256'], start, end)
             steps.extend(held)
             if {row['stage'] for row in held} != {'before', 'after'}:
                 missing.append('owned_namespace_held_reference_census_incomplete')

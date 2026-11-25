@@ -14,13 +14,14 @@ from guard.adapters import vllm_consumption_v2_callback as v2_callback
 from guard.collectors import gpu_input_producers as producers, runner_consumption_v2_producer as producer_v2
 from guard.core.judge import judge_evidence
 from guard.core.run import _normalize
+from guard.core.select import select
 from guard.executors import common_consumption as bridge, registry
 from guard.executors.base import EvidenceDraft
 from guard.executors.http_common import Ctx
 from guard.models import Evidence, DataOrigin, canonical_json, load_pack, sha256_hex, utcnow
 from guard.models.objects import Artifact
 from guard.store import Store
-from tests.builders import completion_response, dummy_ref, environment, policy
+from tests.builders import completion_response, environment, policy
 from tests.test_gpu_input_producers import POD, SCOPE, PARAMS, api_rows, crow
 
 from tests.published_pack38 import original as published_pack38
@@ -61,16 +62,20 @@ def pinned(tmp_path, record, scope, requests=None):
 
 def judged(tmp_path, cid, draft, env, values):
     check = PACK.checks[cid]; store = Store(tmp_path / "stored")
+    pol = policy(PACK.ref(), values={cid: values}, scope={"include": [cid]})
+    plan = select(PACK, [env], pol)
+    store.put_many([env, pol, plan])
     artifacts = []
     for item in draft.artifacts:
         value = store.put_artifact(item.path.read_bytes())
         artifacts.append(Artifact(name=item.name, path=value.path, bytes=value.bytes, sha256=value.sha256,
                                   collected_at=utcnow(), collector=item.collector))
     evd = Evidence(id="EVD-B12-RUNNER", data_origin=draft.data_origin, check_id=cid, environment=env.ref(),
-        plan=dummy_ref("PLAN"), side="single", execution={"status": draft.status}, artifacts=artifacts,
+        plan=plan.ref(), refs=[plan.ref(), env.ref()], side="single", execution={"status": draft.status}, artifacts=artifacts,
         **_normalize(check, draft)).seal()
-    pol = policy(PACK.ref(), values={cid: values}); store.put(evd); store.put(pol)
-    result = judge_evidence(check, evd, pol, utcnow()); store.put(result)
+    store.put(evd)
+    result = judge_evidence(check, evd, pol, utcnow(), plan=plan)
+    store.put(result)
     for artifact in evd.artifacts:
         assert sha256_hex((store.root / artifact.path).read_bytes()) == artifact.sha256
     return evd, result

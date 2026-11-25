@@ -352,7 +352,19 @@ class ConsumptionV2Observer(_Keyed, consumption_v2.ConsumptionV2Observer):
 
 
 class WorkerShardObserver(_Keyed, worker_shard.WorkerShardObserver):
-    pass
+    seal_startup = None
+
+    def _emit(self, row):
+        super()._emit(row)
+        if (self.seal_startup is not None and row.get('point') == 'WorkerProc.monitor_death_pipe'
+                and row.get('phase') == 'RETURN' and row.get('entry_qualified_before') is True
+                and row.get('entry_qualified_after') is True and row.get('runtime_context_injected') is False
+                and row.get('fields', {}).get('ready_candidate') is True
+                and type(row['fields'].get('rank')) is int):
+            try:
+                self.seal_startup()
+            except Exception:
+                self.gaps.add('WORKER_SHARD_STARTUP_SEAL_UNAVAILABLE')
 
 
 class TransitionDispatchObserver(_Keyed, transition_dispatch.TransitionDispatchObserver):
@@ -372,11 +384,11 @@ class BoundedExecutionLinkObserver(ExecutionLinkObserver):
 
 
 class ScopedConsumptionObserver(scoped_consumption._Scoped, _Keyed, consumption.ConsumptionObserver):
-    pass
+    sources = scoped_consumption.ScopedConsumptionObserver.sources
 
 
 class ScopedConsumptionV2Observer(scoped_consumption._Scoped, _Keyed, consumption_v2.ConsumptionV2Observer):
-    pass
+    sources = scoped_consumption.ScopedConsumptionV2Observer.sources
 
 
 class Sink:
@@ -394,12 +406,20 @@ class Sink:
             os.write(self.fd, raw); self.size += len(raw)
 
 
+_ASSIGNMENT_DISABLED_FLAGS = (
+    'lab_faults', 'lab_kernel_checks', 'request_attempts', 'generation_transitions', 'health_causal',
+    'profiler_control', 'runner_consumption', 'supply_watch', 'transition_dispatches', 'execution_links',
+    'execution_link_content_hashes', 'baseline_slot_sampling', 'baseline_piecewise_graph',
+    'baseline_attention_metadata', 'baseline_profiler_local',
+)
+
+
 class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
                  request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
                  runner_consumption=False, worker_shards=False, transition_dispatches=False, execution_links=False,
                  auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False, baseline_slot_sampling=False, baseline_piecewise_graph=False, baseline_attention_metadata=False,
-                 baseline_profiler_local=False, baseline_profiler_local_image=None):
+                 baseline_profiler_local=False, baseline_profiler_local_image=None, normal_scoped_request_identity=False):
         if baseline_profiler_local is True:
             if profiler_control:
                 raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_EXCLUSIVE')
@@ -408,6 +428,7 @@ class EngineCallbacks:
         elif baseline_profiler_local_image is not None:
             raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_FLAG_REQUIRED')
         self.local_profiler = None
+        self.normal_scoped_request_identity = normal_scoped_request_identity is True and scoped_runner_consumption is True
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -471,6 +492,11 @@ class EngineCallbacks:
 
     def instrument(self, module):
         name = vars(module).get('__name__') if type(module) is type(sys) else None
+        if name == scoped_consumption.COMPLETION_MODULE and self.normal_scoped_request_identity:
+            try:
+                return scoped_consumption.install_completion_selection(self.consumption, module)
+            except (AttributeError, OSError, TypeError, ValueError):
+                return False
         installed = False
         if self.local_profiler is not None and name in profiler_local.SPECS:
             # An inherited EngineCallbacks owns the parent's static sink.
@@ -575,6 +601,13 @@ class EngineCallbacks:
         except Exception:
             self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
             return False
+        if name == consumption.INPUT and self.normal_scoped_request_identity and self.link is None:
+            try:
+                assignment = scoped_consumption.assignment_change(self.consumption, module)
+            except (AttributeError, OSError, TypeError, ValueError):
+                assignment = None
+            if assignment is not None:
+                changes.append(assignment)
         for (owner, method, _), wrapped in changes:
             # multiproc 모듈이 선택 관측 경로로 와도 기존 lab fault 감싸기를 그대로 유지한다.
             setattr(owner, method, self._fault(wrapped) if method == FAULT_POINT and self.fault_file else wrapped)
@@ -632,7 +665,8 @@ class Finder(importlib.abc.MetaPathFinder):
         self.callbacks = callbacks
 
     def find_spec(self, name, path=None, target=None):
-        if name not in MODULES:
+        if name not in MODULES and not (self.callbacks.normal_scoped_request_identity
+                                       and name == scoped_consumption.COMPLETION_MODULE):
             return None
         spec = importlib.machinery.PathFinder.find_spec(name, path, target)
         if spec is None or spec.loader is None:
@@ -648,7 +682,12 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
         directory = Path(data_root) / settings['session']
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         from .observer_runtime import JournalSink
-        sink = JournalSink(directory) if settings.get('scoped_runner_consumption') is True else Sink(directory)
+        normal_worker_shards = (settings.get('worker_shards') is True
+                                and settings.get('lab_faults') is False
+                                and settings.get('lab_kernel_checks') is False)
+        paged = settings.get('scoped_runner_consumption') is True or normal_worker_shards
+        terminal_session = settings['session'] if normal_worker_shards and context_provider is None else None
+        sink = JournalSink(directory, terminal_session=terminal_session) if paged else Sink(directory)
         callbacks = EngineCallbacks(settings['session'], bytes.fromhex(settings['secret']), sink,
             context_provider=context_provider,
             fault_file=str(directory / FAULT_FILE) if settings.get('lab_faults') is True else None,
@@ -663,12 +702,21 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             execution_links=settings.get('execution_links') is True,
             execution_link_content_hashes=settings.get('execution_link_content_hashes') is True,
             scoped_runner_consumption=settings.get('scoped_runner_consumption') is True,
+            normal_scoped_request_identity=(all(settings.get(flag) is False for flag in _ASSIGNMENT_DISABLED_FLAGS)
+                                            and 'supply_roots' in settings and settings['supply_roots'] is None
+                                            and settings.get('baseline_profiler_local_image') is None),
             baseline_slot_sampling=settings.get('baseline_slot_sampling') is True,
             baseline_piecewise_graph=settings.get('baseline_piecewise_graph') is True,
             baseline_attention_metadata=settings.get('baseline_attention_metadata') is True,
             baseline_profiler_local=settings.get('baseline_profiler_local') is True,
             baseline_profiler_local_image=settings.get('baseline_profiler_local_image'),
             auxiliary_roots=settings.get('supply_roots'))
+        if (terminal_session is not None and settings.get('supply_roots') is None
+                and settings.get('baseline_profiler_local_image') is None
+                and all(value is False for key, value in settings.items()
+                        if key not in {'session', 'secret', 'worker_shards',
+                                       'supply_roots', 'baseline_profiler_local_image'})):
+            callbacks.shard.seal_startup = sink.seal_startup
         sys.meta_path.insert(0, Finder(callbacks))
         if settings.get('supply_roots'):
             # SUP-03(P2): 선언한 공급 루트 아래에서 실제로 연 파일. audit hook은 원 코드를 바꾸지 않는다.

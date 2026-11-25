@@ -13,8 +13,8 @@ from guard.adapters.vllm_release_profiles import release_profile
 from guard.collectors.file import load_environment
 from guard.collectors.lifecycle import prepare_assets
 from guard.collectors.model_read_scope import build_scope
-from guard.core.execution_recipe import bind_recipe
-from guard.core.run import run_plan
+from guard.core.change_selection import SelectionContext
+from guard.core.execution_recipe import bind_recipe, configuration_sha256
 from guard.core.select import select
 from guard.executors import lifecycle_transition, run_binding
 from guard.executors.base import EvidenceDraft
@@ -22,7 +22,7 @@ from guard.executors.kubernetes_lifecycle_capture import KubernetesCaptureError,
 from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import put_pack
-from tests.builders import environment, policy
+from tests.builders import environment, policy, run_under_plan_lock
 from tests.test_kubernetes_sampling import inputs as owned_targets
 from tests.test_lifecycle_capture import REPOSITORY, external
 from tools import mvp_live_readiness
@@ -254,13 +254,13 @@ def test_side_reuse_blocks_the_transition_and_leaves_unselected_inputs_nonblocki
     plan = _bound_plan(store, pack, envs, pol, cfg)
     monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", _forbidden)
     monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
-    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+    evidence, = run_under_plan_lock(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
     assert evidence.execution.status == ExecStatus.NOT_RUN
     assert evidence.execution.abort_reason == "RUN_BINDING_TRANSITION_GENERATION_SIDE_REUSE"
 
     other = policy(pack.ref(), id="POL-UNRELATED-EXAMPLE", scope={"include": ["SUP-10"]}, values={})
     plan = _bound_plan(store, pack, envs, other, cfg)
-    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+    evidence, = run_under_plan_lock(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
     assert evidence.check_id == "SUP-10"
     assert evidence.execution.abort_reason == "executor 'supply_boot' not configured in guard.toml [executors]"
 
@@ -289,7 +289,7 @@ def test_prepared_generation_pin_rejects_a_rewrite_before_a_new_plan(external, t
     assert not next(row for row in report["checks"] if row["check"] == "inputs")["ok"], report
     store = Store(tmp_path / "store")
     plan = _bound_plan(store, pack, envs, pol, cfg)
-    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+    evidence, = run_under_plan_lock(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
     assert evidence.execution.status == ExecStatus.NOT_RUN
     assert evidence.execution.abort_reason == "RUN_BINDING_TRANSITION_GENERATIONS_UNAVAILABLE"
     assert evidence.execution.run_binding is None
@@ -357,7 +357,7 @@ def test_pinned_redeployment_executes_only_with_the_prebound_update_plan(
 
     monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", collect)
     monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
-    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=side)
+    evidence, = run_under_plan_lock(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=side)
     if mode == "prebound":
         assert evidence.execution.status == ExecStatus.COMPLETED
     else:
@@ -388,14 +388,14 @@ def test_run_rejects_changed_generation_manifest_before_runtime(
             return original(*args, **kwargs)
 
         monkeypatch.setattr(core_run, "_run_one", replace_then_run)
-        evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+        evidence, = run_under_plan_lock(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
         assert evidence.execution.status == ExecStatus.NOT_RUN
         assert evidence.execution.abort_reason == "RUN_BINDING_TRANSITION_GENERATIONS_CHANGED"
         assert evidence.execution.run_binding is None
     else:
         _write(target, changed)
         with pytest.raises(ValueError, match="EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED"):
-            run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+            run_under_plan_lock(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
         assert not store.find_latest("EVD", lambda row: row.plan == plan.ref())
 
 
@@ -403,7 +403,14 @@ def test_lif06_pins_selected_live_generations_with_a_shared_owner(external, tmp_
     pack, envs, pol, cfg = _configuration(external, "LIF-06", change="same-owner")
     del cfg["update"]["allowed_checks"]
     store = Store(tmp_path / "store")
-    plan = _bound_plan(store, pack, envs, pol, cfg)
+    put_pack(store, pack.path)
+    store.put_many([*envs, pol])
+    preparation_digest = configuration_sha256(cfg, envs)
+    context = SelectionContext("ENGINE_RELEASE", full_scope=True, execution_recipe_sha256=preparation_digest)
+    selection = select(pack, envs, pol, mode="update", context=context)
+    plan = bind_recipe(selection, cfg, envs, selected_context_sha256=preparation_digest)
+    assert plan.inputs.execution_recipe_sha256 != preparation_digest
+    store.put(plan)
     candidate = cfg["sides"]["candidate"]["check_config"]["LIF-06"]
     digest = sha256_hex(canonical_json(lifecycle_transition.inputs_manifest(candidate)))
 
@@ -418,7 +425,7 @@ def test_lif06_pins_selected_live_generations_with_a_shared_owner(external, tmp_
 
     monkeypatch.setattr(lifecycle_transition.LifecycleTransitionExecutor, "run", collect)
     monkeypatch.setattr(lifecycle_transition.KubernetesHTTP, "__call__", _forbidden)
-    evidence, = run_plan(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
+    evidence, = run_under_plan_lock(store, pack, plan, application.run_config(deepcopy(cfg)), only_side=Side.candidate)
     assert evidence.execution.status == ExecStatus.COMPLETED
     assert evidence.execution.run_binding["values"]["transition_inputs_sha256"] == digest
 
@@ -428,5 +435,12 @@ def test_lif06_pins_selected_live_generations_with_a_shared_owner(external, tmp_
     changed = json.loads(target_path.read_bytes())
     changed["comparison_config"] = {"EXAMPLE_launch_label": "different"}
     _write(target_path, changed)
-    evidence, = run_plan(store, pack, unselected, application.run_config(cfg), only_side=Side.candidate)
+    with pytest.raises(ValueError, match="EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED"):
+        bind_recipe(selection, cfg, envs, selected_context_sha256=preparation_digest)
+    with pytest.raises(ValueError, match="EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED"):
+        run_under_plan_lock(store, pack, unselected, application.run_config(cfg), only_side=Side.candidate)
+    assert not store.find_latest("EVD", lambda row: row.plan == unselected.ref())
+
+    reselected = _bound_plan(store, pack, envs, other, cfg)
+    evidence, = run_under_plan_lock(store, pack, reselected, application.run_config(cfg), only_side=Side.candidate)
     assert evidence.check_id == "SUP-10" and evidence.execution.status == ExecStatus.NOT_RUN

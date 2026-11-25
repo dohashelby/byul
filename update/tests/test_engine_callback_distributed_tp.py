@@ -71,6 +71,21 @@ def test_rank_running_a_different_model_generation_is_a_violation(tmp_path):
     assert {'reason': 'rank_model_generation_mismatch'} in result['violations']
 
 
+def test_an_unobserved_rank_revision_is_a_gap_not_a_mismatch(tmp_path):
+    result, _ = run(tmp_path, rank1={'revision': None})
+    assert result['ranks'] == 2
+    assert result['violation'] is None and not result['violations']
+    assert 'rank_model_generation_binding_unobserved' in result['missing']
+    assert not result['full_scope']
+
+
+def test_known_models_can_differ_even_when_one_revision_is_unobserved(tmp_path):
+    result, _ = run(tmp_path, rank1={'model': 'another-model', 'revision': None})
+    assert result['violation'] is True
+    assert {'reason': 'rank_model_generation_mismatch'} in result['violations']
+    assert 'rank_model_generation_binding_unobserved' in result['missing']
+
+
 def test_transfer_on_a_closed_communicator_is_a_violation(tmp_path):
     result, _ = run(tmp_path, rank1={'closed': True})
     assert {'point': 'CustomAllreduce.all_reduce', 'reason': 'closed_communicator_transfer'} in result['violations']

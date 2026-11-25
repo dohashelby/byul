@@ -255,3 +255,26 @@ def test_obs02_prepares_only_the_selected_target(tmp_path, damage):
     pin = {"caller-pin": wrong, "no-pin": None}.get(damage, digest)
     with pytest.raises(ValueError, match="^OBS02_NORMAL_TARGET_UNVERIFIED$"):
         executor.prepared_normal_serving_readiness(check, env, VALUES, expected_target_sha256=pin)
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+def test_obs02_run_requires_the_same_regular_target_as_preparation(tmp_path, monkeypatch, version):
+    env, target, _, path = normal_sampling_inputs(tmp_path, version)
+    content = canonical_json(target)
+    path.write_bytes(content)
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["OBS-02"]
+
+    def no_io(*args, **kwargs):
+        pytest.fail("OBS-02 invalid saved target reached transport")
+
+    executor = KubernetesNormalServingReadinessExecutor({"normal_serving_readiness_only": True, "target": str(path)},
+        runner=no_io, expected_target_sha256=sha256_hex(content))
+    executor.prepared_normal_serving_readiness(check, env, VALUES)
+    replacement = path.with_name("same-target-bytes.json")
+    path.rename(replacement)
+    path.symlink_to(replacement)
+    monkeypatch.setattr(executor, "_target_transport", no_io)
+    with pytest.raises(ValueError, match="^OBS02_NORMAL_TARGET_UNVERIFIED$"):
+        executor.prepared_normal_serving_readiness(check, env, VALUES)
+    with pytest.raises(ValueError, match="^OBS02_NORMAL_TARGET_UNVERIFIED$"):
+        executor.run(check, env, VALUES, VllmAdapter(), tmp_path / "work")

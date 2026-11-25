@@ -15,7 +15,7 @@ describe("첫 화면 자료 출처", () => {
       { name: "evidence", mode: "file" }, { name: "store", mode: "example" },
     ], runtime_connection: "example", contracts_version: "0.1" } });
     renderAt("/", "/", <LandingPage />);
-    const banner = await screen.findByText("예시 자료 · runtime, update, store · 해당 자료는 공식 판정 근거 제외");
+    const banner = (await screen.findByText("일부 예시 자료 포함")).closest('[role="status"]')!;
     expect(banner.textContent).not.toContain("evidence");
     expect(screen.queryByText(/일부 수집원은 합성/)).toBeNull();
   });
@@ -27,6 +27,6 @@ describe("첫 화면 자료 출처", () => {
     ], runtime_connection: "connected", contracts_version: "0.1" } });
     renderAt("/", "/", <><LandingPage /><MetaReady /></>);
     await screen.findByText("출처 조회 완료");
-    expect(screen.queryByText(/공식 판정 근거 제외/)).toBeNull();
+    expect(screen.queryByText(/예시 자료는 검증 결과에 포함되지 않습니다/)).toBeNull();
   });
 });

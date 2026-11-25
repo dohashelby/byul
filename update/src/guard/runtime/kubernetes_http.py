@@ -37,6 +37,12 @@ RESPONSE_CONTENT_PROFILE = "kubernetes-owned-response-content-http-v1"
 LOG_INTEGRITY_PROFILE = "kubernetes-owned-log-integrity-http-v1"
 USAGE_CONTROL_PROFILE = "kubernetes-owned-usage-control-http-v1"
 GATEWAY_EVENT_PROFILE = "kubernetes-owned-gateway-event-http-v1"
+GATEWAY_NORMAL_RESPONSE_RECEIPT = "guard.gateway-normal-response-source/1"
+GATEWAY_LOOPBACK_RESPONSE_RECEIPT = "guard.gateway-normal-response-source/2"
+GATEWAY_LOOPBACK_RESPONSE_ORIGIN = "owned-gateway-loopback"
+GATEWAY_LOOPBACK_AUTHORITY = ("http", "127.0.0.1", 8080)
+GATEWAY_RESPONSE_IMAGE = "docker.io/library/byul-gateway-codex@sha256:0dc282b701783a4aab3fc5dbcca5e094490921d930cf6adb3f1b86a9f3c9f754"
+GATEWAY_RESPONSE_IMAGE_CONFIG = "sha256:05111efac75be41ed3eb3e384dcc3d6ce895556f69408832091e41311b895f22"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({SGLANG_TERMINATION_PROFILE,TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
@@ -416,9 +422,15 @@ class AttachStream:
 
 
 class KubernetesHTTP:
-    def __init__(self, target, env, *, duration, binary="kubectl", runner=None, profile=PROFILE, clock=None):
+    def __init__(self, target, env, *, duration, binary="kubectl", runner=None, profile=PROFILE, clock=None,
+                 retain_gateway_response=False):
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
+        if (type(retain_gateway_response) is not bool or retain_gateway_response and
+                (profile != GATEWAY_EVENT_PROFILE or target.get("lab") is not False
+                 or target.get("synthetic", False) is not False)):
+            raise KubernetesBindingError()
+        self._retain_gateway_response = retain_gateway_response
         self.profile = profile
         if profile==ROUTE_AUTHENTICATION_PROFILE and target.get('lab') is not True:
             raise KubernetesBindingError()
@@ -604,7 +616,7 @@ class KubernetesHTTP:
             with self.lock:self.snapshot_reads.append(row)
 
     def __call__(self, network, requests, timeout):
-        if self.profile in {ONLINE_INPUT_PROFILE, *_CLOSE_PROFILES}:
+        if self._retain_gateway_response or self.profile in {ONLINE_INPUT_PROFILE, *_CLOSE_PROFILES}:
             # These closed procedures are serial; legacy sampling/REQ10 stay concurrent.
             with self._online_dispatch:
                 return self._binding_requests(network, requests, timeout)
@@ -663,12 +675,13 @@ class KubernetesHTTP:
                                   "binding_verified_before_after": False, "diagnostic": "KUBERNETES_HTTP_BINDING_UNAVAILABLE"})
             raise KubernetesBindingError() from None
 
-    def _binding_requests(self, network, requests, timeout):
+    def _binding_requests(self, network, requests, timeout, *, gateway_loopback=None):
         ids=[]
         label=re.compile(r"(?:tokenize-[AB]|before|after|(?:json|sse)-(?:generated|distinct_body|collision_body|collision_header)-[AB])\Z")
         try:
             with self.lock:
-                if self.failed:raise KubernetesBindingError()
+                if self.failed or self._retain_gateway_response and self.rows:
+                    raise KubernetesBindingError()
             if (network!="kubernetes-probe" or type(requests) is not list or not 1<=len(requests)<=2
                     or type(timeout) not in (int,float) or not math.isfinite(timeout) or not 0<timeout<=120):
                 raise KubernetesBindingError()
@@ -731,6 +744,8 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._gateway_event_request(request)
+                    if self._retain_gateway_response and request["id"] not in {"obs01-before", "obs01-after"}:
+                        raise KubernetesBindingError()
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -770,15 +785,25 @@ class KubernetesHTTP:
                     raise KubernetesBindingError()
                 value.setdefault("mode","json");prepared.append(value)
             if len(set(ids))!=len(ids):raise KubernetesBindingError()
+            if gateway_loopback is not None:
+                scheme, host, port = GATEWAY_LOOPBACK_AUTHORITY
+                if (self.profile != GATEWAY_EVENT_PROFILE or not self._retain_gateway_response
+                        or ids != ["obs01-before"] or prepared[0]["mode"] != "json"
+                        or prepared[0]["url"] != f"{scheme}://{host}:{port}/v1/chat/completions"):
+                    raise KubernetesBindingError()
+            response_started_ns = time.time_ns() if self._retain_gateway_response else None
             self._verify()
             remaining=min(float(timeout),self.deadline-self.clock())
             if remaining<=0:raise KubernetesBindingError()
             payload=json.dumps({"requests":prepared,"timeout":remaining},ensure_ascii=False,allow_nan=False).encode()
             if len(payload)>128*1024:raise KubernetesBindingError()
-            probe=self.binding["probe"]
-            raw=self._call([f"--namespace={probe['namespace']}","exec","-i",probe["pod"],
-                f"--container={probe['container']}","--","python3","-c",self.source,str(remaining)],payload=payload,cap=2*1024**2,budget=remaining)
+            sender = self.binding["probe"] if gateway_loopback is None else gateway_loopback[0]
+            python = ["python3", "-c"] if gateway_loopback is None else ["python3", "-I", "-S", "-B", "-c"]
+            raw = self._call([f"--namespace={sender['namespace']}", "exec", "-i", sender["pod"],
+                f"--container={sender['container']}", "--", *python, self.source, str(remaining)],
+                payload=payload, cap=2*1024**2, budget=remaining)
             self._verify()
+            response_finished_ns = time.time_ns() if self._retain_gateway_response else None
             if (type(raw) is not list or len(raw)!=len(ids) or any(type(row) is not dict for row in raw)
                     or len({row.get("id") for row in raw})!=len(ids) or {row.get("id") for row in raw}!=set(ids)):
                 raise KubernetesBindingError()
@@ -803,8 +828,28 @@ class KubernetesHTTP:
                     rid=(row.get("response_headers") or {}).get("x-request-id")
                     kept["gateway_request_id"]=rid if type(rid) is str and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}",rid) else None
                 results.append(kept)
+            retained = {}
+            if self._retain_gateway_response:
+                response, = results
+                request, = prepared
+                url = urlsplit(request["url"])
+                # The result stays with the caller; store only its exact commitment.
+                retained = {"retained_normal_response": {
+                    "schema": GATEWAY_NORMAL_RESPONSE_RECEIPT,
+                    "response_sha256": sha256_hex(canonical_json(response)),
+                    "request_fixture_sha256": sha256_hex(canonical_json(request["body"])),
+                    "gateway_authority_sha256": sha256_hex(canonical_json([url.scheme, url.hostname, url.port])),
+                    "observed_started_ns": response_started_ns,
+                    "observed_finished_ns": response_finished_ns,
+                    "data_origin": self.process_observation_origin,
+                }}
+                if gateway_loopback is not None:
+                    retained["retained_normal_response"].update(
+                        schema=GATEWAY_LOOPBACK_RESPONSE_RECEIPT, transport_origin=GATEWAY_LOOPBACK_RESPONSE_ORIGIN,
+                        source_owner_sha256=gateway_loopback[1])
             with self.lock:
                 self.rows.extend({"id":row["id"],"binding_verified_before_after":True,"outcome":row["outcome"],
+                    **retained,
                     "capture_complete":row.get("capture_complete") is True,
                     **({"expected_client_close":self._termination_close(row,
                         "req12-disconnect" if self.profile==REQUEST_ATTEMPTS_PROFILE else "obs02-disconnect" if self.profile==OBSERVATION_STATE_PROFILE else "lif10-disconnect")}
@@ -871,6 +916,65 @@ class KubernetesHTTP:
                 or value.username is not None or value.password is not None or value.netloc==self.endpoint.netloc):
             raise KubernetesBindingError()
         self._gateway_netloc=value.netloc
+
+    def capture_retained_gateway_response(self, gateway, authorization, *, timeout, loopback=False):
+        """Capture one ordinary response, optionally from the verified Gateway container."""
+        if not self._retain_gateway_response or type(loopback) is not bool:
+            raise KubernetesBindingError()
+        try:
+            validate_container_binding(gateway)
+            if (gateway["container"] != "gateway" or gateway["restart_count"] != 0
+                    or any(gateway[key] != self.binding[role][key]
+                           for role in ("engine", "probe") for key in ("namespace", "namespace_uid"))
+                    or any(gateway[key] == self.binding[role][key]
+                           for role in ("engine", "probe") for key in ("pod_uid", "container_id", "pod_ip"))):
+                raise ValueError
+            gateway = deepcopy(gateway)
+            endpoint = f"http://{gateway['pod_ip']}:8080"
+            if loopback:
+                if gateway["image"] != GATEWAY_RESPONSE_IMAGE or gateway["image_id"] not in {
+                        GATEWAY_RESPONSE_IMAGE, f"docker-pullable://{GATEWAY_RESPONSE_IMAGE}",
+                        GATEWAY_RESPONSE_IMAGE_CONFIG}:
+                    raise ValueError
+                scheme, host, port = GATEWAY_LOOPBACK_AUTHORITY
+                endpoint = f"{scheme}://{host}:{port}"
+            request = {"id": "obs01-before", "mode": "json", "method": "POST",
+                       "url": endpoint + "/v1/chat/completions", "headers": {"Authorization": authorization},
+                       "body": {"model": self.api_model, "messages": [{"role": "user", "content": "hello"}],
+                                "max_tokens": 1, "stream": False}}
+            with self._online_dispatch:
+                self.declare_gateway(endpoint)
+                self._gateway_event_request(request)
+                before = self._gateway_owner_snapshot(gateway, require_gateway_role=loopback)
+                source = (gateway, sha256_hex(canonical_json(before["owner"]))) if loopback else None
+                response, = self._binding_requests("kubernetes-probe", [request], timeout, gateway_loopback=source)
+                after = self._gateway_owner_snapshot(gateway, require_gateway_role=loopback)
+                report = self.report()
+                row, = report["requests"]
+                receipt = row["retained_normal_response"]
+                if (report["collection_gap"] or report["cleanup_errors"] or response["outcome"] != 200
+                        or before["owner"] != after["owner"]
+                        or not 0 < before["observed_at_ns"] <= receipt["observed_started_ns"]
+                        < receipt["observed_finished_ns"] <= after["observed_at_ns"] < 2**63):
+                    raise ValueError
+            return {"response": response, "transport_report": report,
+                    "gateway_owners": {"before": before, "after": after}}
+        except (AttributeError, KeyError, TypeError, ValueError, KubernetesBindingError):
+            with self.lock:
+                self.failed = True
+            raise KubernetesBindingError() from None
+
+    def _gateway_owner_snapshot(self, gateway, *, require_gateway_role=False):
+        namespace = self._call(["get", "namespace", gateway["namespace"], "-o", "json"])
+        if (namespace.get("kind") != "Namespace" or namespace["metadata"].get("name") != gateway["namespace"]
+                or namespace["metadata"].get("labels", {}).get("byul.lab/owned") != "true"):
+            raise KubernetesBindingError()
+        pod = self._call([f"--namespace={gateway['namespace']}", "get", "pod", gateway["pod"], "-o", "json"])
+        if (pod.get("kind") != "Pod"
+                or require_gateway_role and pod["metadata"].get("labels", {}).get("app") != "serving-gateway"):
+            raise KubernetesBindingError()
+        owner = verify_owned_pod(pod, namespace["metadata"], gateway, self.binding["run_id"])
+        return {"owner": owner, "observed_at_ns": time.time_ns()}
 
     def _gateway_event_request(self, request):
         """OBS-01 Gateway 경로: 정해진 세 시도와 1-token chat 하나만. 자격은 Authorization 하나만."""

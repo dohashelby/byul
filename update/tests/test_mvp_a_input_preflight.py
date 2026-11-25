@@ -54,6 +54,21 @@ def test_files_and_binding_are_checked_without_network_or_live_success(tmp_path,
     assert report['engine_executed'] is report['ready_for_execution'] is False
 
 
+def test_preflight_parses_verified_environment_and_policy_bytes(tmp_path, monkeypatch, sources):
+    verified = {Path(row[role]['path']) for row in sources['inputs'] for role in ('environment', 'policy')}
+    open_file = Path.open
+
+    def reject_second_reader(path, *args, **kwargs):
+        if path in verified:
+            pytest.fail('preflight must parse the original bounded read')
+        return open_file(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'open', reject_second_reader)
+    report = run(tmp_path, sources)
+    assert report['file_binding_valid_sides'] == 2
+    assert not report['engine_executed']
+
+
 @pytest.mark.parametrize('change', ['hash', 'side', 'target-env', 'symlink', 'missing', 'policy-scope', 'policy-type'])
 def test_invalid_side_keeps_other_input_and_missing_scope_visible(tmp_path, sources, change):
     data = deepcopy(sources); entry = data['inputs'][0]

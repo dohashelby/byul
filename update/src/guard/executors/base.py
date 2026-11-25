@@ -9,7 +9,7 @@ from typing import Any, Protocol, runtime_checkable
 from pydantic import Field, model_validator
 
 from guard.adapters.base import EngineAdapter
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, ORIGIN_STRENGTH
 from guard.models.base import Strict
 from guard.models.objects import Challenge, Comparability, NormalControl, Observation
 
@@ -39,6 +39,17 @@ class EvidenceDraft(Strict):
         if self.data_origin == DataOrigin.MEASURED and self.status != ExecStatus.COMPLETED:
             raise ValueError("unfinished execution cannot be MEASURED (INV-02)")
         return self
+
+    def finish_collection(self, ceiling: DataOrigin, incomplete: bool, cleanup_errors: list[str]) -> EvidenceDraft:
+        self.data_origin = min(self.data_origin, ceiling, key=ORIGIN_STRENGTH.__getitem__)
+        if incomplete:
+            self.status = ExecStatus.ABORTED
+        self.cleanup_errors.extend(cleanup_errors)
+        return self
+
+
+def record_origin_ceiling(environment_origin: DataOrigin, *, local_example: bool) -> DataOrigin:
+    return DataOrigin.EXAMPLE if local_example or environment_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
 
 
 @runtime_checkable

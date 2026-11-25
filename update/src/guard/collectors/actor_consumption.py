@@ -123,7 +123,10 @@ def validate(value, **scope):
 
 
 def record(processes, *, topology=None, qualification_scope=None, request_actors=None, **kwargs):
-    value, _ = previous.record(processes, qualification_scope=qualification_scope, **kwargs)
+    value, scoped = previous.record(processes, qualification_scope=qualification_scope, **kwargs)
     value.update(schema=SCHEMA, producer=producer(), topology=deepcopy(topology), request_actors=deepcopy(request_actors))
     scope = {k: kwargs[k] for k in ('environment_ref', 'target_sha256', 'prepared_sha256', 'session')}
-    return value, validate(value, **scope)
+    result = validate(value, **scope)
+    if 'native_request_links' in scoped:
+        result['native_request_links'] = scoped['native_request_links']
+    return value, result

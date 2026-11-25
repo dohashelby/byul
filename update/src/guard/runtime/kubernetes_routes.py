@@ -72,15 +72,22 @@ class KubernetesRoutesHTTP:
         # The common engine/ENV relation is not imposed on the Gateway image.
         # Its independent exact runtime generation is verified with the same
         # owned Pod validator, context and run, before and after each dispatch.
+        namespaces = {}
         for role in ('external_probe', 'gateway'):
             b = self.binding[role]
-            ns = self.base._call(['get', 'namespace', b['namespace'], '-o', 'json'])
-            if ns.get('kind') != 'Namespace':
+            name = b['namespace']
+            if name not in namespaces:
+                document = self.base._call(['get', 'namespace', name, '-o', 'json'])
+                if document.get('kind') != 'Namespace' or document['metadata'].get('name') != name:
+                    raise KubernetesBindingError()
+                namespaces[name] = document['metadata']
+            namespace = namespaces[name]
+            if namespace.get('uid') != b['namespace_uid'] or namespace.get('deletionTimestamp'):
                 raise KubernetesBindingError()
-            pod = self.base._call(['--namespace='+b['namespace'], 'get', 'pod', b['pod'], '-o', 'json'])
+            pod = self.base._call(['--namespace='+name, 'get', 'pod', b['pod'], '-o', 'json'])
             if pod.get('kind') != 'Pod':
                 raise KubernetesBindingError()
-            verify_owned_pod(pod, ns['metadata'], b, self.binding['run_id'])
+            verify_owned_pod(pod, namespace, b, self.binding['run_id'])
 
     def __call__(self, network, requests, timeout):
         # 원 Docker 전송은 묶음 크기 제한이 없다. REQ-01 경로 열거는 열린 배치에서

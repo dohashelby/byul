@@ -83,6 +83,10 @@ class NormalWorld(World):
             return
         invoke(self.observed, rid, non_block=self.mode == 'future-only')
         self.record_native()
+        if slot == 'normal-after' and self.mode in {'incomplete-source', 'incomplete-source-030'}:
+            rows = self.group.raw_by_pid[42].splitlines(keepends=True)
+            assert json.loads(rows[-1])['event'] == 'END'
+            self.group.raw_by_pid[42] = b''.join(rows[:-1])
 
     def runner(self, argv, **kwargs):
         if self.mode == 'missing-owner' and 'exec' in argv and any('guard-lifecycle-process-context/1' in arg for arg in argv):
@@ -181,12 +185,13 @@ def test_registered_cli_selected_mp_facts_four_missing_faults_and_exact_refs(tmp
 @pytest.mark.parametrize(('mode', 'native_count', 'control_count'), [
     ('normal', 2, 2), ('before-shape', 2, 1), ('future-only', 0, 2),
     ('missing-owner', 0, 2), ('wrong-source', 0, 2), ('normal-030', 2, 2),
+    ('incomplete-source', 0, 2), ('incomplete-source-030', 0, 2),
 ])
 def test_canonical_rank_evidence_keeps_concrete_owned_results_and_separate_controls(
         tmp_path, group, native_target, monkeypatch, mode, native_count, control_count):
     release = None
     source = sensor.SOURCES[sensor.MP]
-    if mode == 'normal-030':
+    if mode.endswith('-030'):
         directory = group.root / 'rank-release'
         directory.mkdir()
         prepared, module = release_assets(directory, monkeypatch)
@@ -212,6 +217,21 @@ def test_canonical_rank_evidence_keeps_concrete_owned_results_and_separate_contr
     assert len(native) == native_count and len(controls) == control_count
     assert all(row['source_sha256'] == source and
         row['operation_started_ns'] <= row['operation_finished_ns'] for row in native)
+    if native:
+        digest = sha256_hex(group.raw_by_pid[42])
+        assert all(row['source_recording_sha256'] == digest for row in native)
+    if mode.startswith('incomplete-source'):
+        artifact, = [row for row in draft.artifacts if row.name == 'probe_log.jsonl']
+        summary = json.loads(artifact.path.read_text().splitlines()[-1])
+        digest = sha256_hex(group.raw_by_pid[42])
+        capture, = [row['capture'] for row in summary['native']['recordings']
+                    if row['capture'] and row['capture']['provenance']['capture_sha256'] == digest]
+        assert capture['process_context_verified'] and capture['provenance']['owner_binding_verified']
+        assert not capture['summary']['recording_closed'] and capture['summary']['discarded_tail_bytes'] == 0
+        returns = [row for row in summary['projection']['calls']
+                   if row['point'] == 'MultiprocExecutor.execute_model' and row['phase'] == 'RETURN']
+        assert len(returns) == 2 and all(row['source_process_binding_observed'] for row in returns)
+        assert 'RANK_NATIVE_EXECUTOR_VALUE_SOURCE_UNVERIFIED' in observed['activation_missing']
     assert all(row['case_id'] in {'lif08-normal-before', 'lif08-normal-after'} and row['normal_shape_verified']
         and row['capture_complete'] and not row['all_required_ranks_completed'] for row in controls)
     assert ('RANK_NATIVE_EXECUTOR_VALUE_RETURN_UNAVAILABLE' in observed['activation_missing']) == (not native)

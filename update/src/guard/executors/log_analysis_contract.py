@@ -16,6 +16,10 @@ from .content_common import leaves
 LEGACY_JSON_PROFILE = "guard-log-json/1"
 STRICT_JSON_PROFILE = "guard-log-json/2"
 REJECTED_JSON_LINE = "GUARD_LOG_JSON_UNVERIFIABLE"
+_CRI_TIMESTAMP = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"(?:\.([0-9]{1,9}))?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])"
+)
 
 
 def strict_json_loads(text: str):
@@ -92,12 +96,29 @@ def _inside(timestamp, window):
         return False
 
 
+def _cri_instant(value):
+    match = _CRI_TIMESTAMP.fullmatch(value)
+    if match is None or value.endswith("-00:00"):
+        raise ValueError("unverified CRI timestamp")
+    point = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    # datetime orders whole microseconds. Keep the remaining nanoseconds.
+    return point, int((match.group(1) or "")[6:].ljust(3, "0"))
+
+
+def _inside_cri_window(timestamp, window):
+    try:
+        return _cri_instant(window["since"]) <= _cri_instant(timestamp) <= _cri_instant(window["until"])
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+
+
 def analyze_log_captures(captures: list[dict], values: dict, marks: dict,
                          correlation: dict, *, initial_gaps: list[str] = (),
-                         profile: str = LEGACY_JSON_PROFILE) -> dict:
+                         profile: str = LEGACY_JSON_PROFILE, strict_cri_timestamps: bool = False) -> dict:
     """Reconstruct semantic log observations without I/O or verdict changes."""
     if profile not in {LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE}:
         raise ValueError("unsupported log analysis profile")
+    inside_window = _inside_cri_window if strict_cri_timestamps else _inside
     gaps, violations, coverage = list(initial_gaps), [], {}
     fields_seen, contexts_seen = set(), set()
     required = values["required_sources"]
@@ -147,7 +168,7 @@ def analyze_log_captures(captures: list[dict], values: dict, marks: dict,
             error = correlation.get("error") in correlation_values
             if not normal and not error:
                 continue  # Historical/unrelated events cannot establish a trial FAIL.
-            if not _inside(row["timestamp"], capture.get("window", {})):
+            if not inside_window(row["timestamp"], capture.get("window", {})):
                 gaps.append(f"{source_id}: exact trial event lies outside or has an invalid capture timestamp")
                 continue
             fields_seen.update(event_fields)

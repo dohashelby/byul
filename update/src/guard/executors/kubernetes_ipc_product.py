@@ -1,11 +1,12 @@
 """A1 registration boundary for A2's immutable Kubernetes Unix IPC consumer."""
 
+from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
-from pathlib import Path
 import math
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesBindingError,KubernetesHTTP,REQUEST_BINDING_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx,HttpCheckExecutor
 from . import kubernetes_ipc_metadata as path_metadata
 from . import kubernetes_worker_trust as worker_trust
@@ -112,8 +113,7 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
             if metadata_only:
                 target = self._read_metadata_target()
             else:
-                with Path(self.cfg['target']).open('rb') as stream:
-                    target = strict_json(stream.read(65537), limit=65536)
+                target = load_bounded_json(self.cfg['target'])
             self._validate_target(target, metadata_only)
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID') from None
         transport = self._transport(target, env, duration)
@@ -148,8 +148,5 @@ class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecut
                 ceiling=min(ceiling,DataOrigin.DECLARED,key=ORIGIN_STRENGTH.get)
             draft.data_origin=min(draft.data_origin,ceiling,key=ORIGIN_STRENGTH.get)
             return draft
-        ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin=min(draft.data_origin,ceiling,key=lambda value:ORIGIN_STRENGTH[value])
-        if ctx._ipc_product_gap:draft.status=ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._ipc_product_cleanup)
-        return draft
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self.runner is not None or ctx.target['lab'])
+        return draft.finish_collection(ceiling, ctx._ipc_product_gap, ctx._ipc_product_cleanup)

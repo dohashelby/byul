@@ -14,15 +14,27 @@ import yaml
 from guard.models import DataOrigin, Environment, Pack, Policy, new_id
 
 
-def _read(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+def load_bounded_json(path: str | Path) -> Any:
+    """Read a local JSON document of at most 64 KiB."""
+    from guard.executors.owned_capture import strict_json
+
+    limit = 64 * 1024
+    with Path(path).open("rb") as stream:
+        return strict_json(stream.read(limit + 1), limit=limit)
+
+
+def _read(path: Path, *, raw: bytes | None = None) -> dict[str, Any]:
+    text = (Path(path).read_text(encoding="utf-8") if raw is None
+            else raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n"))
+    data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path}: top level must be a mapping")
     return data
 
 
-def load_environment(path: Path) -> Environment:
-    data = _read(path)
+def load_environment(path: Path, *, raw: bytes | None = None) -> Environment:
+    """Load the environment file or parse its already-verified bytes."""
+    data = _read(path, raw=raw)
     if data.get("kind") == "ENV":
         obj = Environment.model_validate(data)
         if not obj.hash_ok():
@@ -31,15 +43,15 @@ def load_environment(path: Path) -> Environment:
     origin = DataOrigin(data.get("data_origin", "DECLARED"))
     shorthand_origin = DataOrigin.EXAMPLE if origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
     facts: dict[str, dict] = {}
-    for key, raw in (data.get("facts") or {}).items():
-        if isinstance(raw, dict):
-            fv = dict(raw)
+    for key, fact in (data.get("facts") or {}).items():
+        if isinstance(fact, dict):
+            fv = dict(fact)
             fv.setdefault("source", f"{Path(path).name}#facts.{key}")
             if fv.get("value") is not None:
                 fv.setdefault("origin", shorthand_origin)
         else:
-            fv = {"value": raw}
-            if raw is not None:
+            fv = {"value": fact}
+            if fact is not None:
                 fv.update(origin=shorthand_origin, source=f"{Path(path).name}#facts.{key}")
         facts[key] = fv
     return Environment(
@@ -53,8 +65,9 @@ def load_environment(path: Path) -> Environment:
     ).seal()
 
 
-def load_policy(path: Path, pack: Pack) -> Policy:
-    data = _read(path)
+def load_policy(path: Path, pack: Pack, *, raw: bytes | None = None) -> Policy:
+    """Load the policy file or parse its already-verified bytes."""
+    data = _read(path, raw=raw)
     if data.get("kind") == "POL":
         obj = Policy.model_validate(data)
         if not obj.hash_ok() or obj.pack != pack.ref():
@@ -62,7 +75,8 @@ def load_policy(path: Path, pack: Pack) -> Policy:
         return obj
     want = data.get("pack") or {}
     ref = pack.ref()
-    if want.get("id") != ref.id or int(want.get("revision", -1)) != ref.revision:
+    if (want.get("id") != ref.id or int(want.get("revision", -1)) != ref.revision
+            or "sha256" in want and want["sha256"] != ref.sha256):
         raise ValueError(
             f"{path}: policy is for {want.get('id')} rev {want.get('revision')}, "
             f"loaded pack is {ref.id} rev {ref.revision}"
@@ -77,4 +91,7 @@ def load_policy(path: Path, pack: Pack) -> Policy:
         exceptions=data.get("exceptions") or [],
         confirmed_by=data.get("confirmed_by"),
         confirmed_at=data.get("confirmed_at"),
+        valid_from=data.get("valid_from"),
+        valid_until=data.get("valid_until"),
+        source_document_sha256=data.get("source_document_sha256"),
     ).seal()

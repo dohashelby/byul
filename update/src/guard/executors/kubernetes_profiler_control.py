@@ -6,8 +6,8 @@ import uuid
 
 from guard.adapters import vllm_profiler_sensor as sensor, vllm_profiler_metadata as metadata
 from guard.adapters import vllm_release_observation_sensor as release_observation
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_profiler_control import KubernetesProfilerControlHTTP, SLOTS, CONTROL_PATHS
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader, validate_target
@@ -162,7 +162,7 @@ class KubernetesProfilerControlExecutor:
             if type(owned_fault) is not bool or owned_fault and (
                     policy_values['profiler_case'] != 'prepared-stop-failure' or policy_values['profiler_required_ranks'] != ['0']): raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id, env.model.revision)): raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream: target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(self.cfg['target'])
             prepared = load_prepared(self.cfg['prepared']); digest = sha256_hex(canonical_json(target))
             if (digest != policy_values['profiler_target_sha256'] or env.ref().sha256 != policy_values['profiler_environment_sha256']
                     or self.expected_target_sha256 is not None and self.expected_target_sha256 != digest

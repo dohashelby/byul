@@ -76,8 +76,8 @@ def test_registered_producer_makes_the_sharded_record_complete(monkeypatch):
     assert result['complete'] is True and result['producer_authenticated'] is False
 
 
-def _selected_code(fixture_name, *scope):
-    path = FIXTURE.parent / 'vllm-0.30.0/vllm/model_executor/model_loader' / fixture_name
+def _selected_code(fixture_name, *scope, directory='model_executor/model_loader'):
+    path = FIXTURE.parent / 'vllm-0.30.0/vllm' / directory / fixture_name
     code = compile(path.read_bytes(), str(path), 'exec', dont_inherit=True, optimize=0)
     for name in scope:
         code = next(child for child in code.co_consts if type(child) is CodeType and child.co_name == name)
@@ -156,6 +156,26 @@ def test_vllm_030_selected_native_index_flows_through_the_worker_shard_writer(
         instance.load_config = SimpleNamespace(load_format='safetensors')
         assert instance._prepare_weights(str(tmp_path), None, None, False, None) == (
             str(tmp_path), matching_paths, True)
+        if selection == 'observed':
+            model = SimpleNamespace(named_parameters=lambda: (), named_modules=lambda: ())
+            instance.track_weights_loading(model, set())
+            worker_module = ModuleType(callback.MP)
+            worker_source, monitor = _selected_code('multiproc_executor.py.txt', 'WorkerProc', 'monitor_death_pipe',
+                                                    directory='v1/executor')
+            worker_module.__file__ = str(worker_source)
+            worker_module.WorkerProc = type('WorkerProc', (), {
+                '__module__': worker_module.__name__, 'monitor_death_pipe': FunctionType(monitor, vars(worker_module)),
+            })
+            worker = worker_module.WorkerProc()
+            worker.rank = 0
+            observe = callbacks.shard.wrap(worker_module, 'WorkerProc.monitor_death_pipe')
+            observe(worker, None, None)  # The native method returns before starting a monitor without a pipe.
+            callbacks.shard.gaps.add('WORKER_SHARD_INDEX_UNREADABLE')
+            callbacks.gap('DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED')
+            callbacks.flush_gaps()
+            other = EngineCallbacks(SCOPE['session'], b'w' * 32, sink,
+                                    context_provider=lambda: {'fixture_other_process': True})
+            other.gap('WORKER_SHARD_FILE_SET_UNAVAILABLE')
     finally:
         if sink.fd is not None:
             os.close(sink.fd)
@@ -171,7 +191,8 @@ def test_vllm_030_selected_native_index_flows_through_the_worker_shard_writer(
 
     raw = sink.path.read_text(encoding='utf-8')
     rows = [json.loads(line) for line in raw.splitlines()]
-    returned, = [row for row in rows if row['schema'] == callback.SCHEMA and row['phase'] == 'RETURN']
+    returned, = [row for row in rows if row['schema'] == callback.SCHEMA and row['phase'] == 'RETURN'
+                 and row['point'] == callback.PREPARE]
     assert returned['entry_qualified_before'] is returned['entry_qualified_after'] is True
     assert returned['runtime_context_injected'] is True
     assert returned['native_profile_installed'] is False
@@ -184,17 +205,36 @@ def test_vllm_030_selected_native_index_flows_through_the_worker_shard_writer(
     assert fields['required'] == (sorted(keyed) if observed else None)
     assert all(value not in raw for value in [str(tmp_path), index.name, *(shard.name for shard in shards)])
 
-    record, result = build(rows)
+    if observed:
+        assert callbacks.cache.process_sha256 == returned['process_sha256']
+        record, result = producer.record_from_processes(
+            [{'pid': fields['pid'], 'start_ticks': fields['start_ticks'], 'events': rows}], pod=POD, **SCOPE)
+        assert {'load_completed', 'rank_ready'} <= {event['event'] for event in record['events']}
+        assert record['completeness'] == {'source_ended': False, 'dropped': 0,
+                                          'diagnostic_codes': ['WORKER_SHARD_INDEX_UNREADABLE']}
+    else:
+        record, result = build(rows)
     assert {event['shard_sha256']: event['bytes'] for event in record['events']
             if event['event'] == 'shard_assigned'} == dict(zip(keyed, fields['file_bytes']))
     assert {event['shard_sha256'] for event in record['events'] if event['event'] == 'shard_required'} == (
         set(keyed) if observed else set())
     projection = common_consumption.worker_shards(record, SCOPE, {})
     assert 'GPU_INPUT_PRODUCER_UNSUPPORTED' in projection['missing']
+    if observed:
+        assert 'GPU_INPUT_PRODUCER_DIAGNOSTIC:WORKER_SHARD_INDEX_UNREADABLE' in projection['missing']
+        assert not any('FILE_SET_UNAVAILABLE' in gap or 'DISTRIBUTED' in gap for gap in projection['missing'])
     index_gap = 'WORKER_SHARD_INDEX_UNOBSERVED'
     assert (index_gap in record['completeness']['diagnostic_codes']) == (not observed)
     assert (f'GPU_INPUT_PRODUCER_DIAGNOSTIC:{index_gap}' in projection['missing']) == (not observed)
     assert not result['producer_authenticated'] and not projection['complete'] and not projection['violations']
+    if observed:
+        handoff_root = tmp_path / 'handoff-input'
+        assets = handoff_root / 'assets'
+        engine_callbacks.prepare_assets(assets, worker_shards=True)
+        capture, _, env, env_path, target, target_path = _collect_saved_worker_rows(
+            handoff_root, monkeypatch, 'baseline', assets, rows)
+        _assert_saved_capture_handoff(
+            handoff_root, monkeypatch, 'baseline', env, env_path, target, target_path, assets, capture)
 
 
 def test_relative_index_symlink_preserves_observed_required_and_assigned_shards(tmp_path):
@@ -370,28 +410,129 @@ def test_points_avoid_the_traced_decorators_and_assets_carry_the_flag(tmp_path):
     assert engine_callbacks.prepare_assets(tmp_path / 'b')['worker_shards'] is False
 
 
-@pytest.mark.parametrize(('side', 'wrong_scope'), (
-    ('baseline', None), ('candidate', None), ('candidate', 'session'), ('candidate', 'pid'),
+@pytest.mark.parametrize('broken_pair', [None, 'missing-call', 'entry-code', 'duplicate-terminal', 'terminal-first'])
+def test_page_assignment_requires_one_matching_native_call(broken_pair):
+    from guard.models import sha256_hex
+
+    rows = case('sharded')['rows']
+    for row in rows:
+        if row.get('schema') == callback.SCHEMA:
+            row['session_sha256'] = sha256_hex(SCOPE['session'].encode())
+    call = next(row for row in rows if row.get('point') == callback.PREPARE and row['phase'] == 'CALL')
+    terminal = next(row for row in rows if row.get('point') == callback.PREPARE and row['phase'] == 'RETURN')
+    if broken_pair == 'missing-call':
+        rows.remove(call)
+    elif broken_pair == 'entry-code':
+        terminal['entry_code_sha256'] = sha256_hex(b'EXAMPLE other entry')
+    elif broken_pair == 'duplicate-terminal':
+        rows.append(deepcopy(terminal))
+    elif broken_pair == 'terminal-first':
+        rows.remove(terminal)
+        rows.insert(rows.index(call), terminal)
+    pid, ticks = (terminal['fields'][key] for key in ('pid', 'start_ticks'))
+    record, result = producer.record_from_processes([{'pid': pid, 'start_ticks': ticks, 'events': rows}], pod=POD, **SCOPE)
+    events = {row['event'] for row in record['events']}
+    assert {'load_completed', 'rank_ready'} <= events
+    shard_facts = {'shard_required', 'shard_assigned'}
+    assert events & shard_facts == (shard_facts if broken_pair is None else set())
+    assert ('WORKER_SHARD_TERMINAL_UNJOINED' in record['completeness']['diagnostic_codes']) == (broken_pair is not None)
+    assert not record['completeness']['source_ended']
+    assert not result['supported'] and not result['complete']
+
+
+def test_page_process_requires_one_native_context_and_keeps_an_independent_worker():
+    from guard.models import sha256_hex
+
+    session_sha256 = sha256_hex(SCOPE['session'].encode())
+
+    def page(sample):
+        rows = [row for row in case(sample)['rows'] if row['schema'] == callback.SCHEMA]
+        for row in rows:
+            row['session_sha256'] = session_sha256
+        return {'pid': rows[0]['fields']['pid'], 'start_ticks': rows[0]['fields']['start_ticks'], 'events': rows}
+
+    mixed = page('sharded')
+    sibling = page('single-file')
+    other_context = sibling['events'][0]['process_sha256']
+    # Both legs of the saved prepare call still match, but the load and Ready
+    # records for this page identify another native context.
+    for row in mixed['events']:
+        if row['point'] == callback.PREPARE:
+            row['process_sha256'] = other_context
+
+    record, result = producer.record_from_processes([mixed, sibling], pod=POD, **SCOPE)
+    binding, = record['bindings']
+    assert (binding['worker_pid'], binding['start_ticks']) == (sibling['pid'], sibling['start_ticks'])
+    assert [row['bytes'] for row in record['events'] if row['event'] == 'shard_assigned'] == [
+        next(row['fields']['file_bytes'][0] for row in sibling['events'] if row['point'] == callback.PREPARE
+             and row['phase'] == 'RETURN')]
+    assert {'shard_required', 'shard_assigned', 'load_completed', 'rank_ready'} <= {
+        row['event'] for row in record['events']}
+    assert record['completeness']['diagnostic_codes'] == ['REQUIRED_FROM_ASSIGNED', 'WORKER_SHARD_SCOPE_MISMATCH']
+    assert not record['completeness']['source_ended']
+    assert not result['supported'] and not result['complete'] and not result['producer_authenticated']
+    assert other_context not in json.dumps(record)
+
+
+@pytest.mark.parametrize(('side', 'wrong_scope', 'index_present'), (
+    ('baseline', None, True), ('candidate', None, True), ('candidate', 'session', True),
+    ('candidate', 'pid', True), ('candidate', None, False), ('candidate', None, None),
 ))
-def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypatch, side, wrong_scope):
+def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypatch, side, wrong_scope, index_present):
     from typer.testing import CliRunner
 
     from guard.cli import app
     from guard.models import canonical_json, sha256_hex
-    from tests.test_kubernetes_sampling import normal_sampling_inputs
-    from tools import gpu_a_producers_collect as collector
-    from tools.mvp_versions import versions
 
     assets = tmp_path / 'assets'
     prepared_result = CliRunner().invoke(app, ['prepare-engine-callbacks', '--output', str(assets), '--worker-shards'])
     assert prepared_result.exit_code == 0, prepared_result.output
+    rows = deepcopy(case('sharded')['rows'])
+    if index_present is not True:
+        for row in rows:
+            if row.get('point') == callback.PREPARE and row.get('phase') == 'RETURN':
+                row['fields'].update(index_present=index_present, required=None)
+    result, prepared, env, env_path, target, target_path = _collect_saved_worker_rows(
+        tmp_path, monkeypatch, side, assets, rows, wrong_scope=wrong_scope)
+    captured = result['records']['worker-shard-load']
+    record = captured['record']
+    required = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_required'}
+    assigned = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_assigned'}
+    assert required == (assigned if index_present is not None else set())
+    assert len(assigned) == (0 if wrong_scope else 2)
+    assert {'load_completed', 'rank_ready'} <= {row['event'] for row in record['events']}
+    assert record['completeness']['source_ended'] is False
+    assert ('WORKER_SHARD_SCOPE_MISMATCH' in record['completeness']['diagnostic_codes']) is bool(wrong_scope)
+
+    scope = {'environment_ref': env.ref().model_dump(mode='json'), 'target_sha256': sha256_hex(canonical_json(target)),
+             'prepared_sha256': sha256_hex(canonical_json(prepared)), 'session': prepared['session']}
+    checked = common_consumption.worker_shards(record, scope, {})
+    for validation in (captured['validation'], checked):
+        assert validation['supported'] is validation['complete'] is False
+    _assert_saved_capture_handoff(tmp_path, monkeypatch, side, env, env_path, target, target_path, assets, result,
+                                  other_release=side == 'baseline', assignments_verified=wrong_scope is None)
+
+
+def _collect_saved_worker_rows(tmp_path, monkeypatch, side, assets, rows, *, wrong_scope=None):
+    from guard.adapters import observer_runtime
+    from guard.adapters import vllm_engine_callback_sensor as sensor
+    from guard.models import canonical_json, sha256_hex
+    from guard.runtime.callback_pages import assemble
+    from tests.test_callback_paging_runtime import reader
+    from tests.test_kubernetes_sampling import normal_sampling_inputs
+    from tools import gpu_a_producers_collect as collector
+    from tools.mvp_versions import versions
+
     prepared = engine_callbacks.load_prepared(assets)
     assert prepared['worker_shards'] is True
     session = prepared['session']
     session_hash = sha256_hex(session.encode())
     release = versions()[side]
     env, target, _, target_path = normal_sampling_inputs(tmp_path, release['version'])
-    env = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': release['image']})}).seal()
+    env = env.model_copy(update={
+        'engine': env.engine.model_copy(update={'image_digest': release['image']}),
+        'runtime': env.runtime.model_copy(update={'tp_size': 2, 'pp_size': 1, 'dp_size': 1}),
+    }).seal()
     target['environment_ref'] = env.ref().model_dump(mode='json')
     target['engine']['image_digest'] = release['image']
     target['kubernetes']['engine'].update(image=release['image'], image_id=release['image'])
@@ -399,16 +540,37 @@ def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypat
     env_path.write_bytes(canonical_json(env.to_dict()))
     target_path.write_bytes(canonical_json(target))
 
-    rows = case('sharded')['rows']
+    # Rebind the inert sample to this EXAMPLE session and its local writer epoch.
+    pid = os.getpid()
+    start_ticks = int(Path('/proc/self/stat').read_text().rsplit(')', 1)[1].split()[19])
+    rows = deepcopy(rows)
     for row in rows:
         if 'session_sha256' in row:
             row['session_sha256'] = session_hash
+        fields = row.get('fields', {})
+        if 'pid' in fields and 'start_ticks' in fields:
+            fields.update(pid=pid, start_ticks=start_ticks)
     assignment = next(row for row in rows if row.get('point') == callback.PREPARE and row['phase'] == 'RETURN')
-    pid, start_ticks = (assignment['fields'][key] for key in ('pid', 'start_ticks'))
     if wrong_scope == 'session':
         assignment['session_sha256'] = sha256_hex(b'other fixture session')
     elif wrong_scope == 'pid':
         assignment['fields']['pid'] += 1
+
+    pages_dir = tmp_path / 'callback-pages'
+    data_root = tmp_path / 'callback-data'
+    read_page = reader()
+    row_lengths = [len((json.dumps(event, sort_keys=True, separators=(',', ':')) + '\n').encode()) for event in rows]
+    capture_id = sha256_hex((session + ':example-checkpoint').encode())[:32]
+
+    def retained_pages():
+        snapshot, cursor = None, None
+        for _ in rows:
+            page = read_page(data_root / session, snapshot, cursor, capture_id)
+            yield page
+            if page['done']:
+                return
+            snapshot, cursor = page['snapshot'], page['cursor']
+        raise AssertionError('The EXAMPLE journal did not fit in the expected pages')
 
     class CapturedTransport:
         def __init__(self, selected_target, selected_env, *, duration, profile):
@@ -417,34 +579,38 @@ def test_cli_selected_worker_shards_use_bound_collector_rows(tmp_path, monkeypat
             self.binding = target['kubernetes']
 
         def engine_attempt_events(self, selected_session, *, archive):
-            assert selected_session == session and archive is None
-            return {'processes': [{'pid': pid, 'start_ticks': start_ticks, 'events': rows}], 'truncated': False}
+            assert selected_session == session and archive == pages_dir
+            return assemble(retained_pages(), archive=archive)
 
-    monkeypatch.setattr(collector, 'KubernetesHTTP', CapturedTransport)
-    result = collector.collect(env_path=env_path, target_path=target_path, prepared_dir=assets)
-    captured = result['records']['worker-shard-load']
-    record = captured['record']
-    required = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_required'}
-    assigned = {row['shard_sha256'] for row in record['events'] if row['event'] == 'shard_assigned'}
-    assert required == assigned and len(assigned) == (0 if wrong_scope else 2)
-    assert {'load_completed', 'rank_ready'} <= {row['event'] for row in record['events']}
-    assert record['completeness']['source_ended'] is False
-    assert ('WORKER_SHARD_SCOPE_MISMATCH' in record['completeness']['diagnostic_codes']) is bool(wrong_scope)
+    with monkeypatch.context() as local:
+        meta_path = []
+        local.setattr(sensor, 'sys', SimpleNamespace(meta_path=meta_path))
+        local.setattr(sensor, 'atexit', SimpleNamespace(register=lambda _callback: None))
+        local.setattr(collector, 'KubernetesHTTP', CapturedTransport)
+        local.setitem(read_page.__globals__, 'MAX_PAGE', max(max(row_lengths), sum(row_lengths) // 2))
+        assert sensor.install(root=assets, data_root=data_root, context_provider=lambda: {})
+        callbacks = meta_path[0].callbacks
+        assert isinstance(callbacks.sink, observer_runtime.JournalSink)
+        assert callbacks.shard is not None and callbacks.consumption is callbacks.consumption_v2 is None
+        try:
+            for row in rows:
+                callbacks.sink(row)
+            result = collector.collect(env_path=env_path, target_path=target_path, prepared_dir=assets, pages_dir=pages_dir)
+            assert (data_root / session / f'checkpoint-{pid}-{capture_id}.json').is_file()
+            assert result['page_capture']['diagnostic_codes'] == []
+        finally:
+            callbacks.sink.close()
+    return result, prepared, env, env_path, target, target_path
 
-    scope = {'environment_ref': env.ref().model_dump(mode='json'), 'target_sha256': sha256_hex(canonical_json(target)),
-             'prepared_sha256': sha256_hex(canonical_json(prepared)), 'session': session}
-    checked = common_consumption.worker_shards(record, scope, {})
-    for validation in (captured['validation'], checked):
-        assert validation['supported'] is validation['complete'] is False
-    if wrong_scope is None:
-        _assert_saved_capture_handoff(tmp_path, monkeypatch, side, env, env_path, target, target_path, assets, result)
 
-
-def _assert_saved_capture_handoff(root, monkeypatch, side, env, env_path, target, target_path, assets, capture):
+def _assert_saved_capture_handoff(root, monkeypatch, side, env, env_path, target, target_path, assets, capture, *,
+                                 other_release=False, assignments_verified=True):
     import socket
     import subprocess
+    from types import SimpleNamespace
 
     from guard.collectors import lifecycle
+    from guard.executors import cache_timing_group
     from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
     from guard.models import canonical_json, sha256_hex
     from tools import mvp_sup06_worker_shard_inputs as handoff
@@ -466,14 +632,23 @@ def _assert_saved_capture_handoff(root, monkeypatch, side, env, env_path, target
              'callback_prepared': assets / 'manifest.json', 'capture': capture_path}
     selection_path = root / 'selection.json'
 
-    def write_selection():
+    def write_selection(*, with_archive=True):
         files = {key: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())} for key, path in paths.items()}
-        raw = canonical_json({'schema': handoff.SELECTION_SCHEMA, 'side': side, 'files': files})
+        selection = {'schema': handoff.SELECTION_SCHEMA, 'side': side, 'files': files}
+        if with_archive:
+            selection['page_archive'] = str(root / 'callback-pages')
+        raw = canonical_json(selection)
         selection_path.write_bytes(raw)
         return sha256_hex(raw)
 
     selection_sha = write_selection()
     output = root / 'handoff'
+    if other_release:
+        with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_RELEASE_SOURCE_MISMATCH$'):
+            handoff.prepare(selection_path, selection_sha, output)
+        assert not output.exists()
+        assert capture_path.read_bytes() == capture_raw
+        return
     receipt = handoff.prepare(selection_path, selection_sha, output)
     assert json.loads((output / handoff.OUTPUT_NAME).read_bytes()) == receipt
     assert receipt['side'] == side and receipt['role'] == 'normal'
@@ -484,15 +659,154 @@ def _assert_saved_capture_handoff(root, monkeypatch, side, env, env_path, target
     saved_record = Path(fragment['path']).read_bytes()
     assert saved_record == canonical_json(capture['records']['worker-shard-load']['record'])
     assert fragment['sha256'] == sha256_hex(saved_record) and fragment['data_origin'] == 'EXAMPLE'
+    assert fragment['capture_archive'] == {'path': str(capture_path), 'sha256': sha256_hex(capture_raw),
+                                           'page_archive': str(root / 'callback-pages')}
+    prepared_path = assets / 'manifest.json'
+    source_sha256 = {'target': sha256_hex(target_path.read_bytes()), 'prepared': sha256_hex(prepared_path.read_bytes())}
+    assert fragment['callback_source_sha256'] == source_sha256
     assert capture_path.read_bytes() == capture_raw
 
     base_prepared = lifecycle.prepare_assets(root / 'lifecycle-assets', Path(__file__).resolve().parents[2])
     executor = KubernetesSupplyBootExecutor({'normal': {'worker_shard_input': fragment}}, runner=forbidden)
     bound = {'supply_normal_prepared_sha256': sha256_hex(canonical_json(base_prepared))}
-    record, scope, result = executor._worker_shard_input(
-        env, bound, 'normal', lifecycle_target, sha256_hex(lifecycle_path.read_bytes()))
+    read_regular = cache_timing_group.read_regular
+    reads = []
+
+    def read(path, *, limit, expected_sha256=None):
+        reads.append((Path(path), (limit, expected_sha256)))
+        return read_regular(path, limit=limit, expected_sha256=expected_sha256)
+
+    with monkeypatch.context() as tracked:
+        tracked.setattr(cache_timing_group, 'read_regular', read)
+        record, scope, result = executor._worker_shard_input(
+            env, bound, 'normal', lifecycle_target, sha256_hex(lifecycle_path.read_bytes()))
+    assert dict(reads) == {target_path: (65536, source_sha256['target']),
+                           prepared_path: (262144, source_sha256['prepared']),
+                           **{assets / name: (len(raw), None) for name, raw in engine_callbacks._sources().items()}}
+    assert len(reads) == len(dict(reads)) and assets / 'settings.json' not in dict(reads)
     assert canonical_json(record) == saved_record and scope == fragment['scope']
     assert result['complete'] is False and result['violations'] == []
+    assert result['callback_source_sha256'] == source_sha256
+    witnesses = result['native_rank_witnesses']
+    assert receipt['native_rank_witnesses'] == witnesses
+    assert witnesses['capture_sha256'] == sha256_hex(capture_raw)
+    assert witnesses['expected_ranks'] == [0, 1]
+    rank, = witnesses['ranks']
+    binding, = record['bindings']
+    assert (rank['rank'], rank['worker_pid'], rank['start_ticks']) == (
+        0, binding['worker_pid'], binding['start_ticks'])
+    raw_pages = {reference['sha256']: json.loads((root / 'callback-pages' / reference['path']).read_bytes())
+                 for reference in capture['raw_page_refs']}
+    expected = [
+        ('load_call', 'DefaultModelLoader.track_weights_loading', 'CALL'),
+        ('load_return', 'DefaultModelLoader.track_weights_loading', 'RETURN'),
+        ('ready_candidate_call', 'WorkerProc.monitor_death_pipe', 'CALL'),
+    ]
+    if assignments_verified:
+        expected.extend([('prepare_call', callback.PREPARE, 'CALL'), ('prepare_return', callback.PREPARE, 'RETURN')])
+    else:
+        assert 'prepare_call' not in rank and 'prepare_return' not in rank
+    for key, point, phase in expected:
+        location = rank[key]
+        retained = raw_pages[location['page_sha256']]['rows'][location['row_index']]['event']
+        assert (retained['point'], retained['phase']) == (point, phase)
+        for field in ('call_sha256', 'source_file_sha256', 'operation_started_ns', 'operation_finished_ns'):
+            assert location[field] == retained[field]
+        if key == 'prepare_return':
+            assigned = [(event['shard_sha256'], event['bytes'])
+                        for event in record['events'] if event['event'] == 'shard_assigned']
+            assert assigned == list(zip(retained['fields']['files'], retained['fields']['file_bytes']))
+            if retained['fields']['index_present'] is True:
+                required = {event['shard_sha256'] for event in record['events'] if event['event'] == 'shard_required'}
+                assert location['indexed_shard_assignment'] == {
+                    'required_shard_count': len(required),
+                    'assigned_shard_count': len({digest for digest, _ in assigned}),
+                    'required_shards_assigned': True,
+                }
+            else:
+                assert 'indexed_shard_assignment' not in location
+    assert rank['load_call']['call_sha256'] == rank['load_return']['call_sha256']
+    if assignments_verified:
+        assert rank['prepare_call']['call_sha256'] == rank['prepare_return']['call_sha256']
+
+    with monkeypatch.context() as inert:
+        def offline_reader(*args):
+            raise OSError('EXAMPLE owner unavailable')
+
+        inert.setattr(executor, '_role_reader', offline_reader)
+        collected = executor._collect_role(
+            SimpleNamespace(id='SUP-06'), env, bound, 'normal',
+            role_inputs={'normal': (lifecycle_target, base_prepared, sha256_hex(lifecycle_path.read_bytes()))})
+    role = collected['row']
+    assert role['worker_shard_input']['native_rank_witnesses'] == witnesses
+    assert role['worker_shard_input']['callback_source_sha256'] == source_sha256
+    assert role['worker_shard_input']['reported_source']['owner_binding_verified'] is False
+    assert role['collected'] is role['sealed'] is False
+
+    if not assignments_verified:
+        return
+
+    for path in (target_path, prepared_path):
+        original = path.read_bytes()
+        path.write_bytes(original + b'\n')
+        with pytest.raises(ValueError, match='^B_WORKER_SHARD_CALLBACK_SCOPE_MISMATCH$'):
+            executor._worker_shard_input(env, bound, 'normal', lifecycle_target, sha256_hex(lifecycle_path.read_bytes()))
+        path.write_bytes(original)
+
+    legacy = {key: item for key, item in fragment.items() if key != 'callback_source_sha256'}
+    old_executor = KubernetesSupplyBootExecutor({'normal': {'worker_shard_input': legacy}}, runner=forbidden)
+    old_record, old_scope, old_result = old_executor._worker_shard_input(
+        env, bound, 'normal', lifecycle_target, sha256_hex(lifecycle_path.read_bytes()))
+    assert (old_record, old_scope) == (record, scope)
+    assert old_result == {key: item for key, item in result.items() if key != 'callback_source_sha256'}
+
+    assert len(capture['raw_page_refs']) >= 2
+    page = root / 'callback-pages' / capture['raw_page_refs'][0]['path']
+    page_raw = page.read_bytes()
+    assert sha256_hex(page_raw) == capture['raw_page_refs'][0]['sha256']
+    page.write_bytes(page_raw + b'\n')
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_SOURCE_CHANGED$'):
+        handoff.prepare(selection_path, selection_sha, root / 'changed-page')
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_SOURCE_CHANGED$'):
+        executor._worker_shard_input(env, bound, 'normal', lifecycle_target, sha256_hex(lifecycle_path.read_bytes()))
+    assert not (root / 'changed-page').exists()
+    page.write_bytes(page_raw)
+
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_PAGES_INVALID$'):
+        handoff.prepare(selection_path, write_selection(with_archive=False), root / 'missing-page-archive')
+    assert not (root / 'missing-page-archive').exists()
+
+    repeated_page = deepcopy(capture)
+    repeated_page['raw_page_refs'][1]['sha256'] = repeated_page['raw_page_refs'][0]['sha256']
+    capture_path.write_bytes(canonical_json(repeated_page))
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_PAGES_INVALID$'):
+        handoff.prepare(selection_path, write_selection(), root / 'repeated-page')
+    assert not (root / 'repeated-page').exists()
+
+    other_rank = deepcopy(capture)
+    other_rank['records']['worker-shard-load']['record']['bindings'][0]['rank'] += 1
+    capture_path.write_bytes(canonical_json(other_rank))
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_PAGE_PROJECTION_MISMATCH$'):
+        handoff.prepare(selection_path, write_selection(), root / 'other-rank')
+    assert not (root / 'other-rank').exists()
+
+    capture_path.write_bytes(canonical_json({**capture, 'raw_page_refs': []}))
+    prior = handoff.prepare(selection_path, write_selection(with_archive=False), root / 'unarchived-handoff')
+    assert prior['worker_shard_input']['sha256'] == fragment['sha256']
+    assert 'capture_archive' not in prior['worker_shard_input']
+    assert 'callback_source_sha256' not in prior['worker_shard_input']
+    assert 'native_rank_witnesses' not in prior
+    assert prior['source_ended'] is prior['owner_binding_verified'] is prior['producer_authenticated'] is False
+    capture_path.write_bytes(capture_raw)
+
+    previous_epoch = deepcopy(capture)
+    previous_epoch['processes'][0]['start_ticks'] += 1
+    capture_path.write_bytes(canonical_json(previous_epoch))
+    with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_PREFIX_MISMATCH$'):
+        handoff.prepare(selection_path, write_selection(), root / 'other-process-epoch')
+    assert not (root / 'other-process-epoch').exists()
+    capture_path.write_bytes(capture_raw)
+    assert write_selection() == selection_sha
 
     capture_path.write_bytes(capture_raw + b'\n')
     with pytest.raises(ValueError, match='^MVP_SUP06_WORKER_SHARD_SOURCE_CHANGED$'):

@@ -3,11 +3,13 @@
 No credential contents, copy mutation, issuer call or reuse request is made.
 Collection is separate from actual copy membership, treatment and enforcement.
 """
-from pathlib import Path
+from datetime import datetime, timezone
 import os,stat
-from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
+from guard.collectors.file import load_bounded_json
+from guard.models import canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
 from guard.runtime.kubernetes_http import KubernetesBindingError,KubernetesHTTP,REQUEST_BINDING_PROFILE,REQUIRED_EVENT_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_observation import RequiredEventReader, _read_snapshot_target
 from .owned_capture import MAX_BYTES
@@ -15,6 +17,10 @@ from . import credential_copy_contract as contract
 
 SNAPSHOT_OPTION='copy_record_snapshot_only'
 SNAPSHOT_VERSION='0.2.1+copy-record-snapshot'
+
+
+def _snapshot_time():
+    return datetime.now(timezone.utc)
 
 
 def load_inventory(path,expected_hash,expected_policy):
@@ -36,8 +42,9 @@ def load_inventory(path,expected_hash,expected_policy):
 class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
     name='required_event_record';version='0.2.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
-    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
+    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None, expected_target_file_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
+        self.expected_target_file_sha256 = expected_target_file_sha256
         if self.cfg.get(SNAPSHOT_OPTION) is True:self.version=SNAPSHOT_VERSION
 
     def validate_policy(self,check,values):
@@ -83,7 +90,7 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
         try:
             if env.ref().sha256 != values['copy_environment_sha256']:
                 raise ValueError
-            target = _read_snapshot_target(self.cfg['target'])
+            target = _read_snapshot_target(self.cfg['target'], expected_file_sha256=self.expected_target_file_sha256)
             self._validate_target(target, values, True, expected_target_sha256=expected_target_sha256)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             raise ValueError('COPY_CONFIGURATION_INVALID') from None
@@ -100,11 +107,12 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
         try:
             if set(self.cfg)-{'target','copy_inventory','kubectl_binary','max_duration_seconds',SNAPSHOT_OPTION} or adapter is None:raise ValueError
             start,end=contract.normalize_policy(policy_values)
-            if env.ref().sha256!=policy_values['copy_environment_sha256'] or not start<=utcnow()<=end:raise ValueError
+            now = _snapshot_time() if snapshot_only else utcnow()
+            if env.ref().sha256!=policy_values['copy_environment_sha256'] or not start<=now<=end:raise ValueError
             if snapshot_only:
-                target = _read_snapshot_target(self.cfg['target'])
+                target = _read_snapshot_target(self.cfg['target'], expected_file_sha256=self.expected_target_file_sha256)
             else:
-                with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+                target = load_bounded_json(self.cfg['target'])
             self._validate_target(target, policy_values, snapshot_only)
             if inventory is None:
                 inventory = self._bound_inventory(policy_values)
@@ -121,20 +129,24 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
         values=ctx.policy_values;start,end=contract.normalize_policy(values);reader=None;snapshots=[];collection=[];diagnostics=[]
         snapshot_only=getattr(ctx,'_copy_snapshot_only',False)
         def collect_stage(stage):
-            row={'stage':stage,'collected':False,'file_bytes_sha256':None,'file_bytes':None,'owner_binding_verified':False,'collected_at':utcnow().isoformat()}
+            read_started = _snapshot_time() if snapshot_only else utcnow()
+            row={'stage':stage,'collected':False,'file_bytes_sha256':None,'file_bytes':None,'owner_binding_verified':False,'collected_at':read_started.isoformat()}
             try:
-                if not start<=utcnow()<=end:raise ValueError
+                if not start <= (read_started if snapshot_only else utcnow()) <= end:raise ValueError
                 role=reader.binding['engine']
                 raw,provenance=reader.read_file(reader,ctx.target,container=role['container'],image=role['image'],
                     path='/guard-observation/data/'+values['copy_record_session']+'/required-events.json')
+                read_finished = _snapshot_time() if snapshot_only else None
+                if snapshot_only and reader._parent_cleanup_failures:raise ValueError
                 packet=contract.validate_record(strict_json(raw,limit=MAX_BYTES),environment_ref=ctx.env.ref().model_dump(mode='json'),
                     target_sha256=values['copy_target_sha256'],session=values['copy_record_session'],
                     source_sha256=values['copy_record_source_sha256'],inventory_sha256=values['copy_inventory_sha256'],policy_sha256=values['copy_policy_sha256'])
-                if provenance.get('owner_binding_verified') is not True or not start<=utcnow()<=end:raise ValueError
+                if provenance.get('owner_binding_verified') is not True or not start <= (read_finished if snapshot_only else utcnow()) <= end:raise ValueError
                 snapshot={'stage':stage,'collected':True,'packet':packet}
                 if snapshot_only:
-                    if not start<=contract.stamp(packet['recorded_at'])<=utcnow():raise ValueError
-                row.update(collected=True,file_bytes_sha256=sha256_hex(raw),file_bytes=len(raw),
+                    if read_finished < read_started or not start <= contract.stamp(packet['recorded_at']) <= read_finished:raise ValueError
+                    row['collected_at'] = read_finished.isoformat()
+                row.update(collected=True,file_bytes_sha256=provenance['capture_sha256'],file_bytes=provenance['bytes'],
                     owner_binding_verified=provenance.get('owner_binding_verified') is True)
                 snapshots.append(snapshot)
             except Exception:diagnostics.append('COPY_RECORD_UNAVAILABLE')
@@ -193,12 +205,10 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
                     output[key]={'value':None,'collected':False}
         return output,normal,challenges,summary
 
-    def _finish(self,ctx):
-        draft=super()._finish(ctx)
-        ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin=min(draft.data_origin,ceiling,key=lambda value:ORIGIN_STRENGTH[value])
-        if ctx._copy_gap or ctx._copy_cleanup:
-            draft.status=ExecStatus.ABORTED
-            if getattr(ctx,'_copy_snapshot_only',False):draft.abort_reason=draft.abort_reason or 'COPY_RECORD_SNAPSHOT_INCOMPLETE'
-        draft.cleanup_errors.extend(ctx._copy_cleanup)
-        return draft
+    def _finish(self, ctx):
+        draft = super()._finish(ctx)
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self.runner is not None or ctx.target['lab'])
+        incomplete = bool(ctx._copy_gap or ctx._copy_cleanup)
+        if incomplete and getattr(ctx, '_copy_snapshot_only', False):
+            draft.abort_reason = draft.abort_reason or 'COPY_RECORD_SNAPSHOT_INCOMPLETE'
+        return draft.finish_collection(ceiling, incomplete, ctx._copy_cleanup)

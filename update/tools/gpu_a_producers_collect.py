@@ -15,6 +15,7 @@ import argparse
 import json
 import subprocess
 from pathlib import Path
+from threading import get_ident
 
 from guard.collectors.engine_callbacks import load_prepared
 from guard.collectors.file import load_environment
@@ -25,10 +26,16 @@ from guard.collectors import scoped_consumption
 from guard.collectors import worker_shard_producer
 from guard.collectors.gpu_common_inputs import GpuInputError
 from guard.collectors.gpu_common_input_v4 import event_count
-from guard.models import canonical_json, sha256_hex
-from guard.runtime.engine_http import ENGINE_CALLBACK_PROFILE, KubernetesHTTP
+from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.runtime.engine_http import (
+    ENGINE_CALLBACK_PROFILE, NORMAL_CALLBACK_ATTESTATION_SCHEMA, NORMAL_CALLBACK_CUT_GAP,
+    KubernetesBindingError, KubernetesHTTP,
+)
 
 SCHEMA = 'byul-gpu-a-producers-collect/1'
+NORMAL_SAMPLING_TRIAL_SCHEMA = 'byul-normal-sampling-trial/1'
+_NORMAL_SAMPLING_TRIAL_DIRECTORY = 'normal-sampling-trial'
+_NORMAL_SAMPLING_SCOPE_ERROR = 'NORMAL_SAMPLING_TRIAL_SCOPE_INVALID'
 # 준비 설정 플래그 → (기록 kind, 생산 함수)
 SIMPLE = (('request_attempts', 'request-attempt', producers.request_attempt_record),
           ('generation_transitions', 'generation-transition', producers.generation_transition_record),
@@ -98,35 +105,244 @@ def collect_process_device(transport, scope, *, mode, spec_overrides=None):
     return {'record': record, 'validation': result, 'node_scanned': node['scanned'], 'open_test': opened}
 
 
-def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode=None, spec_overrides=None, runner_scope=None, pages_dir=None, expected_requests=None, topology=None, request_actors=None):
+def _archive_normal_sampling_receipt(draft, archive, pins, *, started, finished, transport_origin):
+    from guard.executors.base import EvidenceDraft
+    from guard.executors.kubernetes_sampling import NORMAL_OPTION, KubernetesSamplingExecutor
+    from guard.executors.normal_sampling_receipt import qualify_summary
+    from guard.update_validation import _plain_path
+    from tools.mvp_a_input_preflight import _read
+
+    if (not isinstance(draft, EvidenceDraft) or draft.status not in {ExecStatus.COMPLETED, ExecStatus.ABORTED}
+            or draft.config != {NORMAL_OPTION: True, 'target_sha256': pins['target_sha256']}
+            or draft.normal_control.attempted is not True or len(draft.artifacts) != 1
+            or draft.started_at is None or draft.started_at.utcoffset() is None
+            or draft.finished_at is None or draft.finished_at.utcoffset() is None
+            or not started <= draft.started_at <= draft.finished_at <= finished):
+        raise ValueError
+    artifact, = draft.artifacts
+    if (artifact.name != 'normal_sampling.json' or artifact.path.name != artifact.name
+            or artifact.collector != f'{KubernetesSamplingExecutor.name}/{KubernetesSamplingExecutor.version}'):
+        raise ValueError
+    raw, _ = _read(_plain_path(artifact.path), max_bytes=16 * 1024)
+    digest = sha256_hex(raw)
+    qualified = qualify_summary(raw, expected_file_sha256=digest, expected_pins=pins)
+    if draft.status == ExecStatus.COMPLETED and (
+            draft.abort_reason is not None or draft.cleanup_errors or draft.normal_control.succeeded is not True
+            or qualified['reported_completion_shape_verified'] is not True):
+        raise ValueError
+    with (archive / artifact.name).open('xb') as stream:
+        stream.write(raw)
+    origin = min(draft.data_origin, DataOrigin(transport_origin), key=ORIGIN_STRENGTH.__getitem__)
+    return {'path': artifact.name, 'sha256': digest, 'bytes': len(raw), 'data_origin': origin.value,
+            'execution_status': draft.status.value, 'started_at': draft.started_at.isoformat(),
+            'finished_at': draft.finished_at.isoformat()}
+
+
+def _collect_normal_sampling_trial(transport, session, pages_dir, operation, request_sha256, capture_options,
+                                   *, observe_response):
+    from guard.update_validation import _plain_path
+
+    pages_dir = _plain_path(Path(pages_dir))
+    pages_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
+    archive = pages_dir / _NORMAL_SAMPLING_TRIAL_DIRECTORY
+    archive.mkdir(mode=0o700)
+    pins = {'target_sha256': transport.target_sha256, 'binding_sha256': sha256_hex(canonical_json(transport.binding)),
+            'probe_source_sha256': transport.source_sha256, 'request_body_sha256': request_sha256}
+    cut = transport.begin_callback_trial(session, archive=archive, **capture_options)
+    thread = get_ident()
+    accepting = seen = False
+    pending = observation = None
+
+    def remember_response(*, body_bytes, summary_sha256, environment_ref, data_origin):
+        nonlocal pending, seen
+        if not accepting or get_ident() != thread:
+            return
+        if seen:
+            pending = None
+            return
+        seen = True
+        if (type(body_bytes) is not bytes or not 0 < len(body_bytes) <= 128 * 1024
+                or type(summary_sha256) is not str or len(summary_sha256) != 64
+                or any(char not in '0123456789abcdef' for char in summary_sha256)
+                or type(environment_ref) is not dict or environment_ref != cut['environment_ref']
+                or type(data_origin) is not str or data_origin != cut['data_origin']):
+            return
+        pending = {'body_bytes': body_bytes, 'summary_sha256': summary_sha256,
+                   'environment_ref': cut['environment_ref'], 'data_origin': data_origin,
+                   'attempt_sha256': sha256_hex(canonical_json(cut))}
+
+    diagnostics = []
+    returned = False
+    draft = None
+    try:
+        transport.verify_normal_callback_cut(session, cut, **capture_options)
+        started = utcnow()
+        accepting = observe_response
+        try:
+            draft = operation(normal_response_observer=remember_response) if observe_response else operation()
+        except Exception:
+            diagnostics.append('NORMAL_SAMPLING_OPERATION_FAILED')
+        else:
+            returned = True
+            observation = pending
+        finally:
+            accepting = False
+            pending = None
+        finished = utcnow()
+    finally:
+        try:
+            captured = transport.engine_attempt_events(session, archive=pages_dir,
+                                                       normal_callback_cut=cut, **capture_options)
+        except (KubernetesBindingError, OSError, ValueError):
+            captured = {'processes': [], 'truncated': True, 'diagnostic_codes': [NORMAL_CALLBACK_CUT_GAP]}
+    receipt = None
+    if returned:
+        try:
+            receipt = _archive_normal_sampling_receipt(draft, archive, pins, started=started, finished=finished,
+                                                       transport_origin=transport.process_observation_origin)
+        except (KeyError, OSError, TypeError, ValueError):
+            diagnostics.append('NORMAL_SAMPLING_RECEIPT_UNVERIFIED')
+    return captured, {'schema': NORMAL_SAMPLING_TRIAL_SCHEMA, 'archive_dir': _NORMAL_SAMPLING_TRIAL_DIRECTORY,
+                      'cut': cut, 'cut_verified': captured.get('normal_callback_cut_verified') is True,
+                      'operation_returned': returned, 'diagnostic_codes': diagnostics,
+                      'expected_pins': pins, 'receipt': receipt}, observation
+
+
+def _associate_normal_response(captured, trial, observer, links, *, pages_dir, scope, settings, api_model):
+    from guard.executors.normal_sampling_receipt import associate_response
+    from guard.update_validation import _plain_path
+    from tools.mvp_a_input_preflight import _read
+
+    cut, receipt, pins = (trial[key] for key in ('cut', 'receipt', 'expected_pins'))
+    session = scope['session']
+    mounted = captured.get('mounted_source_attestation') or {}
+    if (observer is None or receipt is None or receipt['execution_status'] != ExecStatus.COMPLETED
+            or not trial['cut_verified'] or captured.get('normal_callback_cut') != cut
+            or captured.get('truncated') is not False or mounted.get('collection_truncated') is not False
+            or mounted.get('schema') != NORMAL_CALLBACK_ATTESTATION_SCHEMA or not captured.get('page_refs')
+            or mounted.get('observed_pages') != len(captured['page_refs'])
+            or cut['environment_ref'] != scope['environment_ref'] or cut['target_sha256'] != pins['target_sha256']
+            or cut['owned_generation_sha256'] != pins['binding_sha256']
+            or cut['session_sha256'] != sha256_hex(session.encode()) or settings['session'] != session
+            or observer['data_origin'] != receipt['data_origin']
+            or observer['summary_sha256'] != receipt['sha256']
+            or any(mounted.get(key) != cut[key] for key in (
+                'data_origin', 'environment_ref', 'target_sha256', 'target_file_sha256',
+                'plan_sha256', 'source_sha256', 'owned_generation_sha256'))
+            or sha256_hex(canonical_json(mounted.get('observation'))) != cut['source_observation_sha256']):
+        raise ValueError
+    archive = Path(pages_dir) / trial['archive_dir']
+    start = cut['start_page']
+    raw_start, _ = _read(_plain_path(archive / start['path']), max_bytes=1024**2)
+    if sha256_hex(raw_start) != start['sha256']:
+        raise ValueError
+    raw_summary, _ = _read(_plain_path(archive / receipt['path']), max_bytes=16 * 1024)
+    if len(raw_summary) != receipt['bytes']:
+        raise ValueError
+    callback_capture = {key: captured[key] for key in (
+        'normal_callback_cut', 'normal_callback_cut_verified', 'truncated')}
+    return associate_response(raw_summary, expected_file_sha256=receipt['sha256'], expected_pins=pins,
+        observer=observer, callback_capture={**callback_capture, 'native_request_links': links},
+        expected_cut=cut, session=session, request_key=bytes.fromhex(settings['secret']), api_model=api_model)
+
+
+def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode=None, spec_overrides=None,
+            runner_scope=None, pages_dir=None, expected_requests=None, topology=None, request_actors=None,
+            target_file_sha256=None, normal_sampling_operation=None, normal_sampling_request_sha256=None,
+            observe_normal_sampling_response=False):
+    """The caller supplies the approved operation, optionally accepting a one-shot response observer."""
+    normal_trial = normal_sampling_operation is not None or normal_sampling_request_sha256 is not None
+    if type(observe_normal_sampling_response) is not bool or observe_normal_sampling_response and not normal_trial:
+        raise ValueError(_NORMAL_SAMPLING_SCOPE_ERROR)
+    if normal_trial and (not callable(normal_sampling_operation) or type(normal_sampling_request_sha256) is not str
+            or len(normal_sampling_request_sha256) != 64
+            or any(char not in '0123456789abcdef' for char in normal_sampling_request_sha256)
+            or pages_dir is None or node_view_mode is not None or spec_overrides is not None):
+        raise ValueError(_NORMAL_SAMPLING_SCOPE_ERROR)
     environment = load_environment(env_path)
-    target = json.loads(Path(target_path).read_text())
-    prepared = load_prepared(prepared_dir)
-    settings = json.loads((Path(prepared_dir) / 'settings.json').read_text())
+    callback_fields = [field for field in (environment.runtime.platform or '').split('; ')
+                       if field.startswith('normal_tp2_callbacks_sha256=')]
+    if target_file_sha256 is not None or callback_fields:
+        from tools.gpu_a_normal_tp2_callbacks import read_pinned_target
+
+        target = read_pinned_target(target_path, target_file_sha256)
+    else:
+        target = json.loads(Path(target_path).read_text())
+    capture_options = {}
+    if 'normal_tp2_callbacks' in target:
+        from tools.gpu_a_normal_tp2_callbacks import ERROR, environment_field, plan_sha256, read_preparation, verify_mounted_pod
+
+        expected = target.get('normal_tp2_callbacks')
+        if (target_file_sha256 is None or node_view_mode is not None
+                or callback_fields != [environment_field(expected)] or target.get('lab') is not False
+                or target.get('synthetic') is True):
+            raise ValueError(ERROR)
+        actual, files, prepared, settings = read_preparation(prepared_dir, expected['mode'])
+        if any(expected[key] != value for key, value in actual.items()):
+            raise ValueError(ERROR)
+        capture_options = {
+            'normal_callback_assets': {
+                'target_file_sha256': target_file_sha256, 'plan_sha256': plan_sha256(expected),
+                'files': {name: {'bytes': len(raw), 'sha256': sha256_hex(raw)} for name, raw in files.items()},
+            },
+            'normal_pod_check': lambda pod: verify_mounted_pod(target, environment, pod),
+        }
+    else:
+        prepared = load_prepared(prepared_dir)
+        settings = json.loads((Path(prepared_dir) / 'settings.json').read_text())
+    if normal_trial and (not capture_options or prepared.get('scoped_runner_consumption') is not True
+            or settings.get('scoped_runner_consumption') is not True):
+        raise ValueError(_NORMAL_SAMPLING_SCOPE_ERROR)
     transport = KubernetesHTTP(target, environment, duration=duration, profile=ENGINE_CALLBACK_PROFILE)
     scope = {'pod': transport.binding['engine'], 'environment_ref': environment.ref().model_dump(mode='json'),
              'target_sha256': sha256_hex(canonical_json(target)), 'prepared_sha256': sha256_hex(canonical_json(prepared)),
              'session': prepared['session']}
     roots = settings.get('supply_roots') or []
     mount_before = transport.supply_mount_exclusivity(roots) if roots else None
-    value = transport.engine_attempt_events(prepared['session'], archive=pages_dir)
+    if normal_trial:
+        value, trial, response_observation = _collect_normal_sampling_trial(
+            transport, prepared['session'], pages_dir, normal_sampling_operation,
+            normal_sampling_request_sha256, capture_options, observe_response=observe_normal_sampling_response)
+    else:
+        value = transport.engine_attempt_events(prepared['session'], archive=pages_dir, **capture_options)
     processes, truncated = value['processes'], value['truncated']
     page_refs = value.get('page_refs', [])
     page_capture = {k: value[k] for k in ('diagnostic_codes', 'source_events', 'scope') if k in value}
     records, summaries = {}, []
-    if settings.get('runner_consumption') or settings.get('scoped_runner_consumption'):
-        # /1 writers remain available for historical reproduction only. New
-        # captures use scoped coverage even when reading a legacy prepared set.
+    native_request_links = []
+    scoped_requested = bool(settings.get('scoped_runner_consumption') or prepared.get('scoped_runner_consumption'))
+    if settings.get('runner_consumption') or scoped_requested:
+        # /1 writers remain available for historical reproduction only.
         try:
             from guard.collectors import actor_consumption
-            record, result = actor_consumption.record(processes, topology=topology, request_actors=request_actors, truncated=truncated, expected_stage_ranks=runner_scope, expected_requests=expected_requests, qualification_scope={
+
+            if scoped_requested and (settings.get('session') != prepared['session'] or any(
+                    source.get('scoped_runner_consumption') is not True or source.get('runner_consumption') is not False
+                    for source in (settings, prepared))):
+                raise GpuInputError('GPU_INPUT_SCOPED_PREPARATION_MISMATCH')
+            reviewed = (scoped_requested and target.get('lab') is False and target.get('synthetic') is not True and all(
+                source.get('lab_faults') is False and source.get('lab_kernel_checks') is False
+                for source in (settings, prepared)))
+            record, result = actor_consumption.record(processes, topology=topology, request_actors=request_actors,
+                truncated=truncated, expected_stage_ranks=runner_scope, expected_requests=expected_requests,
+                reviewed_scoped_sources=reviewed, retain_request_links=bool(capture_options), qualification_scope={
                 'engine': environment.engine.name, 'engine_version': environment.engine.version,
                 'image_digest': environment.engine.image_digest, 'backend': 'gpu' if environment.runtime.gpu_count else 'cpu',
                 'origin': transport.process_observation_origin}, **scope)
+            native_request_links = result.pop('native_request_links', [])
             records['scoped-runner-consumption'] = {'record': record, 'validation': result}
             summaries.append(_summary(record, result))
         except GpuInputError as error:
             records['scoped-runner-consumption'] = {'contract_error': str(error)}
+    if observe_normal_sampling_response:
+        try:
+            trial['response_association'] = _associate_normal_response(
+                value, trial, response_observation, native_request_links, pages_dir=pages_dir, scope=scope,
+                settings=settings, api_model=transport.api_model)
+        except (KeyError, OSError, TypeError, ValueError):
+            trial['diagnostic_codes'].append('NORMAL_SAMPLING_RESPONSE_ASSOCIATION_UNVERIFIED')
+        finally:
+            response_observation = None
     for flag, kind, make in SIMPLE:
         if not settings.get(flag):
             continue
@@ -169,13 +385,18 @@ def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode
                          else {'kind': 'process-device-provider', 'contract_error': value['contract_error']})
     return {'schema': SCHEMA, 'session': prepared['session'], 'truncated': truncated,
             'processes': [{'pid': p['pid'], 'start_ticks': p['start_ticks'], 'rows': len(p['events'])} for p in processes],
-            'summaries': summaries, 'records': records, 'raw_page_refs': page_refs, 'page_capture': page_capture}
+            'summaries': summaries, 'records': records, 'raw_page_refs': page_refs, 'page_capture': page_capture,
+            **({'mounted_source_attestation': value['mounted_source_attestation']}
+               if 'mounted_source_attestation' in value else {}),
+            **({'normal_sampling_trial': trial} if normal_trial else {}),
+            **({'native_request_links': native_request_links} if native_request_links else {})}
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--env', required=True); parser.add_argument('--target', required=True)
     parser.add_argument('--prepared', required=True); parser.add_argument('--out', required=True)
+    parser.add_argument('--target-file-sha256', help='Independent raw target pin for prepared normal TP2 callbacks')
     parser.add_argument('--duration', type=int, default=240)
     parser.add_argument('--expected-requests', type=Path, help='실행 전에 고정한 요청 HMAC 목록 JSON; 미입력은 범위 미확인')
     parser.add_argument('--runner-scope', type=Path, help='단계별 기대 rank JSON; 미입력은 범위 미확인으로 남음')
@@ -188,6 +409,7 @@ def main(argv=None):
     if out.exists():
         raise SystemExit('출력 파일이 이미 있습니다')
     value = collect(env_path=args.env, target_path=args.target, prepared_dir=args.prepared, duration=args.duration,
+                    target_file_sha256=args.target_file_sha256,
                     node_view_mode=args.node_view, spec_overrides={'dev_root': args.node_dev_root},
                     runner_scope=json.loads(args.runner_scope.read_text()) if args.runner_scope else None,
                     pages_dir=out.with_suffix('.pages'), expected_requests=json.loads(args.expected_requests.read_text()) if args.expected_requests else None,

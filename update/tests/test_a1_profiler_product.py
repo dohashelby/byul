@@ -33,6 +33,14 @@ def insert_profiler(raw,events,mode):
                     if payload[key] is not None:payload[key]+=offset
                 if mode=='unsafe-profiler-record':payload['unexpected']=PRIVATE
             rows.insert(-1,value)
+        if mode in {'profiler-before-call', 'profiler-after-return'}:
+            before, after = (next(row for row in values if row['event'] == 'PROFILER'
+                and row['payload']['point'] == 'Worker.profile' and row['payload']['is_start'] is False
+                and row['payload']['phase'] == phase) for phase in ('CALL', 'RETURN'))
+            if mode == 'profiler-before-call':
+                after['payload']['operation_started_ns'] = before['monotonic_ns'] - 1
+            else:
+                after['payload']['operation_finished_ns'] = after['monotonic_ns'] + 1
         rows[-1]['monotonic_ns']=max(rows[-1]['monotonic_ns'],values[-1]['monotonic_ns']+1)
     return revised(raw,add)
 
@@ -65,7 +73,8 @@ def inputs(tmp_path,group,target,patch,mode):
 
 @pytest.mark.parametrize('mode',['normal','backend-stop-failure','post-stop-output-failure','start-failure','native-one-missing','native-partial','native-census-gap',
     'after-timeout','attachment','seal-failure','engine-replaced','wrong-response-id','missing-profiler','wrong-rank','profile8','version032',
-    'actual-lab-false','prepared-mismatch','http-cleanup','unsafe-profiler-record'])
+    'actual-lab-false','prepared-mismatch','http-cleanup','unsafe-profiler-record',
+    'profiler-before-call','profiler-after-return'])
 def test_registered_cli_profiler_facts_and_source_failures_exact_refs(tmp_path,group,native_target,writer_factory,monkeypatch,mode):
     world,values,pack=inputs(tmp_path,group,native_target,monkeypatch,mode)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.capture_pipes',world.runner)
@@ -107,6 +116,14 @@ def test_registered_cli_profiler_facts_and_source_failures_exact_refs(tmp_path,g
         assert any(c['flag_adapter_conflict_observed'] for c in candidates)==conflict
         assert all(not c['actual_backend_stop_failed_verified'] and not c['actual_collection_continued_verified'] and not c['confirmed_full_state_violation'] for c in candidates)
     if mode in {'normal','backend-stop-failure','post-stop-output-failure','start-failure'}:assert e.execution.status.value=='COMPLETED'
+    if mode in {'profiler-before-call', 'profiler-after-return'}:
+        assert e.execution.status.value == 'ABORTED'
+        worker_calls = e.observations['profiler_worker_calls'].value
+        assert [row['is_start'] for row in worker_calls] == [True]
+        samples = e.observations['profiler_native_samples'].value
+        assert any(row['point'] == 'Worker.profile' and row['phase'] == 'RETURN' and row['is_start'] is False
+                   for row in samples)
+        assert 'profiler_source_process_call_binding_unavailable' in e.observations['profiler_missing'].value
     if mode in {'native-one-missing','native-partial','native-census-gap','after-timeout','attachment','seal-failure','engine-replaced','wrong-response-id',
         'missing-profiler','wrong-rank','profile8','version032','actual-lab-false','prepared-mismatch','http-cleanup','unsafe-profiler-record'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')

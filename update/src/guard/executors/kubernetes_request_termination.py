@@ -1,7 +1,7 @@
 """LIF10 closed disconnect procedure and existing native session capture."""
 from __future__ import annotations
-from datetime import datetime
-from pathlib import Path
+from guard.collectors.file import load_bounded_json
+from guard.executors.record_time import parse_record_time as _time
 import re
 import time
 import uuid
@@ -20,13 +20,6 @@ POLICY_TYPES={"termination_environment_sha256":"str","termination_target_sha256"
 OBSERVATIONS={"termination_attempts":"list","termination_native_events":"list",
     "termination_deadline_conflict_candidates":"list","termination_required_scope_status":"list",
     "termination_binding_observed":"bool","termination_scope_complete":"bool","worker_gpu_release_verified":"bool"}
-
-
-def _time(value):
-    if type(value) is not str or len(value)>40:raise ValueError
-    stamp=datetime.fromisoformat(value.replace("Z","+00:00"))
-    if stamp.tzinfo is None or stamp.utcoffset() is None:raise ValueError
-    return stamp
 
 
 def normalize_policy(values):
@@ -55,8 +48,9 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
     supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9","vllm-native-lifecycle-metadata/23","vllm-native-lifecycle-metadata/25","vllm-native-lifecycle-metadata/28","sglang-native-lifecycle-metadata/1"})
     configuration_keys=frozenset({'target','prepared','retry_scope','kubectl_binary','max_duration_seconds','node_image_verification'})
 
-    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
+    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None,expected_target_file_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target_sha256=expected_target_sha256
+        self.expected_target_file_sha256=expected_target_file_sha256
 
     def validate_policy(self,check,values):
         consumer=self._consumer(check)
@@ -86,6 +80,10 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             raise ValueError('TERMINATION_PROFILE_UNSUPPORTED')
         implementation=branches[key]
         if implementation is None:return self
+        if implementation is KubernetesRetryRecordExecutor:
+            return implementation(self.common_input_config(),runner=self.runner,environ=self._environ,
+                expected_target_sha256=self.expected_target_sha256,
+                expected_target_file_sha256=self.expected_target_file_sha256)
         return implementation(self.common_input_config(),runner=self.runner,environ=self._environ,
             expected_target_sha256=self.expected_target_sha256)
 
@@ -98,7 +96,7 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             if set(self.cfg)-self.configuration_keys or adapter is None or self.cfg.get('node_image_verification')not in (None,'local-containerd-v1'):raise ValueError
             if 'retry_scope' in self.cfg and (type(self.cfg['retry_scope']) is not str or not self.cfg['retry_scope']):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg["target"])
             digest=sha256_hex(canonical_json(target))
             if (digest!=policy_values[self.policy_prefix+"_target_sha256"] or env.ref().sha256!=policy_values[self.policy_prefix+"_environment_sha256"]
                     or self.expected_target_sha256 is not None and self.expected_target_sha256!=digest):raise ValueError

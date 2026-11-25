@@ -9,9 +9,11 @@ from guard.models.base import utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.comparison import execution_conditions
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP, PROFILE
+from guard.runtime.response_evidence import complete_body
 from .base import DraftArtifact, EvidenceDraft
 from .content_common import control_state
 from .http_common import Ctx
+from .kubernetes_observation import _read_snapshot_target
 from .response_projection import capture_metadata
 from .sampling_validation import SamplingValidationExecutor
 
@@ -79,23 +81,20 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
 
     def prepared_normal_sampling(self, check, env, values, *, expected_target_sha256=None):
         """Validate the saved normal control declaration without building or dispatching a request."""
-        from guard.adapters.vllm_file_read_sensor import dependency
-
         if self.cfg.get(NORMAL_OPTION) is not True:
             raise ValueError("KUBERNETES_SAMPLING_NORMAL_SCOPE_INVALID")
         self.validate_policy(check, values)
         try:
-            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            target = _read_snapshot_target(self.cfg["target"])
             self._normal_transport(target, env, expected_target_sha256=expected_target_sha256)
         except (KeyError, TypeError, ValueError, OSError, OverflowError, KubernetesBindingError):
             raise ValueError("KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED") from None
 
-    def _run_normal(self, check, env, values, adapter, workdir):
+    def _run_normal(self, check, env, values, adapter, workdir, *, normal_response_observer=None):
         self.validate_policy(check, values)
         started = utcnow()
         try:
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = _read_snapshot_target(self.cfg["target"])
             if adapter is None:
                 raise ValueError
             target_sha, transport = self._normal_transport(target, env)
@@ -117,16 +116,16 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         reports = report["requests"]
         bound = bool(len(reports) == 1 and reports[0]["id"] == NORMAL_LABEL
                      and reports[0]["binding_verified_before_after"] is True
+                     and all(response.get(key) == request[key] for key in ("id", "method", "mode"))
                      and reports[0]["outcome"] == response.get("outcome"))
-        complete = bool(bound and response.get("capture_complete") is True and response.get("eof") is True
-                        and response.get("utf8_valid") is True and response.get("body_truncated") is False
-                        and capture["original_json_state"] == "valid"
+        response_bytes = complete_body(response) if bound else None
+        complete = bool(response_bytes is not None and capture["original_json_state"] == "valid"
                         and capture.get("original_body_bytes") == response.get("body_bytes")
                         and capture.get("original_body_sha256") == response.get("body_sha256"))
         normal = False
         if complete and control_state(response, transport.api_model, NORMAL_PATH) == "pass":
             try:
-                payload = strict_json(response["body"].encode(), limit=131072)
+                payload = strict_json(response_bytes, limit=131072)
                 normal = len(payload["choices"]) == 1 and payload["usage"]["completion_tokens"] == NORMAL_OPTIONS["max_tokens"]
             except (KeyError, TypeError, ValueError):
                 normal = False
@@ -147,11 +146,12 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
                    "response_capture": capture if bound else None, "normal_completion_shape_verified": normal,
                    "uncollected": ["sampling_limits", "runner_consumption", "rejections", "structured_output", "tool_selection"]}
         artifacts = []
+        summary_bytes = canonical_json(summary)
         try:
             path = Path(workdir) / "normal_sampling.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("xb") as stream:
-                stream.write(canonical_json(summary))
+                stream.write(summary_bytes)
             artifacts.append(DraftArtifact(name=path.name, path=path, collector=f"{self.name}/{self.version}"))
         except OSError:
             cleanup.append("SAMPLING_NORMAL_ARTIFACT_UNAVAILABLE")
@@ -159,6 +159,13 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         origin = DataOrigin(transport.process_observation_origin)
         if error and origin == DataOrigin.MEASURED:
             origin = DataOrigin.DECLARED
+        if normal_response_observer is not None and error is None:
+            normal_response_observer(
+                body_bytes=response_bytes,
+                summary_sha256=sha256_hex(summary_bytes),
+                environment_ref=env.ref().model_dump(mode="json"),
+                data_origin=origin.value,
+            )
         comparability = {}
         if not error and type(target.get("comparison_config")) is dict and target["comparison_config"]:
             fixture = {"profile": NORMAL_PROFILE, "request_body_sha256": summary["request_body_sha256"]}
@@ -179,9 +186,15 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
             artifacts=artifacts, comparability=comparability, config={NORMAL_OPTION: True, "target_sha256": target_sha},
             started_at=started, finished_at=utcnow(), abort_reason=error, cleanup_errors=cleanup)
 
-    def run(self, check, env, policy_values, adapter, workdir):
+    def run(self, check, env, policy_values, adapter, workdir, *, normal_response_observer=None):
+        """For an owned normal trial, expose the verified response in memory only."""
+        if normal_response_observer is not None and (
+            self.cfg.get(NORMAL_OPTION) is not True or not callable(normal_response_observer)
+        ):
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_OBSERVER_INVALID")
         if NORMAL_OPTION in self.cfg:
-            return self._run_normal(check, env, policy_values, adapter, workdir)
+            return self._run_normal(check, env, policy_values, adapter, workdir,
+                                    normal_response_observer=normal_response_observer)
         allowed = {"target", "constraint_source", "constraint_engine_version", "max_output_tokens", "max_total_requests",
                    "max_probe_tokens", "max_duration_seconds", "request_timeout", "kubectl_binary", "roles",
                    "wrong_key_env", "denied_key_env", "allow_mutating_routes", "runner_input", "runner_capture"}

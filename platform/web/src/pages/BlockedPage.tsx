@@ -9,7 +9,7 @@ import { Time } from "../components/Value";
 import { matchesTarget, useEnvTarget } from "../lib/filters";
 import { GATEWAY_REASON } from "../lib/labels";
 import { inRange } from "../lib/time";
-import { isTetragonBlockAttempt, isTetragonSigkill } from "../lib/tetragon";
+import { isTetragonBlockAttempt, isTetragonSigkill, isTetragonExecDenyAttempt } from "../lib/tetragon";
 import { carry, useGlobalFilters, useParams } from "../lib/url";
 import ui from "../components/ui.module.css";
 import p from "./pages.module.css";
@@ -19,7 +19,8 @@ export function blockedRows(requests: RequestRow[], events: RuntimeEvent[]) {
   return {
     requests: requests.filter((r) => r.delivery_attempted === false && ["denied", "invalid", "error"].includes(r.outcome)),
     network: events.filter((e) => e.source === "hubble" && e.observation?.verdict?.toLowerCase() === "dropped"),
-    files: events.filter(isTetragonBlockAttempt),
+    files: events.filter((e) => isTetragonBlockAttempt(e) && !isTetragonExecDenyAttempt(e)),
+    execs: events.filter(isTetragonExecDenyAttempt),
   };
 }
 
@@ -31,7 +32,7 @@ export function BlockedPage() {
   const [params, patch] = useParams();
   const { hash } = useLocation();
   const selected = params.get("section") ?? hash.replace(/^#blocked-/, "");
-  const active = selected === "network" || selected === "files" ? selected : "requests";
+  const active = selected === "network" || selected === "files" || selected === "execs" ? selected : "requests";
   const rows = useMemo(() => blockedRows(
     (requests.data?.items ?? []).filter((r) => inRange(r.recorded_at, range) && matchesTarget(r.target_ref, env, targetRef)),
     (events.data?.items ?? []).filter((e) => inRange(e.recorded_at, range) && matchesTarget(e.target_ref, env, targetRef)),
@@ -42,7 +43,7 @@ export function BlockedPage() {
   const eventLink = (e: RuntimeEvent) => `/runtime/events${carry(params, { sel: e.event_id })}`;
   return <div className="page"><Query q={requests}>{() => <Query q={events}>{() => <>
     <div className={`${ui.cardTabs} ${p.blockedTabs}`} role="tablist" aria-label="차단 내역 구역">
-      {([ ["requests", "엔진에 전달되지 않은 요청", rows.requests.length], ["network", "네트워크 차단", rows.network.length], ["files", "파일 차단 시도", rows.files.length] ] as const).map(([id, label, count]) =>
+      {([ ["requests", "엔진에 전달되지 않은 요청", rows.requests.length], ["network", "네트워크 차단", rows.network.length], ["files", "파일 차단 시도", rows.files.length], ["execs", "실행 거부 시도", rows.execs.length] ] as const).map(([id, label, count]) =>
         <button key={id} type="button" role="tab" className={ui.cardTab} aria-selected={active === id} aria-controls={`blocked-${id}`} onClick={() => patch({ section: id, page: null })}>{label} {count}건</button>
       )}
     </div>
@@ -60,6 +61,17 @@ export function BlockedPage() {
       </tbody></table> : <p className="small muted">선택한 기간·환경에 Hubble DROPPED 기록이 없습니다. 수집 상태도 확인하세요.</p>}
       <Pagination state={pagination} />
       <p className="small muted">Hubble의 DROPPED 관측 기록입니다. 정책 귀속·수신 대조 전에는 통제 결과로 확정하지 않습니다.</p>
+    </section>}
+    {active === "execs" && <section id="blocked-execs" className={sectionClass} aria-label="실행 거부 시도">
+      <h2>실행 거부 시도 <span className={p.blockedCount}>{rows.execs.length}건</span></h2>
+      {rows.execs.length ? <table className={p.blockedTable}><thead><tr><th>시각</th><th>실행 대상</th><th>규칙</th><th>자료</th></tr></thead><tbody>
+        {rows.execs.slice(pagination.start, pagination.end).map((e) => <tr key={e.event_id}>
+          <td><Time iso={e.occurred_at ?? e.recorded_at} /></td><td><Link className="mono" to={eventLink(e)}>{e.observation?.binary ?? e.observation?.path ?? "확인 안 됨"}</Link></td>
+          <td>TG-EXEC-01 · Override</td><td><OriginBadge origin={e.data_origin} detail={e.origin_detail} /></td>
+        </tr>)}
+      </tbody></table> : <p className="small muted">실행 거부 시도 기록이 없습니다.</p>}
+      <Pagination state={pagination} />
+      <Link to="/runtime/enforce/tetragon">실제 실행 거부 시험 보기</Link>
     </section>}
     {active === "files" && <section id="blocked-files" className={sectionClass} aria-label="파일 차단 시도">
       <h2>파일 차단 시도 (Tetragon Override·Sigkill) <span className={p.blockedCount}>{rows.files.length}건</span></h2>

@@ -1,6 +1,7 @@
 """Exercise the normal SUP-05 executor through the canonical update pipeline."""
 
 from copy import deepcopy
+import json
 import os
 from pathlib import Path
 import socket
@@ -22,19 +23,26 @@ from tests.test_sup05_normal_file_reads import normal_case
 PACK = Path(__file__).resolve().parents[1] / "packs" / "PACK-BASELINE"
 
 
-@pytest.mark.parametrize("releases", [
-    pytest.param((None, None), id="native17"),
-    pytest.param(("0.30.0", "0.31.0"), id="reviewed-release-pair", marks=pytest.mark.skipif(
-        sys.platform != "linux" or os.uname().machine != "x86_64" or sys.version_info[:3] != (3, 12, 3)
-        or sys.flags.optimize != 0, reason="the selected producer ABI is Linux x86_64 CPython 3.12.3")),
+REVIEWED_ABI = pytest.mark.skipif(
+    sys.platform != "linux" or os.uname().machine != "x86_64" or sys.version_info[:3] != (3, 12, 3)
+    or sys.flags.optimize != 0, reason="the selected producer ABI is Linux x86_64 CPython 3.12.3")
+
+
+@pytest.mark.parametrize(("releases", "through_preparation"), [
+    pytest.param((None, None), False, id="native17"),
+    pytest.param(("0.30.0", "0.31.0"), False, id="reviewed-release-pair", marks=REVIEWED_ABI),
+    pytest.param(("0.30.0", "0.31.0"), True, id="prepared-release-pair", marks=REVIEWED_ABI),
 ])
-def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, external, monkeypatch, releases):
+def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, external, monkeypatch, releases,
+                                                              through_preparation):
     model_root = external / "approved-model"
     sides = {
         "baseline": normal_case(external / "baseline", monkeypatch, model_root=model_root,
-                                env_id="ENV-EXAMPLE-SUP05-BASELINE", release=releases[0]),
+                                env_id="ENV-EXAMPLE-SUP05-BASELINE", release=releases[0],
+                                through_preparation=through_preparation),
         "candidate": normal_case(external / "candidate", monkeypatch, model_root=model_root,
-                                 env_id="ENV-EXAMPLE-SUP05-CANDIDATE", release=releases[1], engine_role={
+                                 env_id="ENV-EXAMPLE-SUP05-CANDIDATE", release=releases[1],
+                                 through_preparation=through_preparation, engine_role={
                                      "pod_uid": "00000000-0000-0000-0000-000000000099",
                                      "container_id": "containerd://" + "c" * 64,
                                  }),
@@ -46,7 +54,8 @@ def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, extern
         "executors": {"supply_boot": "kubernetes"},
         "update": {"mode": "external", "allowed_checks": ["SUP-05"]},
         "check_config": {"SUP-05": {"normal_file_reads_only": True}},
-        "sides": {side: {"supply_boot": {"normal": data.cfg["normal"]}} for side, data in sides.items()},
+        "sides": {side: {"supply_boot": {key: value for key, value in data.cfg.items()
+                                         if key != "normal_file_reads_only"}} for side, data in sides.items()},
     }
     runners = {data.cfg["normal"]["target"]: data.runner for data in sides.values()}
     executor = kubernetes_supply_boot.KubernetesSupplyBootExecutor
@@ -107,6 +116,11 @@ def test_public_update_keeps_the_two_bound_normal_read_sessions(tmp_path, extern
         assert receipt["target_sha256"] == expected.values["supply_normal_target_sha256"]
         assert receipt["prepared_sha256"] == expected.values["supply_normal_prepared_sha256"]
         assert receipt["producer_authenticated"] is False
+        if through_preparation:
+            summary_artifact = next(item for item in evidence.artifacts if item.name == "supply_boot_summary.json")
+            summary = json.loads((store.root / summary_artifact.path).read_bytes())
+            assert summary["preparation_receipt_sha256"] == expected.cfg["preparation_receipt"]["sha256"]
+            assert summary["prepared_model_mount_matches_before_capture"] is True
         if all(releases):
             assert receipt["producer_profile"] == PROFILES[expected.env.engine.version]
             assert read["source_binding"]["open_event"] == read["source_binding"]["source_events"][0]

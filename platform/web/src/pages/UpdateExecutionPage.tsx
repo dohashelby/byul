@@ -9,6 +9,7 @@ import { JsonView } from "../components/JsonView";
 import { PageHead, Query, StateView } from "../components/Misc";
 import { AnyValue, Time } from "../components/Value";
 import { useParams } from "../lib/url";
+import { reportSearch } from "../lib/reportRef";
 import type { Tone } from "../lib/labels";
 import s from "./UpdateExecutionPage.module.css";
 
@@ -39,6 +40,14 @@ function requestOf(form: Form): UpdateRunRequest | null {
 
 function Status({ run }: { run: UpdateRun }) {
   return <Badge tone={STATUS[run.status].tone}>{STATUS[run.status].label}</Badge>;
+}
+
+function ReportLinks({ run, label }: { run: UpdateRun; label: string }) {
+  const refs = run.report_refs?.length ? run.report_refs : run.report_ids ?? [];
+  return refs.length ? refs.map((ref) => {
+    const query = reportSearch(ref);
+    return <Link key={query} className="btn" to={`/update/results${query}`}>{label}</Link>;
+  }) : null;
 }
 
 export function UpdateExecutionPage() {
@@ -160,6 +169,7 @@ export function UpdateExecutionPage() {
               <div className={s.runId}>{current.id}</div>
               <div className="small muted">준비 요청 <Time iso={current.created_at} /> · {current.requested_by}</div>
               {current.preparation && <Preparation result={current.preparation} />}
+              {!!current.required_checks?.length && <p className="small">모든 측의 필수 확인 범위 {current.required_checks.join(", ")}</p>}
               {current.status === "preparing" && <p role="status">입력·호스트·점검별 지원 상태를 확인하고 있습니다.</p>}
               {current.status === "ready" && restored && <p className="small">준비 조건이 확인되었습니다. ‘검증 실행’을 누르면 선택한 환경에 대한 검증을 시작합니다.</p>}
               {!restored && <p className="small">이전 파일 입력 기록입니다. 등록한 환경·정책을 선택해 준비 점검을 다시 진행하세요.</p>}
@@ -170,7 +180,7 @@ export function UpdateExecutionPage() {
               {current.finished_at && <div className="small muted">최근 처리 종료 <Time iso={current.finished_at} />{current.exit_code != null && ` · 종료 코드 ${current.exit_code}`}</div>}
               <div className="row wrap">
                 <button type="button" className="btn btn-primary" onClick={() => void start()} disabled={!canRun}>검증 실행</button>
-                {(current.report_ids ?? []).map((id) => <Link key={id} className="btn" to={`/update/results?report=${encodeURIComponent(id)}`}>생성된 보고서 보기</Link>)}
+                <ReportLinks run={current} label="생성된 보고서 보기" />
               </div>
               {!sameInputs && current.status === "ready" && <span className="small muted">입력이 바뀌었습니다. 준비 점검을 다시 진행하세요.</span>}
               <p className="small muted">준비 완료·명령 종료는 보안 PASS나 기업 승인이 아닙니다. 검증 결과는 update가 생성한 보고서를 따릅니다.</p>
@@ -191,7 +201,8 @@ export function UpdateExecutionPage() {
         <tbody>{history.items.map((item) => <tr key={item.id} aria-selected={item.id === selectedId}>
           <td><Time iso={item.created_at} /></td><td>{item.request.mode === "update" ? "두 판본 비교" : "단일 환경"}</td>
           <td><button type="button" className={s.historyLink} onClick={() => { patch({ run: item.id }); const restored = formOf(item.request); if (restored) setForm(restored); }}>{item.id}</button></td>
-          <td><Status run={item} /></td><td>{(item.report_ids ?? []).length ? item.report_ids!.map((id) => <Link key={id} to={`/update/results?report=${encodeURIComponent(id)}`}>결과 보기</Link>) : "–"}</td>
+          <td><Status run={item} /></td><td>{item.report_refs?.length || item.report_ids?.length
+            ? <ReportLinks run={item} label="결과 보기" /> : "–"}</td>
         </tr>)}</tbody>
       </table></div> : <StateView kind="empty" detail="아직 검증 실행 기록이 없습니다." />}</Query>
     </section>
@@ -237,7 +248,9 @@ function Preparation({ result }: { result: UpdatePreparation }) {
         <p>{issue.cause}</p><p className="muted">{issue.action}</p>
       </div>)}</div>
     </details>}
-    {!!result.check_support?.length && <details className="small"><summary>점검별 지원 범위 ({result.check_support.length})</summary>
+    {!!result.check_support?.length && <details className="small" open>
+      <summary>점검별 지원 범위 ({result.check_support.length})</summary>
+      <p className="muted">지원 상태는 수집 자격을 나타냅니다. 실측 범위는 실행 보고서에서 확인하세요.</p>
       <div className={s.tableWrap}><table className={s.table}><thead><tr><th>대상</th><th>점검</th><th>지원 상태</th><th>근거</th></tr></thead>
         <tbody>{result.check_support.map((row, index) => <tr key={index}><td><AnyValue v={row.side} /></td><td><AnyValue v={row.check_id} /></td>
           <td><AnyValue v={row.status} /></td><td><AnyValue v={row.reasons} /></td></tr>)}</tbody></table></div>

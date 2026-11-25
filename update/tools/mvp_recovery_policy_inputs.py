@@ -67,6 +67,9 @@ def materialize(policy, pack, environments, targets, preflight, *, issued_at=Non
         raise ValueError('MVP_RECOVERY_PREFLIGHT_INVALID')
     ranks = values['recovery_expected_ranks']
     pair = []
+    process_generations = set()
+    # PIDs are namespace-local and can repeat across independent boots.
+    identity_keys = ('boot_sha256', 'pid_namespace', 'pid', 'start_ticks')
     for side, env in environments.items():
         engine = expected[side]
         if (not env.hash_ok() or env.data_origin == DataOrigin.EXAMPLE
@@ -74,8 +77,15 @@ def materialize(policy, pack, environments, targets, preflight, *, issued_at=Non
                     engine['engine'], engine['version'], engine['image'])
                 or env.runtime.tp_size != len(ranks) or (env.runtime.gpu_count or 0) < len(ranks)):
             raise ValueError('MVP_RECOVERY_PREFLIGHT_TP2_REQUIRED')
-        pair.append(_census_time(preflight['sides'][side], env, targets[side], ranks,
-                                 rules[START]['max_clock_skew_ms']))
+        source = preflight['sides'][side]
+        pair.append(_census_time(source, env, targets[side], ranks, rules[START]['max_clock_skew_ms']))
+        selected_generations = {
+            tuple(owner['context'][key] for key in identity_keys)
+            for owner in source['selection']['owners']
+        }
+        if process_generations & selected_generations:
+            raise ValueError('MVP_RECOVERY_PREFLIGHT_PROCESS_GENERATION_REUSED')
+        process_generations.update(selected_generations)
     start = min(began for began, _ in pair)
     deadline = start + timedelta(milliseconds=rules[ABSENT_AFTER]['milliseconds'])
     end = start + timedelta(milliseconds=rules[END]['milliseconds'])

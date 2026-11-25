@@ -31,10 +31,12 @@ class Transport:
     def report(self):return {'profile':'EXAMPLE-exact-owned-transport'}
 
 
-def setup(monkeypatch,*,approved=True,damage=None):
+def setup(monkeypatch,*,approved=True,damage=None,declared='root'):
     monkeypatch.setattr(proof_module,'verify_grpcurl_binary',lambda:None)
     world=World();_,target=inputs();engine=target['kubernetes']['engine']
-    image=world.engine['image'];engine.update(image=image,image_id=world.config,node='node-one',container_id=world.engine['container_id'])
+    root_image = world.engine['image']
+    image = root_image.partition('@')[0] + '@' + getattr(world, declared)
+    engine.update(image=image,image_id=world.config,node='node-one',container_id=world.engine['container_id'])
     target['engine']['image_digest']=image
     env=environment(engine={'name':'vllm','version':'0.31.0','image_digest':image},model={'id':'m'})
     target['environment_ref']=env.ref().model_dump(mode='json')
@@ -64,17 +66,23 @@ def setup(monkeypatch,*,approved=True,damage=None):
         calls.append(True)
         return {'functional_probe_results':{'value':{'normal':'pass'},'collected':True}}, {'attempted':True,'succeeded':True,'detail':'EXAMPLE control'}
     monkeypatch.setattr(consumer,'kubernetes_process_control',control)
+    approved_images = [image] if approved else ([root_image] if declared == 'manifest' else [])
     ctx=SimpleNamespace(env=env,target=target,check=baseline_pack().checks['SUP-04'],
-        policy_values={'approved_image_digests':[image] if approved else []},
+        policy_values={'approved_image_digests':approved_images},
         cprobe=Transport(target,damage=damage))
     return ctx,calls
 
 
 @pytest.mark.parametrize('approved',[True,False])
-def test_live_chain_binds_actual_image_and_runs_normal_control_without_claiming_full_supply(monkeypatch,approved):
-    ctx,calls=setup(monkeypatch,approved=approved)
+@pytest.mark.parametrize('declared',['root','manifest'])
+def test_live_chain_binds_actual_image_and_runs_normal_control_without_claiming_full_supply(monkeypatch,approved,declared):
+    ctx,calls=setup(monkeypatch,approved=approved,declared=declared)
     observations,normal,challenges,summary=consumer.collect(ctx)
     assert observations['running_image_identity_verified']=={'value':True,'collected':True}
+    assert observations['running_image_repo_digest']=={'value':ctx.target['engine']['image_digest'],'collected':True}
+    receipt = summary['node_image_proof']
+    assert ctx.target['engine']['image_digest'].partition('@')[2] == receipt[declared + '_digest']
+    assert receipt['manifest_digest'] != receipt['root_digest']
     assert observations['running_image_approved']=={'value':approved,'collected':True}
     assert observations['running_image_unapproved']=={'value':not approved,'collected':True}
     assert normal['attempted'] and normal['succeeded'] and len(calls)==1
@@ -85,6 +93,15 @@ def test_live_chain_binds_actual_image_and_runs_normal_control_without_claiming_
     assert ctx._kubernetes_image_data_origin==DataOrigin.EXAMPLE
     assert not summary['dispatch']['whole_run_coverage_verified']
     assert 'EXAMPLE_PRIVATE' not in json.dumps(summary)
+
+
+def test_runtime_image_config_digest_cannot_establish_repo_digest_approval(monkeypatch):
+    ctx,calls=setup(monkeypatch,declared='config')
+    observations,normal,challenges,summary=consumer.collect(ctx)
+    assert observations['running_image_repo_digest']=={'value':None,'collected':False}
+    assert observations['running_image_approved']=={'value':None,'collected':False}
+    assert not normal['attempted'] and not calls
+    assert not summary['dispatch']['runtime_image_approval_connected']
 
 
 @pytest.mark.parametrize('damage',['missing-proof','fake-proof','foreign-proof','node-reboot','replaced'])

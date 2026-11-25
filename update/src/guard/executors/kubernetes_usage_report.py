@@ -7,12 +7,12 @@
 """
 from __future__ import annotations
 
-from pathlib import Path
 from posixpath import normpath
 import re
 import time
 
 from guard.adapters.engine_provider import get_provider
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import validate_capture_target
@@ -25,7 +25,7 @@ from .kubernetes_lifecycle_capture import (
 )
 from .kubernetes_normal_startup_load import _source_profile, _verify_launch
 from .owned_capture import _FILE_READER, MAX_BYTES, validate_file_result
-from .usage_report import PROFILES, SETTINGS, SILENCE_PROFILE, START_SCHEMA, UsageReportExecutor, _READER, new_reports
+from .usage_report import PROFILES, SILENCE_PROFILE, UsageReportExecutor, _sink_snapshot, _snapshot_command, new_reports
 
 SINK_PATH = "/guard-usage/receipts.jsonl"
 CONFIG_KEYS = {"target", "sink_target", "kubectl_binary", "max_duration_seconds", "usage_wait_seconds", "local_observation_only"}
@@ -188,15 +188,17 @@ def _local_snapshot_value(value, paths, allow_cache):
 
 
 def _stable_local_reports(before, after):
-    """Ignore replacements of previously observed folders, but allow genuine creation."""
+    """Treat lost observations as gaps while allowing genuine creation."""
     old = {row["path"]: row for row in before["files"]}
     stable_files = []
     for row in after["files"]:
         earlier = old[row["path"]]
         prior_chain = earlier.get("directory_chain", [])
         chain = row.get("directory_chain", [])
-        # Losing a prior ancestor also prevents comparing this path.
-        stable_files.append(row if chain[:len(prior_chain)] == prior_chain else {**row, "readable": False})
+        if (chain[:len(prior_chain)] != prior_chain
+                or earlier["exists"] is True and row["exists"] is False):
+            row = {**row, "readable": False}
+        stable_files.append(row)
     return new_reports(before, {"files": stable_files})
 
 
@@ -251,7 +253,8 @@ def _complete_control(result):
 
 
 class _UsageReader(KubernetesLifecycleReader):
-    def __init__(self, target, env, *, paths=None, sink=False, binary, duration, runner, local_transport=None):
+    def __init__(self, target, env, *, paths=None, sink=False, binary, duration, runner, local_transport=None,
+                 prefixes=None):
         self._local = local_transport is not None
         if self._local:
             if (sink or local_transport.profile != USAGE_CONTROL_PROFILE or target.get("lab") is not False
@@ -262,7 +265,10 @@ class _UsageReader(KubernetesLifecycleReader):
             binding = validate_capture_target(target, env)
         self._initialize(binding, target, {"session": _NO_SESSION}, binary=binary, duration=duration, runner=runner)
         self._paths, self._sink = list(paths or []), sink
-        program = _LOCAL_READER if self._local else _READER
+        program, args = _snapshot_command(self._paths, prefixes)
+        self.snapshot_argv = ["python3", "-c", program, *args]
+        if self._local:
+            program = _LOCAL_READER
         self.programs["usage"] = program
         self.wrapped["usage"] = supervised_source(program)
 
@@ -289,7 +295,7 @@ class _UsageReader(KubernetesLifecycleReader):
                 return "usage"
             raise KubernetesCaptureError()
         if (not self._sink and self._paths and max_bytes == _SNAPSHOT_BYTES
-                and argv == ["python3", "-c", _READER, ",".join(SETTINGS), *self._paths]):
+                and argv == self.snapshot_argv):
             return "usage"
         if (self._sink and max_bytes == 2 * MAX_BYTES
                 and argv == ["python3", "-c", _FILE_READER, SINK_PATH, str(MAX_BYTES)]):
@@ -380,11 +386,9 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
             if getattr(check, "collection_profile", None) not in PROFILES or adapter is None:
                 raise ValueError
             self.validate_policy(check, policy_values)
-            def load(name):
-                with Path(self.cfg[name]).open("rb") as stream:
-                    return strict_json(stream.read(65537), limit=65536)
-            target = self._read_local_target() if self.cfg.get("local_observation_only") is True else load("target")
-            sink = load("sink_target") if "sink_target" in self.cfg else None
+            target = (self._read_local_target() if self.cfg.get("local_observation_only") is True
+                      else load_bounded_json(self.cfg["target"]))
+            sink = load_bounded_json(self.cfg["sink_target"]) if "sink_target" in self.cfg else None
             local = self._validate_targets(target, sink, env)
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("KUBERNETES_USAGE_CONFIGURATION_INVALID") from None
@@ -554,11 +558,9 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         return _UsageReader(target, ctx.env, binary=self.cfg.get("kubectl_binary", "kubectl"),
                             duration=ctx._usage_duration, runner=self.runner, **kwargs)
 
-    def _snapshot(self, ctx):
-        reader = self._reader(ctx, ctx._usage_engine_target, paths=ctx.policy_values["usage_report_paths"])
-        result = reader.exec_bounded(reader.binding["engine"]["container"],
-                                     ["python3", "-c", _READER, ",".join(SETTINGS), *ctx.policy_values["usage_report_paths"]],
-                                     timeout=5, max_bytes=_SNAPSHOT_BYTES)
+    def _snapshot(self, ctx, *, prefixes=None):
+        reader = self._reader(ctx, ctx._usage_engine_target, paths=ctx.policy_values["usage_report_paths"], prefixes=prefixes)
+        result = reader.exec_bounded(reader.binding["engine"]["container"], reader.snapshot_argv, timeout=5, max_bytes=_SNAPSHOT_BYTES)
         if result.owner_binding_verified is not True:
             raise KubernetesCaptureError()
         value = strict_json(result.stdout.encode(), limit=_SNAPSHOT_BYTES)
@@ -572,19 +574,10 @@ class KubernetesUsageReportExecutor(UsageReportExecutor):
         reader = self._reader(ctx, ctx._usage_sink_target, sink=True)
         result = reader.exec_bounded(reader.binding["engine"]["container"], ["python3", "-c", _FILE_READER, SINK_PATH, str(MAX_BYTES)],
                                      timeout=5, max_bytes=2 * MAX_BYTES)
-        raw, _ = validate_file_result(result, max_bytes=MAX_BYTES)
+        raw, identity = validate_file_result(result, max_bytes=MAX_BYTES)
         if result.owner_binding_verified is not True:
             raise KubernetesCaptureError()
-        # 원 read_owned_jsonl과 같은 경계: 1..64행, 행마다 16 KiB 이하 JSON 객체.
-        lines = raw.split(b"\n")
-        if lines[-1] == b"":
-            lines.pop()
-        if not 1 <= len(lines) <= 64 or any(not line.strip() or len(line) > 16384 for line in lines):
-            raise ValueError("CAPTURE_JSONL_BOUND")
-        rows = [strict_json(line, limit=16384) for line in lines]
-        if any(type(row) is not dict for row in rows) or rows[0] != {"schema": START_SCHEMA}:
-            raise ValueError("USAGE_SINK_RECORD_INVALID")
-        return rows
+        return _sink_snapshot(raw, result.owner_before, identity)
 
 
 def kubernetes_boundary_egress(cfg, *, environ=None, expected_target_sha256=None):

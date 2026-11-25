@@ -69,7 +69,8 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         assert all(right.resolve(obj.ref()).to_dict()==obj.to_dict() for obj in objects)
         result,=left.iter_kind('RES');report,=left.iter_kind('RPT');plan,=left.iter_kind('PLAN')
         assert result.verdicts.model_dump(mode='json')=={key:'UNKNOWN' for key in ('security','functional','performance')}
-        runner=CliRunner();checked=runner.invoke(app,['judge','--plan',plan.id,'--as-of',report.created_at.isoformat(),'--store',str(out/'restored')])
+        assert report.as_of == result.as_of
+        runner=CliRunner();checked=runner.invoke(app,['judge','--plan',plan.id,'--as-of',report.as_of.isoformat(),'--store',str(out/'restored')])
         assert checked.exit_code==0
         checked=runner.invoke(app,['verify','--store',str(out/'restored')]);assert checked.exit_code==0
         final=Store.read_only(out/'restored');assert final.verify()==[]
@@ -127,12 +128,12 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     assert len(objects)==6 and left.verify()==right.verify()==[]
     assert all(right.resolve(o.ref()).to_dict()==o.to_dict() for o in objects)
     result,=left.iter_kind('RES');report,=left.iter_kind('RPT');plan,=left.iter_kind('PLAN');policy,=left.iter_kind('POL')
-    assert not policy.exceptions
+    assert not policy.exceptions and report.as_of == result.as_of
     assert result.verdicts.model_dump(mode='json')=={key:'UNKNOWN' for key in ('security','functional','performance')}
     # Original B run already restored/rejudged with its exact original pack.
     # Also resolve the saved pack through the existing A CLI, without --pack.
     runner=CliRunner()
-    checked=runner.invoke(app,['judge','--plan',plan.id,'--as-of',report.created_at.isoformat(),'--store',str(out/'restored')])
+    checked=runner.invoke(app,['judge','--plan',plan.id,'--as-of',report.as_of.isoformat(),'--store',str(out/'restored')])
     assert checked.exit_code==0,(checked.output,type(checked.exception).__name__ if checked.exception else None)
     checked=runner.invoke(app,['verify','--store',str(out/'restored')]);assert checked.exit_code==0
     final=Store.read_only(out/'restored');assert final.verify()==[]
@@ -146,6 +147,6 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         'actual_target_worker_GPU':False,'source_gate_API_parser_mocked':False,'transport_substituted':True,
         'exact_refs':[o.ref().model_dump(mode='json') for o in objects],
         'original_export_bundle':{'path':str(saved/'evidence.zip'),'original_run_path':str(bundle),'bytes':bundle.stat().st_size,'sha256':sha256_hex(bundle.read_bytes())},
-        'saved_pack_rejudge_equal':True,'as_of':report.created_at.isoformat(),
-        'as_of_basis':'Stored RPT creation; policy exceptions empty; no original B timestamp equivalence claim'}
+        'saved_pack_rejudge_equal':True,'as_of':report.as_of.isoformat(),
+        'as_of_basis':'Original judgment time sealed in the RPT and RES'}
     (tmp_path/'a1-product-receipt.json').write_bytes(canonical_json(receipt))

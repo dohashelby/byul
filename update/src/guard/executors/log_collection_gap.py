@@ -61,6 +61,15 @@ def selected_record_timeline(packet, required_records):
     return [row for row in packet["events"] if row["record"] in required_records]
 
 
+def _deadline_status(elapsed, uncertainty, deadline):
+    earliest = elapsed - uncertainty
+    if earliest > deadline:
+        return "late"
+    if earliest >= 0 and elapsed + uncertainty <= deadline:
+        return "on_time"
+    return "unverified"
+
+
 def evaluate(packet, values):
     """기록별 정상 도착과 누락 처리 위반을 나눈다. 시각 오차를 넘긴 행은 판단하지 않는다."""
     violations, unverified, missing, normal = [], [], [], []
@@ -75,18 +84,30 @@ def evaluate(packet, values):
         for row in selected:
             start = row["event_at_ms"]
             observed = (row["arrived_at_ms"], row["gap_marked_at_ms"], row["alert_at_ms"])
-            if (not 0 <= row["clock_uncertainty_ms"] <= values["max_clock_uncertainty_ms"][record]
+            uncertainty = row["clock_uncertainty_ms"]
+            if (not 0 <= uncertainty <= values["max_clock_uncertainty_ms"][record]
                     or any(timestamp is not None and timestamp < start for timestamp in observed)):
                 unverified.append(record)
                 continue
             arrived, marked, alerted = observed
-            if arrived is not None and arrived - start <= values["collection_deadline_ms"][record]:
-                normal.append(record)
-                continue
-            if marked is None or marked - start > values["detection_deadline_ms"][record]:
-                violations.append({"record": record, "reason": "gap_not_marked_in_time"})
-            if alerted is None or alerted - start > values["alert_deadline_ms"][record]:
-                violations.append({"record": record, "reason": "alert_not_raised_in_time"})
+            if arrived is not None:
+                arrival = _deadline_status(arrived - start, uncertainty, values["collection_deadline_ms"][record])
+                if arrival == "on_time":
+                    normal.append(record)
+                    continue
+                if arrival == "unverified":
+                    unverified.append(record)
+                    continue
+            for timestamp, key, reason in (
+                (marked, "detection_deadline_ms", "gap_not_marked_in_time"),
+                (alerted, "alert_deadline_ms", "alert_not_raised_in_time"),
+            ):
+                status = "late" if timestamp is None else _deadline_status(
+                    timestamp - start, uncertainty, values[key][record])
+                if status == "late":
+                    violations.append({"record": record, "reason": reason})
+                elif status == "unverified":
+                    unverified.append(record)
             if row["dependent_result"] == "PASS":
                 violations.append({"record": record, "reason": "dependent_test_passed_without_record"})
     return {"violations": violations, "unverified": sorted(set(unverified)), "missing": missing, "normal": sorted(set(normal))}

@@ -25,8 +25,7 @@ _RECEIPT_FIELDS = {"schema", "environment", "environment_ref", "input_data_origi
                    "session", "normal", "input_sha256"} | _PREPARATION_ONLY | _RECEIPT_DIGESTS
 
 
-def read_normal_preparation(path, env, *, expected_sha256):
-    """Read an independently pinned local preparation receipt for configuration assembly."""
+def _read_normal_preparation(path, env, *, expected_sha256):
     try:
         if not fingerprint(expected_sha256):
             raise ValueError
@@ -55,7 +54,7 @@ def read_normal_preparation(path, env, *, expected_sha256):
         if not saved_env.hash_ok() or saved_env.ref() != env.ref():
             raise ValueError
         target = strict_json(dependency(normal["target"], hashes["target"]), limit=65536)
-        validate_capture_target(target, env)
+        binding = validate_capture_target(target, env)
         source = get_provider(env.engine.name).evidence_contract("approved_file_read_preparation", env)
         if type(source) is not dict or source.get("profile") != receipt["producer_profile"]:
             raise ValueError
@@ -76,10 +75,50 @@ def read_normal_preparation(path, env, *, expected_sha256):
     except (AttributeError, KeyError, OSError, TypeError, ValueError):
         raise ValueError("SUP05_PREPARATION_RECEIPT_INVALID") from None
 
-    return {"normal": normal, "target_sha256": receipt["target_sha256"], "target_file_sha256": hashes["target"],
-            "model_mount_projection_sha256": receipt["model_mount_projection_sha256"],
-            "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
-                                            "reference_manifest": hashes["reference_manifest"]}}
+    inputs = {"normal": normal, "target_sha256": receipt["target_sha256"], "target_file_sha256": hashes["target"],
+              "model_mount_projection_sha256": receipt["model_mount_projection_sha256"],
+              "expected_normal_file_sha256": {"prepared": receipt["prepared_file_sha256"],
+                                              "reference_manifest": hashes["reference_manifest"]}}
+    return inputs, receipt, binding, prepared
+
+
+def read_normal_preparation(path, env, *, expected_sha256):
+    """Read an independently pinned local preparation receipt for configuration assembly."""
+    inputs, _, _, _ = _read_normal_preparation(path, env, expected_sha256=expected_sha256)
+    return inputs
+
+
+def read_normal_publication(path, env, *, expected_sha256, owner_snapshot, owner_snapshot_sha256):
+    """Return checked bytes for an already-owned pre-Ready normal lifecycle generation.
+
+    The launcher can publish these same bytes without reopening the source paths.
+    The saved snapshot does not establish the time of first import or publication.
+    """
+    inputs, receipt, binding, prepared = _read_normal_preparation(path, env, expected_sha256=expected_sha256)
+    try:
+        if not fingerprint(owner_snapshot_sha256):
+            raise ValueError
+        owner_raw = dependency(_plain_path(Path(owner_snapshot)), owner_snapshot_sha256)
+        if (_owned_snapshot(strict_json(owner_raw, limit=MAX_SCOPE_BYTES), binding)
+                != inputs["model_mount_projection_sha256"]):
+            raise ValueError
+
+        manifest = Path(inputs["normal"]["prepared"])
+        files = {"manifest.json": dependency(_plain_path(manifest), receipt["prepared_file_sha256"])}
+        for name, expected in sorted(prepared["assets"].items()):
+            raw = dependency(_plain_path(manifest.with_name(name)), expected["sha256"])
+            if len(raw) != expected["bytes"]:
+                raise ValueError
+            files[name] = raw
+    except (AttributeError, KeyError, OSError, TypeError, ValueError):
+        raise ValueError("SUP05_NORMAL_PUBLICATION_INVALID") from None
+
+    return {"files": files, "binding": binding, "environment_ref": receipt["environment_ref"],
+            "session": prepared["session"], "profile": prepared["profile"], "preparation_sha256": expected_sha256,
+            "prepared_file_sha256": receipt["prepared_file_sha256"], "target_sha256": inputs["target_sha256"],
+            "target_file_sha256": inputs["target_file_sha256"], "deployed_scope_sha256": receipt["deployed_scope_sha256"],
+            "owner_snapshot_sha256": owner_snapshot_sha256, "input_data_origin": receipt["input_data_origin"],
+            "pre_import_verified": False, "asset_publication_verified": False}
 
 
 def _owned_snapshot(snapshot, binding):

@@ -6,15 +6,15 @@ import re
 from guard.credential_policy import candidate_paths
 from guard.models import DataOrigin,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from .kubernetes_process import PROFILE as PROCESS_PROFILE,SOURCE_SHA256 as PROCESS_SOURCE_SHA256
+from .source_assets import read_pinned_source
 
 PROFILE='kubernetes-owned-process-mount-observations-v1'
 SCHEMA='guard-process-mount-observations/1'
 SOURCE_SHA256='590ac5729bf3cac321c9ac76ee267420e83a5bae8103975a35309dea2b022c16'
 
 def source():
-    raw=(Path(__file__).parent/'assets/process_mount_observations_v1.py.txt').read_bytes()
-    if sha256_hex(raw)!=SOURCE_SHA256:raise ValueError('PROCESS_MOUNT_SOURCE_UNAVAILABLE')
-    return raw.decode('utf-8')
+    return read_pinned_source(Path(__file__).parent / "assets/process_mount_observations_v1.py.txt",
+                              SOURCE_SHA256, "PROCESS_MOUNT_SOURCE_UNAVAILABLE")
 
 def decode(value,spec):
     if (type(value) is not dict or set(value)!={'schema','scope','rows'} or value['schema']!=SCHEMA

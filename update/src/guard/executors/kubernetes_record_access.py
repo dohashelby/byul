@@ -208,6 +208,8 @@ def capture_record_access(env, target, subjects, *, expected_policy_ref, workdir
                     row['gaps'].append('ACCESS_BUDGET_EXHAUSTED' if deadline <= time.monotonic() else 'ACCESS_BINDING_UNAVAILABLE')
                 if row['attempted'] and row['identity_verified'] and row['binding_verified'] and not row['gaps'] and row['byte_count']:
                     row['read_verified'] = True
+                    if row['role'] == 'authorized_reader':
+                        row['owner_sha256'] = before
     except Exception:
         result['gaps'].append('ACCESS_BUDGET_EXHAUSTED' if deadline <= time.monotonic() else 'ACCESS_LOGS_UNAVAILABLE')
     finally:

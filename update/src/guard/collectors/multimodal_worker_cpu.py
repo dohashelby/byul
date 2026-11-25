@@ -5,6 +5,7 @@ import hashlib
 import json
 from . import consumption_links as links
 from .multimodal_processor_model import SOURCES as HF_SOURCES
+from .multimodal_processor_model import _MODEL_SETUP, _PROCESSOR_SETUP
 
 SCHEMA = links.SCHEMA
 callback, auxiliary = links.callback, links.auxiliary
@@ -30,31 +31,12 @@ def project(record):
     return result
 
 
-RUNNER = r'''import os
+RUNNER = (r'''import os
 os.environ['VLLM_ENABLE_V1_MULTIPROCESSING']='0'
 os.environ.pop('VLLM_CPU_KVCACHE_SPACE',None)
 
-import hashlib,importlib,json,pathlib,sys
-pins,config,producer=map(json.loads,sys.argv[1:])
-def sources(): return {n:hashlib.sha256(pathlib.Path(importlib.import_module(n).__file__).read_bytes()).hexdigest() for n in pins}
-def digest(v): return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(',',':')).encode()).hexdigest()
-before=sources()
-config_identity=digest(config)
-if before!=pins: raise RuntimeError('MM_PROCESSOR_MODEL_SOURCE_UNSUPPORTED')
-import torch
-from PIL import Image
-from tokenizers import Tokenizer,models,pre_tokenizers
-from transformers import Qwen2VLConfig,Qwen2VLForConditionalGeneration,Qwen2VLImageProcessor,Qwen2VLVideoProcessor,Qwen2VLProcessor,PreTrainedTokenizerFast
-torch.set_num_threads(1);torch.manual_seed(0)
-cfg=Qwen2VLConfig(**config);cfg._attn_implementation='eager'
-cfg.architectures=['Qwen2VLForConditionalGeneration']
-model=Qwen2VLForConditionalGeneration(cfg).eval()
-backend=Tokenizer(models.WordLevel({'<unk>':0,'<|vision_start|>':1,'<|vision_end|>':2,'<|image_pad|>':3,'<|video_pad|>':4,'Hello':5,'<|endoftext|>':31},unk_token='<unk>'))
-backend.pre_tokenizer=pre_tokenizers.WhitespaceSplit()
-tokenizer=PreTrainedTokenizerFast(tokenizer_object=backend,unk_token='<unk>',pad_token='<unk>',extra_special_tokens=['<|vision_start|>','<|vision_end|>','<|image_pad|>','<|video_pad|>'])
-processor=Qwen2VLProcessor(image_processor=Qwen2VLImageProcessor(patch_size=2,temporal_patch_size=2,merge_size=2,do_resize=False),
-                         video_processor=Qwen2VLVideoProcessor(patch_size=2,temporal_patch_size=2,merge_size=2,do_resize=False),tokenizer=tokenizer)
-
+''' + _MODEL_SETUP + r'''cfg.architectures=['Qwen2VLForConditionalGeneration']
+''' + _PROCESSOR_SETUP + r'''
 folder='/tmp/guard-random-qwen-mm-linked'
 if pathlib.Path(folder).exists(): raise RuntimeError('MM_SYNTHETIC_DIRECTORY_EXISTS')
 cfg.save_pretrained(folder)
@@ -81,4 +63,4 @@ try:
 finally:
     print('GUARD_CAPTURE_RESULT='+json.dumps(results),flush=True)
     llm.llm_engine.engine_core.shutdown()
-'''
+''')

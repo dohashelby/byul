@@ -2,9 +2,10 @@
 
 env:    렌더 기록(gpu_a_aws_lab)과 서버 사실로 봉인된 ENV 객체를 만든다.
 target: kubectl get으로 받은 네임스페이스·엔진·시험 Pod JSON으로 요청 바인딩 target을 만들고 전송 검사로 확인한다.
+startup-prefix: 별도로 지정한 소유 엔진의 기동 로그를 읽고, 같은 Ready 구간이 확인되면 새 target에 고정한다.
 check:  콜백 점검(REQ-14·16·17·18) 하나의 사례 manifest, 해시를 채운 정책, 실행 설정, 실행 명령을 만든다.
 
-kubectl·엔진을 실행하지 않는다. 출력 해시가 실행기의 바인딩 검사와 같은 방식으로 맞는지 쓰기 전에 확인한다.
+startup-prefix는 바인딩 검사에 쓰는 sha256과 입력 파일 고정에 쓰는 target_file_sha256을 출력한다.
 """
 from __future__ import annotations
 
@@ -107,12 +108,21 @@ def _platform(render, launch, *, observed_engine_version, external_platform):
                    ('eager', render['enforce_eager'])))
     if external_platform is None:
         fields.append(('render_engine_sha256', render['outputs_sha256']['engine.yaml']))
+    if 'normal_tp2_callbacks' in render:
+        from tools.gpu_a_normal_tp2_callbacks import ERROR, environment_field
+
+        if 'normal_tp2' not in render:
+            raise ValueError(ERROR)
+        name, digest = environment_field(render['normal_tp2_callbacks']).split('=', 1)
+        fields.append((name, digest))
+    if 'sup05_first_import' in render:
+        fields.append(('sup05_first_import', render['sup05_first_import']['schema']))
     return platform + '; ' + '; '.join(f'{key}={value}' for key, value in fields)
 
 
 def environment(render, *, model_id=None, inventory=None, gpu_model, driver, observed_engine_version=None,
                 data_origin='DECLARED', external_platform=None, engine_pod=None, namespace=None,
-                observed_gpu_count=None):
+                observed_gpu_count=None, sup05_waiting_raw=None):
     generation = render['generation']
     legacy = render.get('schema') == 'byul-gpu-a-aws-render/1'
     if not legacy and render.get('schema') != 'byul-gpu-a-aws-render/2':
@@ -120,6 +130,19 @@ def environment(render, *, model_id=None, inventory=None, gpu_model, driver, obs
     model_id = model_id or render.get('model_id', MODEL_ID)
     if not legacy and model_id != render['model_id']:
         raise ValueError('RUN_INPUTS_MODEL_RENDER_MISMATCH')
+    if ('sup05_first_import' in render) != (sup05_waiting_raw is not None):
+        raise ValueError('SUP05_FIRST_IMPORT_OBSERVED_VERSION_REQUIRED')
+    if sup05_waiting_raw is not None:
+        from tools.gpu_a_sup05_first_import import verify_waiting
+
+        try:
+            engine = _binding(engine_pod, namespace, 'engine', 'serving-engine')
+            _, version = verify_waiting(render, engine, sup05_waiting_raw)
+            if observed_engine_version not in (None, version):
+                raise ValueError
+            observed_engine_version = version
+        except (KeyError, RecursionError, TypeError, ValueError):
+            raise ValueError('SUP05_FIRST_IMPORT_OBSERVED_VERSION_REQUIRED') from None
     version = render.get('engine_version', '0.31.0') if legacy else render['engine_version']
     if 'code-selection' in generation and (observed_engine_version is None or observed_engine_version != version):
         raise ValueError('RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH')
@@ -168,7 +191,9 @@ def _binding(pod, namespace, container, role_label=None):
 
 
 def _normal_tp2_topology(render, namespace, pod):
-    from tools.gpu_a_aws_lab import GPU_RESOURCE, NORMAL_TP2, NORMAL_TP2_ARGS, NORMAL_TP2_GENERATIONS, normal_tp2_release
+    from tools.gpu_a_aws_lab import (EAGER_WEIGHT_READ_ARG, GPU_RESOURCE, NORMAL_TP2, NORMAL_TP2_ARGS,
+                                    NORMAL_TP2_GENERATIONS, NORMAL_TP2_TEMPLATE_GENERATIONS,
+                                    NORMAL_TP2_V1_EAGER_GENERATION, V2_MODEL_RUNNER_ENV, normal_tp2_release)
 
     try:
         layout = render['normal_tp2']
@@ -176,6 +201,13 @@ def _normal_tp2_topology(render, namespace, pod):
         labels = pod['metadata']['labels']
         engine, = (row for row in pod['spec']['containers'] if row['name'] == 'engine')
         launch = render['launch']
+        command = launch['command']
+        if 'sup05_first_import' in render:
+            if render['generation'] != NORMAL_TP2_V1_EAGER_GENERATION:
+                raise ValueError
+            from tools.gpu_a_sup05_first_import import verified_command
+
+            command = verified_command(render, pod, engine, namespace)
         argv = engine['args']
         selectors = [arg.partition('=')[0].replace('_', '-') for arg in argv]
         max_model_len = render['max_model_len']
@@ -188,14 +220,21 @@ def _normal_tp2_topology(render, namespace, pod):
                 or launch['engine'] != 'V1' or namespace['kind'] != 'Namespace'
                 or namespace['metadata']['name'] != binding['namespace'] or pod['kind'] != 'Pod'
                 or labels.get('byul.a/generation') != render['generation'] or binding['image'] != render['engine_image']
-                or engine['command'] != launch['command'] or engine['args'] != launch['argv']
+                or engine['command'] != command or engine['args'] != launch['argv']
                 or engine['args'][-len(NORMAL_TP2_ARGS):] != list(NORMAL_TP2_ARGS)
                 or any(selectors.count(key) != 1 for key in (*NORMAL_TP2_ARGS[::2], '--max-model-len'))
                 or type(max_model_len) is not int or not 256 <= max_model_len <= 131072
                 or model_lengths != [str(max_model_len)]
                 or any(type(quantity) not in (int, str) or str(quantity) != '2' for quantity in quantities)):
             raise ValueError
-        if render['generation'] == 'v2-template':
+        if render['generation'] == NORMAL_TP2_V1_EAGER_GENERATION:
+            runner_env = [item for item in engine.get('env', []) if item.get('name') == V2_MODEL_RUNNER_ENV]
+            load_option = EAGER_WEIGHT_READ_ARG.partition('=')[0]
+            if (launch['runner'] != 'v1' or runner_env != [{'name': V2_MODEL_RUNNER_ENV, 'value': '0'}]
+                    or selectors.count(load_option) != 1 or EAGER_WEIGHT_READ_ARG not in argv
+                    or render['enforce_eager'] is not False or '--enforce-eager' in selectors):
+                raise ValueError
+        if render['generation'] in NORMAL_TP2_TEMPLATE_GENERATIONS:
             template = render['chat_template']
             host_file = Path(template['host_file'])
             template_args = [value for option, value in zip(argv, argv[1:]) if option == '--chat-template']
@@ -213,6 +252,9 @@ def _normal_tp2_topology(render, namespace, pod):
                 raise ValueError
         elif 'chat_template' in render or '--chat-template' in selectors:
             raise ValueError
+        from tools.gpu_a_normal_tp2_callbacks import verify_pod
+
+        verify_pod(render, pod, engine)
         verify_owned_pod(pod, namespace['metadata'], binding, render['run_id'], require_ready=False)
     except (AttributeError, KeyError, TypeError, ValueError):
         raise ValueError('RUN_INPUTS_NORMAL_TP2_POD_MISMATCH') from None
@@ -234,8 +276,23 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         raise ValueError('RUN_INPUTS_PROBE_IMAGE_MISMATCH')
     if env.engine.version != render.get('engine_version', '0.31.0'):
         raise ValueError('RUN_INPUTS_ENGINE_VERSION_MISMATCH')
+    callback_plan = render.get('normal_tp2_callbacks')
+    callback_fields = [field for field in (env.runtime.platform or '').split('; ')
+                       if field.startswith('normal_tp2_callbacks_sha256=')]
+    if 'normal_tp2_callbacks' in render or callback_fields:
+        from tools.gpu_a_normal_tp2_callbacks import ERROR, environment_field
+
+        if 'normal_tp2' not in render or callback_fields != [environment_field(callback_plan)]:
+            raise ValueError(ERROR)
     if 'normal_tp2' in render:
+        from tools.gpu_a_aws_lab import NORMAL_TP2_V1_EAGER_GENERATION
+
         topology = _normal_tp2_topology(render, namespace, engine_pod)
+        if render['generation'] == NORMAL_TP2_V1_EAGER_GENERATION:
+            platform = (env.runtime.platform or '').split('; ')
+            launch_fields = [field for field in platform if field.startswith(('generation=', 'runner='))]
+            if launch_fields != [f'generation={NORMAL_TP2_V1_EAGER_GENERATION}', 'runner=v1']:
+                raise ValueError('RUN_INPUTS_NORMAL_TP2_POD_MISMATCH')
         if observed_engine_version is None or any(getattr(env.runtime, key) != value for key, value in topology.items()):
             raise ValueError('RUN_INPUTS_NORMAL_TP2_OBSERVATION_REQUIRED')
         argv = render['launch']['argv']
@@ -250,7 +307,7 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
     if render.get('schema') == 'byul-gpu-a-aws-render/2':
         spec, = (c for c in engine_pod['spec']['containers'] if c['name'] == 'engine')
         model_volume, = (v for v in engine_pod['spec']['volumes'] if v['name'] == 'model')
-        if (spec.get('command') != render['launch']['command']
+        if (('sup05_first_import' not in render and spec.get('command') != render['launch']['command'])
                 or spec.get('args') != render['launch']['argv']
                 or model_volume['hostPath']['path'] != render['model_host_snapshot']):
             raise ValueError('RUN_INPUTS_RENDERED_LAUNCH_MISMATCH')
@@ -302,9 +359,21 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         value['comparison_config'] = {'launch': {'argv': list(container['args']), 'chat_template': identity,
             'max_model_len': int(container['args'][container['args'].index('--max-model-len') + 1])}}
     if 'normal_tp2' in render:
-        value['engine']['command'] = list(render['launch']['command'])
-        value.setdefault('comparison_config', {}).setdefault('launch', {}).update(
-            argv=list(argv), max_model_len=render['max_model_len'])
+        value['engine']['command'] = list(spec['command'])
+        launch_conditions = value.setdefault('comparison_config', {}).setdefault('launch', {})
+        launch_conditions.update(argv=list(argv), max_model_len=render['max_model_len'])
+        if callback_plan is not None:
+            from tools.gpu_a_normal_tp2_callbacks import comparison_plan
+
+            value['normal_tp2_callbacks'] = callback_plan
+            launch_conditions['normal_tp2_callbacks'] = comparison_plan(callback_plan)
+        from guard.executors.kubernetes_normal_startup_load import STARTUP_READY_WINDOW, startup_ready_window
+
+        try:
+            verify_owned_pod(engine_pod, namespace['metadata'], engine, run_id)
+            value[STARTUP_READY_WINDOW] = startup_ready_window(engine_pod, engine)
+        except (AttributeError, KeyError, TypeError, ValueError):
+            pass  # A declaration may also come from a valid pre-Ready source.
     if observed_engine_version is not None:
         value['observed_version'] = observed_engine_version
     if (render.get('launch') or {}).get('engine') is not None:
@@ -469,8 +538,137 @@ def http_inputs(check_id, target_value, draft, *, root, prepared=None, prepared_
 def _write(path, data, *, exclusive=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     contents = data if type(data) is str else json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + '\n'
-    with path.open('x' if exclusive else 'w', encoding='utf-8') as stream:
+    with path.open('x' if exclusive else 'w', encoding='utf-8', newline='') as stream:
         stream.write(contents)
+    return contents
+
+
+def retain_startup_prefix(env_path, env_sha256, target_path, target_sha256, output):
+    """Bind an independently selected owned target's boot prefix to a new file."""
+    target, _ = _retain_startup_prefix(env_path, env_sha256, target_path, target_sha256, output)
+    return target
+
+
+def _retain_startup_prefix(env_path, env_sha256, target_path, target_sha256, output):
+    from guard.executors.kubernetes_normal_startup_load import STARTUP_READY_WINDOW, capture_startup_log_prefix
+    from guard.runtime.bounded import strict_json
+    from guard.update_validation import _plain_path
+    from tools.mvp_a_input_preflight import _read
+
+    env_path, target_path, output = map(_plain_path, (env_path, target_path, output))
+    if output.exists():
+        raise ValueError('RUN_INPUTS_STARTUP_PREFIX_NEW_TARGET_REQUIRED')
+    originals = {}
+    for path, digest in ((env_path, env_sha256), (target_path, target_sha256)):
+        source = _read(path, max_bytes=65536)
+        if sha256_hex(source[0]) != digest:
+            raise ValueError('RUN_INPUTS_STARTUP_PREFIX_SOURCE_CHANGED')
+        originals[path] = source
+    env = Environment.model_validate(strict_json(originals[env_path][0]))
+    selected = strict_json(originals[target_path][0])
+    if (not env.hash_ok() or type(selected) is not dict or STARTUP_READY_WINDOW not in selected
+            or 'startup_log_prefix' in selected):
+        raise ValueError('RUN_INPUTS_STARTUP_PREFIX_SELECTION_INVALID')
+    value = {**selected, 'startup_log_prefix': capture_startup_log_prefix(selected, env)}
+    if any(_read(_plain_path(path), max_bytes=65536) != original for path, original in originals.items()):
+        raise ValueError('RUN_INPUTS_STARTUP_PREFIX_SOURCE_CHANGED')
+    written = _write(output, value, exclusive=True)
+    return value, sha256_hex(written.encode('utf-8'))
+
+
+def sup05_wait_target(env, render, owner_snapshot, waiting_raw, *, context):
+    """Select the existing lifecycle target while the exact engine container is held."""
+    from tools.gpu_a_sup05_first_import import SCHEMA as HOLD_SCHEMA, verify_waiting
+
+    if type(owner_snapshot) is not dict or set(owner_snapshot) != {'pod', 'namespace'}:
+        raise ValueError('SUP05_FIRST_IMPORT_OWNER_UNVERIFIED')
+    pod, namespace = owner_snapshot['pod'], owner_snapshot['namespace']
+    try:
+        topology = _normal_tp2_topology(render, namespace, pod)
+        engine = _binding(pod, namespace, 'engine', 'serving-engine')
+        status, = [row for row in pod['status']['containerStatuses'] if row['name'] == 'engine']
+        ready, = [row for row in pod['status']['conditions'] if row.get('type') == 'Ready']
+        platform = (env.runtime.platform or '').split('; ')
+        if ('sup05_first_import' not in render or f'sup05_first_import={HOLD_SCHEMA}' not in platform
+                or 'engine_version_observed=True' not in platform
+                or (env.engine.version, env.engine.image_digest) != (render['engine_version'], engine['image'])
+                or (env.model.id, env.model.revision) != (render['model_id'], render['model_revision'])
+                or not re.fullmatch(r'[a-f0-9]{64}', env.model.inventory_sha256 or '')
+                or any(getattr(env.runtime, key) != value for key, value in topology.items())
+                or engine['restart_count'] != 0 or status['ready'] is not False or ready['status'] != 'False'):
+            raise ValueError
+        verify_waiting(render, engine, waiting_raw)
+        target = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': True, 'run_id': render['run_id'],
+                  'environment_ref': env.ref().model_dump(mode='json'), 'kubernetes': {'context': context, 'engine': engine}}
+        from guard.runtime.kubernetes_binding import validate_capture_target
+
+        validate_capture_target(target, env)
+    except (AttributeError, KeyError, OSError, TypeError, ValueError):
+        raise ValueError('SUP05_FIRST_IMPORT_OWNER_UNVERIFIED') from None
+    return target
+
+
+def _sup05_first_import_inputs(args):
+    from guard.adapters.vllm_file_read_sensor import MAX_SCOPE_BYTES, dependency, fingerprint
+    from guard.runtime.bounded import strict_json
+    from guard.runtime.kubernetes_binding import validate_capture_target
+    from guard.update_validation import _plain_path, reserve_output
+    from tools import gpu_a_sup05_first_import as hold
+    from tools.gpu_a_sup05_first_import_runtime import BOOTSTRAP_NAME, IMPORT_DIRECTORY, RELEASE
+
+    roles = ['env', 'render', 'owner_snapshot', 'waiting']
+    if args.kind == 'sup05-first-import-release':
+        roles.append('preparation')
+    paths = {role: _plain_path(getattr(args, role)) for role in roles}
+    hashes = {role: getattr(args, role + '_sha256') for role in roles}
+    if not all(fingerprint(digest) for digest in hashes.values()):
+        raise ValueError('SUP05_FIRST_IMPORT_INPUT_DIGEST_INVALID')
+    raw = {role: dependency(path, hashes[role]) for role, path in paths.items() if role != 'preparation'}
+    env = Environment.model_validate(strict_json(raw['env'], limit=MAX_SCOPE_BYTES))
+    render = strict_json(raw['render'], limit=MAX_SCOPE_BYTES)
+    snapshot = strict_json(raw['owner_snapshot'], limit=MAX_SCOPE_BYTES)
+    target = sup05_wait_target(env, render, snapshot, raw['waiting'], context=args.context)
+    if 'preparation' not in paths:
+        output = _plain_path(args.out)
+        encoded = canonical_json(target)
+        with output.open('xb') as stream:
+            if stream.write(encoded) != len(encoded):
+                raise OSError('SUP05_FIRST_IMPORT_OUTPUT_INCOMPLETE')
+        return {'target_sha256': sha256_hex(encoded)}
+
+    from guard.executors.kubernetes_sup05_normal_preparation import read_normal_publication
+
+    verified = read_normal_publication(paths['preparation'], env, expected_sha256=hashes['preparation'],
+        owner_snapshot=paths['owner_snapshot'], owner_snapshot_sha256=hashes['owner_snapshot'])
+    binding = validate_capture_target(target, env)
+    if verified['binding'] != binding or verified['target_sha256'] != sha256_hex(canonical_json(target)):
+        raise ValueError('SUP05_FIRST_IMPORT_OWNER_UNVERIFIED')
+    expected, _ = hold.verify_waiting(render, binding['engine'], raw['waiting'])
+    release = hold.release_document(expected, raw['waiting'], verified)
+    if any(dependency(paths[role], hashes[role]) != value for role, value in raw.items()):
+        raise ValueError('SUP05_FIRST_IMPORT_INPUT_CHANGED')
+
+    output = reserve_output(args.out, protected=[Path(__file__).resolve().parents[2],
+                                                paths['preparation'].parent, *paths.values()])
+    output.chmod(0o700)
+    assets = output / 'lifecycle'
+    assets.mkdir(mode=0o700)
+    (assets / IMPORT_DIRECTORY).mkdir(mode=0o700)
+    files = {**verified['files'], f'{IMPORT_DIRECTORY}/{BOOTSTRAP_NAME}': verified['files'][BOOTSTRAP_NAME],
+             RELEASE: release}
+    for name, value in files.items():
+        with (assets / name).open('xb') as stream:
+            if stream.write(value) != len(value):
+                raise OSError('SUP05_FIRST_IMPORT_OUTPUT_INCOMPLETE')
+    report = {'schema': 'guard-sup05-first-import-publication/1', 'profile': verified['profile'],
+              'session': verified['session'], 'source_sha256': hashes, 'target_sha256': verified['target_sha256'],
+              'files_sha256': {name: sha256_hex(value) for name, value in files.items()},
+              'asset_publication_verified': False, 'pre_import_verified': False, 'engine_started': False}
+    with (output / 'preparation.json').open('xb') as stream:
+        encoded = canonical_json(report)
+        if stream.write(encoded) != len(encoded):
+            raise OSError('SUP05_FIRST_IMPORT_OUTPUT_INCOMPLETE')
+    return report
 
 
 def main(argv=None):
@@ -484,12 +682,31 @@ def main(argv=None):
     e.add_argument('--engine-pod', type=Path, help='정상 TP2 실행의 실제 엔진 Pod 관측')
     e.add_argument('--namespace', type=Path, help='정상 TP2 실행의 실제 namespace 관측')
     e.add_argument('--observed-gpu-count', type=int, help='같은 TP2 엔진 컨테이너에서 확인한 GPU 수')
+    e.add_argument('--sup05-waiting', type=Path, help='Pinned pre-import marker from the held normal engine')
+    e.add_argument('--sup05-waiting-sha256')
     t = sub.add_parser('target'); t.add_argument('--env', type=Path, required=True); t.add_argument('--render', type=Path, required=True)
     for name in ('namespace', 'engine-pod', 'probe-pod'):
         t.add_argument('--' + name, type=Path, required=True)
     t.add_argument('--context', default='kubernetes-admin@kubernetes'); t.add_argument('--api-model', default='test-model')
     t.add_argument('--observed-engine-version', help='같은 엔진 컨테이너에서 확인한 실제 vLLM 판본')
     t.add_argument('--out', type=Path, required=True)
+    p = sub.add_parser('startup-prefix', help='Retain a bounded boot log hash on a new owned target')
+    for name in ('env', 'target', 'out'):
+        p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--env-sha256', required=True)
+    p.add_argument('--target-sha256', required=True)
+    for kind, description in (
+            ('sup05-first-import-target', 'Select the held normal SUP-05 owner from immutable saved inputs'),
+            ('sup05-first-import-release', 'Stage the verified normal SUP-05 assets and fixed release input offline')):
+        hold = sub.add_parser(kind, help=description)
+        roles = ['env', 'render', 'owner-snapshot', 'waiting']
+        if kind == 'sup05-first-import-release':
+            roles.append('preparation')
+        for role in roles:
+            hold.add_argument('--' + role, type=Path, required=True)
+            hold.add_argument('--' + role + '-sha256', required=True)
+        hold.add_argument('--context', required=True)
+        hold.add_argument('--out', type=Path, required=True)
     c = sub.add_parser('check'); c.add_argument('--check', required=True); c.add_argument('--env', type=Path, required=True)
     c.add_argument('--target', type=Path, required=True); c.add_argument('--prepared', type=Path, required=True)
     c.add_argument('--cases', required=True, help='req14-normal, req16-salt, req16-lab, req16-full, req18-slot 또는 REQ-17 사례 생성기 출력 파일')
@@ -509,8 +726,10 @@ def main(argv=None):
     if args.kind == 'env':
         render_ref = {}
         topology_inputs = {}
-        if args.external_platform is None and any(
-                value is not None for value in (args.engine_pod, args.namespace, args.observed_gpu_count)):
+        if (args.sup05_waiting is None) != (args.sup05_waiting_sha256 is None):
+            parser.error('--sup05-waiting and --sup05-waiting-sha256 are required together')
+        if args.external_platform is None and any(value is not None for value in (
+                args.engine_pod, args.namespace, args.observed_gpu_count, args.sup05_waiting)):
             parser.error('TP2 Pod evidence requires --external-platform')
         if args.external_platform is None:
             render = load(args.render)
@@ -529,6 +748,15 @@ def main(argv=None):
                     raw, _ = _read(path, max_bytes=262144)
                     topology_inputs[key] = strict_json(raw, limit=262144)
                     render_ref[key] = {'path': str(path), 'sha256': sha256_hex(raw)}
+            if args.sup05_waiting is not None:
+                from guard.adapters.vllm_file_read_sensor import dependency, fingerprint
+                from guard.update_validation import _plain_path
+
+                path = _plain_path(args.sup05_waiting)
+                if not fingerprint(args.sup05_waiting_sha256):
+                    raise ValueError('SUP05_FIRST_IMPORT_INPUT_DIGEST_INVALID')
+                topology_inputs['sup05_waiting_raw'] = dependency(path, args.sup05_waiting_sha256)
+                render_ref['sup05_waiting'] = {'path': str(path), 'sha256': args.sup05_waiting_sha256}
         env = environment(render, model_id=args.model_id, gpu_model=args.gpu_model, driver=args.driver,
             observed_engine_version=args.observed_engine_version, external_platform=args.external_platform,
             inventory=args.model_inventory, observed_gpu_count=args.observed_gpu_count, **topology_inputs)
@@ -540,8 +768,25 @@ def main(argv=None):
         value = target(load_environment(args.env), load(args.render), load(args.namespace), load(args.engine_pod),
             load(args.probe_pod), context=args.context, api_model=args.api_model,
             observed_engine_version=args.observed_engine_version)
-        _write(args.out, value)
-        print(json.dumps({'target': str(args.out), 'sha256': sha256_hex(canonical_json(value))}))
+        raw = canonical_json(value)
+        receipt = {'target': str(args.out), 'sha256': sha256_hex(raw)}
+        if 'normal_tp2_callbacks' in value:
+            from guard.update_validation import _plain_path
+
+            output = _plain_path(args.out)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            with output.open('xb') as stream:
+                stream.write(raw)
+            receipt['target_file_sha256'] = receipt['sha256']
+        else:
+            _write(args.out, value)
+        print(json.dumps(receipt))
+    elif args.kind == 'startup-prefix':
+        value, file_sha256 = _retain_startup_prefix(args.env, args.env_sha256, args.target, args.target_sha256, args.out)
+        print(json.dumps({'target': str(args.out), 'sha256': sha256_hex(canonical_json(value)),
+                          'target_file_sha256': file_sha256}))
+    elif args.kind in {'sup05-first-import-target', 'sup05-first-import-release'}:
+        print(json.dumps(_sup05_first_import_inputs(args)))
     elif args.kind == 'http-check':
         value = load(args.target)
         policy, config = http_inputs(args.check, value,

@@ -1,12 +1,13 @@
 """Exact reviewed source profiles; current source gate is exercised without target IO."""
-from copy import deepcopy
+from datetime import timedelta
 from hashlib import sha256
 from pathlib import Path
 import pytest
+from guard.models import utcnow
 from guard.runtime import reviewed_http_contract as contract
+from guard.runtime import kubernetes_worker_readiness as readiness
 from tools import b_lif07_native_capture as helper
 from tools import b_lif07_readiness as tool
-from tests.test_b_lif07_http_readiness import configure, collect
 from tests.test_b_lif07_readiness import case
 
 
@@ -48,17 +49,21 @@ def test_historical_profiles_keep_original_literals(common):
 
 @pytest.mark.parametrize('path', sorted(contract._CURRENT_RAW))
 def test_unregistered_source_combination_closes_before_collector_or_target_IO(case, monkeypatch, path):
-    world, created, window = configure(case, monkeypatch)
-    # Real current proof, then an unregistered literal combination in the resolver.
     from tools import verify_req10_consumption as gate
+
+    def fail_if_constructed(*args, **kwargs):
+        pytest.fail('An unregistered source combination must never construct the HTTP collector')
+
+    monkeypatch.setattr(readiness, 'KubernetesWorkerReadinessHTTP', fail_if_constructed)
+    case['manifest']['request']['messages'] = [{'role': 'user', 'content': 'hello'}]
     proof = gate.verify(Path(__file__).resolve().parents[2])
     monkeypatch.setattr(helper, 'verify_source', lambda: proof)
-    changed = deepcopy(contract._CURRENT_RAW); changed[path] = '0' * 64
-    monkeypatch.setattr(contract, '_CURRENT_RAW', changed)
-    observation = collect(case, window)
+    monkeypatch.setattr(contract, '_CURRENT_RAW', {**contract._CURRENT_RAW, path: '0' * 64})
+    now = utcnow()
+    observation = tool._collect_http(case['env'], case['target'], case['prepared'], case['manifest'],
+        (now - timedelta(seconds=30)).isoformat(), (now + timedelta(minutes=3)).isoformat())
     assert observation['gaps'] == ['HTTP_SOURCE_UNAVAILABLE']
     assert observation['snapshot'] is None and not observation['sample_attempted']
-    assert created == [] and world.calls == [] and world.execs == []
 
 
 @pytest.mark.parametrize('proof', [None, {}, {'reviewed_common_commit': []}, {'reviewed_common_commit': '0'*64}])

@@ -247,6 +247,57 @@ def test_all_four_selected_generations_are_rechecked_after_dispatch(role,field):
     assert transport.report()['collection_gap'] and PRIVATE not in json.dumps(transport.report())
 
 
+@pytest.mark.parametrize('shared,expected_calls', [(True, 13), (False, 15)])
+def test_namespace_read_is_shared_only_within_each_verification_edge(shared, expected_calls):
+    env, target = inputs()
+    external, gateway = (target['kubernetes_routes'][role] for role in ('external_probe', 'gateway'))
+    if shared:
+        gateway.update(namespace=external['namespace'], namespace_uid=external['namespace_uid'])
+    world = World(target)
+    transport = KubernetesRoutesHTTP(target, env, runner=world.runner)
+    row, = transport('kubernetes-probe', [{'id': 'openapi', 'method': 'GET',
+        'url': target['engine']['trusted_url']+'/openapi.json', 'want_body': True}], 1)
+    assert row['outcome'] == 200
+    assert len(world.calls) == expected_calls
+    position = next(index for index, argv in enumerate(world.calls) if 'exec' in argv)
+    for edge in (world.calls[:position], world.calls[position+1:]):
+        namespace_names = [argv[argv.index('namespace')+1] for argv in edge if 'namespace' in argv]
+        expected_names = [external['namespace']] if shared else [external['namespace'], gateway['namespace']]
+        assert namespace_names == expected_names
+        for role in (external, gateway):
+            assert sum('get' in argv and 'pod' in argv and role['pod'] in argv for argv in edge) == 1
+
+
+@pytest.mark.parametrize('change', ['conflicting-uid', 'new-uid', 'deleting'])
+def test_shared_namespace_verification_rejects_conflicts_and_changes(change):
+    env, target = inputs()
+    external, gateway = (target['kubernetes_routes'][role] for role in ('external_probe', 'gateway'))
+    gateway['namespace'] = external['namespace']
+    if change != 'conflicting-uid':
+        gateway['namespace_uid'] = external['namespace_uid']
+    world = World(target)
+
+    def runner(argv, **kwargs):
+        result = world.runner(argv, **kwargs)
+        if world.packets and 'namespace' in argv:
+            document = json.loads(result['stdout_bytes'])
+            if change == 'new-uid':
+                document['metadata']['uid'] = '00000000-0000-0000-0000-000000000099'
+            elif change == 'deleting':
+                document['metadata']['deletionTimestamp'] = '2026-10-26T00:00:01Z'
+            return world.result(document)
+        return result
+
+    transport = KubernetesRoutesHTTP(target, env, runner=runner)
+    row, = transport('kubernetes-probe', [{'id': 'openapi', 'method': 'GET',
+        'url': target['engine']['trusted_url']+'/openapi.json', 'want_body': True}], 1)
+    assert row['outcome'] == 'probe_unavailable'
+    assert transport.report()['collection_gap'] is True
+    dispatched = int(change != 'conflicting-uid')
+    assert len(world.packets) == dispatched
+    assert sum('namespace' in argv for argv in world.calls) == 1 + dispatched
+
+
 def test_serial_socket_timeouts_return_complete_batch_without_a_second_sum_timeout_gate():
     from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
     import sys,threading,time

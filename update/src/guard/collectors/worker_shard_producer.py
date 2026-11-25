@@ -10,21 +10,27 @@ PID·시작 ticks를 읽지 못하거나 rank가 확인되지 않은 프로세�
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from guard.adapters import vllm_worker_shard_callback as callback
 from . import gpu_common_inputs as contract
+from .source_pins import producer_source_sha256
 
 PRODUCER_NAME = 'guard-engine-callback-worker-shard-load'
 PRODUCER_VERSION = '2'
-_CALLBACK_POINTS = frozenset(point for points in callback.TARGETS.values() for point in points)
+_CALLBACK_SOURCES = {point: pins if type(pins) is tuple else (pins,)
+                     for module, points in callback.TARGETS.items() for point in points
+                     for pins in (callback.SOURCES[module],)}
+_CALL_IDENTITY = ("point", "process_sha256", "parent_call_sha256", "source_file_sha256",
+                  "entry_code_sha256", "operation_started_ns")
+_ENGINE_GAP_SCHEMA = "guard-engine-callback-events/1"
+_ENGINE_GAP_FIELDS = {"schema", "phase", "code", "process_sha256", "detail_sha256"}
+_WORKER_SHARD_GAP_CODES = {"WORKER_SHARD_PREPARE_SHAPE_UNAVAILABLE",
+                           "WORKER_SHARD_FILE_SET_UNAVAILABLE", "WORKER_SHARD_INDEX_UNREADABLE"}
 
 
 def producer():
-    digest = hashlib.sha256()
-    for path in (Path(callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    source_sha256 = producer_source_sha256(callback.__file__, __file__)
+    return {'name': PRODUCER_NAME, 'version': PRODUCER_VERSION, 'source_sha256': source_sha256}
 
 
 def _ms(row):
@@ -143,10 +149,35 @@ def _page_fields_valid(point, phase, fields):
             and 'required' in fields and (required is None or index_present is True and _valid_shard_hashes(required)))
 
 
+def _joined_invocations(rows):
+    """Keep page order and admit a terminal only with its unique native call."""
+    by_call = {}
+    for index, (process, row) in enumerate(rows):
+        by_call.setdefault((process, row["call_sha256"]), []).append((index, row))
+    admitted = set()
+    unjoined = False
+    for invocation in by_call.values():
+        calls = [(index, row) for index, row in invocation if row["phase"] == "CALL"]
+        terminals = [(index, row) for index, row in invocation if row["phase"] != "CALL"]
+        if len(calls) != 1 or len(terminals) > 1:
+            unjoined = True
+            continue
+        call_index, call = calls[0]
+        admitted.add(call_index)
+        if terminals:
+            terminal_index, terminal = terminals[0]
+            if call_index < terminal_index and all(call.get(key) == terminal.get(key) for key in _CALL_IDENTITY):
+                admitted.add(terminal_index)
+            else:
+                unjoined = True
+    return [entry for index, entry in enumerate(rows) if index in admitted], unjoined
+
+
 def record_from_processes(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session):
     """Project only page-scoped worker rows. A checkpoint is an open prefix."""
     session_sha256 = hashlib.sha256(session.encode()).hexdigest()
     rows = []
+    reported_gaps = set()
     scope_mismatch = False
     for process in processes:
         if type(process) is not dict or type(process.get('events')) is not list:
@@ -155,24 +186,55 @@ def record_from_processes(processes, *, pod, environment_ref, target_sha256, pre
         pid, ticks = process.get('pid'), process.get('start_ticks')
         valid_process = contract._check(pid, 'int') and pid > 0 and contract._check(ticks, 'int')
         for row in process['events']:
-            if type(row) is not dict or row.get('schema') != callback.SCHEMA:
+            if type(row) is not dict:
+                continue
+            if row.get('schema') == _ENGINE_GAP_SCHEMA:
+                code = row.get('code')
+                if (valid_process and row.keys() == _ENGINE_GAP_FIELDS and row['phase'] == 'GAP'
+                        and type(code) is str and code in _WORKER_SHARD_GAP_CODES
+                        and contract._check(row['process_sha256'], 'sha')
+                        and contract._check(row['detail_sha256'], 'sha')):
+                    reported_gaps.add(((pid, ticks), row['process_sha256'], code))
+                continue
+            if row.get('schema') != callback.SCHEMA:
                 continue
             fields, point, phase = row.get('fields'), row.get('point'), row.get('phase')
             started, finished = row.get('operation_started_ns'), row.get('operation_finished_ns')
             if (not valid_process or row.get('session_sha256') != session_sha256
                     or not contract._check(row.get('process_sha256'), 'sha')
-                    or type(point) is not str or point not in _CALLBACK_POINTS
+                    or type(point) is not str or point not in _CALLBACK_SOURCES
+                    or row.get("source_file_sha256") not in _CALLBACK_SOURCES[point]
+                    or not contract._check(row.get("entry_code_sha256"), "sha")
+                    or not contract._check(row.get("call_sha256"), "sha")
+                    or row.get("parent_call_sha256") is not None
+                        and not contract._check(row["parent_call_sha256"], "sha")
                     or phase not in ('CALL', 'RETURN', 'RAISE') or row.get('entry_qualified_before') is not True
                     or (phase != 'CALL' and row.get('entry_qualified_after') is not True)
                     or type(fields) is not dict or type(fields.get('pid')) is not int or fields['pid'] != pid
                     or type(fields.get('start_ticks')) is not int or fields['start_ticks'] != ticks
                     or not contract._check(started, 'int') or not contract._check(finished, 'int') or finished < started
+                    or phase == "CALL" and finished != started
                     or not _page_fields_valid(point, phase, fields)):
                 scope_mismatch = True
                 continue
-            # The converter's grouping key stays private. The page owns this process identity.
-            rows.append({**row, 'process_sha256': (pid, ticks)})
-    if scope_mismatch:
+            rows.append(((pid, ticks), row))
+    # Keep independently qualified siblings. A page group's identity, rather
+    # than the callback's private process key, binds the resulting observations.
+    joined, unjoined = _joined_invocations(rows)
+    native_processes = {}
+    for process, row in joined:
+        native_processes.setdefault(process, set()).add(row["process_sha256"])
+    # Generic gap rows carry no session or PID of their own. Bind them only through
+    # the same page process and its one qualified native shard identity.
+    codes = {code for process, native_process, code in reported_gaps
+             if native_processes.get(process) == {native_process}}
+    # One page identity cannot combine separate native process contexts.
+    ambiguous_processes = {process for process, contexts in native_processes.items() if len(contexts) > 1}
+    rows = [{**row, "process_sha256": process} for process, row in joined if process not in ambiguous_processes]
+    rows.extend({"phase": "GAP", "code": code} for code in sorted(codes))
+    if unjoined:
+        rows.append({'phase': 'GAP', 'code': 'WORKER_SHARD_TERMINAL_UNJOINED'})
+    if scope_mismatch or ambiguous_processes:
         rows.append({'phase': 'GAP', 'code': 'WORKER_SHARD_SCOPE_MISMATCH'})
     return record(rows, pod=pod, environment_ref=environment_ref, target_sha256=target_sha256,
                   prepared_sha256=prepared_sha256, session=session, source_ended=False)

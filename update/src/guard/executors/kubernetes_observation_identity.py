@@ -21,6 +21,13 @@ from .kubernetes_observation_state import OBSERVATIONS as BASE_OBSERVATIONS
 OBSERVATIONS={**BASE_OBSERVATIONS,**contract.OBSERVATIONS}
 
 
+def _same_model_process(model, candidate, locator, context):
+    return (model['same_process_loader_object_linked'] and model['source_process_context_verified']
+            and candidate['recording'] == locator['recording']
+            and candidate['pid'] == context['pid'] and candidate['start_ticks'] == context['start_ticks']
+            and candidate['observed_model_object_sha256'] == model['session_model_object_sha256'])
+
+
 def _attach_scoped_mapping_contexts(trials,projection):
     """Attach bounded candidates to the same admitted root before a forward.
 
@@ -34,10 +41,7 @@ def _attach_scoped_mapping_contexts(trials,projection):
         for model in trial['configured_model_candidates']:
             locator=model['native_locator'];context=locator['context'];joined=[]
             for candidate in projection['candidates']:
-                if not (model['same_process_loader_object_linked'] and model['source_process_context_verified']
-                        and candidate['recording']==locator['recording']
-                        and candidate['pid']==context['pid'] and candidate['start_ticks']==context['start_ticks']
-                        and candidate['observed_model_object_sha256']==model['session_model_object_sha256']):continue
+                if not _same_model_process(model, candidate, locator, context):continue
                 events=[candidate['root_event'],candidate['first_source_event'],candidate['last_source_event'],*candidate['source_events']]
                 if not all(event[0]==locator['recording'] and event[1]<locator['forward_seq'] for event in events):continue
                 if not candidate['root_last_seq']<locator['forward_seq']:continue
@@ -62,10 +66,7 @@ def _attach_startup_file_contexts(trials,projection):
         for model in trial['configured_model_candidates']:
             locator=model['native_locator'];context=locator['context'];joined=[]
             for candidate in projection['candidates']:
-                if not (model['same_process_loader_object_linked'] and model['source_process_context_verified']
-                        and candidate['recording']==locator['recording']
-                        and candidate['pid']==context['pid'] and candidate['start_ticks']==context['start_ticks']
-                        and candidate['observed_model_object_sha256']==model['session_model_object_sha256']):continue
+                if not _same_model_process(model, candidate, locator, context):continue
                 events=[candidate[key] for key in ('startup_call_event','startup_terminal_event','root_event','root_link_event','first_mapping_event','last_mapping_event')]
                 if not all(event[0]==locator['recording'] and event[1]<locator['forward_seq']
                         for event in [*events,*candidate['mapping_source_events']]):continue

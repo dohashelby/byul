@@ -179,6 +179,15 @@ def _generation_transport(monkeypatch, model, fail_side=None):
     return calls
 
 
+def _assert_preserved_generation(store, report, run_dir, side):
+    original = (run_dir / side / readiness.FILENAME).read_bytes()
+    artifact, = [item for item in report.diagnostic_artifacts if item.name == f"{side}-{readiness.FILENAME}"]
+    assert artifact.sha256 == hashlib.sha256(original).hexdigest() and artifact.bytes == len(original)
+    assert (store.root / artifact.path).read_bytes() == original
+    assert any(artifact.path in line and artifact.sha256 in line for line in report.limitations)
+    return original
+
+
 def test_update_keeps_static_conditions_equal_and_does_not_replace_test_normal_control(tmp_path, monkeypatch):
     pack, envs, _, cfg = _inputs(tmp_path, ("hardened", "hardened"))
     cfg["vllm"][readiness.SETTING] = 120
@@ -208,7 +217,8 @@ def test_update_keeps_static_conditions_equal_and_does_not_replace_test_normal_c
     evds = list(store.iter_kind("EVD"))
     assert len(evds) == 2 and all(not e.normal_control.succeeded for e in evds)
     assert all(r.verdicts.security.value == "UNKNOWN" for r in store.iter_kind("RES"))
-    assert all(any(f"{side}/{readiness.FILENAME}" in line for line in report.limitations) for side in ("baseline", "candidate"))
+    for side in ("baseline", "candidate"):
+        _assert_preserved_generation(store, report, run_dir, side)
     assert not store.verify()
 
 
@@ -221,13 +231,22 @@ def test_failed_generation_keeps_side_abort_and_original_record_without_retry(tm
     calls = _generation_transport(monkeypatch, envs[0].model.id, fail_side=side)
     store = Store(tmp_path / "store")
     report, failed = application.execute_update(store, pack, envs, pol, cfg, run_dir, T0)
-    assert failed and [call[0] for call in calls] == ["baseline", "candidate"]
+    expected_calls = ["baseline"] if side == "baseline" else ["baseline", "candidate"]
+    assert failed and [call[0] for call in calls] == expected_calls
     evidence = next(e for e in store.iter_kind("EVD") if e.side.value == side)
     result = next(r for r in store.iter_kind("RES") if r.side.value == side)
     assert evidence.execution.status.value == "ABORTED" and result.verdicts.security.value == "UNKNOWN"
     assert not (run_dir / side / "target.json").exists()
-    raw = (run_dir / side / readiness.FILENAME).read_bytes()
+    raw = _assert_preserved_generation(store, report, run_dir, side)
     doc = json.loads(raw)
     assert doc["attempts"] == 1 and doc["code"] == "GENERATION_READINESS_NOT_READY"
-    assert any(f"{side}/{readiness.FILENAME}" in line and hashlib.sha256(raw).hexdigest() in line for line in report.limitations)
+    if side == "baseline":
+        candidate = next(e for e in store.iter_kind("EVD") if e.side.value == "candidate")
+        assert candidate.execution.status.value == "ABORTED"
+        assert candidate.execution.abort_reason == "BASELINE_EXECUTION_FAILED"
+        assert not (run_dir / "candidate").exists()
+    else:
+        baseline = next(e for e in store.iter_kind("EVD") if e.side.value == "baseline")
+        assert baseline.execution.status.value == "COMPLETED"
+        _assert_preserved_generation(store, report, run_dir, "baseline")
     assert not store.verify()

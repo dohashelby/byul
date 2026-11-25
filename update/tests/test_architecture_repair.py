@@ -199,7 +199,7 @@ def test_continuous_example_releases_preserve_prior_evidence_and_results(tmp_pat
                 observations=req01_obs(direct={'GET /v1/models': 200} if env.engine.version == versions[1] else None),
                 comparability=Comparability(model_inventory_sha256='a' * 64, fixture_sha256='b' * 64,
                     config_sha256='c' * 64, gpu='EXAMPLE', driver='EXAMPLE'))
-    provider.bind_executor('direct_route', 'kubernetes', lambda cfg: ExampleExecutor(), profile=profile.id)
+    provider.bind_executor('direct_route', 'example-chain', lambda cfg: ExampleExecutor(), profile=profile.id)
     monkeypatch.setitem(engine_provider.PROVIDERS, 'sglang', provider)
     envs = [environment({'gateway': {'value': True, 'origin': 'EXAMPLE', 'source': 'EXAMPLE'}},
         id='ENV-EXAMPLE-' + v.replace('.', '-'), engine={'name': 'sglang', 'version': v}) for v in versions]
@@ -207,7 +207,9 @@ def test_continuous_example_releases_preserve_prior_evidence_and_results(tmp_pat
     store = Store(tmp_path / 'store'); store.put_many([*envs, pol]); preserved = []
     for index, expected in enumerate(('REGRESSED', 'FIXED')):
         plan = select(pack, envs[index:index + 2], pol, mode='update'); store.put(plan)
-        run_plan(store, pack, plan, RunConfig(adapter='sglang', executors={'direct_route': 'kubernetes'}))
+        with pytest.raises(ValueError, match='^PAIRED_EXECUTION_REQUIRES_COORDINATOR$'):
+            run_plan(store, pack, plan, RunConfig(adapter='sglang', executors={'direct_route': 'kubernetes'}))
+        run_plan(store, pack, plan, RunConfig(adapter='sglang', executors={'direct_route': 'example-chain'}))
         judge_plan(store, pack, plan, T0); report = build_report(store, pack, plan, T0); store.put(report)
         row = next(r for r in report.by_check if r.check_id == 'REQ-01')
         assert row.comparison.value == expected and not report.official
@@ -223,12 +225,17 @@ def test_candidate_procedure_must_also_match_before_reusing_pass(reuse_case, mon
     candidate = baseline.model_copy(update={'id': 'ENV-CANDIDATE', 'engine': baseline.engine.model_copy(update={
         'version': '1.0.1', 'source_commit': 'b' * 40, 'image_digest': 'image@sha256:' + 'b' * 64})}).seal()
     original = case['preview']
-    monkeypatch.setattr(case['module'], 'preview_inputs', lambda check, env, values, cfg:
-        replace(original, fixture_sha256='f' * 64) if env.id == candidate.id else original)
+    previews = []
+    def preview(check, env, values, cfg):
+        previews.append((check.id, env.id))
+        return replace(original, fixture_sha256='f' * 64) if env.id == candidate.id else original
+
+    monkeypatch.setattr(case['module'], 'preview_inputs', preview)
     context = case['module'].build_context(case['store'], case['previous'], case['pack'], [baseline, candidate],
         case['policy'], {}, change=_change(['AUTH']), mode='update', as_of=T0)
     assert 'PLT-04' not in context.carried_over
     assert context.triggers['PLT-04'][0].refs == ['CANDIDATE_PROCEDURE_OR_FIXTURE_CHANGED_OR_UNCONFIRMED']
+    assert [env_id for check_id, env_id in previews if check_id == 'PLT-04'] == [baseline.id, candidate.id]
 
 
 def test_plan_lock_and_attempt_path_prevent_evidence_mixing(tmp_path):
@@ -262,18 +269,70 @@ def test_deferred_target_derivation_preserves_recipe_but_baseline_tampering_does
     assert configuration_sha256(cfg) != before
 
 
+def test_recipe_fixes_prepared_assets_and_other_candidate_inputs(tmp_path):
+    from guard.core.execution_recipe import configuration_sha256
+    late = tmp_path / 'late.json'
+    receiver = tmp_path / 'receiver.json'
+    receiver.write_bytes(b'initial')
+    manifest = tmp_path / 'prepared.json'
+    manifest.write_text('{"assets":{"asset.py":{}}}')
+    asset = tmp_path / 'asset.py'
+    asset.write_bytes(b'first')
+    cfg = {'update': {'kubernetes_candidate_binding': 'after_baseline'}, 'sides': {
+        'candidate': {'request_binding': {'target': str(late)},
+                      'check_config': {'LIF-03': {'prepared': str(manifest)},
+                                       'PLT-07': {'receiver_target': str(receiver)}}}}}
+    selected = configuration_sha256(cfg)
+    late.write_bytes(b'current-generation')
+    assert configuration_sha256(cfg) == selected
+    info = asset.stat()
+    asset.write_bytes(b'other')
+    os.utime(asset, ns=(info.st_atime_ns, info.st_mtime_ns))
+    assert configuration_sha256(cfg) != selected
+    asset.write_bytes(b'first')
+    receiver.write_bytes(b'changed')
+    assert configuration_sha256(cfg) != selected
+
+
+def test_requested_input_paths_uses_explicit_working_directory(tmp_path):
+    from guard.configuration import requested_input_paths
+
+    (tmp_path / "prepared.json").write_text('{"assets":{"asset.py":{}}}')
+    paths = list(requested_input_paths({"stream_buffer": {"prepared": "prepared.json"}}, base_dir=tmp_path))
+    assert [(path.name, deferred) for _, path, deferred in paths] == [
+        ("prepared.json", False), ("asset.py", False),
+    ]
+
+
+def test_requested_config_blocks_internal_overrides_and_preserves_selected_commitment():
+    from guard.core.execution_recipe import configuration_sha256
+    pack, env = baseline_pack(), environment()
+    pol = policy(pack.ref())
+    with pytest.raises(ValueError, match='REQUESTED_CONFIG_RESERVED_KEY'):
+        configuration_sha256({'sides': {'candidate': {'_kubernetes_target_sha256': 'f' * 64}}})
+    plan = bind_recipe(select(pack, [env], pol), {'fixture': 'selected'}, [env])
+    assert bind_recipe(plan, {'fixture': 'selected'}, [env]) is plan
+    with pytest.raises(ValueError, match='EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED'):
+        bind_recipe(plan, {'fixture': 'changed'}, [env])
+
+
 def test_recipe_reuses_overlapping_source_digest_and_preserves_wire_hash(tmp_path, monkeypatch):
-    source = tmp_path / 'factory.py'
+    package = tmp_path / 'installed'
+    package.mkdir()
+    source = package / 'factory.py'
     raw_source = b'# EXAMPLE executor source\n'
     source.write_bytes(raw_source)
-    monkeypatch.setattr(execution_recipe, '__file__', str(tmp_path / 'core' / 'execution_recipe.py'))
+    external = tmp_path / 'extension.py'
+    raw_external = b'# EXAMPLE external provider source\n'
+    external.write_bytes(raw_external)
+    monkeypatch.setattr(execution_recipe, '__file__', str(package / 'core' / 'execution_recipe.py'))
 
     def factory(_):
         pytest.fail('recipe must only inspect the factory')
 
     provider = engine_provider.EngineProvider('example-recipe', FakeAdapter)
     monkeypatch.setitem(engine_provider.PROVIDERS, provider.name, provider)
-    monkeypatch.setattr(provider, 'execution_recipe_files', lambda _: (source,))
+    monkeypatch.setattr(provider, 'execution_recipe_files', lambda _: (source, external))
     monkeypatch.setattr(registry, 'resolve_executor', lambda *args, **kwargs: factory)
     getsourcefile = execution_recipe.inspect.getsourcefile
     monkeypatch.setattr(execution_recipe.inspect, 'getsourcefile',
@@ -281,32 +340,62 @@ def test_recipe_reuses_overlapping_source_digest_and_preserves_wire_hash(tmp_pat
     cfg = {'adapter': {'name': provider.name}, 'executors': {'direct_route': 'example'},
            'sides': {'baseline': {}, 'candidate': {}}}
 
-    hashed = Counter()
+    reads, hashed = Counter(), Counter()
+    read_bytes = Path.read_bytes
+
+    def record_read(path):
+        reads[path] += 1
+        return read_bytes(path)
+
     def record_hash(data):
         hashed[data] += 1
         return sha256_hex(data)
+
+    monkeypatch.setattr(Path, 'read_bytes', record_read)
     monkeypatch.setattr(execution_recipe, 'sha256_hex', record_hash)
 
     source_sha256 = sha256_hex(raw_source)
     implementation = {'implementation': 'example', 'factory': factory.__qualname__,
                       'source_sha256': source_sha256,
-                      'provider_sources': [{'name': source.name, 'sha256': source_sha256}]}
+                      'provider_sources': [{'name': external.name, 'sha256': sha256_hex(raw_external)},
+                                           {'name': source.name, 'sha256': source_sha256}]}
     expected = sha256_hex(canonical_json({
         'schema': 'guard-execution-recipe/1', 'requested': cfg, 'inputs': {},
         'implementations': {f'{side}:direct_route': implementation for side in ('root', 'baseline', 'candidate')},
         'software_sha256': sha256_hex(canonical_json({source.name: source_sha256})),
     }))
-    assert execution_recipe.configuration_sha256(cfg) == expected
+    software_digests = {}
+    assert execution_recipe.configuration_sha256(cfg, software_digests=software_digests) == expected
+    assert execution_recipe.configuration_sha256(cfg, software_digests=software_digests) == expected
+    assert reads == {source: 2, external: 2}
     assert hashed[raw_source] == 1
+    assert hashed[raw_external] == 2
+    assert set(software_digests) == {source}
+
+    original_stat = source.stat()
+    updated_source = raw_source.replace(b'executor', b'provider')
+    source.write_bytes(updated_source)
+    os.utime(source, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+    assert source.stat().st_size == original_stat.st_size
+    assert source.stat().st_mtime_ns == original_stat.st_mtime_ns
+    assert execution_recipe.configuration_sha256(cfg, software_digests=software_digests) != expected
+    assert reads == {source: 3, external: 3}
+    assert hashed[updated_source] == 1
 
 
-@pytest.mark.parametrize('mutation', ['unchanged', 'target', 'software', 'added', 'removed'])
+@pytest.mark.parametrize('mutation', ['unchanged', 'target', 'software', 'symlink', 'added', 'removed'])
 def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path, monkeypatch, mutation):
     package = tmp_path / 'installed'
     package.mkdir()
     source = package / 'fixed.py'
     source_bytes = b'# EXAMPLE source A\n'
-    source.write_bytes(source_bytes)
+    if mutation == 'symlink':
+        first_source, next_source = tmp_path / 'first.py', tmp_path / 'next.py'
+        first_source.write_bytes(source_bytes)
+        next_source.write_bytes(b'# EXAMPLE source B\n')
+        source.symlink_to(first_source)
+    else:
+        source.write_bytes(source_bytes)
     target = tmp_path / 'target.json'
     target.write_bytes(b'{"example":"A"}')
     monkeypatch.setattr(execution_recipe, '__file__', str(package / 'core' / 'execution_recipe.py'))
@@ -329,6 +418,9 @@ def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path,
                     replace_bytes_preserving_mtime(target, b'{"example":"B"}')
                 elif mutation == 'software':
                     replace_bytes_preserving_mtime(source, b'# EXAMPLE source B\n')
+                elif mutation == 'symlink':
+                    source.unlink()
+                    source.symlink_to(next_source)
                 elif mutation == 'added':
                     (package / 'new.txt').write_bytes(b'EXAMPLE added source')
                 elif mutation == 'removed':
@@ -347,16 +439,25 @@ def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path,
     plan = bind_recipe(select(pack, envs, pol, mode='update'), cfg, envs)
     store.put_many([*envs, pol, plan])
 
-    reads, hashes = Counter(), Counter()
+    reads, hashes, resolved = Counter(), Counter(), Counter()
     read_bytes = Path.read_bytes
+    resolve = store.resolve
+
     def record_read(path):
         reads[path] += 1
         return read_bytes(path)
+
     def record_hash(data):
         hashes[data] += 1
         return sha256_hex(data)
+
+    def record_resolve(ref):
+        resolved[ref.id] += 1
+        return resolve(ref)
+
     monkeypatch.setattr(Path, 'read_bytes', record_read)
     monkeypatch.setattr(execution_recipe, 'sha256_hex', record_hash)
+    monkeypatch.setattr(store, 'resolve', record_resolve)
 
     run_cfg = RunConfig(raw=cfg, executors=cfg['executors'])
     if mutation == 'unchanged':
@@ -372,6 +473,8 @@ def test_run_recipe_rereads_files_and_rejects_changes_before_next_side(tmp_path,
     assert reads[target] == 3
     assert reads[source] == (2 if mutation == 'removed' else 3)
     assert hashes[source_bytes] == 1
+    assert hashes[b'{"example":"A"}'] == (2 if mutation == 'target' else 3)
+    assert resolved == {pol.id: 1, envs[0].id: 1, envs[1].id: 1}
 
 
 @pytest.mark.parametrize('adapter', [VllmAdapter(), SGLangAdapter(), TensorRTAdapter()])

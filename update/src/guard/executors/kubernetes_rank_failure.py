@@ -1,10 +1,9 @@
 """Draft LIF08 canonical product: passive mp facts, no fault-control protocol."""
-from pathlib import Path
 import uuid
+from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_rank_failure_sensor as sensor,vllm_rank_failure_metadata as metadata
 from guard.adapters import vllm_release_observation_sensor as release_observation,vllm_lifecycle_profiles as profiles
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
-from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_rank_failure import KubernetesRankFailureHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
@@ -15,7 +14,7 @@ from .rank_failure_contract import PROFILE,normalize_policy,stamp
 ACTIVATION_OBSERVATIONS = {'activation_steps', 'activation_violations', 'activation_missing', 'activation_scope_complete'}
 
 
-def _activation_observations(projection, trials, diagnostics):
+def _activation_observations(projection, trials, diagnostics, packet):
     calls = {(row['recording'], row['pid'], row['start_ticks'], row['call_sha256']) for row in projection['calls']
         if row['point'] == 'MultiprocExecutor.execute_model' and row['phase'] == 'RETURN'
         and row['source_process_binding_observed']}
@@ -23,17 +22,29 @@ def _activation_observations(projection, trials, diagnostics):
         if row['point'] == 'MultiprocExecutor.execute_model' and row['phase'] == 'RETURN'
         and row['returned_kind'] == 'value'
         and (row['recording'], row['pid'], row['start_ticks'], row['call_sha256']) in calls]
+    source_recordings = {}
+    for index, recording in enumerate((packet or {}).get('recordings', [])):
+        capture = recording.get('capture') or {}
+        summary, provenance = capture.get('summary', {}), capture.get('provenance', {})
+        if (summary.get('recording_closed') is True and summary.get('discarded_tail_bytes') == 0
+                and provenance.get('owner_binding_verified') is True
+                and metadata.fingerprint(provenance.get('capture_sha256'))):
+            source_recordings[index] = provenance['capture_sha256']
+    attributed = [row for row in native if row['recording'] in source_recordings]
     controls = [row for row in trials if row['case_id'] in {'lif08-normal-before', 'lif08-normal-after'}
         and row.get('binding_verified') is True and row.get('policy_window_verified') is True
         and row.get('capture_complete') is True and row.get('normal_shape_verified') is True]
     # These are independently observed facts. The native return did not identify the client control.
-    steps = [{'step': 'native-rank-executor-value-return', **{key: row[key] for key in (
-        'call_sha256', 'source_sha256', 'recording', 'seq', 'operation_started_ns', 'operation_finished_ns')}} for row in native]
+    steps = [{'step': 'native-rank-executor-value-return', 'source_recording_sha256': source_recordings[row['recording']],
+              **{key: row[key] for key in ('call_sha256', 'source_sha256', 'recording', 'seq',
+                                         'operation_started_ns', 'operation_finished_ns')}} for row in attributed]
     steps += [{'step': 'direct-rank-normal-control', **row} for row in controls]
     missing = set(diagnostics)
     missing.update(f"{row['kind']}:{row['reason']}" if row.get('kind') is not None else row['reason']
                    for row in projection['missing'])
-    if not native:
+    if len(attributed) != len(native):
+        missing.add('RANK_NATIVE_EXECUTOR_VALUE_SOURCE_UNVERIFIED')
+    if not attributed:
         missing.add('RANK_NATIVE_EXECUTOR_VALUE_RETURN_UNAVAILABLE')
     if len(controls) != 2:
         missing.add('RANK_BOUNDED_NORMAL_CONTROL_PAIR_UNAVAILABLE')
@@ -66,7 +77,7 @@ class KubernetesRankFailureExecutor(HttpCheckExecutor):
         try:
             if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target=load_bounded_json(self.cfg['target'])
             target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end=normalize_policy(policy_values)
             if (target_hash!=policy_values['rank_target_sha256'] or env.ref().sha256!=policy_values['rank_environment_sha256']
                     or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile'] not in {sensor.PROFILE,release_observation.RANK_PROFILE}
@@ -126,7 +137,7 @@ class KubernetesRankFailureExecutor(HttpCheckExecutor):
             'rank_failure_candidates':projection['source_failure_candidates'],'rank_fault_cases':projection['fault_cases'],'rank_missing':projection['missing'],
             'rank_producer_authenticated':False,'rank_normal_all_ranks_verified':False,'rank_upper_client_receipt_verified':False,'rank_scope_complete':False}
         if ACTIVATION_OBSERVATIONS <= {item.key for item in ctx.check.required_observations}:
-            observations.update(_activation_observations(projection, trials, diagnostics))
+            observations.update(_activation_observations(projection, trials, diagnostics, packet))
         return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Closed normal probes and selected mp source facts; four independent fault activations, all-rank normal computation and upper receipt unverified.'},[],summary
 

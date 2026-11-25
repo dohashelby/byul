@@ -72,10 +72,15 @@ export const usePhaseTimeline = () =>
   useQuery({ queryKey: ["runtime", "phase-timeline"], queryFn: () => getJson<PhaseTimelineResponse>("/api/runtime/phase-timeline"), ...live });
 export const useResults = () =>
   useQuery({ queryKey: ["update", "results"], queryFn: () => getJson<VerificationList>("/api/update/results") });
-export const useResult = (id: string | null) =>
+export const useResult = (id: string | null, revision: string | null, sha256: string | null) =>
   useQuery({
-    queryKey: ["update", "result", id],
-    queryFn: () => getJson<VerificationDetail>(`/api/update/results/${enc(id!)}`),
+    queryKey: ["update", "result", id, revision, sha256],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (revision !== null) params.set("revision", revision);
+      if (sha256 !== null) params.set("sha256", sha256);
+      return getJson<VerificationDetail>(`/api/update/results/${enc(id!)}${params.size ? `?${params}` : ""}`);
+    },
     enabled: !!id,
   });
 export const useRevalidation = () =>

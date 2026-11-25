@@ -59,8 +59,12 @@ def test_materialized_grant_enters_existing_plan_and_policy_validator(tmp_path):
                            sha256_hex(env.model.revision.encode()))}
 
 
-@pytest.mark.parametrize('replace_target', [False, True], ids=['unchanged', 'replaced-with-identical-bytes'])
-def test_prepare_checks_saved_source_identity_before_writing(tmp_path, monkeypatch, replace_target):
+@pytest.mark.parametrize(('change', 'error'), [
+    (None, None),
+    ('replaced-with-identical-bytes', 'MVP_MODEL_GRANT_SOURCE_CHANGED'),
+    ('other-gateway-policy', 'MVP_MODEL_GRANT_GATEWAY_POLICY_PAIR_MISMATCH'),
+], ids=['unchanged', 'replaced-with-identical-bytes', 'other-gateway-policy'])
+def test_prepare_checks_saved_source_identity_before_writing(tmp_path, monkeypatch, change, error):
     _, base, envs, targets, receipt = declarations()
 
     def write(name, value):
@@ -69,10 +73,12 @@ def test_prepare_checks_saved_source_identity_before_writing(tmp_path, monkeypat
         return path
 
     policy_path = write('policy.json', base.to_dict())
+    if change == 'other-gateway-policy':
+        receipt['sides']['candidate']['gateway_policy_sha256'] = sha256_hex(b'other-runtime-policy-fixture')
     inventory_path = write('inventory.json', receipt)
     environment_paths = {side: write(f'{side}-env.json', env.to_dict()) for side, env in envs.items()}
     target_paths = {side: write(f'{side}-target.json', target) for side, target in targets.items()}
-    if replace_target:
+    if change == 'replaced-with-identical-bytes':
         materialize = inputs.materialize
 
         def replace_after_materialization(*args):
@@ -88,8 +94,8 @@ def test_prepare_checks_saved_source_identity_before_writing(tmp_path, monkeypat
     selection_pin = sha256_hex(inventory_path.read_bytes())
     output, store = tmp_path / 'revised.json', tmp_path / 'store'
     arguments = policy_path, environment_paths, target_paths, inventory_path, selection_pin, output
-    if replace_target:
-        with pytest.raises(ValueError, match='^MVP_MODEL_GRANT_SOURCE_CHANGED$'):
+    if error:
+        with pytest.raises(ValueError, match=f'^{error}$'):
             inputs.prepare(*arguments, store=store)
         assert not output.exists() and not store.exists()
     else:

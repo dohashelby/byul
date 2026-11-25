@@ -24,7 +24,11 @@ PROFILES = {'dev': ('2', '4', '8Gi', '16Gi'), 'reference': ('4', '8', '12Gi', '2
 CALLBACKS, DATA = '/guard-lifecycle/engine-callbacks', '/guard-lifecycle/data'
 MP = ('--distributed-executor-backend', 'mp')
 GPU_RESOURCE = 'nvidia.com/gpu'
-NORMAL_TP2_GENERATIONS = frozenset({'v2-default', 'v2-template'})
+NORMAL_TP2_V1_EAGER_GENERATION = 'v1-eager-template'
+NORMAL_TP2_TEMPLATE_GENERATIONS = frozenset({'v2-template', NORMAL_TP2_V1_EAGER_GENERATION})
+NORMAL_TP2_GENERATIONS = NORMAL_TP2_TEMPLATE_GENERATIONS | {'v2-default'}
+EAGER_WEIGHT_READ_ARG = '--safetensors-load-strategy=eager'
+V2_MODEL_RUNNER_ENV = 'VLLM_USE_V2_MODEL_RUNNER'
 NORMAL_TP2 = {'gpu_count': 2, 'tp_size': 2, 'pp_size': 1, 'dp_size': 1}
 NORMAL_TP2_ARGS = ('--tensor-parallel-size', '2', '--pipeline-parallel-size', '1',
                    '--data-parallel-size', '1', *MP)
@@ -51,6 +55,9 @@ GENERATIONS = {
     'v2-code-selection-notrust': {'sensor': False, 'args': [], 'env': {}},
     # SUP-03. guard 고정 템플릿 파일을 읽기 전용으로 마운트하고 --chat-template으로 고른다.
     'v2-template': {'sensor': False, 'template': True, 'args': ['--chat-template', CHAT_TEMPLATE_PATH], 'env': {}},
+    # This selects the normal reader launch settings. Lifecycle preparation is separate.
+    NORMAL_TP2_V1_EAGER_GENERATION: {'sensor': False, 'template': True,
+        'args': ['--chat-template', CHAT_TEMPLATE_PATH, EAGER_WEIGHT_READ_ARG], 'env': {V2_MODEL_RUNNER_ENV: '0'}},
     # 2단계 P1·P2 생산자 GPU 확인. 콜백 센서의 선택 관측(prepare-engine-callbacks 플래그)을 한 엔진에서 함께 켠다.
     # 세대 전환을 직접 일으키는 개발 경로와 torch profiler를 켠다. 시험 예외로만 닿는 lab 엔진이다.
     'v1-producers': {'sensor': True, 'profiles': True,
@@ -101,11 +108,23 @@ def normal_tp2_release(version, image):
 def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revision, host_root, enforce_eager=False,
            engine_version=None, model_id=None, model_host_snapshot=None,
            code_revision=None, extra_engine_args=(), max_model_len=2048, check_id=None, release_launch=False,
-           normal_tp2=False):
+           normal_tp2=False, sup05_first_import=False, normal_tp2_callbacks=None):
     if (generation not in GENERATIONS or profile not in PROFILES or not _RUN_ID.fullmatch(run_id or '')
             or not _IMAGE.fullmatch(engine_image or '') or not re.fullmatch(r'[0-9a-f]{40}', model_revision or '')
             or not _HOST_PATH.fullmatch(host_root or '')):
         raise ValueError('AWS_RENDER_INPUT_INVALID')
+    if generation == NORMAL_TP2_V1_EAGER_GENERATION and (normal_tp2 is not True or extra_engine_args):
+        raise ValueError('AWS_NORMAL_TP2_V1_EAGER_LAUNCH_UNAVAILABLE')
+    if type(sup05_first_import) is not bool or sup05_first_import and (
+            normal_tp2 is not True or not release_launch or generation != NORMAL_TP2_V1_EAGER_GENERATION):
+        raise ValueError('SUP05_FIRST_IMPORT_NORMAL_LAUNCH_REQUIRED')
+    if normal_tp2_callbacks is not None:
+        from tools import gpu_a_normal_tp2_callbacks as passive
+
+        if (normal_tp2 is not True or release_launch is not True or generation not in passive.GENERATIONS
+                or sup05_first_import or extra_engine_args):
+            raise ValueError(passive.ERROR)
+        passive.validate_plan(normal_tp2_callbacks, attached=False)
     code_selection = generation in {'v2-code-selection-trust', 'v2-code-selection-notrust'}
     if code_selection and (engine_version is None or model_id is None or code_revision is None):
         raise ValueError('AWS_CODE_SELECTION_IDENTITY_REQUIRED')
@@ -152,7 +171,7 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
             generation not in NORMAL_TP2_GENERATIONS or not release_launch or release['launch']['engine'] != 'V1'
             or not normal_tp2_release(engine_version, engine_image)
             or check_id is not None or code_revision is not None or enforce_eager
-            or tuple(extra_engine_args) not in ((), ('--safetensors-load-strategy=eager',))):
+            or tuple(extra_engine_args) not in ((), (EAGER_WEIGHT_READ_ARG,))):
         raise ValueError('AWS_NORMAL_TP2_LAUNCH_UNAVAILABLE')
     check_args = []
     if check_id is not None:
@@ -200,12 +219,14 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     if marker_root is not None:
         engine['env'].append({'name': 'BYUL_CODE_MARKER_ROOT', 'value': marker_root})
     run_root = f'{host_root}/{run_id}'
-    if spec['sensor']:
+    host_directories = {}
+    if spec['sensor'] or normal_tp2_callbacks is not None:
+        host_directories = {'engine_callbacks': run_root + '/engine-callbacks', 'lifecycle_data': run_root + '/lifecycle-data'}
         engine['env'].append({'name': 'PYTHONPATH', 'value': CALLBACKS})
         engine['volumeMounts'] += [{'name': 'guard-callbacks', 'mountPath': CALLBACKS, 'readOnly': True},
             {'name': 'guard-data', 'mountPath': DATA}]
-        pod['spec']['volumes'] += [{'name': 'guard-callbacks', 'hostPath': {'path': run_root + '/engine-callbacks', 'type': 'Directory'}},
-            {'name': 'guard-data', 'hostPath': {'path': run_root + '/lifecycle-data', 'type': 'Directory'}}]
+        pod['spec']['volumes'] += [{'name': 'guard-callbacks', 'hostPath': {'path': host_directories['engine_callbacks'], 'type': 'Directory'}},
+            {'name': 'guard-data', 'hostPath': {'path': host_directories['lifecycle_data'], 'type': 'Directory'}}]
     if spec.get('template'):
         engine['volumeMounts'].append({'name': 'guard-chat-template', 'mountPath': CHAT_TEMPLATE_PATH, 'readOnly': True})
         pod['spec']['volumes'].append({'name': 'guard-chat-template',
@@ -228,6 +249,20 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
             'containers': [{'name': 'probe', 'image': engine_image, 'command': ['sleep', 'infinity'],
                 'securityContext': {'allowPrivilegeEscalation': False, 'capabilities': {'drop': ['ALL']}},
                 'resources': {'requests': {'cpu': '100m', 'memory': '256Mi'}, 'limits': {'cpu': '1', 'memory': '1Gi'}}}]}}
+    launch = {'command': list(engine['command']), 'argv': list(engine['args']),
+            'engine': launch_profile.get('engine'), 'env': release_env,
+            'runner': {'0': 'v1', '1': 'v2'}.get(spec['env'].get(V2_MODEL_RUNNER_ENV), 'engine-default'),
+            'async_requested': False if '--no-async-scheduling' in engine['args'] else None,
+            'prefix_cache': True if '--enable-prefix-caching' in engine['args'] else None}
+    held = None
+    if sup05_first_import:
+        from tools.gpu_a_sup05_first_import import render_hold
+
+        held = render_hold(pod, engine, version=engine_version, run_id=run_id, launch=launch, run_root=run_root)
+    callback_plan = None
+    if normal_tp2_callbacks is not None:
+        callback_plan = passive.attach_plan(normal_tp2_callbacks, run_id, host_directories)
+        pod['metadata'].setdefault('annotations', {})[passive.ANNOTATION] = passive.plan_sha256(callback_plan)
     engine_yaml = yaml.safe_dump_all([deployment, service], sort_keys=False).encode()
     probe_yaml = yaml.safe_dump(probe, sort_keys=False).encode()
     record = {'schema': SCHEMA, 'handoff_zip_sha256': HANDOFF_ZIP_SHA256, 'template_sha256': TEMPLATE_SHA256,
@@ -237,19 +272,51 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
         'engine_version': engine_version, 'model_id': model_id,
         'model_host_snapshot': model_host_snapshot or f'/srv/serving/models/{model_revision}',
         'code_revision': code_revision, 'code_marker_root': marker_root,
-        'launch': {'command': list(engine['command']), 'argv': list(engine['args']),
-            'engine': launch_profile.get('engine'), 'env': release_env,
-            'runner': {'0': 'v1', '1': 'v2'}.get(spec['env'].get('VLLM_USE_V2_MODEL_RUNNER'), 'engine-default'),
-            'async_requested': False if '--no-async-scheduling' in engine['args'] else None,
-            'prefix_cache': True if '--enable-prefix-caching' in engine['args'] else None},
+        'launch': launch,
         'lab_namespace_owner_label_required': bool(spec.get('lab')),
-        'host_directories': ({'engine_callbacks': run_root + '/engine-callbacks', 'lifecycle_data': run_root + '/lifecycle-data'}
-            if spec['sensor'] else {}),
+        'host_directories': host_directories,
         **({'chat_template': {'host_file': run_root + '/guard-text-chat-v1.jinja', 'container_path': CHAT_TEMPLATE_PATH,
             'sha256': CHAT_TEMPLATE_SHA256}} if spec.get('template') else {}),
         **({'normal_tp2': dict(NORMAL_TP2)} if normal_tp2 else {}),
+        **({'sup05_first_import': held} if held is not None else {}),
         'outputs_sha256': {'engine.yaml': _sha(engine_yaml), 'probe.yaml': _sha(probe_yaml)}}
+    if callback_plan is not None:
+        record[passive.KEY] = callback_plan
+        passive.verify_pod(record, pod, engine)
     return engine_yaml, probe_yaml, record
+
+
+def _write_render(output, engine_yaml, probe_yaml, record):
+    (output / 'engine.yaml').write_bytes(engine_yaml)
+    (output / 'probe.yaml').write_bytes(probe_yaml)
+    (output / 'render.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8')
+
+
+def prepare_normal_tp2_render(handoff_dir, output, *, callback_mode, **render_options):
+    """Write a private offline launch bundle and its exact prepared files."""
+    from tempfile import TemporaryDirectory
+
+    from guard.update_validation import _plain_path
+    from tools import gpu_a_normal_tp2_callbacks as passive
+
+    output = _plain_path(Path(output))
+    with TemporaryDirectory() as staging:
+        plan, files, _, _ = passive.prepare(Path(staging) / 'engine-callbacks', callback_mode)
+    engine_yaml, probe_yaml, record = render(handoff_dir, normal_tp2_callbacks=plan, **render_options)
+    template = None
+    if 'chat_template' in record:
+        from guard.adapters.vllm import CHAT_TEMPLATE_ASSET
+
+        template = CHAT_TEMPLATE_ASSET.read_bytes()
+        if _sha(template) != record['chat_template']['sha256']:
+            raise ValueError(passive.ERROR)
+    output.mkdir(parents=True, mode=0o700, exist_ok=False)
+    passive.write_assets(output / 'engine-callbacks', files)
+    (output / 'lifecycle-data').mkdir(mode=0o700)
+    if template is not None:
+        (output / Path(CHAT_TEMPLATE_PATH).name).write_bytes(template)
+    _write_render(output, engine_yaml, probe_yaml, record)
+    return record
 
 
 def main(argv=None):
@@ -267,21 +334,28 @@ def main(argv=None):
     parser.add_argument('--check-id', choices=['REQ-16', 'REQ-17'], help='승인된 두 판본 캐시 비교 기동 조건')
     parser.add_argument('--release-launch', action='store_true', help='정확한 이미지 쌍의 판본 profile 기동 명령 사용')
     parser.add_argument('--normal-tp2', action='store_true', help='검토된 V1 정상 서빙을 Pod당 GPU 두 장으로 렌더링')
+    parser.add_argument('--sup05-first-import', action='store_true',
+                        help='Render a bounded pre-import hold for the reviewed ordinary TP2 eager launch')
+    parser.add_argument('--normal-tp2-callbacks',
+                        help='Stage worker-shards, scoped-runner-consumption or both (worker-shards-and-scoped-runner-consumption)')
     parser.add_argument('--code-revision')
     parser.add_argument('--extra-engine-args-json', default='[]', help='추가 기동 인자의 JSON 배열')
     parser.add_argument('--host-root', default='/srv/byul-a')
     parser.add_argument('--enforce-eager', action='store_true')
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
-    engine_yaml, probe_yaml, record = render(args.handoff_dir, generation=args.generation, profile=args.profile,
+    options = dict(generation=args.generation, profile=args.profile,
         run_id=args.run_id, engine_image=args.engine_image, model_revision=args.model_revision,
         host_root=args.host_root, enforce_eager=args.enforce_eager, engine_version=args.engine_version,
         model_id=args.model_id, model_host_snapshot=args.model_host_snapshot, code_revision=args.code_revision,
         extra_engine_args=json.loads(args.extra_engine_args_json), max_model_len=args.max_model_len, check_id=args.check_id,
-        release_launch=args.release_launch, normal_tp2=args.normal_tp2)
-    args.out.mkdir(parents=True)
-    (args.out / 'engine.yaml').write_bytes(engine_yaml); (args.out / 'probe.yaml').write_bytes(probe_yaml)
-    (args.out / 'render.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8')
+        release_launch=args.release_launch, normal_tp2=args.normal_tp2, sup05_first_import=args.sup05_first_import)
+    if args.normal_tp2_callbacks is None:
+        engine_yaml, probe_yaml, record = render(args.handoff_dir, **options)
+        args.out.mkdir(parents=True)
+        _write_render(args.out, engine_yaml, probe_yaml, record)
+    else:
+        record = prepare_normal_tp2_render(args.handoff_dir, args.out, callback_mode=args.normal_tp2_callbacks, **options)
     print(json.dumps({'out': str(args.out), **record['outputs_sha256']}))
 
 

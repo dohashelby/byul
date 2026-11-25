@@ -12,7 +12,8 @@ SCOPE='owned-host-gpu-process-and-device-reference-census'
 def producer():
     root=Path(gpu_process_probe.__file__).parents[1]
     paths=[Path(__file__),Path(gpu_process_probe.__file__),Path(resource_recovery_probe.__file__),
-        root/'runtime/gpu_process_source.py',root/'runtime/bounded.py',Path(qualification_document.__file__),root/'executors/node_gpu_process.py',
+        root/'runtime/gpu_process_source.py',root/'runtime/source_assets.py',root/'runtime/bounded.py',
+        Path(qualification_document.__file__),root/'executors/node_gpu_process.py',
         root/'executors/node_image_proof.py']
     digest=hashlib.sha256()
     for path in paths:digest.update(path.name.encode()+b'\0'+path.read_bytes()+b'\0')

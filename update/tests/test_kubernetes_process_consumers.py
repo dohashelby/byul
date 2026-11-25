@@ -131,20 +131,30 @@ def context(tmp_path, *, kind="normal", mode=None, normal_mode=None):
     return ctx, world
 
 
-def test_approved_ipc_path_metadata_uses_owned_reader_without_any_connection(tmp_path, monkeypatch):
+@pytest.mark.parametrize('coverage', ['single-complete', 'multiple-complete', 'partial'])
+def test_approved_ipc_path_metadata_uses_owned_reader_without_any_connection(tmp_path, monkeypatch, coverage):
     ctx, world = context(tmp_path)
     pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
     check = pack.checks['PLT-02']
     protected = '/run/fixture/engine.sock'
-    values = {'protected_unix_paths': [protected], 'allowed_ipc_uids': ['1000']}
+    second_path = '/run/fixture/second.sock'
+    partial = coverage == 'partial'
+    selected_paths = [protected] if coverage == 'single-complete' else [protected, second_path]
+    values = {'protected_unix_paths': selected_paths, 'allowed_ipc_uids': ['1000']}
     target_path = tmp_path / 'target.json'
     target_path.write_bytes(canonical_json(ctx.target))
     target_hash = sha256_hex(target_path.read_bytes())
 
     def limited_runner(argv, **kwargs):
+        result = world.runner(argv, **kwargs)
         if 'exec' in argv:
-            assert json.loads(kwargs['input_bytes']) == {'candidate_paths': [protected]}
-        return world.runner(argv, **kwargs)
+            assert json.loads(kwargs['input_bytes']) == {'candidate_paths': selected_paths}
+            if partial:
+                observed = json.loads(result['stdout_bytes'])
+                observed['candidate_metadata'][1].update(state='unavailable',
+                    metadata_identity_stable=False, path_chain_sha256=None, diagnostic_codes=['PATH_METADATA_UNAVAILABLE'])
+                result['stdout_bytes'] = canonical_json(observed)
+        return result
 
     def wrong_lane(*args, **kwargs):
         pytest.fail('A connection collector selected the protected-path metadata path')
@@ -153,15 +163,22 @@ def test_approved_ipc_path_metadata_uses_owned_reader_without_any_connection(tmp
     config = {'target': str(target_path), 'protected_path_metadata_only': True}
     executor = KubernetesIPCProductExecutor(config, runner=limited_runner, expected_target_sha256=target_hash)
     draft = executor.run(check, ctx.env, values, ctx.adapter, tmp_path / 'work')
-    assert draft.status == ExecStatus.COMPLETED and draft.data_origin.value == 'EXAMPLE'
+    assert draft.status == (ExecStatus.ABORTED if partial else ExecStatus.COMPLETED)
+    assert draft.data_origin.value == 'EXAMPLE'
+    assert draft.abort_reason == ('KUBERNETES_IPC_PATH_METADATA_UNAVAILABLE' if partial else None)
     assert world.process_reads == 1 and not world.packets
-    row, = draft.observations['unix_ipc_trials'].value
-    assert row['path_sha256'] == sha256_hex(protected.encode()) and row['state'] == 'absent_in_reader_namespace'
-    assert row['access_tested'] is False and not draft.normal_control.attempted
+    rows = draft.observations['unix_ipc_trials'].value
+    assert [row['path_sha256'] for row in rows] == [sha256_hex(path.encode()) for path in
+                                                   ([protected] if partial else selected_paths)]
+    assert all(row['state'] == 'absent_in_reader_namespace' and row['access_tested'] is False for row in rows)
+    assert not draft.normal_control.attempted
     assert not draft.observations['unix_ipc_violations'].collected
     assert draft.observations['ipc_scope_complete'].value is False
     summary = draft.artifacts[0].path.read_text()
-    assert protected not in summary and PRIVATE not in summary
+    assert all(value not in summary for value in (protected, second_path, PRIVATE))
+    capture = json.loads(summary.splitlines()[-1])
+    assert capture['uncollected_path_sha256'] == ([sha256_hex(second_path.encode())] if partial else [])
+    assert ('IPC_PATH_METADATA_UNAVAILABLE' in capture['diagnostic_codes']) is partial
 
     invalid = KubernetesIPCProductExecutor(config, runner=limited_runner, expected_target_sha256='f' * 64)
     with pytest.raises(ValueError, match='KUBERNETES_IPC_PRODUCT_CONFIGURATION_INVALID'):

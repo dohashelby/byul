@@ -15,7 +15,7 @@ from guard.executors import kubernetes_usage_report as module
 from guard.executors.kubernetes_lifecycle_capture import KubernetesCaptureError
 from guard.executors.owned_capture import _FILE_READER, MAX_BYTES
 from guard.executors.registry import EXECUTORS
-from guard.executors.usage_report import SETTINGS, _READER
+from guard.executors.usage_report import SETTINGS, _READER, _snapshot_command
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex
 from guard.runtime.kubernetes_http import KubernetesBindingError, KubernetesHTTP
 from tests.builders import T0, evidence, policy
@@ -24,11 +24,13 @@ from tests.test_model_preparation_integration import FullWorld, full_inputs
 PATHS = ['/root/.config/vllm/usage_stats.json']
 
 
-def reader(*, sink=False):
+def reader(*, sink=False, prefixes=None):
     value = module._UsageReader.__new__(module._UsageReader)
     value.binding = {'engine': {'container': 'sink' if sink else 'engine'}}
     value._paths, value._sink = ([] if sink else list(PATHS)), sink
     value._local = False
+    program, arguments = _snapshot_command(value._paths, prefixes)
+    value.snapshot_argv = ["python3", "-c", program, *arguments]
     return value
 
 
@@ -45,6 +47,19 @@ def test_engine_reader_runs_only_the_original_usage_snapshot_and_the_sink_reader
     assert sink._program('sink', ['python3', '-c', _FILE_READER, module.SINK_PATH, str(MAX_BYTES)], 2 * MAX_BYTES) == 'file'
     with pytest.raises(KubernetesCaptureError):
         sink._program('sink', ['python3', '-c', _FILE_READER, '/guard-usage/other.jsonl', str(MAX_BYTES)], 2 * MAX_BYTES)
+
+
+def test_engine_reader_binds_the_exact_usage_append_prefix_to_the_existing_file_paths():
+    prefixes = {PATHS[0]: [13, 'a' * 64, 'b' * 64]}
+    engine = reader(prefixes=prefixes)
+    assert engine._program('engine', engine.snapshot_argv, 262144) == 'usage'
+    legacy = ['python3', '-c', _READER, ','.join(SETTINGS), *PATHS]
+    with pytest.raises(KubernetesCaptureError):
+        engine._program('engine', legacy, 262144)
+    for alternative in ({}, {PATHS[0]: [13, 'c' * 64, 'b' * 64]}):
+        program, args = _snapshot_command(PATHS, alternative)
+        with pytest.raises(KubernetesCaptureError):
+            engine._program('engine', ['python3', '-c', program, *args], 262144)
 
 
 def test_transport_accepts_only_the_single_usage_control_request():
@@ -237,6 +252,10 @@ class LocalUsageWorld(FullWorld):
                 for row in files[:1 if self.mode == 'one-unreadable' else 2]:
                     row.update(exists=None, readable=False)
                     del row['directory_chain']
+            if self.mode == 'present-unchanged' or (self.snapshots == 1 and self.mode in (
+                    'effective-file-disappeared', 'optional-file-disappeared')):
+                existing = files[0 if self.mode == 'optional-file-disappeared' else -1]
+                existing.update(exists=True, bytes=42, lines=1, sha256='a' * 64)
             if self.mode in ('new', 'cache-new') and self.snapshots == 2:
                 files[-1 if cache else 0].update(exists=True, bytes=42, lines=1, sha256='a' * 64)
             if self.mode == 'cache-source-change-legacy-new' and self.snapshots == 2:
@@ -343,7 +362,10 @@ def test_local_usage_preparation_checks_saved_target_without_collecting(tmp_path
 
 
 @pytest.mark.parametrize('mode,completed,collected,verdict', [
-    ('absent', True, True, 'UNKNOWN'), ('new', True, True, 'FAIL'), ('one-unreadable', True, False, 'UNKNOWN'),
+    ('absent', True, True, 'UNKNOWN'), ('present-unchanged', True, True, 'UNKNOWN'),
+    ('new', True, True, 'FAIL'), ('one-unreadable', True, False, 'UNKNOWN'),
+    ('effective-file-disappeared', False, False, 'UNKNOWN'),
+    ('optional-file-disappeared', True, False, 'UNKNOWN'),
     ('all-unreadable', False, False, 'UNKNOWN'), ('optout-missing', False, False, 'UNKNOWN'),
     ('process-changed', False, False, 'UNKNOWN'), ('partial-control', False, False, 'UNKNOWN'),
     ('shared-pid', False, False, 'UNKNOWN'), ('host-pid', False, False, 'UNKNOWN'), ('proc-mount', False, False, 'UNKNOWN'),
@@ -414,8 +436,9 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monk
         assert summary['local_snapshot_status'] == {'before': pre_control_failures[mode]}
         assert summary['local_snapshot_presence'] == {}
         assert draft.normal_control.attempted is False
-    elif mode == 'absent':
+    elif mode in ('absent', 'present-unchanged'):
         assert summary['local_snapshot_status'] == dict.fromkeys(('before', 'after'), 'USAGE_LOCAL_SNAPSHOT_VERIFIED')
+        assert draft.observations['usage_new_local_reports'].value == []
     elif mode == 'local-after-transport-timed-out':
         assert summary['local_snapshot_status'] == {
             'before': 'USAGE_LOCAL_SNAPSHOT_VERIFIED', 'after': 'USAGE_LOCAL_TRANSPORT_UNAVAILABLE',
@@ -430,6 +453,14 @@ def test_local_usage_runs_only_owned_reads_and_one_normal_control(tmp_path, monk
         assert summary['local_snapshot_failure_kind'] == failure_kinds[mode]
     else:
         assert 'local_snapshot_failure_kind' not in summary
+    if mode in ('effective-file-disappeared', 'optional-file-disappeared'):
+        optional = mode == 'optional-file-disappeared'
+        lost, retained = (LOCAL_PATHS if optional else LOCAL_PATHS[::-1])
+        assert summary['unverified_paths'] == [sha256_hex(lost.encode())]
+        assert summary['observed_paths'] == [sha256_hex(retained.encode())]
+        assert summary['effective_report_path_observed'] is optional
+        assert not summary['local_paths_complete']
+        assert draft.normal_control.attempted and draft.normal_control.succeeded
     if mode == 'cache-new':
         reports = draft.observations['usage_new_local_reports'].value
         assert [report['path_sha256'] for report in reports] == [sha256_hex(CACHE_PATH.encode())]

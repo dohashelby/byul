@@ -45,12 +45,13 @@ def gpu_read(owners,engine,index,mode):
     for i,owner in enumerate(owners):
         uuid='GPU-00000000-0000-0000-0000-'+str(i+1).zfill(12)
         held = index == 0 or mode == 'same-owner-references'
-        devices.append({'uuid':uuid,'major':195,'minor':i+3,'memory_used_mib':12 if held else 0})
+        memory = 12 + i + 10 * index
+        devices.append({'uuid':uuid,'major':195,'minor':i+3,'memory_used_mib':100 if held else 0})
         if held:
             pid=10000+i;current={**owner['context'],'pid':pid}
             rows.append({'host_pid':pid,'context':current,'nspid':[pid,owner['context']['pid']],
                 'handles':[{'fd':7,'major':195,'minor':i+3}],'stable':True,'diagnostic_codes':[]})
-            compute.append({'host_pid':pid,'uuid':uuid,'memory_used_mib':12})
+            compute.append({'host_pid':pid,'uuid':uuid,'memory_used_mib':memory})
     rows.append({'host_pid':11000,'context':observer,'nspid':[11000],'handles':[],'stable':True,'diagnostic_codes':[]})
     if index==1 and mode=='retained-handle':
         rows.append({'host_pid':12000,'context':{**observer,'pid':12000,'start_ticks':12000},'nspid':[12000],
@@ -121,7 +122,7 @@ def test_optional_node_gpu_references_survive_product_artifacts_without_full_gpu
 @pytest.mark.parametrize(('mode', 'stages'), [
     ('absent-references', ['before']), ('same-owner-references', ['before', 'after']),
     ('late-after', ['before']), ('unbound-after', ['before']),
-    ('inconsistent-wall-after', ['before']), ('wrong-receipt', []),
+    ('inconsistent-wall-after', ['before']), ('changed-memory-after', ['before']), ('wrong-receipt', []),
 ])
 def test_canonical_lif11_retains_only_in_window_owned_positive_gpu_references(
         tmp_path, group, native_target, monkeypatch, mode, stages):
@@ -136,7 +137,7 @@ def test_canonical_lif11_retains_only_in_window_owned_positive_gpu_references(
     def capture(reader, owners, **options):
         index = len(captures)
         fixture_mode = 'same-owner-references' if mode in {
-            'late-after', 'unbound-after', 'inconsistent-wall-after'} else mode
+            'late-after', 'unbound-after', 'inconsistent-wall-after', 'changed-memory-after'} else mode
         record = gpu_read(owners, reader.binding['engine'], index, fixture_mode)
         offset = wall_offset_ns + (3_600_000_000_000 if index == 1 and mode == 'late-after' else 0)
         for key in ('started_wall_ns', 'finished_wall_ns'):
@@ -146,6 +147,10 @@ def test_canonical_lif11_retains_only_in_window_owned_positive_gpu_references(
             record['packet'].update(host_inventory_complete=False, diagnostic_codes=['GPU_PROCESS_CLOCK_UNVERIFIED'])
             gpu.validate_packet(record['packet'], record['receipt']['selection'])
             assert record['clock_window_verified'] is True and record['owner_binding_verified'] is True
+        if index == 1 and mode == 'changed-memory-after':
+            record['packet']['compute_confirm'][0]['memory_used_mib'] += 1
+            record['packet'].update(host_inventory_complete=False, diagnostic_codes=['GPU_PROCESS_NVML_INVENTORY_CHANGED'])
+            gpu.validate_packet(record['packet'], record['receipt']['selection'])
         record['receipt']['packet_sha256'] = sha256_hex(canonical_json(record['packet']))
         if index == 1 and mode == 'unbound-after':
             record['owner_binding_verified'] = False
@@ -167,13 +172,15 @@ def test_canonical_lif11_retains_only_in_window_owned_positive_gpu_references(
     assert observations['activation_scope_complete']['value'] is False
     assert observations['activation_violations']['value'] is None and draft.data_origin.value == 'EXAMPLE'
     for step in held:
-        record = captures[0 if step['stage'] == 'before' else 1]
+        index = 0 if step['stage'] == 'before' else 1
+        record = captures[index]
         assert step['packet_sha256'] == record['receipt']['packet_sha256']
         assert step['selection_sha256'] == record['receipt']['selection_sha256']
         assert not step['gpu_release_verified'] and not step['producer_authenticated']
         expected = [{'owner_id': owner['id'],
-                     'device_sha256': sha256_hex(canonical_json([values['recovery_target_sha256'], device['uuid']]))}
-                    for owner, device in zip(selected['owners'], record['packet']['devices'], strict=True)]
+                     'device_sha256': sha256_hex(canonical_json([values['recovery_target_sha256'], device['uuid']])),
+                     'process_memory_used_mib': 12 + i + 10 * index}
+                    for i, (owner, device) in enumerate(zip(selected['owners'], record['packet']['devices'], strict=True))]
         assert step['compute_and_device_handle_references'] == expected
         serialized = canonical_json(step).decode()
         assert 'host_pid' not in serialized and 'GPU-' not in serialized and 'nspid' not in serialized

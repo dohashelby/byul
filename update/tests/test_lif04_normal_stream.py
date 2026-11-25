@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -200,6 +201,58 @@ def test_failed_normal_transport_keeps_only_its_typed_diagnostic_in_artifact(tmp
         'case_id': 'lif04-normal-before', 'binding_verified': False, 'diagnostic': 'STREAM_BUFFER_HTTP_UNAVAILABLE',
     }]
     assert PRIVATE_OUTPUT not in saved and 'unselected-example-case' not in saved and 'binding' not in summary
+
+
+@pytest.mark.parametrize('timing', ['in-window', 'expired-before-read', 'expired-during-read'])
+def test_normal_memory_samples_require_the_observed_policy_window(monkeypatch, timing):
+    start = utcnow()
+    end = start + timedelta(microseconds=750000)
+    after = {'in-window': (400000, 450000, 700000),
+             'expired-before-read': (800000,),
+             'expired-during-read': (400000, 450000, 800000)}[timing]
+    clock = iter(start + timedelta(microseconds=offset) for offset in (100000, 120000, 150000, *after))
+    monkeypatch.setattr(normal, '_memory_time', lambda: next(clock))
+    monkeypatch.setattr(normal, 'utcnow', lambda: start)
+    reads = []
+    engine = {'namespace': 'example', 'pod': 'fixture-engine', 'container': 'engine'}
+    pod = {'spec': {'containers': [{'name': engine['container']}]}}
+
+    def read_memory(argv, *, cap, budget):
+        assert argv[-1] == normal.MEMORY_SOURCE and cap == 1024 and budget == 5
+        reads.append(len(reads) + 1)
+        return {'schema': 'guard-owned-container-memory/1', 'memory_current_bytes': 1000 + reads[-1],
+                'domain_sha256': 'a' * 64}
+
+    class Transport:
+        base = SimpleNamespace(binding={'engine': engine}, _verify=lambda **_: {'engine': pod}, _call=read_memory)
+
+        def __call__(self, _probe, requests, _timeout):
+            request, = requests
+            return [{'outcome': 200, 'binding_verified': True, 'capture_complete': True,
+                     'normal_event_sequence_verified': request['mode'] == 'sse',
+                     'body': canonical_json({'model': 'fixture-model', 'choices': [{'text': PRIVATE_OUTPUT}]}).decode()}]
+
+        def report(self):
+            return {'collection_gap': False, 'cleanup_errors': [], 'probe_source_sha256': 'c' * 64,
+                    'target_sha256': 'd' * 64}
+
+    ctx = SimpleNamespace(cprobe=Transport(), engine_url='http://example.invalid',
+                          api_model='fixture-model', timeout=3)
+    observations, control, _, _ = normal.collect(ctx, start, end)
+    step, = observations['activation_steps']['value']
+    first, second = step['container_memory_samples']
+    assert first['collected'] and first['memory_current_bytes'] == 1001
+    assert len(reads) == (1 if timing == 'expired-before-read' else 2)
+    assert len(step['trials']) == 3 and all(trial['normal_shape_verified'] for trial in step['trials'])
+    assert control['attempted'] and control['succeeded'] is None
+    assert step['same_memory_domain_verified'] is (timing == 'in-window')
+    assert ctx._buffer_gap is (timing != 'in-window')
+    assert observations['activation_scope_complete']['value'] is False
+    if timing == 'in-window':
+        assert second['collected'] and second['memory_current_bytes'] == 1002
+    else:
+        assert not second['collected'] and second['memory_current_bytes'] is second['domain_sha256'] is None
+        assert second['diagnostic'] == 'STREAM_BUFFER_OWNED_MEMORY_POLICY_WINDOW_UNVERIFIED'
 
 
 @pytest.mark.parametrize('same_group', [True, False])

@@ -1,18 +1,32 @@
 """Read-only LIF12 declarations using the existing owned OBS01 file reader."""
 
+from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
 from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION
-from pathlib import Path
+from datetime import datetime, timezone
 import os
 import stat
 
-from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
+from guard.models import canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import capture_pipes, strict_json
 from guard.runtime.engine_http import KubernetesBindingError, KubernetesHTTP, REQUIRED_EVENT_PROFILE
+from .base import record_origin_ceiling
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_observation import RequiredEventReader
 from .owned_capture import MAX_BYTES
 from . import retry_record_contract as contract
+
+
+def _snapshot_time():
+    return datetime.now(timezone.utc)
+
+
+def _source_time_in_window(value, *, start, finish):
+    try:
+        selected = contract.source_stamp(value)
+    except ValueError:
+        return False
+    return start <= selected <= (finish, "")
 
 
 def snapshot_target_sha256(raw, env):
@@ -56,9 +70,10 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
     requires_route_scope = False
     functional_via = 'engine'
 
-    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
+    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None, expected_target_file_sha256=None):
         super().__init__(cfg, environ=environ)
         self.runner, self.expected_target = runner, expected_target_sha256
+        self.expected_target_file_sha256 = expected_target_file_sha256
         if self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
             self.version += '+record-snapshot'
 
@@ -116,7 +131,8 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
     def _read_stable_target(self):
         from guard.adapters.vllm_file_read_sensor import dependency
 
-        target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+        expected = self.expected_target_file_sha256 if self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True else None
+        target = strict_json(dependency(self.cfg['target'], expected), limit=65536)
         if type(target) is not dict:
             raise ValueError('RETRY_CONFIGURATION_INVALID')
         return target
@@ -147,18 +163,19 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
 
     def run(self, check, env, policy_values, adapter, workdir):
         self.validate_policy(check, policy_values)
+        snapshot_only = self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True
         try:
             if adapter is None:
                 raise ValueError
             self._validate_configuration(env)
             start, end = contract.normalize_policy(policy_values)
-            if env.ref().sha256 != policy_values['retry_environment_sha256'] or not start <= utcnow() <= end:
+            now = _snapshot_time() if snapshot_only else utcnow()
+            if env.ref().sha256 != policy_values['retry_environment_sha256'] or not start <= now <= end:
                 raise ValueError
-            if self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+            if snapshot_only:
                 target = self._read_stable_target()
             else:
-                with Path(self.cfg['target']).open('rb') as stream:
-                    target = strict_json(stream.read(65537), limit=65536)
+                target = load_bounded_json(self.cfg['target'])
             scope = self._bound_scope(target, env, policy_values)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             raise ValueError('RETRY_CONFIGURATION_INVALID') from None
@@ -171,23 +188,37 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
     def collect(self, ctx):
         values = ctx.policy_values
         start, end = contract.normalize_policy(values)
+        snapshot_only = self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True
+        source_start = contract._source_policy_bound(values["retry_validity_start"], start) if snapshot_only else None
         reader, snapshots, collection, diagnostics, cleanup = None, [], [], [], []
 
         def collect_stage(stage):
+            started_at = _snapshot_time() if snapshot_only else utcnow()
             row = {'stage': stage, 'collected': False, 'file_bytes_sha256': None,
-                   'file_bytes': None, 'owner_binding_verified': False, 'collected_at': utcnow().isoformat()}
+                   'file_bytes': None, 'owner_binding_verified': False, 'collected_at': started_at.isoformat()}
             try:
-                if not start <= utcnow() <= end:
+                if not start <= (started_at if snapshot_only else utcnow()) <= end:
                     raise ValueError
-                role = reader.binding['engine']
-                raw, provenance = reader.read_file(reader, ctx.target, container=role['container'], image=role['image'],
-                    path='/guard-observation/data/' + values['retry_session'] + '/required-events.json')
+                raw, provenance = reader.read_record(ctx.target)
+                finished_at = _snapshot_time() if snapshot_only else utcnow()
                 packet = contract.validate_record(strict_json(raw, limit=MAX_BYTES),
                     environment_ref=ctx.env.ref().model_dump(mode='json'), target_sha256=values['retry_target_sha256'],
                     values=values, scope=ctx._retry_scope)
-                if provenance.get('owner_binding_verified') is not True or not start <= utcnow() <= end:
+                if provenance.get('owner_binding_verified') is not True or not start <= finished_at <= end:
                     raise ValueError
-                row.update(collected=True, file_bytes_sha256=sha256_hex(raw), file_bytes=len(raw), owner_binding_verified=True)
+                if snapshot_only and reader._parent_cleanup_failures:
+                    raise ValueError
+                if snapshot_only and not (started_at <= finished_at
+                                          and _source_time_in_window(packet['recorded_at'], start=source_start, finish=finished_at)):
+                    diagnostics.append('RETRY_RECORD_SOURCE_TIME_UNVERIFIED')
+                    raise ValueError
+                receipt = {}
+                if snapshot_only:
+                    receipt = {'source_read_finished_at': finished_at.isoformat(),
+                               'owner_sha256': sha256_hex(canonical_json(provenance['owner'])),
+                               'file_identity_sha256': sha256_hex(canonical_json(provenance['file_identity']))}
+                row.update(collected=True, file_bytes_sha256=provenance['capture_sha256'],
+                           file_bytes=provenance['bytes'], owner_binding_verified=True, **receipt)
                 snapshots.append({'stage': stage, 'packet': packet})
             except Exception:
                 diagnostics.append('RETRY_RECORD_UNAVAILABLE')
@@ -196,7 +227,7 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
         try:
             reader = RequiredEventReader(ctx.cprobe, ctx.target, values['retry_session'],
                 binary=self.cfg.get('kubectl_binary', 'kubectl'), duration=self.cfg.get('max_duration_seconds', 120),
-                runner=self.runner or capture_pipes, snapshot_only=self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True)
+                runner=self.runner or capture_pipes, snapshot_only=snapshot_only)
             reader.snapshot()
             collect_stage('before')
             reader.snapshot()
@@ -204,7 +235,7 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
             reader.snapshot()
         except Exception:
             diagnostics.append('RETRY_PREFLIGHT_OR_GENERATION_UNAVAILABLE')
-        projected = contract.project(ctx._retry_scope, snapshots, values)
+        projected = contract.project(ctx._retry_scope, snapshots, values, exact_source_clock=snapshot_only)
         transport, report = None, None
         try:
             transport = ctx.cprobe.report()
@@ -237,13 +268,31 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
             'detail': 'Read-only declarations; actual retry/normal control/trigger/previous work/cost enforcement are independently unverified.'}
         challenges = [{'step': step, 'attempted': False, 'observations': {'retry_scope_complete': False}}
                       for step in ctx.check.challenge_steps]
-        return {key: {'value': value, 'collected': True} for key, value in observations.items()}, normal, challenges, summary
+        observations = {key: {'value': value, 'collected': True} for key, value in observations.items()}
+        if snapshot_only and ctx.check.revision == 9:
+            steps = [{
+                'step': 'owned-retry-record-read', 'stage': row['stage'],
+                'file_bytes_sha256': row['file_bytes_sha256'], 'file_bytes': row['file_bytes'],
+                'owner_sha256': row['owner_sha256'], 'file_identity_sha256': row['file_identity_sha256'],
+                'started_at': row['collected_at'], 'finished_at': row['source_read_finished_at'],
+                'target_sha256': values['retry_target_sha256'],
+                'scope_sha256': values['retry_scope_sha256'],
+                'declared_source_sha256': values['retry_record_source_sha256'],
+            } for row in collection if row['collected']]
+            missing = {
+                *projected['missing'], *projected['conflicts'], *projected['unverified'], *diagnostics, *cleanup,
+            }
+            if not steps:
+                missing.add('owned_retry_record_observation_unavailable')
+            observations.update({
+                'activation_steps': {'value': steps, 'collected': bool(steps)},
+                'activation_missing': {'value': sorted(missing), 'collected': True},
+                'activation_violations': {'value': None, 'collected': False},
+                'activation_scope_complete': {'value': False, 'collected': True},
+            })
+        return observations, normal, challenges, summary
 
     def _finish(self, ctx):
         draft = super()._finish(ctx)
-        ceiling = DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
-        draft.data_origin = min(draft.data_origin, ceiling, key=lambda value: ORIGIN_STRENGTH[value])
-        if ctx._retry_gap or ctx._retry_cleanup:
-            draft.status = ExecStatus.ABORTED
-        draft.cleanup_errors.extend(ctx._retry_cleanup)
-        return draft
+        ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=self.runner is not None or ctx.target['lab'])
+        return draft.finish_collection(ceiling, bool(ctx._retry_gap or ctx._retry_cleanup), ctx._retry_cleanup)

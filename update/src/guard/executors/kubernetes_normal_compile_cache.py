@@ -16,28 +16,35 @@ from guard.runtime.kubernetes_http import (
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import supervised_source
 from .kubernetes_normal_startup_load import (
-    _read_logs, _ready_window, _source_profile, _stamp, _verify_launch, normal_startup_load_transport,
+    _RANKED_PROCESS_FILES, _read_logs, _ready_window, _source_profile, _verify_launch, _window_stamp,
+    normal_startup_load_transport,
 )
 
 NORMAL_OPTION = "normal_compile_cache_only"
 PROFILE = "kubernetes-owned-normal-compile-cache/1"
 _CHECK_PROFILE = "supply-boot-cache-tamper-v1"
 _SOURCE_FILES = {"compilation/backends.py", "compilation/monitor.py"}
+_AOT_SOURCE = "compilation/decorators.py"
+_AOT_SITE = "aot_save_call_linenumber"
 _SOURCE_KEYS = {"file_sha256", "directory_call_linenumber", "completion_call_linenumber",
                 "cache_env", "cache_root", "relative_directory_pattern", "artifact_name"}
 _SHA = re.compile(r"[0-9a-f]{64}")
-_LINE = re.compile(rb"(?P<time>[0-9T:.Z-]{20,30}) (?:\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\) )?"
+_LINE = re.compile(rb"(?P<time>[0-9T:.Z-]{20,30}) (?:(?P<process>\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\)) )?"
                    rb"INFO [0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} "
-                   rb"\[(?P<source>backends|monitor)\.py:(?P<line>[0-9]{1,5})\] (?P<body>[^\r\n]{1,300})")
+                   rb"\[(?P<source>backends|monitor|decorators)\.py:(?P<line>[0-9]{1,5})\] (?P<body>[^\r\n]{1,300})")
 _DIRECTORY = re.compile(rb"Using cache directory: (/[A-Za-z0-9_./-]{1,255}) for vLLM's torch\.compile")
 _COMPLETION = re.compile(rb"torch\.compile took ([0-9]{1,6}\.[0-9]{2}) s in total")
+_AOT_SAVED = re.compile(rb"saved AOT compiled function to (/[A-Za-z0-9_./-]{1,255})")
 _CACHE_ROOT = "/cache/vllm"
 _RELATIVE_DIRECTORY = r"torch_compile_cache/[0-9a-f]{10}/rank_0_0/backbone"
 _ARTIFACT_NAME = "vllm_compile_cache.py"
+_AOT_ARTIFACT = "model"
+_AOT_KIND = "native_aot_model"
+_AOT_RELATIVE_PATH = r"torch_compile_cache/torch_aot_compile/[0-9a-f]{64}/rank_0_0/model"
 _CACHE_FORBIDDEN_LONG = {"--compilation-config", "--optimization-level", "--enforce-eager"}
 _CACHE_FORBIDDEN_ENV = {"VLLM_DISABLE_COMPILE_CACHE", "VLLM_USE_AOT_COMPILE", "TORCH_COMPILE_DISABLE", "TORCHDYNAMO_DISABLE"}
 _METADATA_KEYS = {"device", "inode", "mode", "uid", "gid", "size", "mtime_ns", "ctime_ns"}
-_METADATA_SOURCE = f"CACHE_ROOT = {_CACHE_ROOT!r}\nARTIFACT_NAME = {_ARTIFACT_NAME!r}\n" + r'''
+_METADATA_BODY = r'''
 import json, os, re, stat, sys
 
 def mark(info):
@@ -72,9 +79,9 @@ def snapshot(parts):
 
 try:
     cache_id, = sys.argv[1:]
-    if re.fullmatch(r"[0-9a-f]{10}", cache_id) is None:
+    if re.fullmatch(CACHE_ID_PATTERN, cache_id) is None:
         raise ValueError()
-    parent = CACHE_ROOT.lstrip("/").split("/") + ["torch_compile_cache", cache_id, "rank_0_0", "backbone"]
+    parent = CACHE_ROOT.lstrip("/").split("/") + ["torch_compile_cache", *NAMESPACE, cache_id, *SUFFIX]
     chain, artifact = snapshot(parent)
     if snapshot(parent) != (chain, artifact):
         raise ValueError()
@@ -82,26 +89,42 @@ try:
 except (OSError, ValueError):
     print("{}")
 '''
+def _metadata_source(artifact_name, namespace, suffix, key_pattern):
+    return (f"CACHE_ROOT = {_CACHE_ROOT!r}\nARTIFACT_NAME = {artifact_name!r}\n"
+            f"NAMESPACE = {namespace!r}\nSUFFIX = {suffix!r}\nCACHE_ID_PATTERN = {key_pattern!r}\n"
+            + _METADATA_BODY)
+
+
+_METADATA_SOURCE = _metadata_source(_ARTIFACT_NAME, [], ["rank_0_0", "backbone"], r"[0-9a-f]{10}")
 _METADATA_PROGRAM = supervised_source(_METADATA_SOURCE)
 _METADATA_PROGRAM_SHA256 = sha256_hex(_METADATA_PROGRAM.encode())
+_AOT_METADATA_PROGRAM = supervised_source(_metadata_source(_AOT_ARTIFACT, ["torch_aot_compile"],
+                                                           ["rank_0_0"], r"[0-9a-f]{64}"))
 _MISSING = ["inductor_or_triton_artifact_scope", "all_cached_files_and_writers", "compile_cache_initial_emptiness",
             "file_read_and_consumption", "cache_integrity_enforcement", "restart_reuse"]
 
 
 def normal_compile_cache_transport(target, env, *, duration, binary="kubectl", runner=None):
     """Readiness uses the same non-dispatching boot prefix validation as LIF-01."""
-    return normal_startup_load_transport(target, env, duration=duration, binary=binary, runner=runner)
+    return normal_startup_load_transport(target, env, duration=duration, binary=binary,
+                                         runner=runner, allow_ranked=True)
 
 
 def _compile_profile(adapter, env):
     method = getattr(adapter, "compile_cache_source", None)
     source = (method(env) if callable(method) else
               get_provider(env.engine.name).evidence_contract("compile_cache_source", env))
-    if (type(source) is not dict or set(source) != _SOURCE_KEYS
-            or type(source["file_sha256"]) is not dict or source["file_sha256"].keys() != _SOURCE_FILES
+    ranked = env.runtime.tp_size == 2
+    keys = _SOURCE_KEYS | {_AOT_SITE} if ranked else _SOURCE_KEYS
+    files = _SOURCE_FILES | {_AOT_SOURCE} if ranked else _SOURCE_FILES
+    sites = {"directory_call_linenumber", "completion_call_linenumber"}
+    if ranked:
+        sites.add(_AOT_SITE)
+    if (type(source) is not dict or set(source) != keys
+            or type(source["file_sha256"]) is not dict or source["file_sha256"].keys() != files
             or any(type(value) is not str or not _SHA.fullmatch(value) for value in source["file_sha256"].values())
             or any(type(source[key]) is not int or not 1 <= source[key] <= 99999
-                   for key in ("directory_call_linenumber", "completion_call_linenumber"))
+                   for key in sites)
             or type(source["cache_env"]) is not str or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", source["cache_env"])
             or source["cache_root"] != _CACHE_ROOT or source["relative_directory_pattern"] != _RELATIVE_DIRECTORY
             or source["artifact_name"] != _ARTIFACT_NAME):
@@ -131,6 +154,8 @@ def _cache_mount(container, profile):
 
 def _verify_compiler(transport, startup, profile):
     expected = {name: startup["file_sha256"][name] for name in ("logger.py", "logging_utils/formatter.py")}
+    if "ranked_load" in startup:
+        expected.update({name: startup["file_sha256"][name] for name in _RANKED_PROCESS_FILES})
     expected.update(profile["file_sha256"])
     files = [{"root": 0, "relative": filename} for filename in sorted(expected)]
     rows = transport.engine_supply_hashes([startup["source_root"]], files)
@@ -141,54 +166,78 @@ def _verify_compiler(transport, startup, profile):
     return observed
 
 
-def _compile_observation(raw, window, profile):
-    started, ready = (_stamp(window[key]) for key in ("container_started_at", "ready_at"))
-    directories, completions = [], []
+def _compile_observation(raw, window, profile, *, worker=None):
+    label = b"(" + worker.encode("ascii") + b" pid=" if worker is not None else None
+    started, ready = (_window_stamp(window[key]) for key in ("container_started_at", "ready_at"))
+    directories, completions, publications = [], [], []
     for line in raw.split(b"\n")[:-1]:
         row = _LINE.fullmatch(line)
-        if row is None:
+        if row is None or label is not None and not (row["process"] or b"").startswith(label):
             continue
-        instant = _stamp(row["time"].decode("ascii"))
+        instant = _window_stamp(row["time"].decode("ascii"))
         if not started <= instant <= ready:
             continue
         location = (row["source"], int(row["line"]))
         if location == (b"backends", profile["directory_call_linenumber"]):
             directory = _DIRECTORY.fullmatch(row["body"])
             if directory:
-                directories.append((instant, directory[1].decode("ascii")))
+                directories.append((instant, directory[1].decode("ascii"), row["process"], sha256_hex(line)))
         elif location == (b"monitor", profile["completion_call_linenumber"]):
             completion = _COMPLETION.fullmatch(row["body"])
             if completion:
-                completions.append((instant, int(Decimal(completion[1].decode("ascii")) * 1000)))
+                completions.append((instant, int(Decimal(completion[1].decode("ascii")) * 1000),
+                                    row["process"], sha256_hex(line)))
+        elif location == (b"decorators", profile.get(_AOT_SITE)):
+            published = _AOT_SAVED.fullmatch(row["body"])
+            if published is None:
+                raise ValueError("SUP07_COMPILE_AOT_REPORT_UNVERIFIED")
+            publications.append((instant, published[1].decode("ascii"), row["process"], sha256_hex(line)))
 
-    (selected_at, directory), = directories
-    (completed_at, elapsed_ms), = completions
+    (selected_at, directory, directory_process, directory_line_sha), = directories
+    (completed_at, elapsed_ms, completion_process, completion_line_sha), = completions
     root = PurePosixPath(profile["cache_root"])
     folder = PurePosixPath(directory)
     relative = folder.relative_to(root)
     if (selected_at > completed_at or folder.as_posix() != directory or ".." in relative.parts
+            or label is not None and directory_process != completion_process
             or not re.fullmatch(profile["relative_directory_pattern"], relative.as_posix())):
         raise ValueError("SUP07_COMPILE_PATH_UNVERIFIED")
-    return folder, {"selected_at": selected_at.isoformat(), "completed_at": completed_at.isoformat(),
-                    "reported_compile_elapsed_ms": elapsed_ms, "scope": "native_ordinary_compile_monitor"}
+    observation = {"selected_at": selected_at[0].isoformat(), "completed_at": completed_at[0].isoformat(),
+                   "reported_compile_elapsed_ms": elapsed_ms, "scope": "native_ordinary_compile_monitor"}
+    if label is not None:
+        observation.update(reported_tp_rank=0, directory_line_sha256=directory_line_sha,
+                           completion_line_sha256=completion_line_sha)
+    if publications:
+        (published_at, published_path, published_process, publication_sha), = publications
+        artifact = PurePosixPath(published_path)
+        if (artifact.as_posix() != published_path or published_process != directory_process
+                or not selected_at <= published_at <= completed_at
+                or not re.fullmatch(_AOT_RELATIVE_PATH, artifact.relative_to(root).as_posix())):
+            raise ValueError("SUP07_COMPILE_AOT_REPORT_UNVERIFIED")
+        folder = artifact.parent
+        observation.update(artifact_kind=_AOT_KIND, publication_line_sha256=publication_sha)
+    return folder, observation
 
 
-def _ns(instant):
+def _ns(value):
+    instant, remainder_ns = _window_stamp(value)
     delta = instant - datetime(1970, 1, 1, tzinfo=timezone.utc)
-    return ((delta.days * 86400 + delta.seconds) * 1000000 + delta.microseconds) * 1000
+    return ((delta.days * 86400 + delta.seconds) * 1000000 + delta.microseconds) * 1000 + remainder_ns
 
 
-def _cache_metadata(transport, folder, profile, mount, window):
+def _cache_metadata(transport, folder, profile, mount, window, *, aot=False):
     engine = transport.binding["engine"]
     before, container = _ready_window(transport)
     if before != window or _cache_mount(container, profile) != mount:
         raise ValueError("SUP07_COMPILE_MOUNT_UNVERIFIED")
-    cache_id = folder.relative_to(_CACHE_ROOT).parts[1]
+    cache_id = folder.relative_to(_CACHE_ROOT).parts[2 if aot else 1]
+    program = _AOT_METADATA_PROGRAM if aot else _METADATA_PROGRAM
+    artifact_name = _AOT_ARTIFACT if aot else _ARTIFACT_NAME
     remaining = min(5, transport.deadline - transport.clock())
     if remaining <= 0:
         raise ValueError("SUP07_COMPILE_METADATA_UNVERIFIED")
     result = transport._call([f"--namespace={engine['namespace']}", "exec", engine["pod"],
-        f"--container={engine['container']}", "--", "python3", "-I", "-S", "-B", "-c", _METADATA_PROGRAM,
+        f"--container={engine['container']}", "--", "python3", "-I", "-S", "-B", "-c", program,
         f"{remaining:.9f}", cache_id], cap=4096, budget=remaining)
     after, container = _ready_window(transport)
     if (after != window or _cache_mount(container, profile) != mount
@@ -204,16 +253,16 @@ def _cache_metadata(transport, folder, profile, mount, window):
             raise ValueError("SUP07_COMPILE_METADATA_UNVERIFIED")
     if not stat.S_ISDIR(directory_meta["mode"]):
         raise ValueError("SUP07_COMPILE_GENERATION_UNVERIFIED")
-    source = {"metadata_program_sha256": _METADATA_PROGRAM_SHA256,
+    source = {"metadata_program_sha256": sha256_hex(program.encode()) if aot else _METADATA_PROGRAM_SHA256,
               "metadata_snapshot_sha256": sha256_hex(canonical_json(result))}
     if file_meta is None:
         return None, {"artifact_absent_at_capture": True, **source}
-    started, ready = (_ns(_stamp(window[key])) for key in ("container_started_at", "ready_at"))
+    started, ready = (_ns(window[key]) for key in ("container_started_at", "ready_at"))
     if (not stat.S_ISREG(file_meta["mode"]) or file_meta["size"] <= 0
             or directory_meta["device"] != file_meta["device"]
             or not started <= file_meta["mtime_ns"] <= file_meta["ctime_ns"] <= ready):
         raise ValueError("SUP07_COMPILE_GENERATION_UNVERIFIED")
-    return {"file_path_sha256": sha256_hex((folder / _ARTIFACT_NAME).as_posix().encode()),
+    return {"file_path_sha256": sha256_hex((folder / artifact_name).as_posix().encode()),
             "directory_path_sha256": sha256_hex(folder.as_posix().encode()),
             "file_permissions": stat.S_IMODE(file_meta["mode"]), "directory_permissions": stat.S_IMODE(directory_meta["mode"]),
             "file_owner_uid": file_meta["uid"], "file_owner_gid": file_meta["gid"],
@@ -257,13 +306,16 @@ class KubernetesNormalCompileCacheExecutor:
         source_reader.deadline = metadata_reader.deadline = logs.deadline
         return target_sha, startup, compile_profile, logs, source_reader, metadata_reader
 
-    def prepared_normal_compile_cache(self, check, env, values, *, expected_target_sha256):
-        """Validate the saved boot selector and configured transport without collecting."""
+    def _saved_target(self):
         from guard.adapters.vllm_file_read_sensor import dependency
 
+        return strict_json(dependency(self.cfg["target"], None), limit=65536)
+
+    def prepared_normal_compile_cache(self, check, env, values, *, expected_target_sha256):
+        """Validate the saved boot selector and configured transport without collecting."""
         self.validate_policy(check, values)
         try:
-            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            target = self._saved_target()
             adapter = get_provider(env.engine.name).adapter()
             self._target_inputs(target, env, adapter, duration=self.cfg.get("max_duration_seconds", 30),
                                 expected_target_sha256=expected_target_sha256)
@@ -275,8 +327,7 @@ class KubernetesNormalCompileCacheExecutor:
         started = utcnow()
         duration = self.cfg.get("max_duration_seconds", 30)
         try:
-            with Path(self.cfg["target"]).open("rb") as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = self._saved_target()
             target_sha, startup, compile_profile, logs, source_reader, metadata_reader = self._target_inputs(
                 target, env, adapter, duration=duration, expected_target_sha256=self._expected_target_sha256)
         except (AttributeError, KeyError, OSError, TypeError, ValueError, re.error, KubernetesBindingError):
@@ -298,13 +349,15 @@ class KubernetesNormalCompileCacheExecutor:
             if len(raw) != prefix["byte_count"] or sha256_hex(raw) != prefix["sha256"]:
                 raise ValueError
             failure = "SUP07_COMPILE_REPORT_UNVERIFIED"
-            folder, compilation = _compile_observation(raw, window, compile_profile)
+            ranked = startup.get("ranked_load")
+            worker = ranked["process_names"][0] if ranked else None
+            folder, compilation = _compile_observation(raw, window, compile_profile, worker=worker)
             try:
-                metadata, absence = _cache_metadata(metadata_reader, folder, compile_profile, mount, window)
+                metadata, absence = _cache_metadata(metadata_reader, folder, compile_profile, mount, window,
+                                                   aot=compilation.get("artifact_kind") == _AOT_KIND)
             except (AttributeError, KeyError, OSError, TypeError, ValueError, KubernetesBindingError):
                 metadata = absence = None
-            failure = ("SUP07_COMPILE_FILE_METADATA_UNVERIFIED" if metadata is None
-                       else "SUP07_COMPILE_OWNER_AFTER_UNVERIFIED")
+            failure = "SUP07_COMPILE_OWNER_AFTER_UNVERIFIED"
             final_window, container = _ready_window(logs)
             _verify_launch(target, container, startup)
             if (final_window == window and _cache_mount(container, compile_profile) == mount
@@ -312,6 +365,7 @@ class KubernetesNormalCompileCacheExecutor:
                     and not any(t.report()["cleanup_errors"] or t.report()["collection_gap"]
                                 for t in (logs, source_reader, metadata_reader))):
                 if metadata is None:
+                    failure = "SUP07_COMPILE_FILE_METADATA_UNVERIFIED"
                     retained_compile_report = {
                         **compilation,
                         "reported_directory_sha256": sha256_hex(folder.as_posix().encode()),
@@ -326,6 +380,8 @@ class KubernetesNormalCompileCacheExecutor:
 
         cleanup = sorted({item for t in (logs, source_reader, metadata_reader) for item in t.report()["cleanup_errors"]})
         missing = _MISSING + ([] if observed else ["ordinary_compile_cache_file_metadata"])
+        if "ranked_load" in startup:
+            missing.append("other_tp_rank_compile_artifacts")
         settings = {NORMAL_OPTION: True, "max_duration_seconds": duration, "cache_scope": "one_native_rank_zero_artifact"}
         conditions_sha = (sha256_hex(canonical_json(execution_conditions(target, settings, [])))
                           if observed and target.get("comparison_config") else None)

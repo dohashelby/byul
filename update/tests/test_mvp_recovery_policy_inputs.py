@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
 
@@ -14,7 +15,7 @@ from tools.mvp_runtime_policy import AMENDMENT, BASE_DECISIONS, ROOT
 T0 = datetime(2026, 11, 18, 18, tzinfo=timezone.utc)
 
 
-def pair():
+def pair(*, repeat_pid_numbers=False):
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
     decisions = json.loads(BASE_DECISIONS.read_bytes())['decisions']
     computed = {inputs.START, inputs.END, inputs.ABSENT_AFTER}
@@ -28,6 +29,11 @@ def pair():
         start = T0 + timedelta(seconds=offset)
         finish = start + timedelta(milliseconds=100)
         selected = selection()
+        if side == 'candidate':
+            for owner in selected['owners']:
+                owner['context']['pid_namespace'] += 1
+                if not repeat_pid_numbers:
+                    owner['context']['pid'] += 100
         receipt = packet(selected)
         receipt.update(started_wall_ns=inputs._unix_ns(start), finished_wall_ns=inputs._unix_ns(finish))
         ref = env.ref().model_dump(mode='json')
@@ -43,8 +49,9 @@ def pair():
     return pack, base, envs, targets, source
 
 
-def test_window_removes_only_the_policy_value_gap():
-    pack, base, envs, targets, source = pair()
+@pytest.mark.parametrize('repeat_pid_numbers', [False, True], ids=['distinct-pids', 'repeat-pids-distinct-namespace'])
+def test_window_removes_only_the_policy_value_gap(repeat_pid_numbers):
+    pack, base, envs, targets, source = pair(repeat_pid_numbers=repeat_pid_numbers)
     revised = inputs.materialize(base, pack, envs, targets, source, issued_at=T0 + timedelta(seconds=2))
     ordered = [envs[side] for side in ('baseline', 'candidate')]
     assert Gap.NO_POLICY_VALUE in select(pack, ordered, base, mode='update').item('LIF-11').gaps
@@ -55,6 +62,29 @@ def test_window_removes_only_the_policy_value_gap():
     assert stamp(values[inputs.END]) == T0 + timedelta(minutes=10)
     assert values['recovery_require_absent_kinds'] == base.values['LIF-11']['recovery_require_absent_kinds']
     assert revised.refs[-1] == base.ref() and revised.hash_ok()
+
+
+@pytest.mark.parametrize('reuse', ['all-ranks', 'one-rank'])
+def test_lif11_preflight_refuses_a_process_generation_reused_by_the_other_release(reuse):
+    pack, base, envs, targets, source = pair()
+    original = source['sides']['baseline']
+    candidate = source['sides']['candidate']
+    borrowed = deepcopy(original['selection'])
+    if reuse == 'one-rank':
+        borrowed['owners'][1]['context']['pid'] += 100
+    # Distinct declared owner IDs and side-local clocks cannot make an exact
+    # process generation independent.
+    borrowed['owners'][0]['id'] = '5' * 64
+    for resource in borrowed['resources']:
+        resource['owner_id'] = borrowed['owners'][0]['id']
+    selected_census = packet(borrowed)
+    for key in ('started_wall_ns', 'finished_wall_ns'):
+        selected_census[key] = candidate['census']['packet'][key]
+    candidate['selection'] = borrowed
+    candidate['census'].update(packet=selected_census, selection_sha256=selected_census['selection_sha256'])
+    assert inputs._census_time(candidate, envs['candidate'], targets['candidate'], ['0', '1'], 100)
+    with pytest.raises(ValueError, match='^MVP_RECOVERY_PREFLIGHT_PROCESS_GENERATION_REUSED$'):
+        inputs.materialize(base, pack, envs, targets, source, issued_at=T0 + timedelta(seconds=2))
 
 
 @pytest.mark.parametrize('damage,diagnostic', [

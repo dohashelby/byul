@@ -8,7 +8,7 @@ import pytest
 from guard import application
 from guard.core.execution_recipe import bind_recipe
 from guard.core.judge import judge_evidence
-from guard.core.run import RunConfig, run_plan
+from guard.core.run import RunConfig
 from guard.core.select import select
 from guard.executors import passive_api_hop as subject, registry, run_binding
 from guard.executors.kubernetes_container_config import KubernetesContainerConfigExecutor
@@ -16,7 +16,9 @@ from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack
 from guard.models.objects import Operator
 from guard.runtime.kubernetes_http import KubernetesHTTP
 from guard.store import Store
-from tests.builders import T0, policy
+from guard.store.integrity import ref_key
+from guard.update_acceptance import _evidence_refs
+from tests.builders import T0, policy, run_under_plan_lock
 from tests.test_kubernetes_process_consumers import PERMISSION_VALUES, PRIVATE, ProcessWorld
 from tests.test_model_preparation_integration import full_inputs
 from tests.update_builders import GPU_RUNTIME
@@ -72,7 +74,7 @@ def paired_controls(tmp_path, monkeypatch, *, review_fixture=False):
         monkeypatch.setattr(KubernetesHTTP, '__init__', with_fixture_transport)
     else:
         monkeypatch.setattr(KubernetesContainerConfigExecutor, '__init__', with_runner)
-    evds = run_plan(store, pack, plan, RunConfig(executors=executors, adapter='vllm', requested=config,
+    evds = run_under_plan_lock(store, pack, plan, RunConfig(executors=executors, adapter='vllm', requested=config,
         side_configs={side: RunConfig(executors=executors, adapter='vllm', raw=values) for side, values in sides.items()}))
     originals = {}
     for source in (evd for evd in evds if evd.check_id == 'PLT-01'):
@@ -248,6 +250,9 @@ def test_product_update_projects_only_the_newly_committed_side_controls(tmp_path
         assert derived.data_origin == source.data_origin == DataOrigin.EXAMPLE
         assert derived.comparability == source.comparability
         assert derived.refs == [derived.plan, derived.environment, source.ref()]
+        assert _evidence_refs(derived, source) == {ref_key(ref) for ref in derived.refs}
+        with pytest.raises(ValueError, match="same RPT side's exact PLT-01 control"):
+            _evidence_refs(derived, old_source)
         assert not derived.artifacts and not derived.normal_control.attempted
         assert not any(challenge.attempted for challenge in derived.challenges)
         binding = derived.execution.run_binding
@@ -279,7 +284,7 @@ def test_product_update_withholds_projection_if_source_has_not_been_committed(pa
         run_cfg.side_configs[side.value].raw['_kubernetes_target_sha256_by_executor'] = {
             'api_transport': scope['expected_target_sha256'],
         }
-    for evd in run_plan(store, pack, plan, run_cfg):
+    for evd in run_under_plan_lock(store, pack, plan, run_cfg):
         if evd.check_id == 'PLT-08':
             assert evd.execution.status == ExecStatus.NOT_RUN
             assert evd.execution.abort_reason == 'PASSIVE_API_HOP_SOURCE_NOT_COLLECTED'
@@ -302,10 +307,10 @@ def test_product_update_rejects_scope_or_recipe_runtime_fallback(passive_update)
     for side in run_cfg.side_configs.values():
         side.raw.pop('check_config')
     with pytest.raises(subject.PassiveApiHopUnavailable, match='PASSIVE_API_HOP_CONFIGURATION_INVALID'):
-        run_plan(store, pack, plan, run_cfg)
+        run_under_plan_lock(store, pack, plan, run_cfg)
     assert not store.find_latest('EVD', lambda row: row.plan == plan.ref())
 
     audit = bind_recipe(select(pack, envs[:1], pol, mode='audit'), config, envs[:1])
     store.put(audit)
     with pytest.raises(subject.PassiveApiHopUnavailable, match='PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, audit, application.run_config(config))
+        run_under_plan_lock(store, pack, audit, application.run_config(config))

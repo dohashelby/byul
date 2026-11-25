@@ -15,7 +15,7 @@ from guard.adapters.vllm_approved_file_read_composition import PROFILES
 from guard.cli import app
 from guard.collectors.lifecycle import load_prepared
 from guard.executors import registry, run_binding
-from guard.executors.kubernetes_sup05_normal_preparation import prepare, read_normal_preparation
+from guard.executors.kubernetes_sup05_normal_preparation import prepare, read_normal_preparation, read_normal_publication
 from guard.models import ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from tests.builders import environment
 from tests.test_kubernetes_sampling import inputs as sampling_inputs
@@ -116,6 +116,131 @@ def test_cli_prepares_real_registry_inputs_for_each_pinned_release(external, mon
     factory.validate_policy(check, values)
     _, reloaded, target_hash, prepared_hash = factory.normal_file_read_inputs(case.env, values)
     assert (reloaded, target_hash, prepared_hash) == (prepared, receipt["target_sha256"], receipt["prepared_sha256"])
+
+
+@pytest.mark.parametrize("release", ("0.30.0", "0.31.0"))
+def test_publication_reads_the_exact_assets_for_the_current_owned_generation(external, release):
+    case = _case(external, release)
+    receipt = prepare(case.output, REPOSITORY, **case.args)
+    path = case.output / "preparation.json"
+    preparation_sha256 = sha256_hex(path.read_bytes())
+    snapshot = deepcopy(case.snapshot)
+    snapshot["pod"]["metadata"]["resourceVersion"] = "2"
+    owner_path = external / "current-owner.json"
+    owner_sha256 = _write(owner_path, snapshot)
+    assert owner_sha256 != receipt["input_sha256"]["owner_snapshot"]
+
+    result = read_normal_publication(path, case.env, expected_sha256=preparation_sha256,
+                                     owner_snapshot=owner_path, owner_snapshot_sha256=owner_sha256)
+    prepared_path = Path(receipt["normal"]["prepared"])
+    prepared = load_prepared(prepared_path)
+    assert result["files"] == {name: (prepared_path.parent / name).read_bytes()
+                               for name in {"manifest.json", *prepared["assets"]}}
+    assert result["prepared_file_sha256"] == sha256_hex(result["files"]["manifest.json"])
+    for name, expected in prepared["assets"].items():
+        raw = result["files"][name]
+        assert (len(raw), sha256_hex(raw)) == (expected["bytes"], expected["sha256"])
+    target = json.loads(case.args["target"].read_bytes())
+    assert result["binding"] == {**target["kubernetes"], "run_id": target["run_id"]}
+    assert result["environment_ref"] == case.env.ref().model_dump(mode="json")
+    assert result["profile"] == case.profile and result["session"] == prepared["session"]
+    assert result["deployed_scope_sha256"] == prepared["assets"]["model-read-scope.json"]["sha256"]
+    assert result["owner_snapshot_sha256"] == owner_sha256 and result["preparation_sha256"] == preparation_sha256
+    assert result["input_data_origin"] == "EXAMPLE"
+    assert result["pre_import_verified"] is result["asset_publication_verified"] is False
+    assert all(b"/private-model-location" not in source for source in result["files"].values())
+
+
+@pytest.mark.parametrize("damage", ("owner-pin", "new-container", "writable-model", "changed-mount", "ready",
+                                    "missing-asset", "replaced-asset", "replaced-manifest", "v2"))
+def test_publication_rejects_unusable_current_owner_or_asset_bytes(external, monkeypatch, damage):
+    from guard.executors import kubernetes_sup05_normal_preparation as preparation
+
+    case = _case(external, "0.31.0")
+    receipt = prepare(case.output, REPOSITORY, **case.args)
+    path = case.output / "preparation.json"
+    prepared_path = Path(receipt["normal"]["prepared"])
+    owner = deepcopy(case.snapshot)
+    pod = owner["pod"]
+    if damage == "new-container":
+        pod["status"]["containerStatuses"][0]["containerID"] = "containerd://" + "4" * 64
+    elif damage == "writable-model":
+        pod["spec"]["containers"][0]["volumeMounts"][0]["readOnly"] = False
+    elif damage == "changed-mount":
+        pod["spec"]["volumes"][0]["hostPath"]["path"] = "/different-private-model-location"
+    elif damage == "ready":
+        pod["status"]["containerStatuses"][0]["ready"] = True
+    owner_path = external / "current-owner.json"
+    owner_sha256 = _write(owner_path, owner)
+    if damage == "owner-pin":
+        owner_sha256 = "8" * 64
+    if damage in {"missing-asset", "replaced-asset", "replaced-manifest"}:
+        verify = preparation._read_normal_preparation
+
+        def verify_then_change(*args, **kwargs):
+            result = verify(*args, **kwargs)
+            asset = prepared_path if damage == "replaced-manifest" else prepared_path.with_name("sitecustomize.py")
+            if damage == "missing-asset":
+                asset.unlink()
+            else:
+                asset.write_bytes(asset.read_bytes() + b"\n")
+            return result
+
+        monkeypatch.setattr(preparation, "_read_normal_preparation", verify_then_change)
+    env = case.env
+    reason = "SUP05_NORMAL_PUBLICATION_INVALID"
+    if damage == "v2":
+        runtime = env.runtime.model_copy(update={"platform": "Linux x86_64; engine_requested=V2"})
+        env = env.model_copy(update={"runtime": runtime}).seal()
+        reason = "SUP05_PREPARATION_RECEIPT_INVALID"
+    with pytest.raises(ValueError, match=f"^{reason}$"):
+        read_normal_publication(path, env, expected_sha256=sha256_hex(path.read_bytes()),
+                                owner_snapshot=owner_path, owner_snapshot_sha256=owner_sha256)
+
+
+@pytest.mark.parametrize("release", ("0.30.0", "0.31.0"))
+@pytest.mark.parametrize("asset", ("settings.json", "sitecustomize.py"))
+def test_preflight_requires_the_prepared_session_and_bootstrap(external, monkeypatch, release, asset):
+    from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+
+    case = _case(external, release)
+    receipt = prepare(case.output, REPOSITORY, **case.args)
+    receipt_path = case.output / "preparation.json"
+    manifest_path = Path(receipt["normal"]["prepared"])
+    manifest = load_prepared(manifest_path)
+    settings = {"normal_file_reads_only": True, "normal": receipt["normal"], "preparation_receipt": {
+        "path": str(receipt_path), "sha256": sha256_hex(receipt_path.read_bytes())}}
+    check = load_pack(REPOSITORY / "update" / "packs" / "PACK-BASELINE").checks["SUP-05"]
+    _, values = run_binding.effective_values(check, settings, case.env, {}, side="baseline",
+                                               attempt_id=None, issued_at=utcnow())
+
+    source_path = manifest_path.with_name(asset)
+    if asset == "settings.json":
+        # A valid ordinary settings document for a separate prepared session.
+        other = prepare(case.output.with_name("other-prepared"), REPOSITORY, **case.args)
+        assert other["session"] != receipt["session"]
+        raw = Path(other["normal"]["prepared"]).with_name(asset).read_bytes()
+        reason = "APPROVED_FILE_READ_SETTINGS_MISMATCH"
+    else:
+        raw = b"# EXAMPLE without a lifecycle bootstrap\n"
+        reason = "APPROVED_FILE_READ_BOOTSTRAP_MISMATCH"
+    source_path.write_bytes(raw)
+    manifest["assets"][asset] = {"sha256": sha256_hex(raw), "bytes": len(raw)}
+    receipt["prepared_file_sha256"] = _write(manifest_path, manifest)
+    receipt["prepared_sha256"] = sha256_hex(canonical_json(manifest))
+    settings["preparation_receipt"]["sha256"] = _write(receipt_path, receipt)
+    values["supply_normal_prepared_sha256"] = receipt["prepared_sha256"]
+
+    with pytest.raises(ValueError, match=f"^{reason}$"):
+        load_prepared(manifest_path, expected_sha256=receipt["prepared_file_sha256"])
+
+    def unavailable(*args, **kwargs):
+        pytest.fail("Unusable observer assets must be rejected before reader construction")
+
+    executor = KubernetesSupplyBootExecutor(settings, runner=unavailable)
+    monkeypatch.setattr(executor, "_normal_reader", unavailable)
+    with pytest.raises(ValueError, match="^SUP05_PREPARATION_RECEIPT_INVALID$"):
+        executor.normal_file_read_inputs(case.env, values)
 
 
 @pytest.mark.parametrize("changed", (False, True))

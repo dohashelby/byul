@@ -8,6 +8,8 @@ import subprocess
 
 import pytest
 
+from tests.builders import run_under_plan_lock
+
 from guard.models import load_pack
 from tools import mvp_live_readiness as tool
 from tests.test_kubernetes_record_access import context as record_access_context  # noqa: F401
@@ -89,6 +91,105 @@ def test_example_file_binding_does_not_issue_live_readiness(tmp_path, sources, u
     assert all('LIVE_EXECUTOR_PREFLIGHT_REQUIRED' in r['blocking_codes'] for r in bound)
     assert all(not r['ready_for_execution'] and r['actual_results'] is None for r in bound)
     assert report['blocking_counts']['ACTUAL_INPUT_FILES_MISSING'] == 136
+
+
+def test_uses_the_verified_environment_and_policy_bytes(tmp_path, sources, monkeypatch):  # noqa: F811
+    value = blank()
+    value['inputs'] = sources['inputs']
+    verified_paths = {
+        Path(entry[role]['path'])
+        for entry in value['inputs']
+        for role in ('environment', 'policy')
+    }
+    read_text = Path.read_text
+
+    def reject_text_reread(path, *args, **kwargs):
+        if path in verified_paths:
+            raise AssertionError('parse the verified bytes for this input')
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'read_text', reject_text_reread)
+    report = run(tmp_path, value)
+    bound = [row for row in report['rows'] if row['file_binding_valid']]
+    assert len(bound) == report['file_binding_valid_sides'] == 2
+    assert all('EXAMPLE_ENV_NOT_ACTUAL' in row['blocking_codes'] for row in bound)
+    assert all(row['actual_results'] is None for row in bound)
+    assert report['ready_for_execution'] is report['engine_executed'] is False
+
+
+@pytest.mark.parametrize('manifest_state', ['absent', 'malformed', 'appears-during-audit'])
+def test_req02_offline_audit_matches_the_exact_prebound_record_only_scope(tmp_path, monkeypatch, manifest_state):
+    from guard.executors.kubernetes_native_route import KubernetesNativeRouteExecutor
+    from guard.executors.kubernetes_route_record import KubernetesRouteRecordExecutor
+    from guard.models import canonical_json
+    from tests.builders import environment, policy
+    from tests.test_kubernetes_request_binding import target as route_target
+    from tools.j02_run_config import write_config
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Retained route readiness must not dispatch collection')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    monkeypatch.setattr(KubernetesNativeRouteExecutor, '__init__', forbidden)
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    config = {'adapter': {'name': 'vllm'}, 'executors': {'route_record': 'kubernetes'},
+              'update': {'mode': 'external', 'kubernetes_candidate_binding': 'prebound',
+                         'allowed_checks': ['REQ-02']}, 'sides': {}}
+    policy_path = tmp_path / 'policy.json'
+    pol = policy(pack.ref(), scope={'include': ['REQ-02']}, values={})
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    config_path = tmp_path / 'guard.toml'
+    inputs, prepared_paths = [], {}
+    for side, expected in tool.versions().items():
+        env = environment(id=f'ENV-ROUTE-{side.upper()}',
+            engine={'name': expected['engine'], 'version': expected['version'], 'image_digest': expected['image']},
+            model={'id': 'EXAMPLE-model', 'revision': 'EXAMPLE-revision'},
+            runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE-GPU', 'driver': 'EXAMPLE-driver'})
+        env_path = tmp_path / f'{side}-env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        target = route_target(env)
+        target['lab'] = False
+        target['observed_version'] = expected['version']
+        target['engine']['image_digest'] = expected['image']
+        target['kubernetes']['engine'].update(image=expected['image'], image_id=expected['image'])
+        target_path = tmp_path / f'{side}-target.json'
+        target_path.write_bytes(canonical_json(target))
+        prepared = prepared_paths[side] = tmp_path / f'{side}-native.json'
+        config['sides'][side] = {'route_record': {'target': str(target_path),
+            'native_route': {'target': str(target_path), 'prepared': str(prepared)}},
+            'run_binding': {'REQ-02': {'record_session': f'{len(inputs) + 1:032x}'}}}
+        inputs.append({'check_id': 'REQ-02', 'side': side, **{
+            role: {'path': str(path), 'sha256': sha256(path.read_bytes()).hexdigest()}
+            for role, path in {'environment': env_path, 'policy': policy_path}.items()}})
+
+    candidate = prepared_paths['candidate']
+    if manifest_state == 'malformed':
+        candidate.write_bytes(b'{')
+    elif manifest_state == 'appears-during-audit':
+        prepare = KubernetesRouteRecordExecutor.prepared_route_record_only
+
+        def prepare_and_create_manifest(executor, check, env, values):
+            prepare(executor, check, env, values)
+            if env.id.endswith('CANDIDATE'):
+                candidate.write_bytes(b'{')
+
+        monkeypatch.setattr(KubernetesRouteRecordExecutor, 'prepared_route_record_only', prepare_and_create_manifest)
+    write_config(config, config_path)
+    for entry in inputs:
+        entry['configuration'] = {'path': str(config_path), 'sha256': sha256(config_path.read_bytes()).hexdigest()}
+    report = run(tmp_path, {**blank(), 'inputs': inputs})
+    rows = {row['side']: row for row in report['rows'] if row['check_id'] == 'REQ-02'}
+    assert report['file_binding_valid_sides'] == (2 if manifest_state == 'absent' else 1), rows
+    for side, row in rows.items():
+        assert not row['engine_executed'] and row['actual_results'] is None
+        if side == 'baseline' or manifest_state == 'absent':
+            assert row['binding_schema'] == 'guard-run-binding/2'
+            assert 'NATIVE_ROUTE_PREPARATION_ABSENT' in row['blocking_codes']
+        elif manifest_state == 'appears-during-audit':
+            assert row['blocking_codes'] == ['MVP_INPUT_FILE_CHANGED']
+        else:
+            assert 'NATIVE_ROUTE_PREPARATION_ABSENT' not in row['blocking_codes']
 
 
 def test_fake_executor_cannot_be_an_active_execution_input(tmp_path, sources):  # noqa: F811
@@ -921,7 +1022,7 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
             application.execute_validation(store, pack, envs[0], pol, managed, tmp_path / 'managed', utcnow())
         assert not (tmp_path / 'managed').exists()
         with pytest.raises(ValueError, match="^RETRY_RECORD_SNAPSHOT_SCOPE_INVALID$"):
-            core.run_plan(store, pack, plan, rc)
+            run_under_plan_lock(store, pack, plan, rc)
         assert not called and not list(store.iter_kind("EVD"))
         return
 
@@ -929,7 +1030,7 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
         path = scope_path if case.startswith("scope-") else producer_path
         path.write_bytes(path.read_bytes() + b'\n')
         with pytest.raises(ValueError, match="^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$"):
-            core.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+            run_under_plan_lock(store, pack, plan, rc, only_side=Side.candidate)
         assert not called and not list(store.iter_kind("EVD"))
         return
 
@@ -948,7 +1049,7 @@ def test_retry_snapshot_uses_only_verified_paired_recipe_bytes(tmp_path, monkeyp
 
         monkeypatch.setattr(core, "_run_one", change_before_binding)
 
-    evd, = core.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+    evd, = run_under_plan_lock(store, pack, plan, rc, only_side=Side.candidate)
     if case == "exact":
         assert called == [envs[1].ref()]
         assert evd.execution.status is ExecStatus.COMPLETED and evd.data_origin is DataOrigin.EXAMPLE
@@ -1012,7 +1113,7 @@ def test_obs06_rejects_changed_plan_inputs_before_collection(
             return original(*args, **kwargs)
 
         monkeypatch.setattr(core_run, '_run_one', replace_after_recipe)
-        evidence, = core_run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+        evidence, = run_under_plan_lock(store, pack, plan, rc, only_side=Side.candidate)
         assert evidence.execution.status == ExecStatus.NOT_RUN
         assert evidence.execution.abort_reason == reason
         assert evidence.execution.run_binding is None
@@ -1020,16 +1121,16 @@ def test_obs06_rejects_changed_plan_inputs_before_collection(
     else:
         path.write_bytes(replacement)
         with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
-            core_run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+            run_under_plan_lock(store, pack, plan, rc, only_side=Side.candidate)
         assert not list(store.iter_kind('EVD'))
 
 
 @pytest.mark.parametrize('scope', ['selected', 'unselected', 'staged', 'legacy'])
-def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_access_context, scope):
+def test_obs06_recipe_seals_raw_subjects_and_keeps_the_selected_canonical_binding(tmp_path, record_access_context, scope):
     from guard.core.execution_recipe import configuration_sha256
     from guard.core.select import select
     from guard.executors.run_binding import stages_for
-    from guard.models import CheckDef, Mode, canonical_json
+    from guard.models import CheckDef, Mode, canonical_json, sha256_hex
     from tests.builders import policy
     import yaml
 
@@ -1047,7 +1148,8 @@ def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_acces
             item.model_copy(update={'check_revision': legacy.revision}) if item.check_id == legacy.id else item
             for item in plan.items
         ]}).seal()
-    original = configuration_sha256(cfg, envs, plan=plan)
+    prior_bindings = {}
+    original = configuration_sha256(cfg, envs, plan=plan, record_access_digests=prior_bindings)
     path = tmp_path / 'candidate-subjects.json'
     if scope == 'selected':
         replacement = path.read_bytes() + b'\n'
@@ -1056,4 +1158,11 @@ def test_obs06_recipe_keeps_canonical_hash_and_read_scope(tmp_path, record_acces
         subjects['subjects'][0]['username'] = 'example-replacement'
         replacement = canonical_json(subjects)
     path.write_bytes(replacement)
-    assert configuration_sha256(cfg, envs, plan=plan) == original
+    current_bindings = {}
+    assert configuration_sha256(cfg, envs, plan=plan, record_access_digests=current_bindings) != original
+    assert current_bindings == prior_bindings
+    if scope == 'selected':
+        assert set(current_bindings) == {'baseline', 'candidate'}
+        assert current_bindings['candidate']['subjects'] == sha256_hex(canonical_json(json.loads(replacement)))
+    else:
+        assert not current_bindings

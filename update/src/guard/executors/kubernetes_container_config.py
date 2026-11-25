@@ -60,11 +60,10 @@ class KubernetesContainerConfigExecutor(LifecycleCommonInputConsumer, HttpCheckE
             raise ValueError("KUBERNETES_CONTAINER_PROFILE_UNSUPPORTED")
         validate_image_approval_policy(values)
 
-    def run(self,check,env,policy_values,adapter,workdir):
-        self.validate_policy(check,policy_values)
+    def prepared_container_configuration(self, check, env):
+        """Check the selected target and build its transport without dispatch."""
         try:
             if (set(self.cfg)-{"target","kubectl_binary","max_duration_seconds","node_image_verification","worker_prepared"}
-                    or adapter is None
                     or self.cfg.get("node_image_verification") not in (None,"local-containerd-v1","local-k3s-containerd-v1")
                     or self.cfg.get("node_image_verification") is not None and check.id!="SUP-04"):
                 raise ValueError
@@ -72,14 +71,25 @@ class KubernetesContainerConfigExecutor(LifecycleCommonInputConsumer, HttpCheckE
                 from guard.collectors.worker_security import load_prepared
                 if check.id not in {'PLT-01','PLT-04'}:raise ValueError
                 load_prepared(self.cfg['worker_prepared'])
-            with Path(self.cfg["target"]).open("rb") as stream:
+            path = Path(self.cfg["target"])
+            if not path.is_file():
+                raise ValueError
+            with path.open("rb") as stream:
                 target=strict_json(stream.read(65537),limit=65536)
             if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target))!=self._expected_target_sha256:
                 raise ValueError
         except (KeyError,TypeError,ValueError,OSError):
             raise ValueError("KUBERNETES_CONTAINER_CONFIGURATION_INVALID") from None
-        transport=KubernetesHTTP(target,env,duration=self.cfg.get("max_duration_seconds",30),
-            binary=self.cfg.get("kubectl_binary","kubectl"),runner=self._kubectl_runner,profile=REQUEST_BINDING_PROFILE)
+        transport = KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 30),
+                                   binary=self.cfg.get("kubectl_binary", "kubectl"),
+                                   runner=self._kubectl_runner, profile=REQUEST_BINDING_PROFILE)
+        return target, transport
+
+    def run(self,check,env,policy_values,adapter,workdir):
+        self.validate_policy(check,policy_values)
+        if adapter is None:
+            raise ValueError("KUBERNETES_CONTAINER_CONFIGURATION_INVALID")
+        target, transport = self.prepared_container_configuration(check, env)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,
             timeout=3.0,allow_mutating=False,keys={},secrets=[],cprobe=transport,
             workdir=workdir,started=utcnow())

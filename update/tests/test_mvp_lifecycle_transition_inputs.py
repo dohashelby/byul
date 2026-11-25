@@ -750,3 +750,261 @@ def test_joins_prebound_sup05_receipts_and_keeps_ordinary_sibling_targets(extern
         valid = {(row['check_id'], row['side']) for row in checked['rows'] if row['file_binding_valid']}
         assert len(valid) == 5 and ('SUP-05', 'candidate') not in valid and ('SUP-10', 'candidate') in valid
         path.write_bytes(original)
+
+
+@pytest.mark.parametrize('damage, error', [
+    (None, None),
+    ('missing-own-pin', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('changed-target', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('late-manifest', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+])
+def test_joins_prebound_gateway_response_without_replacing_its_target(external, monkeypatch, damage, error):
+    from guard.configuration import RESPONSE_SNAPSHOT_INPUT, RESPONSE_SNAPSHOT_OPTION
+    from tests.test_kubernetes_response_snapshot import VALUES, snapshot_inputs
+    from tests.test_mvp_gateway_preparation import MODEL, gateway_pair
+
+    _offline_only(monkeypatch)
+    _, mapping = declared_mapping()
+    build_environment = fixture.environment
+
+    def mapped_environment(*, model, **kwargs):
+        model = {**model, 'id': mapping['repository_id'], 'revision': mapping['revision']}
+        return build_environment(model=model, **kwargs)
+
+    monkeypatch.setattr(fixture, 'environment', mapped_environment)
+    check = 'LIF-16'
+    pack, envs, _, cfg = fixture._configuration(external, check, mvp_inputs=True, lab=False)
+    policy_values = {'REQ-13': VALUES, 'SUP-04': {'approved_image_digests': [env.engine.image_digest for env in envs]}}
+    confirmed = policy(pack.ref(), scope={'include': [check, *policy_values]}, values=policy_values,
+                       data_origin=DataOrigin.DECLARED, status='CONFIRMED',
+                       confirmed_by='EXAMPLE operator', confirmed_at=T0)
+    policy_path = external / 'policy.json'
+    policy_path.write_bytes(canonical_json(confirmed.to_dict()))
+
+    lifecycle_sides, ordinary = {}, {}
+    for side, env in zip(readiness.SIDES, envs, strict=True):
+        rows = cfg['sides'][side]['check_config'][check]['generations']
+        lifecycle_sides[side] = _selected_side(env, rows, cfg['run_binding'][check])
+        target = json.loads(Path(rows[0]['target']).read_bytes())
+        target['model_mapping'] = {**mapping, 'served_model_name': MODEL, 'inventory_sha256': env.model.inventory_sha256,
+                                   'environment_ref': env.ref().model_dump(mode='json')}
+        path = external / f'{side}-ordinary-target.json'
+        path.write_bytes(canonical_json(target))
+        ordinary[side] = {'environment': Path(rows[0]['environment']), 'target': path}
+
+    gateway = gateway_pair.__wrapped__(external, (pack, ordinary, policy_path))
+    selected, response_targets, response_manifests = {}, {}, {}
+    for side in readiness.SIDES:
+        _, settings, pins = snapshot_inputs(external, gateway, side, confirmed.ref().sha256)
+        target = Path(settings['target'])
+        selection = target.parent / 'selection.json'
+        selection.write_bytes(canonical_json(settings))
+        selected[side] = {**_pointer(selection), 'target_file_sha256': pins['expected_target_file_sha256']}
+        response_targets[side] = _pointer(target)
+        response_manifests[side] = _pointer(settings[RESPONSE_SNAPSHOT_INPUT]['path'])
+
+    stock = external / 'stock'
+    stock.mkdir()
+    config, bindings, decisions = metadata.assemble(ordinary, policy_path, pack=pack, store=external / 'store',
+                                                    gateway_response_selections=selected)
+    metadata._publish_prebound(stock, config=config, bindings=bindings, checks=decisions,
+                               pack=pack, preparations=None, record_checks=set())
+    stock_index = stock / 'input-sources.json'
+    if damage == 'missing-own-pin':
+        inventory = json.loads(stock_index.read_bytes())
+        row = next(item for item in inventory['inputs'] if item['check_id'] == 'REQ-13' and item['side'] == 'candidate')
+        del row[RESPONSE_SNAPSHOT_INPUT]
+        stock_index.write_bytes(canonical_json(inventory))
+    if damage == 'changed-target':
+        target = Path(response_targets['candidate']['path'])
+        target.write_bytes(target.read_bytes() + b'\n')
+    if damage == 'late-manifest':
+        audit = readiness.audit
+        manifest = Path(response_manifests['candidate']['path'])
+
+        def mutate_after_audit(*args, **kwargs):
+            report = audit(*args, **kwargs)
+            manifest.write_bytes(manifest.read_bytes() + b'\n')
+            return report
+
+        monkeypatch.setattr(readiness, 'audit', mutate_after_audit)
+
+    selection = external / 'lifecycle-selection.json'
+    selection.write_bytes(canonical_json({'schema': materializer.SELECTION_SCHEMA, 'check_id': check,
+        'policy_ref': confirmed.ref().model_dump(mode='json'), 'sides': lifecycle_sides}))
+    declaration = {'index': _pointer(stock_index), 'targets': {side: _pointer(value['target']) for side, value in ordinary.items()}}
+    output = external / 'joined'
+    selections = [(selection, _pointer(selection)['sha256'])]
+    if error:
+        with pytest.raises(ValueError, match=error):
+            materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=declaration)
+        assert not output.exists()
+        return
+
+    combined, index = materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=declaration)
+    assert set(combined['update']['allowed_checks']) == {check, 'SUP-04', 'REQ-13'}
+    assert combined['check_config']['REQ-13'] == {RESPONSE_SNAPSHOT_OPTION: True}
+    for side in readiness.SIDES:
+        assert combined['sides'][side]['response_content']['target'] == response_targets[side]['path']
+        assert combined['sides'][side]['container_config']['target'] == declaration['targets'][side]['path']
+        assert response_targets[side] != declaration['targets'][side]
+    targets = {(row['check_id'], row['side']): row.get('target') for row in index['inputs']}
+    assert targets == {(cid, side): pointer for side in readiness.SIDES for cid, pointer in (
+        (check, None), ('SUP-04', declaration['targets'][side]), ('REQ-13', response_targets[side]))}
+    assert {row['side']: row[RESPONSE_SNAPSHOT_INPUT] for row in index['inputs'] if row['check_id'] == 'REQ-13'} == response_manifests
+    report = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 6
+    assert not report['engine_executed'] and report['actual_results'] is None
+    prepared = application.update_readiness(pack, envs, confirmed, combined)
+    assert prepared['execution_scope']['static_preparation_ready'], prepared
+
+
+@pytest.mark.parametrize('mode, damage, error', [
+    ('allowed-only', None, None),
+    ('both-actors', None, None),
+    ('legacy-target', None, None),
+    ('allowed-only', 'one-target', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('allowed-only', 'record-target', 'MVP_TRANSITION_METADATA_RECORD_INPUT_MISMATCH'),
+    ('allowed-only', 'late-target', 'MVP_TRANSITION_DECLARATION_FILE_CHANGED'),
+    ('allowed-only', 'source-environment', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+    ('allowed-only', 'gateway-image', 'MVP_TRANSITION_METADATA_INPUT_INVALID'),
+])
+def test_joins_prebound_gateway_observation_and_copy_with_their_own_pins(external, monkeypatch, mode, damage, error):
+    from guard.configuration import GATEWAY_RECORD_SNAPSHOT_OPTION
+    from guard.executors.kubernetes_gateway_observation import SNAPSHOT_SOURCE
+    from tests.test_mvp_gateway_preparation import MODEL, _gateway_owner, gateway_pair
+    from tools import mvp_gateway_preparation as gateway
+
+    _offline_only(monkeypatch)
+    _, mapping = declared_mapping()
+    build_environment = fixture.environment
+
+    def mapped_environment(*, model, **kwargs):
+        model = {**model, 'id': mapping['repository_id'], 'revision': mapping['revision']}
+        return build_environment(model=model, **kwargs)
+
+    monkeypatch.setattr(fixture, 'environment', mapped_environment)
+    check = 'LIF-16'
+    pack, envs, _, cfg = fixture._configuration(external, check, mvp_inputs=True, lab=False)
+    values = {'OBS-01': {'observation_required_events': ['ACCESS_ALLOWED', 'ACCESS_DENIED'],
+                         'observation_required_fields': ['actor_sha256', 'target_sha256', 'run_sha256', 'policy_sha256'],
+                         'observation_max_delay_ms': 5000},
+              'PLT-12': {'copy_max_record_delay_ms': 5000}}
+    confirmed = policy(pack.ref(), scope={'include': [check, *values]}, values=values, data_origin=DataOrigin.DECLARED,
+                       status='CONFIRMED', confirmed_by='EXAMPLE operator', confirmed_at=T0)
+    confirmed, copy_bindings = _copy_pair(external, pack, envs, confirmed)
+    policy_path = external / 'policy.json'
+    policy_path.write_bytes(canonical_json(confirmed.to_dict()))
+
+    lifecycle_sides, ordinary = {}, {}
+    for side, env in zip(readiness.SIDES, envs, strict=True):
+        rows = cfg['sides'][side]['check_config'][check]['generations']
+        lifecycle_sides[side] = _selected_side(env, rows, cfg['run_binding'][check])
+        target = json.loads(Path(rows[0]['target']).read_bytes())
+        target['model_mapping'] = {**mapping, 'served_model_name': MODEL, 'inventory_sha256': env.model.inventory_sha256,
+                                   'environment_ref': env.ref().model_dump(mode='json')}
+        path = external / f'{side}-ordinary-target.json'
+        path.write_bytes(canonical_json(target))
+        ordinary[side] = {'environment': Path(rows[0]['environment']), 'target': path}
+
+    pair = gateway_pair.__wrapped__(external, (pack, ordinary, policy_path))
+    producer = external / 'gateway-producer.py'
+    producer.write_bytes(b'# EXAMPLE reviewed Gateway source; never executed\n')
+    monkeypatch.setattr(gateway, 'PRODUCER_SHA256', _pointer(producer)['sha256'])
+    gateway_targets, gateway_inputs = {}, {}
+    for number, side in enumerate(readiness.SIDES, 1):
+        env, target_path, _, prepared, owner = _gateway_owner(pair, side)
+        gateway_targets[side] = gateway.bind_gateway(target_path, env, prepared, **owner)
+        actors = {'allowed': f'{number:064x}'}
+        if mode == 'both-actors':
+            actors['denied'] = f'{number + 10:064x}'
+        gateway_inputs[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer), 'test_actors': actors,
+            SNAPSHOT_SOURCE: {'environment': gateway.GATEWAY_ENV, 'target_id': prepared['runtime_target_id'],
+                              'runtime_policy_sha256': prepared['runtime_policy_sha256'], 'request_sha256': f'{number:064x}'}}
+    target_pins = {}
+    for side, target in gateway_targets.items():
+        path = ordinary[side]['target'] if mode == 'legacy-target' else external / f'{side}-gateway-target.json'
+        path.write_bytes(canonical_json(target))
+        target_pins[side] = _pointer(path)
+        if mode != 'legacy-target':
+            gateway_inputs[side]['target'] = target_pins[side]
+
+    stock = external / 'stock'
+    stock.mkdir()
+    config, bindings, decisions = metadata.assemble(ordinary, policy_path, pack=pack, store=external / 'store',
+        gateway_record_inputs=gateway_inputs, copy_record_inputs=copy_bindings, prebound_copy_records=True)
+    assert set(config['update']['allowed_checks']) == {'OBS-01', 'PLT-12'}, decisions
+    metadata._publish_prebound(stock, config=config, bindings=bindings, checks=decisions, pack=pack,
+                               preparations=None, record_checks={'OBS-01', 'PLT-12'})
+    stock_index = stock / 'input-sources.json'
+    if damage in {'one-target', 'record-target', 'source-environment', 'gateway-image'}:
+        inventory = json.loads(stock_index.read_bytes())
+        row = next(item for item in inventory['inputs'] if item['check_id'] == 'OBS-01' and item['side'] == 'candidate')
+        if damage == 'one-target':
+            del row['target']
+        elif damage == 'record-target':
+            row['record_inputs']['target_file_sha256'] = _pointer(ordinary['candidate']['target'])['sha256']
+        elif damage == 'gateway-image':
+            path = Path(row['target']['path'])
+            target = json.loads(path.read_bytes())
+            image = 'docker.io/library/fixture-gateway@sha256:' + 'f' * 64
+            target['kubernetes_gateway'].update(image=image, image_id=image)
+            path.write_bytes(canonical_json(target))
+            row['target'] = _pointer(path)
+            row['record_inputs']['target_file_sha256'] = row['target']['sha256']
+        else:
+            config['sides']['candidate']['check_config']['OBS-01'][SNAPSHOT_SOURCE]['environment'] = 'fixture-unrelated'
+            config_path = stock / 'guard.toml'
+            write_config(config, config_path)
+            pointer = _pointer(config_path)
+            for item in inventory['inputs']:
+                item['configuration'] = pointer
+        stock_index.write_bytes(canonical_json(inventory))
+    elif damage == 'late-target':
+        audit = readiness.audit
+        target = Path(target_pins['candidate']['path'])
+
+        def mutate_after_audit(*args, **kwargs):
+            report = audit(*args, **kwargs)
+            target.write_bytes(target.read_bytes() + b'\n')
+            return report
+
+        monkeypatch.setattr(readiness, 'audit', mutate_after_audit)
+
+    selection = external / 'lifecycle-selection.json'
+    selection.write_bytes(canonical_json({'schema': materializer.SELECTION_SCHEMA, 'check_id': check,
+        'policy_ref': confirmed.ref().model_dump(mode='json'), 'sides': lifecycle_sides}))
+    declaration = {'index': _pointer(stock_index), 'targets': {side: _pointer(paths['target']) for side, paths in ordinary.items()}}
+    output = external / 'joined'
+    selections = [(selection, _pointer(selection)['sha256'])]
+    if error:
+        with pytest.raises(ValueError, match=error):
+            materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=declaration)
+        assert not output.exists()
+        return
+
+    combined, index = materializer.prepare_many(policy_path, selections, output, pack=pack, prebound_metadata=declaration)
+    assert set(combined['update']['allowed_checks']) == {check, 'OBS-01', 'PLT-12'}
+    assert combined['check_config']['OBS-01'][GATEWAY_RECORD_SNAPSHOT_OPTION] is True
+    for side in readiness.SIDES:
+        settings = combined['sides'][side]
+        assert settings['required_event_record']['target'] == declaration['targets'][side]['path']
+        assert settings['check_config']['OBS-01'] == config['sides'][side]['check_config']['OBS-01']
+        assert settings['check_config']['PLT-12'] == {'copy_inventory': copy_bindings[side]['copy_inventory']}
+        assert settings['run_binding']['OBS-01']['test_actors'] == gateway_inputs[side]['test_actors']
+    stock_pins = {(row['check_id'], row['side']): row['record_inputs'] for row in bindings}
+    for row in index['inputs']:
+        check_id, side = row['check_id'], row['side']
+        if check_id in {'OBS-01', 'PLT-12'}:
+            assert row['record_inputs'] == stock_pins[check_id, side]
+        if check_id == 'OBS-01':
+            assert row.get('target') == (None if mode == 'legacy-target' else target_pins[side])
+            assert row['record_inputs']['target_file_sha256'] == target_pins[side]['sha256']
+        elif check_id == 'PLT-12':
+            assert row['target'] == declaration['targets'][side]
+            assert row['record_inputs']['target_file_sha256'] == declaration['targets'][side]['sha256']
+    report = readiness.audit(output / materializer.INDEX_NAME, pack=pack)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == 6
+    assert not report['engine_executed'] and report['actual_results'] is None
+    prepared = application.update_readiness(pack, envs, confirmed, combined)
+    assert prepared['execution_scope']['static_preparation_ready'], prepared

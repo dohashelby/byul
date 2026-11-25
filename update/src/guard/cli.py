@@ -3,30 +3,37 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 import tomllib
 from datetime import datetime, timezone
+import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Optional
 
 import typer
 import yaml
 
-from guard.collectors.file import load_environment, load_policy
+from guard.collectors.file import load_bounded_json, load_environment, load_policy
 from guard.collectors.change import read_change, resolve_plan, save_change, extracted_input
 from guard.collectors.updates import update_object
 from guard.core.change_selection import build_context
 from guard.collectors.manual import ManualEvidenceError, build_template, dump_template, import_evidence, read_document
 from guard.collectors.policy_template import write_policy_template
+from guard.configuration import validate_requested_config
+from guard.core.execution_recipe import execution_lock, validate_policy_time
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.core.run import RunConfig, run_plan
+from guard.core.run import recover_pending_locked, run_plan
 from guard.core.select import select as select_plan
-from guard.models import Pack, Plan, load_pack, utcnow
+from guard.models import Mode, Pack, Plan, load_pack, utcnow
+from guard.models.objects import Report
+from guard.models.hashing import sha256_hex
 from guard.store import Store
 from guard.store import IntegrityError
 from guard.store.packs import PackNotStoredError, get_pack, put_pack
-from guard.application import execute_update, execute_validation, run_config, update_readiness, validation_readiness
-from guard.store.bundle import export_bundle, restore_bundle, DEFAULT_MAX_BYTES
+from guard.application import execute_saved_update, execute_update, execute_validation, run_config, update_readiness, validation_readiness
+from guard.store.bundle import export_bundle, restore_bundle, verify_complete, DEFAULT_MAX_BYTES
 from guard.core.preflight import validate_pack
 from guard.models import new_id
 from guard.preparation_guidance import annotate, input_failure, read_inputs
@@ -46,7 +53,11 @@ StoreOpt = typer.Option(None, "--store", help="저장소 경로 (기본: guard.t
 
 
 def _config(path: Path) -> dict:
-    return tomllib.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if not path.exists() and path == Path("guard.toml"):
+        return {}
+    config = tomllib.loads(path.read_text(encoding="utf-8"))
+    validate_requested_config(config)
+    return config
 
 
 def _store(store: Optional[Path], cfg: dict) -> Store:
@@ -89,7 +100,41 @@ def _as_of(value: Optional[str]) -> datetime:
     if not value:
         return utcnow()
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    if dt.utcoffset() is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _publish_report(path: Path, report) -> None:
+    temporary = None
+    try:
+        with NamedTemporaryFile(dir=path.parent, suffix=".tmp", delete=False, mode="w", encoding="utf-8") as stream:
+            temporary = Path(stream.name)
+            json.dump(report.to_dict(), stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _replay_inputs(store, plan, source, attempt, as_of):
+    if source is None:
+        return attempt, _as_of(as_of) if as_of else None, None, None
+    report = Report.model_validate_json(source.read_bytes())
+    report = store.resolve(report.ref())
+    store.validate_object(report)
+    plans = [store.resolve(ref) for ref in report.inputs_manifest if ref.kind == "PLAN"]
+    predecessors = [item.inputs.previous_plan for item in plans]
+    primary_plans = [item.ref() for item in plans if item.ref() not in predecessors]
+    if primary_plans != [plan.ref()] or (attempt is not None and attempt != report.execution_attempt_id):
+        raise typer.BadParameter("선택한 PLAN 또는 시도가 원본 보고서와 다릅니다")
+    requested_time = _as_of(as_of) if as_of else report.as_of
+    if requested_time is None or (report.as_of is not None and requested_time != report.as_of):
+        raise typer.BadParameter("원본 보고서의 판정 시각을 확인할 수 없습니다")
+    evds = [store.resolve(ref) for ref in report.inputs_manifest if ref.kind == "EVD"]
+    return report.execution_attempt_id, requested_time, [evd for evd in evds if evd.plan == plan.ref()], report
 
 
 @policy_app.command("template")
@@ -182,18 +227,23 @@ def select(
     p = load_pack(pack)
     validate_pack(p)
     e, pol = load_environment(env), load_policy(policy, p)
+    validate_policy_time(pol)
     change_input, previous, source = _change_inputs(change, previous_plan, p, cfg, store)
+    preview = None
     if change_input is not None or previous is not None:
-        build_context(source, previous, p, [e], pol, cfg, change_input.change if change_input else None, read_only=True)
+        preview = build_context(source, previous, p, [e], pol, cfg, change_input.change if change_input else None, read_only=True)
     st = _store(store, cfg)
     put_pack(st, pack)  # select 시점 팩 보존본
     st.put(e)
     st.put(pol)
     chg = save_change(st, change_input) if change_input is not None else None
     context = build_context(st, previous, p, [e], pol, cfg, chg) if chg is not None or previous is not None else None
+    if preview and context and preview.execution_recipe_sha256 != context.execution_recipe_sha256:
+        raise ValueError("EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED")
     plan = select_plan(p, [e], pol, change=chg, context=context) if context is not None else select_plan(p, [e], pol)
     from guard.core.execution_recipe import bind_recipe
-    plan = bind_recipe(plan, cfg, [e])
+    plan = bind_recipe(plan, cfg, [e],
+                       selected_context_sha256=context.execution_recipe_sha256 if context else None)
     st.put(plan)
     selected = [i for i in plan.items if i.selected]
     auto = [i for i in selected if not i.gaps]
@@ -216,9 +266,20 @@ def run(
         cfg.setdefault("fake", {})["scenario"] = fake_scenario
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack)
-    rc = run_config(cfg)
-    rc.replace_manual = replace_manual
-    evds = run_plan(st, pk, pl, rc)
+    try:
+        get_pack(st, pl.inputs.pack)
+    except PackNotStoredError:
+        if pk.path is None:
+            raise
+        put_pack(st, pk.path, expected_ref=pl.inputs.pack)
+    failed = False
+    if pl.mode == Mode.update:
+        evds, failed = execute_saved_update(st, pk, pl, cfg, st.root / "runs" / new_id("UPDATE"),
+                                            replace_manual=replace_manual)
+    else:
+        rc = run_config(cfg)
+        rc.replace_manual = replace_manual
+        evds = run_plan(st, pk, pl, rc)
     counts: dict[str, int] = {}
     for e in evds:
         counts[e.execution.status.value] = counts.get(e.execution.status.value, 0) + 1
@@ -229,6 +290,8 @@ def run(
     if any(e.execution.cleanup_errors for e in evds):
         typer.echo("probe cleanup incomplete; inspect execution.cleanup_errors and labelled resources")
         raise typer.Exit(1)
+    if failed:
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -236,6 +299,8 @@ def judge(
     plan: str = typer.Option(..., "--plan"),
     pack: Optional[Path] = typer.Option(None, "--pack"),
     as_of: Optional[str] = typer.Option(None, "--as-of", help="예외 만료 판단 시각 (RFC3339, 기본 현재)"),
+    attempt: Optional[str] = typer.Option(None, "--attempt", help="판정할 정확한 실행 시도 ID"),
+    from_report: Optional[Path] = typer.Option(None, "--from-report", help="저장된 원본 RPT의 증거와 시각으로 재판정"),
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
@@ -243,7 +308,8 @@ def judge(
     cfg = _config(config)
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
-    results = judge_plan(st, pk, pl, _as_of(as_of))
+    attempt, judgment_time, evds, _ = _replay_inputs(st, pl, from_report, attempt, as_of)
+    results = judge_plan(st, pk, pl, judgment_time or utcnow(), attempt_id=attempt, evidence=evds)
     counts: dict[str, int] = {}
     for r in results:
         counts[r.verdicts.security.value] = counts.get(r.verdicts.security.value, 0) + 1
@@ -260,6 +326,8 @@ def report(
     pack: Optional[Path] = typer.Option(None, "--pack"),
     json_out: Path = typer.Option(Path("report.json"), "--json"),
     as_of: Optional[str] = typer.Option(None, "--as-of"),
+    attempt: Optional[str] = typer.Option(None, "--attempt", help="보고할 정확한 실행 시도 ID"),
+    from_report: Optional[Path] = typer.Option(None, "--from-report", help="저장된 원본 RPT의 증거와 시각으로 보고"),
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
@@ -267,10 +335,17 @@ def report(
     cfg = _config(config)
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
-    rpt = build_report(st, pk, pl, _as_of(as_of))
-    st.put(rpt)
-    data = rpt.to_dict()
-    json_out.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    with execution_lock(st.root, pl.id):
+        attempt, judgment_time, evds, original = _replay_inputs(st, pl, from_report, attempt, as_of)
+        judged = None if original is None else [
+            st.resolve(side.result)
+            for row in original.by_check if row.selected
+            for side in (row.single, row.baseline, row.candidate)
+            if side is not None and side.result is not None
+        ]
+        rpt = build_report(st, pk, pl, judgment_time, attempt_id=attempt, evidence=evds, judged=judged)
+        st.put(rpt)
+    _publish_report(json_out, rpt)
     typer.echo(f"{rpt.id}@{rpt.revision} official={rpt.official} → {json_out}")
 
 
@@ -340,8 +415,7 @@ def update(
     judged_at = _as_of(as_of)
     extra = {"change": change_input, "previous_plan": previous} if change_input is not None or previous is not None else {}
     rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, judged_at, **extra)
-    data = rpt.to_dict()
-    (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _publish_report(folder / "report.json", rpt)
     typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
     raise typer.Exit(1 if failed else 0)
 
@@ -378,8 +452,7 @@ def validate(
     pol = load_policy(policy, pk)
     folder = output / new_id("VALIDATE")
     rpt, failed = execute_validation(_store(store, cfg), pk, environment, pol, cfg, folder, utcnow())
-    data = rpt.to_dict()
-    (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _publish_report(folder / "report.json", rpt)
     typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
     raise typer.Exit(1 if failed else 0)
 
@@ -434,10 +507,15 @@ def prepare_update(
 
 
 @evidence_app.command("export")
-def evidence_export(store: Path = typer.Option(..., "--store"), output: Path = typer.Option(..., "--output")) -> None:
+def evidence_export(store: Path = typer.Option(..., "--store"), output: Path = typer.Option(..., "--output"),
+                    from_report: Optional[Path] = typer.Option(None, "--from-report", help="이 RPT의 정확한 증거만 반출")) -> None:
     """원본을 변경하지 않고 DB·artifacts·팩 보존본만 검증해 zip으로 반출."""
     try:
-        manifest = export_bundle(store, output)
+        if from_report is None:
+            manifest = export_bundle(store, output)
+        else:
+            report = Report.model_validate_json(from_report.read_bytes())
+            manifest = export_bundle(store, output, report_ref=report.ref())
     except Exception as exc:
         typer.echo(f"export failed ({type(exc).__name__}): {exc}")
         raise typer.Exit(1)
@@ -459,12 +537,28 @@ def evidence_restore(bundle: Path = typer.Option(..., "--bundle"), destination: 
 @app.command()
 def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
     """저장소 해시·참조·증거 파일 일괄 검증"""
-    st = _store(store, _config(config))
-    problems = st.verify()
-    for p in problems:
-        typer.echo(p)
-    typer.echo("OK" if not problems else f"{len(problems)} problem(s)")
-    raise typer.Exit(1 if problems else 0)
+    try:
+        root = store or Path(_config(config).get("store", ".guard"))
+        verify_complete(Store.read_only(root))
+    except (IntegrityError, OSError, ValueError) as error:
+        typer.echo(f"verify failed: {error}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo("OK")
+
+
+@evidence_app.command("recover")
+def evidence_recover(
+    plan: str = typer.Option(..., "--plan"),
+    attempt: str = typer.Option(..., "--attempt"),
+    store: Path = typer.Option(..., "--store"),
+) -> None:
+    """중단된 시도의 봉인 증거를 시험 재실행 없이 저장소에 복구한다."""
+    Store.read_only(store)
+    st = Store(store)
+    pl = resolve_plan(st, plan)
+    with execution_lock(st.root, pl.id):
+        recovered = recover_pending_locked(st, pl, attempt)
+    typer.echo(f"{attempt}: {len(recovered)} sealed evidence fragment(s) recovered")
 
 
 @app.command("prepare-model-read-scope")
@@ -481,9 +575,7 @@ def prepare_model_read_scope(
     model_manifest_sha256: str | None = typer.Option(None, "--model-manifest-sha256", help="승인 모델 참조 파일의 바이트 해시"),
 ) -> None:
     """선언한 비밀 아닌 safetensors 참조 범위를 만든다. 모델 파일을 읽지 않는다."""
-    from guard.collectors.file import load_environment
     from guard.collectors.model_read_scope import build_scope
-    from guard.executors.owned_capture import strict_json
     from guard.collectors.route_observations import validate_output
     from guard.models import canonical_json
     try:
@@ -491,8 +583,7 @@ def prepare_model_read_scope(
                          "hash_model_bytes": hash_model_bytes, "max_hash_bytes": max_hash_bytes}
         if target_sha256 is None and model_manifest_sha256 is None:
             environment = load_environment(env)
-            with target.open("rb") as stream:
-                topology = strict_json(stream.read(65537))
+            topology = load_bounded_json(target)
             value = build_scope(environment, topology, model_manifest, model_root, **scope_options)
         else:
             from guard.executors.lifecycle_transition_scope import prepare_scope
@@ -602,6 +693,35 @@ def capture_lifecycle_observations(
                           "product_connected":False,"security":"UNKNOWN"}))
 
 
+def _encode_capture(value: dict, *, max_bytes: int, bound_code: str | None) -> str:
+    raw = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    # The serialized artifact is ASCII, so text length equals its UTF-8 byte length.
+    if len(raw) > max_bytes:
+        raise ValueError() if bound_code is None else ValueError(bound_code)
+    return raw
+
+
+def _publish_capture(
+    output: Path,
+    value: dict,
+    raw: str,
+    validate_output: Callable[[Path, Path], None],
+    failure_code: str,
+) -> dict[str, int | str]:
+    try:
+        validate_output(output, Path(__file__).resolve().parents[3])
+        with output.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(raw)
+    except (OSError, UnicodeError, ValueError):
+        # Only validated metadata reaches this fallback; preserve collected facts.
+        typer.echo(json.dumps({
+            "capture_executed": True, "artifact_saved": False, "security": "UNKNOWN",
+            "diagnostic_codes": [failure_code], "capture": value,
+        }, ensure_ascii=True))
+        raise typer.Exit(1)
+    return {"sha256": sha256_hex(raw.encode("utf-8")), "bytes": len(raw)}
+
+
 @app.command("capture-lifecycle-session")
 def capture_lifecycle_session(
     env: Path = typer.Option(...,"--env"),
@@ -613,7 +733,6 @@ def capture_lifecycle_session(
     execute: bool = typer.Option(False,"--execute",help="소유 세션의 프로세스·파일 metadata만 읽기"),
 ) -> None:
     """세션의 개별 기록과 누락을 보존한다. 종결·전체 회수 판정은 UNKNOWN이다."""
-    import hashlib
     from guard.collectors.lifecycle import load_session_inputs,validate_output,collect_session
     from guard.executors.owned_capture import create_capture_client,SourceCaptureError
     try:
@@ -623,24 +742,13 @@ def capture_lifecycle_session(
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
             return
         value=collect_session(create_capture_client(topology["run_id"]),environment,topology,container,image,assets)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode("utf-8"))>64*1024**2:
-            raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
+        raw = _encode_capture(value, max_bytes=64 * 1024**2, bound_code="LIFECYCLE_SESSION_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError,SourceCaptureError):
         typer.echo("LIFECYCLE_SESSION_CAPTURE_FAILED")
         raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open("x",encoding="utf-8",newline="\n") as stream:
-            stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        # Only validated metadata reaches this fallback; preserve collected facts.
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
-        raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
-        "recordings":len(value["recordings"]),"sha256":hashlib.sha256(raw.encode("utf-8")).hexdigest(),
-        "bytes":len(raw.encode("utf-8"))}))
+        "recordings":len(value["recordings"]),**saved}))
 
 
 @app.command("capture-kubernetes-lifecycle-session")
@@ -655,7 +763,6 @@ def capture_kubernetes_lifecycle_session(
     execute: bool = typer.Option(False,"--execute",help="명시 소유 Kubernetes 세션의 파일·프로세스 metadata만 읽기"),
 ) -> None:
     """명시 context/Pod 세대에서 고정 읽기 helper만 실행한다. 보안 판정은 UNKNOWN이다."""
-    import hashlib
     from guard.collectors.kubernetes_lifecycle import load_inputs,load_model_mapping,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
@@ -667,21 +774,13 @@ def capture_kubernetes_lifecycle_session(
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
             return
         value=collect(environment,topology,assets,binary=kubectl_binary,duration=max_duration,model_mapping=mapping)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode("utf-8"))>64*1024**2:raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
+        raw = _encode_capture(value, max_bytes=64 * 1024**2, bound_code="LIFECYCLE_SESSION_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):
         typer.echo("KUBERNETES_LIFECYCLE_CAPTURE_FAILED")
         raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open("x",encoding="utf-8",newline="\n") as stream:stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
-        raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
-        "recordings":len(value["recordings"]),"sha256":hashlib.sha256(raw.encode("utf-8")).hexdigest(),
-        "bytes":len(raw.encode("utf-8"))}))
+        "recordings":len(value["recordings"]),**saved}))
 
 
 @app.command("capture-kubernetes-process-snapshot")
@@ -694,7 +793,6 @@ def capture_kubernetes_process_snapshot(
     execute: bool=typer.Option(False,"--execute",help="선택 컨테이너의 process metadata·환경 이름만 읽기"),
 ) -> None:
     """기존 권한/자격 소비자의 공통 입력. worker/source 귀속과 보안 판정은 미확인이다."""
-    import hashlib
     from guard.collectors.kubernetes_process import load_inputs,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
@@ -706,22 +804,14 @@ def capture_kubernetes_process_snapshot(
                 "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN"}))
             return
         value=collect(environment,topology,binary=kubectl_binary,duration=max_duration,candidate_paths=selected)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode())>1024**2:
-            raise ValueError('KUBERNETES_PROCESS_ATTACHMENT_BOUND')
+        raw = _encode_capture(value, max_bytes=1024**2, bound_code="KUBERNETES_PROCESS_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,RuntimeError,yaml.YAMLError):
         typer.echo('KUBERNETES_PROCESS_CAPTURE_FAILED')
         raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open('x',encoding='utf-8',newline='\n') as stream:stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["PROCESS_SNAPSHOT_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
-        raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "PROCESS_SNAPSHOT_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"available":value['available'],
         "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN",
-        "sha256":hashlib.sha256(raw.encode()).hexdigest(),"bytes":len(raw.encode())}))
+        **saved}))
     if not value['available']:
         raise typer.Exit(1)
 
@@ -736,7 +826,6 @@ def capture_native_weight_files(
     execute: bool=typer.Option(False,"--execute",help="명시된 소유 모델 파일의 bytes 해시만 읽기"),
 ) -> None:
     """native iterator 경로 지문과 별도 파일 해시를 대조한다. 최종 모델/소비 판정은 미확인이다."""
-    import hashlib
     from guard.collectors.native_weight_files import load_inputs,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
@@ -747,18 +836,12 @@ def capture_native_weight_files(
         if not execute:
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}));return
         value=collect(inputs,duration=max_duration,max_file_bytes=max_file_bytes,binary=kubectl_binary)
-        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
-        if len(raw.encode())>16*1024**2:raise ValueError()
+        raw = _encode_capture(value, max_bytes=16 * 1024**2, bound_code=None)
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):
         typer.echo("NATIVE_WEIGHT_FILE_CAPTURE_FAILED");raise typer.Exit(2)
-    try:
-        validate_output(output,Path(__file__).resolve().parents[3])
-        with output.open("x",encoding="utf-8",newline="\n") as stream:stream.write(raw)
-    except (OSError,UnicodeError,ValueError):
-        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
-            "diagnostic_codes":["WEIGHT_FILE_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True));raise typer.Exit(1)
+    saved = _publish_capture(output, value, raw, validate_output, "WEIGHT_FILE_ARTIFACT_UNAVAILABLE")
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
-        "files":len(value["files"]),"sha256":hashlib.sha256(raw.encode()).hexdigest(),"bytes":len(raw.encode())}))
+        "files":len(value["files"]),**saved}))
 
 
 @app.command("capture-stream-pressure")

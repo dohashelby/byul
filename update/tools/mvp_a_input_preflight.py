@@ -86,14 +86,14 @@ def inspect_side(source, check, pack, *, issued_at):
     raw_env = json.loads(files['environment'], object_pairs_hook=_pairs)
     if raw_env.get('kind') != 'ENV':
         raise ValueError('MA7_SEALED_ENV_REQUIRED')
-    env = load_environment(Path(source['environment']['path']))
+    env = load_environment(Path(source['environment']['path']), raw=files['environment'])
     expected = versions()[source['side']]
     if (env.engine.name, env.engine.version, env.engine.image_digest) != (
             expected['engine'], expected['version'], expected['image']):
         raise ValueError('MA7_ENGINE_SIDE_MISMATCH')
     if not env.runtime.gpu_count or not env.runtime.gpu_model or not env.runtime.driver:
         raise ValueError('MA7_GPU_FACTS_REQUIRED')
-    policy = load_policy(Path(source['policy']['path']), pack)
+    policy = load_policy(Path(source['policy']['path']), pack, raw=files['policy'])
     if not _in_scope(check.id, policy):
         raise ValueError('MA7_POLICY_SCOPE_MISMATCH')
     values = policy.values.get(check.id) or {}

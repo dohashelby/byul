@@ -145,7 +145,9 @@ def analyze(packet, prepared):
         for history in journal([row for row in rows if row["event"] == source.EVENT], prepared).values():
             phases = [row["payload"]["phase"] for row in history]
             if phases == ["OPEN_RAISE"]:
-                open_failures += 1
+                if (owner_bound and (capture.get("provenance") or {}).get("owner_binding_verified") is True
+                        and capture["summary"]["recording_closed"] is True):
+                    open_failures += 1
                 continue
             if not owner_bound or phases != ["OPEN_RETURN", "READ_RETURN", "CLOSE_RETURN"]:
                 unjoined += 1

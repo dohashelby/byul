@@ -9,10 +9,11 @@ import subprocess
 
 import pytest
 
+from tests.builders import run_under_plan_lock
+
 from guard import application
 from guard.collectors.file import load_environment
 from guard.core.execution_recipe import bind_recipe
-from guard.core.run import run_plan
 from guard.core.select import select
 from guard.executors import kubernetes_response_content as module
 from guard.executors.registry import EXECUTORS
@@ -357,14 +358,14 @@ def test_prebound_gateway_bytes_cannot_change_after_selection(tmp_path, monkeypa
             return run_one(*args, **kwargs)
 
         monkeypatch.setattr(core_run, '_run_one', replace_after_recipe)
-        evd, = run_plan(store, pack, plan, application.run_config(cfg), only_side=Side.candidate)
+        evd, = run_under_plan_lock(store, pack, plan, application.run_config(cfg), only_side=Side.candidate)
         assert evd.execution.status == ExecStatus.ABORTED and evd.execution.abort_reason == 'EXECUTOR_FAILURE'
     else:
         routes = json.loads(route_path.read_bytes())
         routes['kubernetes_routes']['gateway']['pod_uid'] = '00000000-0000-0000-0000-000000000102'
         route_path.write_bytes(canonical_json(routes))
         with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
-            run_plan(store, pack, plan, application.run_config(cfg), only_side=Side.candidate)
+            run_under_plan_lock(store, pack, plan, application.run_config(cfg), only_side=Side.candidate)
         assert not store.find_latest('EVD', lambda row: row.plan == plan.ref())
 
 

@@ -89,5 +89,11 @@ def provider_leases(environments, prepared, *, root=None):
         for identity in provider.resource_lease_keys(options):
             lease = provider.make_resource_lease(root, identity); leases[lease.key] = lease
     with ExitStack() as stack:
-        for key in sorted(leases): stack.enter_context(leases[key].acquire())
+        try:
+            for key in sorted(leases):
+                stack.enter_context(leases[key].acquire())
+        except BaseException:
+            # No caller has received these claims or started any resources yet.
+            stack.close()
+            raise
         yield tuple(leases.values())

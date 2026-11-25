@@ -217,7 +217,7 @@ def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp
     before = None if mode == 'initial-binding-failure' else 'match'
     assert all(row['before_status'] == before for row in resources.values())
     after = {'released-descriptors': 'absent', 'retained': 'match', 'census-failure': None,
-             'initial-binding-failure': 'match', 'clock-skew': None, 'wrong-census-source': 'absent'}
+             'initial-binding-failure': 'match', 'clock-skew': None, 'wrong-census-source': None}
     assert all(resources[row['id']]['after_status'] == after[mode] for row in selected['resources'])
     expected_stages = (['after'] if mode == 'initial-binding-failure'
                        else ['before'] if mode in {'census-failure', 'clock-skew', 'wrong-census-source'}
@@ -238,6 +238,14 @@ def test_baseline_keeps_the_selected_census_without_a_whole_recovery_verdict(tmp
     if mode == 'initial-binding-failure':
         assert world.census_count == 1 and draft.status.value == 'ABORTED'
         assert not any(row['same_selected_baseline_observed'] for row in resources.values())
+    if mode == 'wrong-census-source':
+        # The independent before phase stays attributed. The raw after rows
+        # remain in diagnostics, but cannot support canonical absence or deadlines.
+        assert world.census_count == 2 and len(summary['censuses']) == 2
+        assert all(row['after_status'] is None and not row['same_selected_baseline_observed']
+                   and not row['selected_absent_observed'] and not row['required_absence_deadline_violated']
+                   for row in resources.values())
+        assert 'selected_resource_census_source_binding_unverified' in observations['activation_missing']['value']
     assert observations['activation_missing']['value']
     assert observations['activation_violations']['value'] is None
     assert not observations['activation_violations']['collected']

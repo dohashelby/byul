@@ -18,18 +18,27 @@ from guard.runtime.kubernetes_http import (
 from .base import DraftArtifact, EvidenceDraft
 
 NORMAL_OPTION = "normal_startup_load_only"
+STARTUP_READY_WINDOW = "startup_ready_window"
 PROFILE = "kubernetes-owned-normal-startup-load/1"
+RANKED_PROFILE = "kubernetes-owned-normal-startup-load-tp2/1"
 _CHECK_PROFILE = "supply-boot-stage-budget-v1"
 _LIMIT = 65536
 _SHA = re.compile(r"[0-9a-f]{64}")
 _LOG_TIME = re.compile(rb"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z")
-_SOURCE_FILES = frozenset({"v1/worker/gpu_model_runner.py", "utils/mem_utils.py", "platforms/cuda.py",
-                           "logger.py", "logging_utils/formatter.py"})
+_COMMON_SOURCE_FILES = frozenset({"utils/mem_utils.py", "platforms/cuda.py", "logger.py", "logging_utils/formatter.py"})
+_SOURCE_FILES = _COMMON_SOURCE_FILES | {"v1/worker/gpu_model_runner.py"}
+_RANKED_PROCESS_FILES = {"v1/executor/multiproc_executor.py", "utils/system_utils.py"}
+_RANKED_SOURCE_FILES = {
+    "gpu_model_runner.py": _SOURCE_FILES | _RANKED_PROCESS_FILES,
+    "model_runner.py": _COMMON_SOURCE_FILES | _RANKED_PROCESS_FILES | {
+        "v1/worker/gpu/model_runner.py", "v1/worker/gpu_worker.py",
+    },
+}
 _SOURCE_KEYS = {"source_root", "file_sha256", "logger_call_linenumber", "entrypoint", "required_env", "optional_env", "forbidden_args"}
-_COST_LINE = re.compile(rb"(?:\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\) )?INFO "
+_COST_LINE = re.compile(rb"(?:\((?P<process>[A-Za-z0-9_-]{1,40}) pid=(?P<pid>[1-9][0-9]{0,8})\) )?INFO "
                         rb"[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} "
-                        rb"\[gpu_model_runner\.py:([0-9]{1,5})\] Model loading took "
-                        rb"(-?[0-9]{1,4}\.[0-9]{1,2}) GiB memory and ([0-9]{1,6}\.[0-9]{6}) seconds")
+                        rb"\[(?P<filename>(?:gpu_)?model_runner\.py):(?P<line>[0-9]{1,5})\] Model loading took "
+                        rb"(?P<delta>-?[0-9]{1,4}\.[0-9]{1,2}) GiB memory and (?P<elapsed>[0-9]{1,6}\.[0-9]{6}) seconds")
 _MISSING = ["resolve_fetch_verify_stage_costs", "compile_stage_cost", "cpu_memory_disk_and_peak_resources",
             "total_budget_and_enforcement", "stop_and_cleanup", "independent_worker_measurements"]
 
@@ -48,17 +57,23 @@ def _window_stamp(value):
     return parsed, remainder_ns
 
 
-def _transport(target, env, *, duration, binary, runner):
+def _transport(target, env, *, duration, binary, runner, retain_tp2_prefix=False):
+    layout = env.runtime.tp_size, env.runtime.pp_size, env.runtime.dp_size
     if (type(target) is not dict or target.get("lab") is not False or target.get("synthetic") is True
-            or not supports(env.engine.name, env.engine.version, "log_integrity")
-            or (env.runtime.tp_size, env.runtime.pp_size, env.runtime.dp_size) != (1, 1, 1)):
+            or not supports(env.engine.name, env.engine.version, "log_integrity")):
+        raise ValueError("LIF01_BOOT_TARGET_UNVERIFIED")
+    tp2_prefix = (retain_tp2_prefix and layout == (2, 1, 1) and env.runtime.gpu_count == 2
+                  and STARTUP_READY_WINDOW in target)
+    if layout != (1, 1, 1) and not tp2_prefix:
         raise ValueError("LIF01_BOOT_TARGET_UNVERIFIED")
     return KubernetesHTTP(target, env, duration=duration, binary=binary, runner=runner, profile=LOG_INTEGRITY_PROFILE)
 
 
-def normal_startup_load_transport(target, env, *, duration, binary="kubectl", runner=None):
+def normal_startup_load_transport(target, env, *, duration, binary="kubectl", runner=None, allow_ranked=False):
     """Validate a sealed selection and the bounded prefix selector without I/O."""
-    transport = _transport(target, env, duration=duration, binary=binary, runner=runner)
+    transport = _transport(target, env, duration=duration, binary=binary, runner=runner, retain_tp2_prefix=allow_ranked)
+    if env.runtime.tp_size == 2:
+        _verify_ranked_selection(target, env)
     prefix = target.get("startup_log_prefix")
     if (type(prefix) is not dict or set(prefix) != {"byte_count", "sha256", "container_started_at", "ready_at"}
             or type(prefix["byte_count"]) is not int or not 0 < prefix["byte_count"] < _LIMIT
@@ -66,18 +81,30 @@ def normal_startup_load_transport(target, env, *, duration, binary="kubectl", ru
             or prefix["container_started_at"] != transport.binding["engine"]["started_at"]
             or _window_stamp(prefix["ready_at"]) < _window_stamp(prefix["container_started_at"])):
         raise ValueError("LIF01_BOOT_PREFIX_UNVERIFIED")
+    _check_retained_ready_window(target, {key: prefix[key] for key in ("container_started_at", "ready_at")})
     return transport
+
+
+def startup_ready_window(pod, engine):
+    """Return the original Ready timestamp for an ownership-checked Pod."""
+    condition, = [row for row in pod["status"]["conditions"] if row.get("type") == "Ready"]
+    started_at, ready_at = engine["started_at"], condition["lastTransitionTime"]
+    if (condition.get("status") != "True" or engine["restart_count"] != 0
+            or not _window_stamp(started_at) <= _window_stamp(ready_at) <= (utcnow(), 0)):
+        raise ValueError("LIF01_BOOT_WINDOW_UNVERIFIED")
+    return {"container_started_at": started_at, "ready_at": ready_at}
+
+
+def _check_retained_ready_window(target, window):
+    if STARTUP_READY_WINDOW in target and target[STARTUP_READY_WINDOW] != window:
+        raise ValueError("LIF01_BOOT_WINDOW_UNVERIFIED")
 
 
 def _ready_window(transport):
     pod = transport._verify(capture_snapshot=True)["engine"]
     engine = transport.binding["engine"]
     selected, = [row for row in pod["spec"]["containers"] if row["name"] == engine["container"]]
-    condition, = [row for row in pod["status"]["conditions"] if row.get("type") == "Ready"]
-    started_at, ready_at = engine["started_at"], condition["lastTransitionTime"]
-    if engine["restart_count"] != 0 or not _window_stamp(started_at) <= _window_stamp(ready_at) <= (utcnow(), 0):
-        raise ValueError("LIF01_BOOT_WINDOW_UNVERIFIED")
-    return {"container_started_at": started_at, "ready_at": ready_at}, selected
+    return startup_ready_window(pod, engine), selected
 
 
 def _read_logs(transport, window, cap):
@@ -98,8 +125,9 @@ def capture_startup_log_prefix(target, env, *, duration=15, binary="kubectl", ru
     same-owner source and fixed producer files must still verify in the EVD run.
     """
     try:
-        transport = _transport(target, env, duration=duration, binary=binary, runner=runner)
+        transport = _transport(target, env, duration=duration, binary=binary, runner=runner, retain_tp2_prefix=True)
         window, _ = _ready_window(transport)
+        _check_retained_ready_window(target, window)
         raw = _read_logs(transport, window, _LIMIT)
         after, _ = _ready_window(transport)
         if window != after or len(raw) == _LIMIT:
@@ -115,14 +143,17 @@ def _source_profile(adapter, env):
     method = getattr(adapter, "startup_load_source", None)
     source = (method(env) if callable(method) else
               get_provider(env.engine.name).evidence_contract("startup_load_source", env))
-    return _validate_source_profile(source)
+    return _validate_source_profile(source, ranked=env.runtime.tp_size == 2)
 
 
-def _validate_source_profile(source):
-    if (type(source) is not dict or set(source) != _SOURCE_KEYS
-            or type(source["source_root"]) is not str or not source["source_root"].startswith("/")
+def _validate_source_profile(source, *, ranked=False):
+    keys = _SOURCE_KEYS | {"ranked_load"} if ranked else _SOURCE_KEYS
+    if type(source) is not dict or set(source) != keys:
+        raise ValueError("LIF01_BOOT_SOURCE_UNQUALIFIED")
+    files = _RANKED_SOURCE_FILES.get(source["ranked_load"]["logger_filename"]) if ranked else _SOURCE_FILES
+    if (type(source["source_root"]) is not str or not source["source_root"].startswith("/")
             or ".." in PurePosixPath(source["source_root"]).parts
-            or type(source["file_sha256"]) is not dict or source["file_sha256"].keys() != _SOURCE_FILES
+            or type(source["file_sha256"]) is not dict or source["file_sha256"].keys() != files
             or any(type(value) is not str or not _SHA.fullmatch(value) for value in source["file_sha256"].values())
             or type(source["logger_call_linenumber"]) is not int or not 1 <= source["logger_call_linenumber"] <= 99999
             or type(source["entrypoint"]) is not list or not source["entrypoint"]
@@ -134,21 +165,50 @@ def _validate_source_profile(source):
     return source
 
 
+def _verify_ranked_selection(target, env):
+    """Require the reviewed normal multiprocess declaration for the two-rank reports."""
+    source = _validate_source_profile(get_provider(env.engine.name).evidence_contract("startup_load_source", env), ranked=True)
+    try:
+        ranked = source["ranked_load"]
+        suffix, names = ranked["launch_suffix"], ranked["process_names"]
+        args = target["comparison_config"]["launch"]["argv"]
+        runner_markers = [field for field in (env.runtime.platform or "").split("; ") if field.startswith("runner=")]
+        if (type(suffix) is not list or len(suffix) != 8 or any(type(arg) is not str for arg in suffix)
+                or type(names) is not list or len(names) != 2 or len(set(names)) != 2
+                or any(type(name) is not str or re.fullmatch(r"[A-Za-z0-9_-]{1,40}", name) is None for name in names)
+                or type(args) is not list or any(type(arg) is not str for arg in args)
+                or args[-len(suffix):] != suffix or target.get("observed_version") != env.engine.version
+                or target["engine"].get("command") != ranked["command"]
+                or runner_markers != [ranked["platform_marker"]]):
+            raise ValueError
+        options = [arg.partition("=")[0].replace("_", "-") for arg in args]
+        if any(options.count(flag) != 1 for flag in suffix[::2]):
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("LIF01_BOOT_RANKED_LAUNCH_UNQUALIFIED") from None
+
+
 def _verify_launch(target, container, source):
     selected_env = {}
     settings = source["required_env"] | source["optional_env"]
+    ranked = source.get("ranked_load")
+    prohibited = {"PYTHONHOME", "PYTHONPATH", "PATH", "LD_PRELOAD", "LD_LIBRARY_PATH"}
+    if ranked:
+        prohibited.update(ranked["forbidden_env"])
     for row in container.get("env", []):
         name = row["name"]
-        if name in {"PYTHONHOME", "PYTHONPATH", "PATH", "LD_PRELOAD", "LD_LIBRARY_PATH"}:
+        if name in prohibited:
             raise ValueError("LIF01_BOOT_LAUNCH_UNQUALIFIED")
         if name in settings:
             if name in selected_env or row.get("value") != settings[name] or "valueFrom" in row:
                 raise ValueError("LIF01_BOOT_LAUNCH_UNQUALIFIED")
             selected_env[name] = row["value"]
-    protected = [PurePosixPath(path) for path in [source["source_root"], *source["entrypoint"]]]
+    command = source["entrypoint"] if ranked is None else ranked["command"]
+    executable_dirs = [] if ranked is None else ranked["executable_dirs"]
+    protected = [PurePosixPath(path) for path in [source["source_root"], *source["entrypoint"], *executable_dirs]]
     args = container.get("args")
     mounts = [PurePosixPath(row["mountPath"]) for row in container.get("volumeMounts", [])]
-    if (container.get("command") != source["entrypoint"]
+    if (container.get("command") != command
             or type(args) is not list or args != target["comparison_config"]["launch"]["argv"]
             or any(arg.partition("=")[0].replace("_", "-") in source["forbidden_args"]
                    for arg in args if arg.startswith("--"))
@@ -159,7 +219,7 @@ def _verify_launch(target, container, source):
 
 
 def _verify_source(transport, source):
-    files = [{"root": 0, "relative": filename} for filename in sorted(_SOURCE_FILES)]
+    files = [{"root": 0, "relative": filename} for filename in sorted(source["file_sha256"])]
     rows = transport.engine_supply_hashes([source["source_root"]], files)
     observed = {row["relative"]: row["sha256"] for row in rows if row["state"] == "hashed"
                 and type(row["root"]) is int and row["root"] == 0}
@@ -167,9 +227,9 @@ def _verify_source(transport, source):
         raise ValueError("LIF01_BOOT_INSTALLED_SOURCE_MISMATCH")
 
 
-def _load_cost(raw, window, line_number):
+def _load_reports(raw, window, line_number, *, filename="gpu_model_runner.py"):
+    source_filename = filename.encode("ascii")
     started, ready = (_window_stamp(window[key]) for key in ("container_started_at", "ready_at"))
-    matches = []
     for row in raw.split(b"\n")[:-1]:
         if b"Model loading took " not in row:
             continue
@@ -180,13 +240,33 @@ def _load_cost(raw, window, line_number):
         if not started <= event <= ready:
             continue
         match = _COST_LINE.fullmatch(message)
-        if match and int(match[1]) == line_number:
-            matches.append((event, match))
-    (event, match), = matches
+        if match and match["filename"] == source_filename and int(match["line"]) == line_number:
+            yield timestamp, event, match
+
+
+def _reported_cost(event, match):
     return {"stage": "load", "observed_at": event[0].isoformat(),
-            "elapsed_us": int(Decimal(match[3].decode("ascii")) * 1000000),
-            "reported_allocator_delta_centi_gib": int(Decimal(match[2].decode("ascii")) * 100),
+            "elapsed_us": int(Decimal(match["elapsed"].decode("ascii")) * 1000000),
+            "reported_allocator_delta_centi_gib": int(Decimal(match["delta"].decode("ascii")) * 100),
             "allocator_delta_scope": "reported_cuda_torch_allocated_after_minus_before"}
+
+
+def _load_cost(raw, window, line_number):
+    (_, event, match), = _load_reports(raw, window, line_number)
+    return _reported_cost(event, match)
+
+
+def _ranked_load_costs(raw, window, source):
+    ranked = source["ranked_load"]
+    names = {name.encode("ascii"): rank for rank, name in enumerate(ranked["process_names"])}
+    rows = list(_load_reports(raw, window, source["logger_call_linenumber"], filename=ranked["logger_filename"]))
+    processes = {match["process"] for _, _, match in rows}
+    if (len(rows) != len(names) or processes != names.keys()
+            or len({match["pid"] for _, _, match in rows}) != len(names)):
+        raise ValueError("LIF01_BOOT_RANK_REPORT_UNAVAILABLE")
+    return sorted(({"reported_rank": names[match["process"]], "log_timestamp": stamp.decode("ascii"),
+                    **_reported_cost(event, match)} for stamp, event, match in rows),
+                  key=lambda row: row["reported_rank"])
 
 
 class KubernetesNormalStartupLoadExecutor:
@@ -222,10 +302,11 @@ class KubernetesNormalStartupLoadExecutor:
         target_sha = sha256_hex(canonical_json(target))
         if target_sha != expected_target_sha256 or self._expected_target_sha256 not in (None, target_sha):
             raise ValueError
-        source = (_source_profile(adapter, env) if adapter is not None else
-                  _validate_source_profile(get_provider(env.engine.name).evidence_contract("startup_load_source", env)))
+        source = (_source_profile(adapter, env) if adapter is not None else _validate_source_profile(
+            get_provider(env.engine.name).evidence_contract("startup_load_source", env), ranked=env.runtime.tp_size == 2))
         binary = self.cfg.get("kubectl_binary", "kubectl")
-        transport = normal_startup_load_transport(target, env, duration=duration, binary=binary, runner=self.runner)
+        transport = normal_startup_load_transport(
+            target, env, duration=duration, binary=binary, runner=self.runner, allow_ranked=True)
         source_reader = KubernetesHTTP(target, env, duration=duration, binary=binary, runner=self.runner,
             profile=ENGINE_CALLBACK_PROFILE, clock=transport.clock)
         source_reader.deadline = transport.deadline
@@ -255,6 +336,8 @@ class KubernetesNormalStartupLoadExecutor:
             raise ValueError("LIF01_BOOT_TARGET_OR_SOURCE_UNVERIFIED") from None
 
         prefix = target["startup_log_prefix"]
+        ranked = env.runtime.tp_size == 2
+        profile = RANKED_PROFILE if ranked else PROFILE
         observed = None
         failure = "LIF01_BOOT_OWNER_BEFORE_UNVERIFIED"
         try:
@@ -268,22 +351,28 @@ class KubernetesNormalStartupLoadExecutor:
             raw = _read_logs(transport, window, prefix["byte_count"])
             if len(raw) != prefix["byte_count"] or sha256_hex(raw) != prefix["sha256"]:
                 raise ValueError
-            failure = "LIF01_BOOT_LOAD_REPORT_UNAVAILABLE"
-            cost = _load_cost(raw, window, source["logger_call_linenumber"])
+            failure = "LIF01_BOOT_RANK_REPORT_UNAVAILABLE" if ranked else "LIF01_BOOT_LOAD_REPORT_UNAVAILABLE"
+            if ranked:
+                load = {"engine_reported_rank_load_costs": _ranked_load_costs(raw, window, source),
+                        "worker_identity_verified": False}
+            else:
+                cost = _load_cost(raw, window, source["logger_call_linenumber"])
+                load = {"engine_reported_load_cost": cost}
             failure = "LIF01_BOOT_OWNER_AFTER_UNVERIFIED"
             after, container = _ready_window(transport)
             _verify_launch(target, container, source)
             _verify_source(source_reader, source)
             if after == window and not any(t.report()["cleanup_errors"] or t.report()["collection_gap"]
                                            for t in (transport, source_reader)):
-                observed = {"role": "normal", "profile": PROFILE, "engine_reported_load_cost": cost}
+                observed = {"role": "normal", "profile": profile, **load}
         except (AttributeError, KubernetesBindingError, KeyError, OSError, TypeError, ValueError):
             pass
 
         cleanup = sorted(set(transport.report()["cleanup_errors"] + source_reader.report()["cleanup_errors"]))
-        missing = _MISSING + ([] if observed else ["ordinary_model_load_report"])
+        missing = _MISSING + ([] if observed else [
+            "ordinary_rank_load_reports" if ranked else "ordinary_model_load_report"])
         time_budget, violations = None, []
-        if observed:
+        if observed and not ranked:
             # The reviewed log is emitted after the load continues to completion.
             # Its six-decimal seconds can prove a strict overrun of an integer-ms
             # limit. The reported allocation delta cannot prove a peak-byte overrun.
@@ -294,16 +383,18 @@ class KubernetesNormalStartupLoadExecutor:
             if exceeded:
                 violations.append({"reason": "stage_budget_exceeded_without_stop", "stage": "load"})
         settings = {NORMAL_OPTION: True, "max_duration_seconds": duration, "boot_log_cap": _LIMIT,
-                    "source_file_roles": sorted(_SOURCE_FILES)}
+                    "source_file_roles": sorted(source["file_sha256"])}
         conditions_sha = (sha256_hex(canonical_json(execution_conditions(target, settings, [])))
                           if observed and target.get("comparison_config") else None)
-        summary = {"profile": PROFILE, "target_sha256": target_sha, "environment_sha256": env.ref().sha256,
+        summary = {"profile": profile, "target_sha256": target_sha, "environment_sha256": env.ref().sha256,
                    "binding_sha256": transport.report()["binding_sha256"], "fixed_boot_prefix": prefix,
                    "installed_source_sha256": source["file_sha256"] if observed else None,
                    "source_log_call_linenumber": source["logger_call_linenumber"] if observed else None,
                    "observation": observed, "conditions_sha256": conditions_sha, "missing": missing,
                    "reported_load_time_budget": time_budget,
                    "gap": None if observed else failure}
+        if ranked:
+            summary["source_log_call_filename"] = source["ranked_load"]["logger_filename"] if observed else None
         error = None if observed else failure
         artifacts = []
         try:
@@ -328,7 +419,7 @@ class KubernetesNormalStartupLoadExecutor:
                           "supply_boot_missing": {"value": missing, "collected": True},
                           "supply_boot_complete": {"value": False, "collected": True},
                           "supply_boot_record_authenticated": {"value": False, "collected": True}},
-            comparability={"fixture_sha256": sha256_hex(canonical_json({"profile": PROFILE, "source_scope": "ordinary_load"})),
+            comparability={"fixture_sha256": sha256_hex(canonical_json({"profile": profile, "source_scope": "ordinary_load"})),
                            "config_sha256": conditions_sha, "model_inventory_sha256": env.model.inventory_sha256,
                            "gpu": env.runtime.gpu_model, "driver": env.runtime.driver, "cpu": env.runtime.cpu},
             config={NORMAL_OPTION: True, "target_sha256": target_sha}, artifacts=artifacts,

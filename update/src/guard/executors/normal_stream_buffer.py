@@ -1,5 +1,6 @@
 """Collect LIF-04 normal-stream and owned container memory observations."""
 
+from datetime import datetime, timezone
 from pathlib import PurePosixPath
 import re
 import uuid
@@ -77,14 +78,25 @@ def _engine_pod_isolated(pod, container):
     return not any(path.is_relative_to(mount) or mount.is_relative_to(path) for path in protected for mount in mounts)
 
 
-def memory_sample(transport, stage):
-    row = {'stage': stage, 'started_at': utcnow().isoformat(), 'collected': False,
+def _memory_time():
+    return datetime.now(timezone.utc)
+
+
+def memory_sample(transport, stage, valid_from, valid_until):
+    started = _memory_time()
+    row = {'stage': stage, 'started_at': started.isoformat(), 'collected': False,
            'memory_current_bytes': None, 'domain_sha256': None, 'source_sha256': MEMORY_SOURCE_SHA256}
+    window_gap = 'STREAM_BUFFER_OWNED_MEMORY_POLICY_WINDOW_UNVERIFIED'
+    if not valid_from <= started <= valid_until:
+        return {**row, 'finished_at': started.isoformat(), 'diagnostic': window_gap}
     try:
         base = transport.base
         engine = base.binding['engine']
         if not _engine_pod_isolated(base._verify(capture_snapshot=True)['engine'], engine['container']):
             raise ValueError()
+        ready_to_read = _memory_time()
+        if not started <= ready_to_read <= valid_until:
+            return {**row, 'finished_at': ready_to_read.isoformat(), 'diagnostic': window_gap}
         sample = base._call([f"--namespace={engine['namespace']}", 'exec', engine['pod'],
             f"--container={engine['container']}", '--', 'python3', '-I', '-S', '-B', '-c', MEMORY_SOURCE],
             cap=1024, budget=5)
@@ -95,10 +107,16 @@ def memory_sample(transport, stage):
                 or not 0 <= sample['memory_current_bytes'] < 2**63 or type(sample['domain_sha256']) is not str
                 or re.fullmatch('[0-9a-f]{64}', sample['domain_sha256']) is None):
             raise ValueError()
-        row.update(collected=True, memory_current_bytes=sample['memory_current_bytes'], domain_sha256=sample['domain_sha256'])
     except (KeyError, ValueError, TypeError, OSError, RuntimeError):
+        sample = None
+    finished = _memory_time()
+    if not started <= finished <= valid_until:
+        row['diagnostic'] = window_gap
+    elif sample is None:
         row['diagnostic'] = 'STREAM_BUFFER_OWNED_MEMORY_SAMPLE_UNAVAILABLE'
-    row['finished_at'] = utcnow().isoformat()
+    else:
+        row.update(collected=True, memory_current_bytes=sample['memory_current_bytes'], domain_sha256=sample['domain_sha256'])
+    row['finished_at'] = finished.isoformat()
     return row
 
 
@@ -133,7 +151,7 @@ def collect(ctx, start, end):
             missing.append('STREAM_BUFFER_NORMAL_CONTROL_INCOMPLETE')
             break
         if slot != 'normal-after':
-            samples.append(memory_sample(ctx.cprobe, 'before-stream' if slot == 'normal-before' else 'after-stream'))
+            samples.append(memory_sample(ctx.cprobe, 'before-stream' if slot == 'normal-before' else 'after-stream', start, end))
     same_domain = (len(samples) == 2 and all(sample['collected'] for sample in samples)
                    and samples[0]['domain_sha256'] == samples[1]['domain_sha256'])
     if not same_domain:

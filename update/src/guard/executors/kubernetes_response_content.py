@@ -12,11 +12,13 @@ import os
 from pathlib import Path
 import stat
 
-from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
+from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import RESPONSE_CONTENT_PROFILE, KubernetesBindingError, KubernetesHTTP
 from guard.runtime.kubernetes_routes import KubernetesRoutesHTTP
-from .http_common import Ctx
+from .base import DraftArtifact, EvidenceDraft
+from .http_common import Ctx, incomplete_artifact_capture
+from . import kubernetes_response_snapshot as snapshot
 from .response_content import ResponseContentExecutor
 
 _SETTINGS = {"target", "endpoint", "kubectl_binary", "request_timeout", "max_duration_seconds", "route_target", "allowed_key_env"}
@@ -68,13 +70,25 @@ class _Legs:
 class KubernetesResponseContentExecutor(ResponseContentExecutor):
     version = "0.2.1+k8s.1"
 
-    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None, expected_route_target_sha256=None):
+    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None, expected_route_target_sha256=None,
+                 expected_manifest_sha256=None, expected_policy_sha256=None, expected_target_file_sha256=None,
+                 expected_policy_validity=None):
         super().__init__(cfg, environ=environ)
         self._kubectl_runner = runner
         self._expected_target_sha256 = expected_target_sha256
         self._expected_route_target_sha256 = expected_route_target_sha256
+        self._expected_manifest_sha256 = expected_manifest_sha256
+        self._expected_policy_sha256 = expected_policy_sha256
+        self._expected_target_file_sha256 = expected_target_file_sha256
+        self._expected_policy_validity = expected_policy_validity
 
     def validate_configuration(self, check):
+        if snapshot.OPTION in self.cfg or snapshot.INPUT in self.cfg:
+            if (check.id != "REQ-13" or check.executor != self.name or self.cfg.get(snapshot.OPTION) is not True
+                    or set(self.cfg) != {"target", snapshot.OPTION, snapshot.INPUT}
+                    or self._expected_route_target_sha256 is not None):
+                raise ValueError(snapshot.INVALID)
+            return
         if type(self.cfg) is not dict or set(self.cfg) - _SETTINGS:
             raise ValueError(CONFIGURATION_INVALID)
         if ("route_target" in self.cfg) != ("allowed_key_env" in self.cfg):
@@ -85,6 +99,80 @@ class KubernetesResponseContentExecutor(ResponseContentExecutor):
             super().validate_configuration(check)
         finally:
             self.cfg = saved
+
+    def validate_policy(self, check, values):
+        super().validate_policy(check, values)
+        if (self.cfg.get(snapshot.OPTION) is True
+                and (set(values) != {"allowed_response_fields", "allowed_error_fields", "forbidden_return_options", "required_targets"}
+                     or values["required_targets"] != ["gateway"])):
+            raise ValueError(snapshot.INVALID)
+
+    def prepared_response_snapshot(self, check, env, values, *, expected_target_sha256, expected_manifest_sha256,
+                                   expected_policy_sha256, policy_validity=None):
+        """Qualify the independently pinned ordinary response without dispatch or key lookup."""
+        self.validate_policy(check, values)
+        if self.cfg.get(snapshot.OPTION) is not True:
+            raise ValueError(snapshot.INVALID)
+        for stored, expected in ((self._expected_target_sha256, expected_target_sha256),
+                                 (self._expected_manifest_sha256, expected_manifest_sha256),
+                                 (self._expected_policy_sha256, expected_policy_sha256)):
+            if stored is not None and stored != expected:
+                raise ValueError(snapshot.INVALID)
+        if policy_validity is None:
+            policy_validity = self._expected_policy_validity
+        elif self._expected_policy_validity is not None and policy_validity != self._expected_policy_validity:
+            raise ValueError(snapshot.INVALID)
+        return snapshot.verified_snapshot(self.cfg, env, target_sha256=expected_target_sha256,
+            manifest_sha256=expected_manifest_sha256, guard_policy_sha256=expected_policy_sha256,
+            target_file_sha256=self._expected_target_file_sha256, policy_validity=policy_validity, policy_values=values)
+
+    def _run_response_snapshot(self, check, env, values, workdir):
+        if self._expected_target_file_sha256 is None:
+            raise ValueError(snapshot.INVALID)
+        started = utcnow()
+        proof = self.prepared_response_snapshot(check, env, values,
+            expected_target_sha256=self._expected_target_sha256, expected_manifest_sha256=self._expected_manifest_sha256,
+            expected_policy_sha256=self._expected_policy_sha256)
+        gaps = ["gateway: error responses, private context and return options were not exercised"]
+        response_only = proof["profile"] == snapshot.RESPONSE_ONLY_PROFILE
+        if response_only:
+            gaps.append("gateway: independent access audit and denial were not observed")
+        observations = {obs.key: {"collected": False, "value": None} for obs in check.required_observations}
+        for key, value in {
+            "response_coverage_complete": False, "response_coverage_gaps": gaps,
+            "response_cases_tested": ["gateway:normal"], "response_fields_seen": proof["response_fields_seen"],
+            "response_targets_tested": ["gateway"],
+        }.items():
+            observations[key] = {"collected": True, "value": value}
+        self.version = "0.2.1+k8s-req13-response-only.1" if response_only else "0.2.1+k8s-req13-snapshot.1"
+        conditions = {"profile": proof["profile"], "target": proof["target_sha256"],
+                      "manifest_sha256": proof["manifest_sha256"], "policy_sha256": proof["guard_policy_sha256"]}
+        comparison = {"profile": proof["profile"], "policy": values}
+        if response_only and "transport_origin" in proof:
+            comparison["transport_origin"] = proof["transport_origin"]
+        draft = EvidenceDraft(
+            status=ExecStatus.COMPLETED,
+            data_origin=DataOrigin.EXAMPLE if (self._kubectl_runner is not None or env.data_origin == DataOrigin.EXAMPLE
+                or proof.get("guard_policy_data_origin") == DataOrigin.EXAMPLE.value) else DataOrigin.MEASURED,
+            normal_control={"attempted": True, "succeeded": True, "detail": "Verified one retained ordinary Gateway response."},
+            challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
+            observations=observations, config=conditions,
+            started_at=started, finished_at=utcnow(),
+            comparability={
+                "fixture_sha256": proof["request_fixture_sha256"],
+                "config_sha256": sha256_hex(canonical_json(comparison)),
+                "model_inventory_sha256": env.model.inventory_sha256, "gpu": env.runtime.gpu_model,
+                "driver": env.runtime.driver, "cpu": env.runtime.cpu,
+            })
+        path = workdir / "response_samples.json"
+        try:
+            workdir.mkdir(parents=True, exist_ok=True)
+            with path.open("xb") as stream:
+                stream.write(canonical_json({"snapshot": proof, "coverage_gaps": gaps}))
+        except OSError:
+            return incomplete_artifact_capture(draft)
+        draft.artifacts.append(DraftArtifact(name=path.name, path=path, collector=f"{self.name}/{self.version}"))
+        return draft
 
     def _gateway_transport(self, target, env, *, bounded=False):
         pinned = self._expected_route_target_sha256
@@ -130,6 +218,9 @@ class KubernetesResponseContentExecutor(ResponseContentExecutor):
             raise ValueError(CONFIGURATION_INVALID) from None
 
     def run(self, check, env, policy_values, adapter, workdir):
+        if snapshot.OPTION in self.cfg or snapshot.INPUT in self.cfg:
+            return self._run_response_snapshot(check, env, policy_values, workdir)
+        self.version = "0.2.1+k8s.1"
         try:
             if adapter is None:
                 raise ValueError

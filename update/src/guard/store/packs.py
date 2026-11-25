@@ -13,6 +13,7 @@ from pathlib import Path
 from guard.models import Pack, Ref, canonical_json, load_pack, sha256_hex
 from guard.models.checkdef import PackIntegrityError, build_pack
 
+from .integrity import is_content_digest
 from .sqlite import Store
 
 
@@ -20,10 +21,12 @@ class PackNotStoredError(LookupError):
     pass
 
 
-def put_pack(store: Store, pack_dir: Path) -> Ref:
+def put_pack(store: Store, pack_dir: Path, *, expected_ref: Ref | None = None) -> Ref:
     """팩 폴더를 검증한 뒤 보존본으로 저장한다. 같은 내용은 한 번만 저장된다."""
     pack = load_pack(pack_dir)  # 폴더 해시 검증
     ref = pack.ref()
+    if expected_ref is not None and ref != expected_ref:
+        raise PackIntegrityError("pack source changed before storing the PLAN's snapshot")
     manifest_bytes = canonical_json(pack.manifest.model_dump(mode="json"))
     assert sha256_hex(manifest_bytes) == ref.sha256
     for f in pack.manifest.files_sha256:
@@ -36,20 +39,31 @@ def put_pack(store: Store, pack_dir: Path) -> Ref:
 
 def get_pack(store: Store, ref: Ref) -> Pack:
     """PLAN이 가리키는 팩 Ref로 보존본을 읽는다. 없거나 Ref(id·revision·sha256)와 다르면 거부."""
-    mpath = store.root / "artifacts" / ref.sha256
-    if ref.kind != "PACK" or not mpath.exists():
+    artifacts = store.root / "artifacts"
+    if ref.kind != "PACK" or not is_content_digest(ref.sha256):
+        raise PackIntegrityError("invalid stored pack reference")
+    mpath = artifacts / ref.sha256
+    if artifacts.is_symlink() or mpath.is_symlink() or not mpath.is_file():
         raise PackNotStoredError(f"pack {ref.id} rev {ref.revision} is not stored in {store.root}")
     raw = mpath.read_bytes()
     if sha256_hex(raw) != ref.sha256:
         raise PackIntegrityError(f"stored manifest for {ref.id} rev {ref.revision} is corrupted")
     manifest = json.loads(raw)
+    if not isinstance(manifest, dict):
+        raise PackIntegrityError("stored pack manifest is not an object")
     if manifest.get("pack_id") != ref.id or manifest.get("revision") != ref.revision:
         raise PackNotStoredError(f"stored manifest is {manifest.get('pack_id')} rev {manifest.get('revision')}, "
                                  f"not {ref.id} rev {ref.revision}")
+    entries = manifest.get("files_sha256")
+    if not isinstance(entries, list) or any(
+        not isinstance(entry, dict) or not isinstance(entry.get("path"), str)
+        or not is_content_digest(entry.get("sha256")) for entry in entries
+    ):
+        raise PackIntegrityError("invalid stored pack file references")
     files = {}
-    for f in manifest["files_sha256"]:
-        p = store.root / "artifacts" / f["sha256"]
-        if not p.exists():
+    for f in entries:
+        p = artifacts / f["sha256"]
+        if p.is_symlink() or not p.is_file():
             raise PackIntegrityError(f"stored pack file missing: {f['path']}")
         files[f["path"]] = p.read_bytes()
     pack = build_pack(manifest, files, source="store")

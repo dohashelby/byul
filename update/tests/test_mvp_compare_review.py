@@ -1,5 +1,6 @@
 """Read-only work-order counts from real product object graphs with synthetic evidence."""
 from copy import deepcopy
+from datetime import timedelta
 import json
 
 import pytest
@@ -15,7 +16,7 @@ from guard.store.packs import put_pack
 from guard.update_acceptance import assess_update
 from tests import update_builders as builders
 from tests import test_passive_api_hop as passive_fixtures
-from tests.builders import T0
+from tests.builders import T0, dummy_ref, environment
 from tests.test_update_acceptance import patch_case
 from tests.test_passive_api_hop import paired_controls
 from tools import mvp_compare_review as tool
@@ -149,6 +150,87 @@ def test_config_difference_keeps_real_verdict_and_exact_blocker():
     assert 'REQ-01' in result['unresolved_check_ids']
 
 
+@pytest.mark.parametrize('mismatch', ['between-sides', 'with-report'])
+def test_paired_measurement_requires_the_original_execution_attempt(mismatch):
+    case = builders.build_pure_update_case()
+    if mismatch == 'between-sides':
+        case = patch_case(case, 'EVD', lambda obj: obj['execution'].update(attempt_id='ATTEMPT-DISTINCT'),
+                          lambda obj: obj['check_id'] == 'REQ-01' and obj['side'] == 'candidate')
+    else:
+        case = patch_case(case, 'RPT', lambda obj: obj.update(execution_attempt_id='ATTEMPT-DISTINCT'))
+
+    result = tool.review([case], pack=case[2], expected=_expected(case))
+    row = result['rows']['REQ-01']
+    assert result['reports'][0]['verified']
+    assert row['status'] == 'ORIGINAL_ROW_UNRESOLVED'
+    assert row['comparison_reasons'] == ['EXECUTION_ATTEMPT_INCOMPLETE_OR_DIFFERENT']
+    assert 'ORIGINAL_RPT_COMPARISON_MISMATCH' in row['blocking_codes']
+    assert all(row[side]['verdicts']['security'] == 'PASS' for side in tool.SIDES)
+    assert not result['paired_execution_complete']
+
+
+@pytest.mark.parametrize('source', ['report', 'result', 'created_at'])
+def test_verification_replays_at_the_recorded_decision_time(monkeypatch, source):
+    case = builders.build_pure_update_case()
+    generated_at = T0 + timedelta(hours=1)
+
+    def adjust_report(report):
+        report['created_at'] = generated_at.isoformat()
+        if source != 'report':
+            report.pop('as_of')
+
+    if source != 'result':
+        case = patch_case(case, 'RES', lambda result: result.pop('as_of'))
+    case = patch_case(case, 'RPT', adjust_report)
+
+    observed_times = []
+    judge_evidence = tool.judge_evidence
+
+    def record_replay(check, evd, policy, as_of, **kwargs):
+        observed_times.append(as_of)
+        return judge_evidence(check, evd, policy, as_of, **kwargs)
+
+    monkeypatch.setattr(tool, 'judge_evidence', record_replay)
+    verification = tool.review([case], pack=case[2], expected=_expected(case))
+    assert verification['rows']['REQ-01']['status'] == 'MEASURED_ROWS_VERIFIED'
+    assert set(observed_times) == {generated_at if source == 'created_at' else T0}
+
+
+def test_conflicting_report_and_result_decision_times_prevent_pair_verification():
+    case = builders.build_pure_update_case()
+    foreign_time = (T0 + timedelta(hours=1)).isoformat()
+    case = patch_case(case, 'RES', lambda result: result.update(as_of=foreign_time),
+                      lambda result: result['check_id'] == 'REQ-01' and result['side'] == 'candidate')
+    verification = tool.review([case], pack=case[2], expected=_expected(case))
+    row = verification['rows']['REQ-01']
+    assert verification['reports'][0]['verified']
+    assert row['status'] == 'ORIGINAL_ROW_UNRESOLVED'
+    assert row['candidate']['blocking_codes'] == ['ORIGINAL_RESULT_DECISION_TIME_MISMATCH']
+    assert row['candidate']['verdicts'] is None
+    assert row['baseline']['verdicts']['security'] == 'PASS'
+
+
+@pytest.mark.parametrize('field', ['as_of', 'exception'])
+def test_invalid_decision_metadata_only_prevents_verifying_the_affected_side(field):
+    case = builders.build_pure_update_case()
+    if field == 'as_of':
+        case = patch_case(case, 'RPT', lambda report: report.pop('as_of'))
+        value = T0.replace(tzinfo=None).isoformat()
+        blocker = 'ORIGINAL_RESULT_DECISION_TIME_INVALID'
+    else:
+        value = {'check_id': 'REQ-01', 'expires_at': (T0 + timedelta(hours=1)).isoformat()}
+        blocker = 'ORIGINAL_RESULT_REPLAY_MISMATCH'
+    case = patch_case(case, 'RES', lambda result: result.update({field: value}),
+                      lambda result: result['check_id'] == 'REQ-01' and result['side'] == 'candidate')
+    verification = tool.review([case], pack=case[2], expected=_expected(case))
+    assert verification['reports'][0]['verified']
+    row = verification['rows']['REQ-01']
+    assert row['candidate']['blocking_codes'] == [blocker]
+    assert row['candidate']['verdicts'] is None
+    assert row['baseline']['verdicts']['security'] == 'PASS'
+    assert verification['rows']['PLT-01']['status'] == 'MEASURED_ROWS_VERIFIED'
+
+
 @pytest.mark.parametrize('status', ['NOT_RUN', 'ABORTED'])
 def test_unfinished_execution_retains_exact_refs_as_an_unresolved_side(status):
     def unfinished(cid, side, raw):
@@ -174,12 +256,106 @@ def test_unfinished_execution_retains_exact_refs_as_an_unresolved_side(status):
     assert not result['paired_execution_complete']
 
 
+@pytest.mark.parametrize('clock', ['mixed', 'naive'])
+def test_invalid_execution_clock_only_prevents_verifying_the_affected_side(clock):
+    case = builders.build_pure_update_case()
+
+    def change_clock(evd):
+        evd['execution']['started_at'] = T0.replace(tzinfo=None).isoformat()
+        if clock == 'naive':
+            evd['execution']['finished_at'] = (T0.replace(tzinfo=None) + timedelta(seconds=1)).isoformat()
+
+    case = patch_case(case, 'EVD', change_clock,
+                      lambda evd: evd['check_id'] == 'REQ-01' and evd['side'] == 'candidate')
+    verification = tool.review([case], pack=case[2], expected=_expected(case))
+    assert verification['reports'][0]['verified']
+    row = verification['rows']['REQ-01']
+    assert row['candidate']['blocking_codes'] == ['ORIGINAL_EXECUTION_TIME_INVALID']
+    assert row['candidate']['verdicts'] is None
+    assert row['baseline']['verdicts']['security'] == 'PASS'
+    assert verification['rows']['PLT-01']['status'] == 'MEASURED_ROWS_VERIFIED'
+
+
+@pytest.mark.parametrize(('execution_note', 'reported'), [
+    ({'cleanup_errors': ['Synthetic cleanup failure']}, 'PASS'),
+    ({'abort_reason': 'Synthetic conflicting completion'}, 'FAIL'),
+])
+def test_conflicting_completion_keeps_reported_verdict_without_verifying_it(execution_note, reported):
+    case = builders.build_pure_update_case(candidate_fail=reported == 'FAIL')
+    case = patch_case(case, 'EVD', lambda evd: evd['execution'].update(execution_note),
+                      lambda evd: evd['check_id'] == 'REQ-01' and evd['side'] == 'candidate')
+    verification = tool.review([case], pack=case[2], expected=_expected(case))
+    row = verification['rows']['REQ-01']
+    assert row['candidate']['execution_status'] == 'COMPLETED'
+    assert row['candidate']['reported_security'] == reported
+    assert row['candidate']['blocking_codes'] == ['EXECUTION_OR_CLEANUP_UNRESOLVED']
+    assert row['candidate']['verdicts'] is None
+    assert row['baseline']['verdicts']['security'] == 'PASS'
+    assert 'REQ-01' in verification['execution_coverage']['candidate']['unverified']
+
+
 def test_repeated_original_rows_never_choose_a_result_implicitly():
     case = builders.build_pure_update_case()
     result = tool.review([case, case], pack=case[2], expected=_expected(case))
     assert result['rows']['REQ-01']['status'] == 'ORIGINAL_ROW_AMBIGUOUS'
     assert len(result['rows']['REQ-01']['reports']) == 2
     assert not result['comparison_complete']
+
+
+@pytest.mark.parametrize('scope', [
+    'full', 'seven-unknown', 'unofficial', 'two-reports', 'unselected', 'not-run',
+    'unknown-gateway', 'missing-policy', 'different-capture',
+])
+def test_official_goal_requires_one_official_report_with_all_69_paired_completions(monkeypatch, scope):
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    # Exercise aggregation independently of original object validation.
+    facts = {} if scope == 'unknown-gateway' else {
+        'gateway': {'value': True, 'origin': 'DECLARED', 'source': 'synthetic fixture'},
+    }
+    env = environment(origin=DataOrigin.DECLARED, facts=facts)
+    side = {'execution_status': 'COMPLETED', 'reported_security': 'PASS', 'blocking_codes': []}
+    completed = {'selected': True, 'selection_gaps': [],
+                 'comparison': 'NO_CHANGE', 'functional_comparison': 'NO_CHANGE',
+                 'comparison_reasons': [], 'blocking_codes': [], **dict.fromkeys(tool.SIDES, side)}
+    rows = {check.id: {**deepcopy(completed), 'applicability': tool.evaluate_check(check, [env])[0].value}
+            for check in pack.active_checks()}
+    refs = {key: dummy_ref(kind).model_dump(mode='json') for key, kind in [('report', 'RPT'), ('policy', 'POL')]}
+    unknown_count = 7 if scope == 'seven-unknown' else 6
+    for child in list(rows.values())[:unknown_count]:
+        child['baseline'] = {**child['baseline'], 'reported_security': 'UNKNOWN'}
+        child['comparison'] = 'UNKNOWN'
+    check_id = next(reversed(rows))
+    if scope == 'unselected':
+        rows[check_id] = {'selected': False, 'applicability': 'NOT_APPLICABLE'}
+    elif scope == 'not-run':
+        rows[next(iter(rows))]['baseline'].update(
+            execution_status='NOT_RUN', blocking_codes=['EXECUTION_NOT_RUN'])
+    elif scope == 'missing-policy':
+        rows['SUP-05']['selection_gaps'] = ['NO_POLICY_VALUE']
+    elif scope == 'different-capture':
+        rows['SUP-05']['comparison_reasons'] = ['fixture_sha256']
+
+    case = ({}, [], pack)
+    original_reports = [case]
+    retained = [(rows, refs, scope != 'unofficial')]
+    if scope == 'two-reports':
+        # Complementary original scopes can satisfy the archive aggregation.
+        remainder = {key: rows.pop(key) for key in list(rows)[1:]}
+        other_refs = {**refs, 'report': {**refs['report'], 'id': 'RPT-SYNTHETIC-SECOND'}}
+        original_reports.append(case)
+        retained.append((remainder, other_refs, True))
+
+    verified = iter(retained)
+    monkeypatch.setattr(tool, '_verified_rows', lambda *args: next(verified))
+    result = tool.review(original_reports, pack=pack, expected={})
+    assert result['official_comparison_goal_met'] is (scope == 'full')
+    assert result['active_checks'] == 69
+    if scope in ('full', 'two-reports', 'unselected', 'unofficial'):
+        assert result['paired_execution_complete']
+    if scope == 'full':
+        assert result['unknown_security_count'] == 6
+        assert result['rows']['SUP-05']['blocking_codes'] == ['SELECTION_UNRESOLVED']
+        assert not result['comparison_complete']
 
 
 def test_explicit_exact_original_report_ref_resolves_overlapping_plans():

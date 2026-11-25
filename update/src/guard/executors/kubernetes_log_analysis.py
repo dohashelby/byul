@@ -32,7 +32,7 @@ def _runner_status(returncode, pipes):
 
 class KubernetesLogAnalysisExecutor(KubernetesContainerConfigExecutor):
     name = 'log_analysis'
-    version = '0.1.0+k8s-normal'
+    version = '0.1.1+k8s-normal'
 
     def validate_policy(self, check, values):
         if check.id != 'OBS-03':
@@ -119,7 +119,7 @@ class KubernetesLogAnalysisExecutor(KubernetesContainerConfigExecutor):
             gaps.append('OWNED_ENGINE_LOG_UNAVAILABLE')
         ctx._normal_log_cleanup = list(log_transport.report()['cleanup_errors'])
         observed = protect_analysis(analyze_log_captures(captures, ctx.policy_values, {}, correlation,
-            initial_gaps=gaps, profile=STRICT_JSON_PROFILE), ctx.policy_values)
+            initial_gaps=gaps, profile=STRICT_JSON_PROFILE, strict_cri_timestamps=True), ctx.policy_values)
         # The response and log strings never enter EVD or the status summary.
         fixture = {'profile': PROFILE, 'target_source': 'owned-engine-pod-stdout', 'logical_request': LOGICAL_ID,
                    'policy_sha256': sha256(canonical_json(ctx.policy_values)).hexdigest()}

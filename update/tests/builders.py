@@ -137,3 +137,12 @@ def evidence(
         else req01_obs(),
         **kw,
     ).seal()
+
+
+def run_under_plan_lock(store, pack, plan, cfg, *, only_side=None):
+    """Exercise isolated collectors with the same PLAN lock as the update coordinator."""
+    from guard.core.execution_recipe import execution_lock
+    from guard.core.run import run_plan_locked
+
+    with execution_lock(store.root, plan.id):
+        return run_plan_locked(store, pack, plan, cfg, only_side=only_side)

@@ -15,7 +15,7 @@ from guard.core.judge import judge_evidence
 from guard.core.run import _normalize
 from guard.executors.initialization_contract import normalize_policy
 from guard.executors.registry import build_executor
-from guard.models import Evidence,canonical_json,load_pack,sha256_hex,utcnow
+from guard.models import Evidence,ExecStatus,canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
 from tests.builders import baseline_pack,dummy_ref,policy,T0
@@ -28,6 +28,7 @@ from tools.build_kubernetes_initialization_pack import derive
 
 PRIVATE='EXAMPLE_INITIALIZATION_PRODUCT_PRIVATE'
 RELEASE_IMAGE = 'docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40'
+CENSUS_MODES = {'worker-census-match', 'worker-census-foreign-parent', 'worker-census-reused-pid'}
 
 
 class World(BaseWorld):
@@ -38,15 +39,49 @@ class World(BaseWorld):
         self.native_added=True
         world=make_world(self.group.prepared['session'],'partial-failure' if self.mode=='partial-failure' else 'normal',
                          profile=self.group.prepared['profile'])
+        if self.mode in {'worker-pids-match', 'worker-pids-mismatch', 'ready-status-unqualified'} | CENSUS_MODES:
+            make_worker = world.module.WorkerProc.make_worker_process
+
+            def labeled_worker(**kwargs):
+                worker = make_worker(**kwargs)
+                worker.proc._popen.pid = 3100 + worker.rank
+                return worker
+
+            world.module.WorkerProc.make_worker_process = staticmethod(labeled_worker)
+            if self.mode == 'worker-pids-mismatch':
+                from_handle = world.module.WorkerProcHandle.from_unready_handle
+
+                def mismatched_worker(handle, mq, peer_worker_response_mqs):
+                    worker = from_handle(handle, mq, peer_worker_response_mqs)
+                    if worker.rank == 1:
+                        worker.proc = deepcopy(worker.proc)
+                        worker.proc._popen.pid = 3210
+                    return worker
+
+                world.module.WorkerProcHandle.from_unready_handle = staticmethod(mismatched_worker)
+        if self.mode == 'missing-executor-identity':
+            native_init = world.module.MultiprocExecutor._init_executor
+            world.executor._init_executor = lambda: native_init(self=world.executor)
         try:invoke(world)
         except Exception:
             assert self.mode=='partial-failure'
         additions=deepcopy(world.observer.recorded)
+        if self.mode == 'ready-status-unqualified':
+            for event in additions:
+                row = event['payload']
+                if (event['event'] == 'INITIALIZATION' and row['point'] == 'WorkerProc.wait_for_response_handle_ready'
+                        and row['expected_handles'][0]['rank'] == 1):
+                    row['response_status'] = 'other'
         if self.mode=='mp-unobserved':additions=[r for r in additions if r['event']!='INITIALIZATION']
         if self.mode=='invalid-native':next(r['payload'] for r in additions if r['event']=='INITIALIZATION')['service_gate_verified']=True
         def change(rows):
             rows[-1:-1]=additions;rows[-1]['monotonic_ns']=max(rows[-1]['monotonic_ns'],additions[-1]['monotonic_ns'])
-        self.group.raw_by_pid[42]=revised(self.group.raw_by_pid[42],change)
+        raw = revised(self.group.raw_by_pid[42], change)
+        if self.mode == 'incomplete-source':
+            rows = raw.splitlines(keepends=True)
+            assert json.loads(rows[-1])['event'] == 'END'
+            raw = b''.join(rows[:-1])
+        self.group.raw_by_pid[42] = raw
     def runner(self,argv,**kwargs):
         if 'exec' in argv and 'input_bytes' in kwargs:
             request,=json.loads(kwargs['input_bytes'])['requests'];self.sent.append(request)
@@ -65,6 +100,18 @@ class World(BaseWorld):
             return {'returncode':0,'stdout_bytes':canonical_json([row]),'stderr_bytes':PRIVATE.encode(),'capture':pipe}
         if self.mode=='dead-process' and 'exec' in argv and any('guard-lifecycle-process-context/1' in v for v in argv):raise OSError(PRIVATE)
         result=super().runner(argv,**kwargs)
+        if self.mode in CENSUS_MODES and 'exec' in argv:
+            packet = json.loads(result['stdout_bytes'])
+            if packet.get('schema') == 'guard-lifecycle-session-inventory/1':
+                executor, = [row for row in packet['processes'] if row['pid'] == 42]
+                for rank in (0, 1):
+                    row = {**executor, 'pid': 3100 + rank, 'parent_pid': 42, 'start_ticks': executor['start_ticks'] + 1}
+                    if rank == 1 and self.mode == 'worker-census-foreign-parent':
+                        row['parent_pid'] = 43
+                    if rank == 1 and self.mode == 'worker-census-reused-pid' and self.native.inventories == 2:
+                        row['start_ticks'] += 1
+                    packet['processes'].append(row)
+                result['stdout_bytes'] = canonical_json(packet)
         if 'get' in argv:
             value=json.loads(result['stdout_bytes'])
             if 'namespaces' in argv:
@@ -170,6 +217,17 @@ def test_registered_cli_preparation_and_aggregate_claims_exact_refs(tmp_path,gro
 @pytest.mark.parametrize(('check_id', 'mode', 'profile'), [
     ('LIF-07', 'normal', sensor.PROFILE), ('LIF-09', 'normal', init_release.PROFILE),
     ('LIF-07', 'dead-process', sensor.PROFILE), ('LIF-09', 'before-shape', sensor.PROFILE),
+    ('LIF-07', 'worker-pids-match', sensor.PROFILE), ('LIF-07', 'worker-pids-mismatch', sensor.PROFILE),
+    ('LIF-09', 'worker-pids-match', init_release.PROFILE), ('LIF-09', 'worker-pids-mismatch', init_release.PROFILE),
+    ('LIF-07', 'worker-pids-match', init_release.PROFILE), ('LIF-09', 'worker-pids-match', sensor.PROFILE),
+    ('LIF-07', 'ready-status-unqualified', init_release.PROFILE),
+    ('LIF-07', 'incomplete-source', init_release.PROFILE), ('LIF-09', 'incomplete-source', sensor.PROFILE),
+    ('LIF-07', 'missing-executor-identity', init_release.PROFILE),
+    ('LIF-09', 'missing-executor-identity', sensor.PROFILE),
+    ('LIF-07', 'worker-census-match', sensor.PROFILE),
+    ('LIF-09', 'worker-census-match', init_release.PROFILE),
+    ('LIF-07', 'worker-census-foreign-parent', init_release.PROFILE),
+    ('LIF-09', 'worker-census-reused-pid', sensor.PROFILE),
 ])
 def test_canonical_initialization_evidence_preserves_bound_positive_steps(tmp_path, group, native_target, monkeypatch,
                                                                        check_id, mode, profile):
@@ -192,7 +250,7 @@ def test_canonical_initialization_evidence_preserves_bound_positive_steps(tmp_pa
     observed = {key: item.value for key, item in evidence.observations.items() if item.collected}
     native = [row for row in observed['activation_steps'] if row['step'] == 'native-initialization-correspondence']
     controls = [row for row in observed['activation_steps'] if row['step'] == 'direct-initialization-normal-control']
-    assert bool(native) == (mode != 'dead-process')
+    assert bool(native) == (mode not in {'dead-process', 'incomplete-source', 'missing-executor-identity'})
     assert len(controls) == (1 if mode == 'before-shape' else 2)
     assert all(row['same_process_interval_observed'] and row['required_rank_ready_return_observed'] for row in native)
     source = (init_release if profile == init_release.PROFILE else sensor).SOURCE_ADDITIONS[sensor.MP]
@@ -200,7 +258,28 @@ def test_canonical_initialization_evidence_preserves_bound_positive_steps(tmp_pa
     artifact, = [item for item in draft.artifacts if item.name == 'probe_log.jsonl']
     summary = json.loads(artifact.path.read_text().splitlines()[-1])
     assert summary['summary'] is True
+    if mode == 'incomplete-source':
+        digest = sha256_hex(group.raw_by_pid[42])
+        capture, = [recording['capture'] for recording in summary['native']['recordings']
+                    if recording['capture'] and recording['capture']['provenance']['capture_sha256'] == digest]
+        assert capture['process_context_verified'] and capture['provenance']['owner_binding_verified']
+        assert not capture['summary']['recording_closed'] and capture['summary']['discarded_tail_bytes'] == 0
+        unclosed, = summary['projection']['correspondence']
+        assert unclosed['same_process_interval_observed'] and unclosed['required_rank_ready_return_observed']
+        assert 'source_recording' not in unclosed
+        assert 'INITIALIZATION_NORMAL_NATIVE_SOURCE_UNVERIFIED' in observed['activation_missing']
+    if mode == 'missing-executor-identity':
+        unbound, = summary['projection']['correspondence']
+        assert unbound['same_process_interval_observed'] and unbound['required_rank_ready_return_observed']
+        calls = [row for row in summary['projection']['calls']
+                 if row['call_sha256'] in (unbound['executor_call_sha256'], unbound['ready_call_sha256'])]
+        assert len(calls) == 2 and all(row['source_process_binding_observed'] and
+                                      row['executor_sha256'] is None for row in calls)
+        assert 'source_recording' not in unbound
+        assert 'initialization_executor_instance_unverified' in observed['activation_missing']
     for row in native:
+        assert row['required_rank_worker_pid_chain_observed'] is (
+            mode in {'worker-pids-match', 'ready-status-unqualified'} | CENSUS_MODES)
         receipt = row['source_recording']
         assert set(receipt) == {'sha256', 'aggregate_call_and_return_seq', 'ready_call_and_return_seq'}
         capture, = [recording['capture'] for recording in summary['native']['recordings']
@@ -214,11 +293,44 @@ def test_canonical_initialization_evidence_preserves_bound_positive_steps(tmp_pa
             assert records[call_seq]['payload']['phase'] == 'CALL'
             assert records[return_seq]['payload']['phase'] == 'RETURN'
             assert records[call_seq]['payload']['call_sha256'] == records[return_seq]['payload']['call_sha256'] == row[call]
+        ready_responses = row.get('rank_ready_responses', [])
+        expected = {'worker-pids-match': [0, 1], 'worker-pids-mismatch': [0], 'ready-status-unqualified': [0]}
+        if mode in CENSUS_MODES:
+            expected[mode] = [0, 1]
+        assert [response['rank'] for response in ready_responses] == expected.get(mode, [])
+        ready_begin, ready_end = receipt['ready_call_and_return_seq']
+        for response in ready_responses:
+            assert set(response) - {'current_child_process_census'} == {
+                'rank', 'response_status', 'call_and_return_seq', 'worker_handle_pid_match_observed'}
+            first, last = response['call_and_return_seq']
+            assert ready_begin < first < last < ready_end
+            payloads = [records[seq]['payload'] for seq in (first, last)]
+            assert [payload['phase'] for payload in payloads] == ['CALL', 'RETURN']
+            assert all(payload['point'] == 'WorkerProc.wait_for_response_handle_ready'
+                       and payload['response_status'] == response['response_status'] == 'READY'
+                       and payload['expected_handles'][0]['rank'] == response['rank'] for payload in payloads)
+            assert payloads[1]['returned_handles'] == payloads[0]['expected_handles']
+            assert response['worker_handle_pid_match_observed'] is True
+            if mode == 'worker-census-match' or mode in CENSUS_MODES and response['rank'] == 0:
+                before, after = summary['native']['before'], summary['native']['after']
+                pid = payloads[1]['returned_handles'][0]['pid']
+                child, = [entry for entry in before['metadata']['processes'] if entry['pid'] == pid]
+                assert child in after['metadata']['processes'] and child['parent_pid'] == 42
+                assert response['current_child_process_census'] == {
+                    'before_sha256': before['capture_sha256'], 'after_sha256': after['capture_sha256'],
+                    'process_identity_sha256': sha256_hex(canonical_json(child)),
+                }
+            else:
+                assert 'current_child_process_census' not in response
     assert all(row['normal_shape_verified'] and not row['service_gate_verified'] for row in controls)
     assert not observed['activation_scope_complete'] and not observed['activation_violations']
     assert 'readiness_and_http_shape_are_not_independent_admission_oracle' in observed['activation_missing']
     result = judge_evidence(check, evidence, policy(pack.ref(), values={check_id: values}), utcnow())
     assert evidence.data_origin.value == 'EXAMPLE'
+    if mode == 'worker-pids-match' or mode in CENSUS_MODES - {'worker-census-reused-pid'}:
+        assert evidence.execution.status is ExecStatus.COMPLETED
+    if mode == 'worker-census-reused-pid':
+        assert evidence.execution.status is ExecStatus.ABORTED
     assert result.verdicts.security.value == 'UNKNOWN'
 
 

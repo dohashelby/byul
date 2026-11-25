@@ -24,8 +24,10 @@ from tools.mvp_versions import versions
 
 ROOT = Path(__file__).resolve().parents[1]
 SIDES = ('baseline', 'candidate')
+ACTIVE_CHECK_COUNT = 69
 UNKNOWN_LIMIT = 6
 SHA256 = re.compile(r'[0-9a-f]{64}')
+ATTEMPT_MISMATCH = 'EXECUTION_ATTEMPT_INCOMPLETE_OR_DIFFERENT'
 
 
 def _key(ref):
@@ -100,7 +102,7 @@ def _verify_passive_hop(evd, source, env, policy, plan, artifact_store, values):
         return False
 
 
-def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, source=None, artifact_store=None):
+def _verify_side(check, item, evd, result, shown, env, policy, plan, report, *, source=None, artifact_store=None):
     side = {'environment': _dump(env.ref()), 'evidence': _dump(evd.ref()) if evd else None,
             'result': _dump(result.ref()) if result else None, 'verdicts': None, 'blocking_codes': [],
             'reported_security': None,
@@ -121,8 +123,12 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, s
             blockers.append(f'EXECUTION_{execution.status.value}')
         if evd.data_origin != 'MEASURED' or execution.operator is not None or execution.override_reason:
             blockers.append('AUTOMATED_MEASUREMENT_REQUIRED')
+        started, finished = execution.started_at, execution.finished_at
+        time_verified = (started is not None and finished is not None and started.utcoffset() is not None
+                         and finished.utcoffset() is not None and started <= finished)
         passive_values = _passive_hop_values(evd)
-        passive_verified = passive_values is not None and _verify_passive_hop(evd, source, env, policy, plan, artifact_store, passive_values)
+        passive_verified = (time_verified and passive_values is not None
+                            and _verify_passive_hop(evd, source, env, policy, plan, artifact_store, passive_values))
         if passive_values is not None and not passive_verified:
             blockers.append('PASSIVE_API_HOP_PROVENANCE_INVALID')
         if ((not passive_verified and not evd.artifacts) or any(artifact.bytes < 1 for artifact in evd.artifacts)
@@ -130,8 +136,7 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, s
                 or execution.adapter is None or execution.adapter.name != env.engine.name
                 or not SHA256.fullmatch(execution.executor.config_sha256)):
             blockers.append('ORIGINAL_EXECUTOR_OR_ARTIFACTS_INVALID')
-        if (execution.started_at is None or execution.finished_at is None
-                or execution.finished_at < execution.started_at):
+        if not time_verified:
             blockers.append('ORIGINAL_EXECUTION_TIME_INVALID')
         if (evd.comparability.model_inventory_sha256 != model_closure_sha256(env.model)
                 or evd.comparability.gpu != env.runtime.gpu_model or evd.comparability.driver != env.runtime.driver
@@ -149,23 +154,30 @@ def _verify_side(check, item, evd, result, shown, env, policy, plan, as_of, *, s
             if isinstance(values, dict) and run_binding.CURRENT_POLICY_REF in values:
                 if values[run_binding.CURRENT_POLICY_REF] != _dump(policy.ref()):
                     blockers.append('RUN_BINDING_POLICY_REF_MISMATCH')
+        if execution.cleanup_errors or (execution.status == 'COMPLETED' and execution.abort_reason):
+            blockers.append('EXECUTION_OR_CLEANUP_UNRESOLVED')
     if evd is not None and result is not None and shown is not None and shown.result is not None:
-        replay = judge_evidence(check, evd, policy, as_of,
-                                condition_origins=[condition.origin for condition in item.conditions], plan=plan)
-        if (result.evidence != evd.ref() or {_key(ref) for ref in result.refs} != {_key(ref) for ref in replay.refs}
-                or shown.result != result.ref() or shown.verification_level != result.verification_level
-                or any(getattr(shown, axis) != getattr(result.verdicts, axis)
-                       for axis in ('security', 'functional', 'performance'))
-                or any(getattr(result, key) != getattr(replay, key)
-                       for key in ('judge', 'verdicts', 'verification_level', 'data_origin', 'missing_observations'))):
-            blockers.append('ORIGINAL_RESULT_REPLAY_MISMATCH')
+        if any(stamp is not None and stamp.utcoffset() is None for stamp in (report.as_of, result.as_of)):
+            blockers.append('ORIGINAL_RESULT_DECISION_TIME_INVALID')
         else:
-            side['reported_security'] = shown.security.value
-            if not blockers:
-                side['verdicts'] = result.verdicts.model_dump(mode='json')
-    if evd is not None and (evd.execution.cleanup_errors
-                            or evd.execution.status == 'COMPLETED' and evd.execution.abort_reason):
-        blockers.append('EXECUTION_OR_CLEANUP_UNRESOLVED')
+            if report.as_of is not None and result.as_of is not None and report.as_of != result.as_of:
+                blockers.append('ORIGINAL_RESULT_DECISION_TIME_MISMATCH')
+            # Legacy reports can have a decision time only on the stored result.
+            as_of = report.as_of or result.as_of or report.created_at
+            replay = judge_evidence(check, evd, policy, as_of,
+                                    condition_origins=[condition.origin for condition in item.conditions], plan=plan)
+            if (result.evidence != evd.ref() or {_key(ref) for ref in result.refs} != {_key(ref) for ref in replay.refs}
+                    or shown.result != result.ref() or shown.verification_level != result.verification_level
+                    or any(getattr(shown, axis) != getattr(result.verdicts, axis)
+                           for axis in ('security', 'functional', 'performance'))
+                    or any(getattr(result, key) != getattr(replay, key)
+                           for key in ('judge', 'verdicts', 'verification_level', 'data_origin', 'missing_observations',
+                                       'exception'))):
+                blockers.append('ORIGINAL_RESULT_REPLAY_MISMATCH')
+            else:
+                side['reported_security'] = shown.security.value
+                if not blockers:
+                    side['verdicts'] = result.verdicts.model_dump(mode='json')
     return side
 
 
@@ -282,10 +294,19 @@ def _verified_rows(original_report, objects, pack, expected, artifact_store=None
                 if original is not None and not original['blocking_codes']:
                     source = evidence.get(('PLT-01', side))
             sides[side] = _verify_side(check, item, evidence.get((check_id, side)), results.get((check_id, side)),
-                                       getattr(shown, side), env, policy, plan, report.created_at,
+                                       getattr(shown, side), env, policy, plan, report,
                                        source=source, artifact_store=artifact_store)
         base_evd, cand_evd = (evidence.get((check_id, side)) for side in SIDES)
-        observed_diff = comparison_differences(base_evd.comparability, cand_evd.comparability) if base_evd and cand_evd else []
+        observed_diff = []
+        if base_evd is not None and cand_evd is not None:
+            base_attempt = base_evd.execution.attempt_id
+            report_attempt = report.execution_attempt_id
+            if base_attempt != cand_evd.execution.attempt_id or (
+                    report_attempt is not None and base_attempt != report_attempt):
+                blockers.append(ATTEMPT_MISMATCH)
+                observed_diff = [ATTEMPT_MISMATCH]
+            else:
+                observed_diff = comparison_differences(base_evd.comparability, cand_evd.comparability)
         if all(side['verdicts'] is not None for side in sides.values()):
             for axis, name in (('security', 'comparison'), ('functional', 'functional_comparison')):
                 baseline = sides['baseline']['verdicts'][axis] or 'UNKNOWN'
@@ -323,6 +344,16 @@ def _verified_rows(original_report, objects, pack, expected, artifact_store=None
                 for side, (_, conditions, _) in zip(SIDES, evaluations, strict=True)}}
     refs = {'pack': _dump(pack.ref()), 'policy': _dump(policy.ref()), 'plan': _dump(plan.ref()), 'report': _dump(report.ref())}
     return rows, refs, official
+
+
+def _only_prose_applicability_gap(check, row):
+    """A prose-only CheckDef intentionally leaves applicability undetermined."""
+    applies_when = check.applies_when
+    return (
+        row.get('blocking_codes') == ['SELECTION_UNRESOLVED']
+        and row['applicability'] == 'UNDETERMINED' and not row['selection_gaps']
+        and bool(applies_when.prose) and not applies_when.always and not applies_when.all
+    )
 
 
 def review(run_inputs, *, pack, expected, assignments=None):
@@ -410,8 +441,16 @@ def review(run_inputs, *, pack, expected, assignments=None):
             else:
                 coverage['unverified'].append(check_id)
         execution_coverage[side] = coverage
-    execution_complete = exact_policy and verified_inputs and all(
+    paired_attempts_match = all(ATTEMPT_MISMATCH not in row.get('blocking_codes', ()) for row in inventory.values())
+    execution_complete = exact_policy and verified_inputs and paired_attempts_match and all(
         not (row['not_run'] or row['aborted'] or row['unverified']) for row in execution_coverage.values())
+    all_reports_official = verified_inputs and all(report['official'] for report in reviews)
+    official_comparison_goal_met = (
+        len(reviews) == 1 and all_reports_official and len(active) == ACTIVE_CHECK_COUNT
+        and execution_complete and len(unknown) <= UNKNOWN_LIMIT
+        and all(len(coverage['verified_measured']) == ACTIVE_CHECK_COUNT for coverage in execution_coverage.values())
+        and all(_only_prose_applicability_gap(pack.checks[check_id], inventory[check_id]) for check_id in unresolved)
+    )
     return {
         'schema': 'guard-mvp-compare-review/1', 'pack_ref': _dump(pack.ref()),
         'policy_ref': policies[0] if exact_policy else None, 'active_checks': len(active), 'reports': reviews,
@@ -420,7 +459,8 @@ def review(run_inputs, *, pack, expected, assignments=None):
         'unknown_security_limit': UNKNOWN_LIMIT, 'unresolved_check_ids': unresolved,
         'execution_coverage': execution_coverage, 'paired_execution_complete': execution_complete,
         'comparison_complete': complete, 'unknown_security_limit_met': complete and len(unknown) <= UNKNOWN_LIMIT,
-        'all_reports_official': verified_inputs and all(report['official'] for report in reviews), 'rows': inventory,
+        'all_reports_official': all_reports_official, 'official_comparison_goal_met': official_comparison_goal_met,
+        'rows': inventory,
     }
 
 
@@ -497,7 +537,7 @@ def main():
     if args.plt08_targets is not None and len(args.run) != 1:
         parser.error('--plt08-targets requires exactly one original --run')
     pack = load_pack(ROOT / 'packs/PACK-BASELINE')
-    if len(pack.active_checks()) != 69:
+    if len(pack.active_checks()) != ACTIVE_CHECK_COUNT:
         raise ValueError('MVP_ACTIVE_SCOPE_MISMATCH')
     if any(args.output.resolve().is_relative_to(store.resolve()) for store, _ in args.run):
         parser.error('--output must be outside the restored stores')

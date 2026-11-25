@@ -190,6 +190,43 @@ def test_pinned_loader_eager_read_reaches_owner_bound_projection(external, tmp_p
         journal(selected, prepared)
 
 
+@pytest.mark.parametrize('release', ('0.30.0', '0.31.0'))
+def test_open_failure_count_requires_verified_owner_and_recording_closure(external, tmp_path, monkeypatch, release):
+    from guard.executors.supply_boot_contract import native_consumption
+    from tests.lifecycle_fixtures import revised
+
+    path, prepared_path, prepared = _prepared(external, release)
+    packet, _ = produce_normal_file_read_fixture(tmp_path / 'positive', monkeypatch, release,
+        model_path=path, prepared_path=prepared_path)
+    expected = analyze(packet, prepared)
+    failed, raw = produce_normal_file_read_fixture(tmp_path / 'open-failure', monkeypatch, release,
+        model_path=path, prepared_path=prepared_path, missing_file=True)
+
+    def separate_process(rows):
+        rows[0]['payload']['context']['pid'] += 1
+
+    sibling_raw = revised(raw, separate_process)
+    sibling = failed['recordings'][0]
+    capture = sibling['capture']
+    capture['records'], capture['summary'] = parse_recording(sibling_raw, prepared)
+    capture['provenance']['capture_sha256'] = sha256_hex(sibling_raw)
+    packet['recordings'].append(sibling)
+    result = analyze(packet, prepared)
+    assert result['candidates'] == expected['candidates']
+    assert native_consumption(result)['open_failures'] == 1
+
+    for metadata, key in ((sibling, 'session_owner_match'), (sibling, 'listed_file_identity_match'),
+                          (capture, 'process_context_verified'), (capture['provenance'], 'owner_binding_verified'),
+                          (capture['summary'], 'recording_closed')):
+        metadata[key] = False
+        result = analyze(packet, prepared)
+        assert result['candidates'] == expected['candidates']
+        projection = native_consumption(result)
+        assert projection['open_failures'] == 0
+        assert projection['unjoined_reads'] == expected['unjoined_read_count']
+        metadata[key] = True
+
+
 @pytest.mark.parametrize('matched,observed', ((False, True), (True, False)))
 def test_eager_native_read_remains_unobserved_without_the_same_active_loader(external, tmp_path, monkeypatch, matched, observed):
     path, prepared_path, prepared = _prepared(external, '0.30.0')

@@ -7,16 +7,18 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import re
 
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from .base import DraftArtifact, EvidenceDraft
-from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
+from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
 from .kubernetes_record_access import PROFILE as ACCESS_CAPTURE_PROFILE, SCHEMA as ACCESS_CAPTURE_SCHEMA
 from .kubernetes_record_access import capture_record_access, _inputs, _policy_ref
-from .owned_capture import _FILE_READER, MAX_BYTES
+from .owned_capture import MAX_BYTES
 from .rank_failure_contract import stamp
 
 PROFILE = "kubernetes-record-access-scope-v1"
@@ -41,6 +43,8 @@ def inventory_path(session):
 
 
 def _read_declared_json(path, limit):
+    if limit == 65536:
+        return load_bounded_json(path)
     with Path(path).open("rb") as stream:
         return strict_json(stream.read(limit + 1), limit=limit)
 
@@ -110,13 +114,9 @@ def evaluate_inventory(packet):
     return violations, sorted(set(missing))
 
 
-def _ordinary_capture_provenance(capture, env, values, policy_ref, started, policy_end):
-    """Keep the scope of a qualified ordinary read without its content or subject identities."""
-    if not capture or not any(
-        row["case_id"] in {"allowed-before", "allowed-after"} and row["role"] == "authorized_reader"
-        and all(row[key] is True for key in ("attempted", "identity_verified", "binding_verified", "read_verified"))
-        for row in capture["rows"]
-    ):
+def _capture_provenance(capture, env, values, policy_ref, started, capture_limit):
+    """Bind the collector result before attributing its observations."""
+    if type(capture) is not dict:
         return None
     expected = {
         "schema": ACCESS_CAPTURE_SCHEMA, "profile": ACCESS_CAPTURE_PROFILE,
@@ -132,7 +132,7 @@ def _ordinary_capture_provenance(capture, env, values, policy_ref, started, poli
     try:
         policy_sha256 = _policy_ref(policy_ref)["sha256"]
         capture_start, capture_end = stamp(capture.get("started_at")), stamp(capture.get("finished_at"))
-        if not started <= capture_start <= capture_end <= policy_end:
+        if not started <= capture_start <= capture_end <= capture_limit:
             return None
     except ValueError:
         return None
@@ -144,18 +144,28 @@ def _ordinary_capture_provenance(capture, env, values, policy_ref, started, poli
     }
 
 
-class InventoryReader(KubernetesLifecycleReader):
+_INVENTORY_CLEANUP = "RECORD_ACCESS_INVENTORY_PARENT_CLEANUP_UNVERIFIED"
+_INVENTORY_WINDOW = "RECORD_ACCESS_INVENTORY_WINDOW_UNVERIFIED"
+
+
+class _InventoryCleanupUnverified(ValueError):
+    pass
+
+
+class _InventoryWindowUnverified(ValueError):
+    pass
+
+
+_RECORD_PROFILE = FixedRecordProfile(
+    inventory_path("{session}"), program_error_code="RECORD_ACCESS_INVENTORY_PROGRAM_INVALID",
+)
+
+
+def InventoryReader(target, env, session, *, binary, duration, runner=None):
     """사본 기록 한 개만 읽는다. native 세션 읽기는 허용하지 않는다."""
-
-    def __init__(self, target, env, session, *, binary, duration, runner=None):
-        from .kubernetes_lifecycle_capture import validate_target
-        self._initialize(validate_target(target, env), target, {"session": session}, binary=binary, duration=duration, runner=runner)
-
-    def _program(self, container, argv, max_bytes):
-        if (container != self.binding["engine"]["container"] or max_bytes != 2 * MAX_BYTES
-                or argv != ["python3", "-c", _FILE_READER, inventory_path(self.session), str(MAX_BYTES)]):
-            raise ValueError("RECORD_ACCESS_INVENTORY_PROGRAM_INVALID")
-        return "file"
+    from .kubernetes_lifecycle_capture import validate_target
+    return FixedRecordReader(validate_target(target, env), target, session, profile=_RECORD_PROFILE,
+                             binary=binary, duration=duration, runner=runner)
 
 
 class KubernetesRecordAccessExecutor:
@@ -176,18 +186,25 @@ class KubernetesRecordAccessExecutor:
     def _inventory(self, env, target, values, digest):
         reader = InventoryReader(target, env, values["record_inventory_session"], binary=self.cfg.get("kubectl_binary", "kubectl"),
                                  duration=self.cfg.get("max_duration_seconds", 60), runner=self.runner)
-        engine = reader.binding["engine"]
-        raw, provenance = reader.read_file(reader, target, container=engine["container"], image=engine["image"],
-                                           path=inventory_path(values["record_inventory_session"]))
+        try:
+            raw, provenance = reader.read_record(target)
+        finally:
+            if reader.report().get("parent_cleanup_unverified"):
+                raise _InventoryCleanupUnverified(_INVENTORY_CLEANUP) from None
         if provenance.get("owner_binding_verified") is not True:
             raise ValueError("RECORD_ACCESS_INVENTORY_OWNER_CHANGED")
+        if reader.gap:
+            raise ValueError("RECORD_ACCESS_INVENTORY_UNAVAILABLE")
         env_ref = env.ref()
         packet = validate_inventory(strict_json(raw, limit=MAX_BYTES), environment_ref=env_ref.model_dump(mode="json"),
                                     target_sha256=digest, source_sha256=values["record_inventory_source_sha256"])
         # The file reader computes its digest and byte count from these exact retained bytes.
         return packet, {"file_sha256": provenance["capture_sha256"], "file_bytes": provenance["bytes"],
                         "environment_sha256": env_ref.sha256, "target_sha256": digest,
-                        "declared_source_sha256": packet["source_sha256"], "owner_binding_verified": True}
+                        "declared_source_sha256": packet["source_sha256"], "owner_binding_verified": True,
+                        "owner_sha256": sha256_hex(canonical_json(provenance["owner"])),
+                        "file_identity_sha256": sha256_hex(canonical_json(provenance["file_identity"])),
+                        "record_inventory_session_sha256": sha256_hex(values["record_inventory_session"].encode("ascii"))}
 
     def _bound_inputs(self, env, values, *, read=_read_declared_json, expected_target_sha256=None):
         try:
@@ -239,23 +256,60 @@ class KubernetesRecordAccessExecutor:
         workdir.mkdir(parents=True, exist_ok=True)
         diagnostics = []
         capture = packet = inventory_receipt = evaluated = None
+        capture_cleanup_unverified = False
+        ordinary_capture = None
+        capture_started = datetime.now(timezone.utc)
         try:
             capture = capture_record_access(env, target, subjects, expected_policy_ref=expected_policy_ref, workdir=workdir,
                 binary=self.cfg.get("kubectl_binary", "kubectl"), duration=self.cfg.get("max_duration_seconds", 60),
                 _runner=self.runner)
         except Exception:
             diagnostics.append("RECORD_ACCESS_LOG_READ_UNAVAILABLE")
+        else:
+            observed_at = datetime.now(timezone.utc)
+            scoped = _capture_provenance(capture, env, policy_values, expected_policy_ref,
+                                         capture_started if bound else started, min(end, observed_at) if bound else end)
+            cleanup = capture.get("cleanup") if type(capture) is dict else None
+            capture_cleanup_unverified = type(cleanup) is dict and cleanup.get("complete") is False
+            if bound and scoped is None:
+                diagnostics.append("RECORD_ACCESS_LOG_SOURCE_UNVERIFIED")
+                capture = None
+            elif scoped is not None:
+                authorized_reads = [row for row in capture["rows"]
+                    if row["case_id"] in {"allowed-before", "allowed-after"} and row["role"] == "authorized_reader"
+                    and all(row[key] is True for key in ("attempted", "identity_verified", "binding_verified", "read_verified"))]
+                if authorized_reads:
+                    ordinary_capture = scoped
+                    if bound:
+                        owners = {row["case_id"]: owner for row in authorized_reads
+                                  if type(owner := row.get("owner_sha256")) is str and _SHA.fullmatch(owner)}
+                        if owners:
+                            ordinary_capture["authorized_read_owners"] = owners
         try:
-            packet, inventory_receipt = self._inventory(env, target, policy_values, digest)
+            if bound:
+                inventory_started = datetime.now(timezone.utc)
+                if not begin <= inventory_started <= end:
+                    raise _InventoryWindowUnverified
+            selected, receipt = self._inventory(env, target, policy_values, digest)
+            if bound:
+                inventory_finished = datetime.now(timezone.utc)
+                if not inventory_started <= inventory_finished <= end:
+                    raise _InventoryWindowUnverified
+                receipt.update(started_at=inventory_started.isoformat(), finished_at=inventory_finished.isoformat(),
+                               policy_sha256=_policy_ref(expected_policy_ref)['sha256'])
+            packet, inventory_receipt = selected, receipt
             evaluated = evaluate_inventory(packet)
+        except _InventoryCleanupUnverified:
+            diagnostics.extend(("RECORD_ACCESS_INVENTORY_UNAVAILABLE", _INVENTORY_CLEANUP))
+        except _InventoryWindowUnverified:
+            diagnostics.extend(("RECORD_ACCESS_INVENTORY_UNAVAILABLE", _INVENTORY_WINDOW))
         except Exception:
             diagnostics.append("RECORD_ACCESS_INVENTORY_UNAVAILABLE")
-        ordinary_capture = _ordinary_capture_provenance(capture, env, policy_values, expected_policy_ref, started, end)
         return self._draft(check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture,
-                           inventory_receipt=inventory_receipt)
+                           inventory_receipt=inventory_receipt, capture_cleanup_unverified=capture_cleanup_unverified)
 
     def _draft(self, check, env, workdir, started, capture, packet, evaluated, diagnostics, ordinary_capture,
-               *, inventory_receipt=None):
+               *, inventory_receipt=None, capture_cleanup_unverified=False):
         unauthorized = capture.get("unauthorized_read_verified") if capture else None
         rows = [{key: row[key] for key in ("case_id", "role", "attempted", "identity_verified", "binding_verified",
                                            "read_verified", "returncode", "byte_count", "gaps")} for row in capture["rows"]] if capture else None
@@ -284,9 +338,21 @@ class KubernetesRecordAccessExecutor:
             summary["ordinary_capture"] = ordinary_capture
         if inventory_receipt is not None:
             summary["inventory_receipt"] = inventory_receipt
+        if (ordinary_capture is not None and inventory_receipt is not None and "started_at" in inventory_receipt
+                and all(ordinary_capture[key] == inventory_receipt[key]
+                        for key in ("environment_sha256", "target_sha256", "policy_sha256"))
+                and stamp(ordinary_capture["finished_at"]) <= stamp(inventory_receipt["started_at"])):
+            owner = inventory_receipt["owner_sha256"]
+            matching = sorted(case for case, digest in ordinary_capture.get("authorized_read_owners", {}).items()
+                              if digest == owner)
+            if matching:
+                summary["ordinary_inventory_owner_join"] = {"owner_sha256": owner, "authorized_read_cases": matching,
+                    "inventory_file_sha256": inventory_receipt["file_sha256"]}
         artifact.write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True), encoding="utf-8")
         gap = bool(diagnostics or (capture and capture["gaps"]))
-        cleanup = [] if capture is None or capture["cleanup"]["complete"] else ["RECORD_ACCESS_CLEANUP_UNVERIFIED"]
+        cleanup = ["RECORD_ACCESS_CLEANUP_UNVERIFIED"] if capture_cleanup_unverified else []
+        if _INVENTORY_CLEANUP in diagnostics:
+            cleanup.append(_INVENTORY_CLEANUP)
         return EvidenceDraft(
             status=ExecStatus.ABORTED if gap else ExecStatus.COMPLETED,
             data_origin=DataOrigin.EXAMPLE if self.runner is not None or env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,

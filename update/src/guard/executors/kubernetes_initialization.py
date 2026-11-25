@@ -1,6 +1,6 @@
 """LIF09 canonical single-stage observation; full experiment lineage remains separate."""
-from pathlib import Path
 import uuid
+from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_initialization_sensor as sensor,vllm_initialization_metadata as metadata
 from guard.adapters import vllm_initialization_release_sensor as init_release
 from guard.adapters.vllm_lifecycle_profiles import source_hashes
@@ -39,13 +39,18 @@ def _activation_observations(projection, trials, diagnostics, *, source_sha256, 
     # Neither proves which request the external service gate admitted or when it admitted it.
     correspondence = [row for row in projection['correspondence']
         if row['same_process_interval_observed'] and row['ready_phase'] == row['aggregate_phase'] == 'RETURN']
+    missing = set(projection['missing']) | set(diagnostics)
+    if declared_phase in {'normal', 'recovered-normal'}:
+        attributed = [row for row in correspondence if 'source_recording' in row]
+        if len(attributed) != len(correspondence):
+            missing.add('INITIALIZATION_NORMAL_NATIVE_SOURCE_UNVERIFIED')
+        correspondence = attributed
     controls = [row for row in trials if row.get('binding_verified') is True
         and row.get('policy_window_verified') is True and row.get('normal_shape_verified') is True]
     steps = [{'step': 'native-initialization-correspondence', 'source_sha256': source_sha256,
               'declared_phase': declared_phase, **row} for row in correspondence]
     steps += [{'step': 'direct-initialization-normal-control', 'declared_phase': declared_phase, **row}
               for row in controls]
-    missing = set(projection['missing']) | set(diagnostics)
     if not correspondence:
         missing.add('INITIALIZATION_NORMAL_NATIVE_CORRESPONDENCE_UNAVAILABLE')
     if not controls:
@@ -79,7 +84,7 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
             if stages_for(check) == (1, 2):
                 target = strict_json(dependency(self.cfg['target'], None), limit=65536)
             else:
-                with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+                target = load_bounded_json(self.cfg['target'])
             target_hash = sha256_hex(canonical_json(target))
             prepared = load_initialization_prepared(self.cfg['prepared'], env, expected_sha256=self.expected_prepared)
             start, end = normalize_check_policy(check, policy_values)

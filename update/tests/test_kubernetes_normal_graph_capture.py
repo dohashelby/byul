@@ -11,7 +11,7 @@ from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
 from tests.builders import evidence
 from tests.test_gpu_a_run_inputs import UPDATE
-from tests.test_kubernetes_normal_startup_load import ARGS, Adapter, ROOT, StartupWorld, _inputs as startup_inputs
+from tests.test_kubernetes_normal_startup_load import ARGS, Adapter, READY, ROOT, StartupWorld, _inputs as startup_inputs
 
 UNRELATED = "EXAMPLE unrelated console data"
 _ZERO = "Capturing CUDA graphs (decode, FULL):   0%|          | 0/2 [00:00<?, ?it/s]"
@@ -70,6 +70,13 @@ def _run(tmp_path, version, fault=None, graph_option=None):
         rows.append(completion)
     if fault == "return-out-of-window":
         rows[3] = completion.replace("00:00:06.514Z", "00:00:16.514Z")
+    if fault == "return-at-ready":
+        rows[3] = completion.replace("2026-10-26T00:00:06.514Z", READY)
+    if fault == "return-after-ready-one-ns":
+        rows[3] = completion.replace("2026-10-26T00:00:06.514Z", READY.removesuffix("Z") + ".000000001Z")
+    if fault == "return-before-progress-one-ns":
+        rows[2] = progress.replace("00:00:05.323Z", "00:00:06.514000002Z")
+        rows[3] = completion.replace("00:00:06.514Z", "00:00:06.514000001Z")
     if fault == "skip-and-return":
         rows.insert(2, "2026-10-26T00:00:05.000Z Skipping CUDA graph capture")
     world.raw = ("\n".join(rows) + "\n").encode()
@@ -157,7 +164,8 @@ def test_req20_retains_parser_diagnostic_only_after_owner_and_source_recheck(tmp
     draft, summary, check, world = _run(tmp_path, "0.30.0", fault)
     assert len(world.hash_calls) == source_reads and world.log_calls == [len(world.raw)]
     assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.EXAMPLE
-    assert draft.abort_reason == summary["gap"] == "REQ20_CAPTURE_NATIVE_REPORT_UNVERIFIED"
+    expected = "REQ20_CAPTURE_OWNER_AFTER_UNVERIFIED" if suffix is None else "REQ20_CAPTURE_NATIVE_REPORT_UNVERIFIED"
+    assert draft.abort_reason == summary["gap"] == expected
     assert summary["observation"] is None and not any(step.attempted for step in draft.challenges)
     if suffix is None:
         assert "native_report_diagnostic" not in summary
@@ -175,6 +183,21 @@ def test_req20_retains_parser_diagnostic_only_after_owner_and_source_recheck(tmp
     observations = _normalize(check, draft)["observations"]
     result = RuleTableJudge().judge(check, evidence(check_id=check.id, observations=observations), check.judge.params, {})
     assert result.verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize(("fault", "complete", "retained_return"), [
+    ("return-at-ready", True, False),
+    ("return-after-ready-one-ns", False, False),
+    ("return-before-progress-one-ns", False, True),
+])
+def test_req20_uses_nanosecond_boot_window_and_event_order(tmp_path, fault, complete, retained_return):
+    draft, summary, _, _ = _run(tmp_path, "0.30.0", fault)
+    assert draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.status == (ExecStatus.COMPLETED if complete else ExecStatus.ABORTED)
+    assert (summary["observation"] is not None) is complete
+    assert ("native_capture_return_report" in summary) is retained_return
+    if not complete:
+        assert summary["native_report_diagnostic"] == "REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED"
 
 
 @pytest.mark.parametrize("fault", ["wrong-callsite", "duplicate-return", "return-out-of-window", "skip-and-return"])
@@ -202,8 +225,9 @@ def test_req20_rejects_nonstock_capture_options_before_reading_logs_or_sources(t
     ("0.30.0", None), ("0.31.0", None), ("0.31.0", "duration"), ("0.30.0", "binary"),
     ("0.30.0", "missing-argv"), ("0.31.0", "invalid-argv"), ("0.31.0", "graph-override"),
     ("0.30.0", "source-override"), ("0.30.0", "prefix"), ("0.31.0", "image"), ("0.30.0", "pin"),
+    ("0.30.0", "target-alias"), ("0.31.0", "target-alias"),
 ])
-def test_req20_prepares_the_selected_boot_declaration_without_collection(tmp_path, version, damage):
+def test_req20_prepares_the_selected_boot_declaration_without_collection(tmp_path, monkeypatch, version, damage):
     from tools.mvp_versions import versions
 
     env, target, path, world = startup_inputs(tmp_path, version)
@@ -239,8 +263,153 @@ def test_req20_prepares_the_selected_boot_declaration_without_collection(tmp_pat
         pytest.fail("REQ-20 declaration validation must not collect from the target")
 
     executor = graph.KubernetesNormalGraphCaptureExecutor(config, runner=no_collection)
-    if damage is None:
+    if damage in (None, "target-alias"):
         executor.prepared_normal_graph_capture(check, env, {}, expected_target_sha256=pin)
+        if damage == "target-alias":
+            replacement = path.with_name("same-target-bytes.json")
+            path.rename(replacement)
+            path.symlink_to(replacement)
+            monkeypatch.setattr(executor, "_target_inputs", no_collection)
+            with pytest.raises(ValueError, match="^REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED$"):
+                executor.prepared_normal_graph_capture(check, env, {}, expected_target_sha256=pin)
+            with pytest.raises(ValueError, match="^REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED$"):
+                executor.run(check, env, {}, world.adapter, tmp_path / "work")
     else:
         with pytest.raises(ValueError, match="^REQ20_CAPTURE_TARGET_OR_SOURCE_UNVERIFIED$"):
             executor.prepared_normal_graph_capture(check, env, {}, expected_target_sha256=pin)
+
+
+@pytest.mark.parametrize("side", ["baseline", "candidate"])
+@pytest.mark.parametrize("fault", [None, "lost-profile-boundary", "wrong-actual-memory", "extra-rank",
+                                  "worker-replaced", "outside-ready", "changed-helper"])
+def test_req20_default_tp2_pairs_profile_and_warmup_reports(tmp_path, side, fault):
+    from guard.adapters.engine_provider import get_provider
+    from guard.application import _scoped_target_sha256
+    from tests.test_gpu_a_run_inputs import deployed
+    from tools import gpu_a_run_inputs
+    from tools.mvp_versions import versions
+
+    selected = versions()[side]
+    version = selected["version"]
+    pods, render = deployed(tmp_path, "v2-template", engine_version=version, engine_image=selected["image"],
+                            release_launch=True, normal_tp2=True)
+    namespace = json.loads((tmp_path / "namespace.json").read_bytes())
+    for pod in pods.values():
+        pod["kind"] = "Pod"
+    ready = "2026-11-04T01:00:18.000000001Z"
+    pods["engine"]["status"]["conditions"][0]["lastTransitionTime"] = ready
+    env = gpu_a_run_inputs.environment(render, inventory="b" * 64, gpu_model="EXAMPLE L4", driver="EXAMPLE driver",
+        observed_engine_version=version, external_platform="Linux x86_64", observed_gpu_count=2,
+        engine_pod=pods["engine"], namespace=namespace)
+    target = gpu_a_run_inputs.target(env, render, namespace, pods["engine"], pods["probe"], context="fixture-context",
+                                    observed_engine_version=version)
+
+    runner_line, profile_line, pool_line = (1066, 655, 825) if side == "baseline" else (1087, 707, 892)
+    rows = []
+    by_rank = ([], [])
+    for phase, (file, line, content) in enumerate((
+        ("model_runner", runner_line, "Graph capturing finished in 1 secs, took 0.06 GiB"),
+        ("gpu_worker", profile_line,
+         "CUDA graph memory profiling is enabled (default since v0.21.0). The estimated memory was recorded."),
+        ("model_runner", runner_line, "Graph capturing finished in 1 secs, took 0.03 GiB"),
+        ("gpu_worker", pool_line,
+         "CUDA graph pool memory: 0.03 GiB (actual), 0.07 GiB (estimated), difference: 0.04 GiB (133.3%)."),
+    )):
+        for rank in (1, 0):
+            if fault == "lost-profile-boundary" and phase == 1 and rank == 1:
+                continue
+            instant = f"2026-11-04T01:00:0{5 + phase}.00000000{2 - rank}Z"
+            pid = 42101 + rank
+            if fault == "wrong-actual-memory" and phase == 3 and rank == 1:
+                content_for_rank = content.replace("0.03 GiB (actual)", "0.02 GiB (actual)")
+            else:
+                content_for_rank = content
+            if fault == "worker-replaced" and phase >= 2 and rank == 1:
+                pid += 10
+            if fault == "outside-ready" and phase == 3 and rank == 1:
+                instant = ready.replace("000000001Z", "000000002Z")
+            row = (f"{instant} (Worker_TP{rank} pid={pid}) INFO 11-04 01:00:08 "
+                   f"[{file}.py:{line}] {content_for_rank}").encode()
+            rows.append(row)
+            by_rank[rank].append(row)
+    if fault == "extra-rank":
+        rows.append(rows[-1].replace(b"Worker_TP0", b"Worker_TP2"))
+    raw = b"\n".join(rows) + b"\n"
+    provider = get_provider("vllm")
+    helper = "v1/worker/gpu/cudagraph_utils.py"
+    helper_pin = {
+        "baseline": "6e9c042890603535e300a40df8ee159dbed1058a64a83ae50ff0329e332e05ff",
+        "candidate": "8e6ac6f655dd013dd2a3d3561bc88fe05ceeea2b060e5cb6bc85decb0bb2f813",
+    }[side]
+    source = provider.evidence_contract("startup_load_source", env)
+    source_hashes = {**source["file_sha256"], helper: helper_pin}
+    hash_reads, log_reads = [], []
+
+    def runner(argv, **kwargs):
+        assert argv[:2] == ["kubectl", "--context=fixture-context"]
+        command = argv[3:]
+        if command == ["get", "namespaces", "serving-lab", "-o", "json"]:
+            payload = canonical_json({"kind": "List", "items": [namespace]})
+        elif "get" in command:
+            pod, = (pod for pod in pods.values() if pod["metadata"]["name"] in command)
+            payload = canonical_json(pod)
+        elif "logs" in command:
+            assert command[3:5] == ["--container=engine", "--timestamps"]
+            log_reads.append(kwargs["max_stdout_bytes"])
+            payload = raw
+        else:
+            assert command[1:9] == ["exec", "-i", pods["engine"]["metadata"]["name"],
+                                     "--container=engine", "--", "python3", "-I", "-S"]
+            request = json.loads(kwargs["input_bytes"])
+            hash_reads.append(request)
+            assert request["roots"] == [source["source_root"]]
+            assert {row["relative"] for row in request["files"]} == source_hashes.keys()
+            rows = [{**row, "state": "hashed", "sha256": source_hashes[row["relative"]]} for row in request["files"]]
+            if fault == "changed-helper" and len(hash_reads) == 2:
+                next(row for row in rows if row["relative"] == helper)["sha256"] = "0" * 64
+            payload = canonical_json({"files": rows})
+        return {"returncode": 0, "stdout_bytes": payload, "capture": {
+            "complete": True, "bounded_at_source": True, "truncated": False, "timed_out": False}}
+
+    target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=runner)
+    target_raw = canonical_json(target)
+    target_file = tmp_path / "bound-graph-target.json"
+    target_file.write_bytes(target_raw)
+    pin = sha256_hex(target_raw)
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["REQ-20"]
+    executor = graph.KubernetesNormalGraphCaptureExecutor(
+        {graph.NORMAL_OPTION: True, "target": str(target_file)}, expected_target_sha256=pin, runner=runner)
+    assert _scoped_target_sha256(target_raw, env, scoped_check=check.id) == pin
+    executor.prepared_normal_graph_capture(check, env, {}, expected_target_sha256=pin)
+    assert not hash_reads and log_reads == [65536]
+    draft = executor.run(check, env, {}, provider.adapter(), tmp_path / "evidence")
+    assert draft.data_origin == DataOrigin.EXAMPLE and not draft.normal_control.attempted
+    assert len(hash_reads) == 2 and log_reads == [65536, len(raw)]
+    artifact = draft.artifacts[0].path.read_bytes()
+    assert b"pid=" not in artifact and b"GiB" not in artifact
+    summary = json.loads(artifact)
+    if fault:
+        assert draft.status == ExecStatus.ABORTED and summary["observation"] is None
+        if fault == "changed-helper":
+            assert draft.abort_reason == "REQ20_CAPTURE_OWNER_AFTER_UNVERIFIED"
+        else:
+            assert summary["native_report_diagnostic"] == "REQ20_CAPTURE_RANK_REPORT_UNVERIFIED"
+        return
+
+    assert draft.status == ExecStatus.COMPLETED and summary["profile"] == graph.TP2_PROFILE
+    assert summary["installed_source_sha256"] == source_hashes
+    assert summary["capture_completion_call_linenumber"] == runner_line
+    assert summary["profiling_completion_call_linenumber"] == profile_line
+    assert summary["warmup_pool_call_linenumber"] == pool_line
+    assert summary["observation"]["worker_identity_verified"] is False
+    for rank, item in enumerate(summary["observation"]["reported_rank_capture"]):
+        assert item["reported_rank"] == rank
+        for key, row in zip(("profile_capture", "profiling_completion", "warmup_capture", "warmup_pool_report"),
+                            by_rank[rank], strict=True):
+            assert item[key] == {"log_timestamp": row.split(b" ", 1)[0].decode(),
+                                 "log_line_sha256": sha256_hex(row)}
+    assert len(summary["observation"]["reported_rank_capture"]) == 2
+    observations = _normalize(check, draft)["observations"]
+    assert observations["engine_sensor_full_scope"] == {"value": False, "collected": True}
+    result = RuleTableJudge().judge(check, evidence(check_id=check.id, observations=observations), check.judge.params, {})
+    assert result.verdicts["security"] == Verdict.UNKNOWN

@@ -1,9 +1,13 @@
 """기존 실행기 확장 7개: 정상·위반·누락·지원 불일치·후속 오류와 선정→EVD→RES→RPT→저장 팩 재판정."""
 from __future__ import annotations
 
+from base64 import b64encode
+from contextlib import redirect_stdout
 from copy import deepcopy
+import io
 import json
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -12,13 +16,13 @@ from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
-from guard.executors import (ipc_trust_scope, log_collection_gap, record_transport, registry, request_field_probe,
+from guard.executors import (ipc_trust_scope, log_collection_gap, owned_capture, record_transport, registry, request_field_probe,
                              usage_report)
 from guard.executors.api_transport import APITransportExecutor
 from guard.executors.input_validation import InputValidationExecutor
 from guard.executors.log_integrity import LogIntegrityExecutor
 from guard.executors.unix_ipc import UnixIPCExecutor
-from guard.models import load_pack
+from guard.models import ExecStatus, load_pack, sha256_hex
 from guard.runtime.docker import CmdResult
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
@@ -185,17 +189,59 @@ def usage_snapshot(sha="a" * 64, start=7, fields=("event",), exists=True):
     return {"files": [row], "settings": {"VLLM_NO_USAGE_STATS": "1"}, "process_start_ticks": start}
 
 
+def scope_snapshot(**options):
+    result = usage_snapshot(**options)
+    result["files"][0]["generation_sha256"] = "c" * 64
+    return result
+
+
+class UsageAppendDocker(HelperDocker):
+    """Execute only the fixed read program on a fixture file with saved process metadata."""
+
+    def __init__(self, path, before, after, monkeypatch, *, rotate=False):
+        super().__init__([before, after])
+        self.path, self.monkeypatch, self.rotate = path, monkeypatch, rotate
+        self.snapshots = []
+
+    def exec_bounded(self, container, argv, *, timeout, max_bytes=None, uid=None):
+        assert argv[:3] == ["python3", "-c", usage_report._SCOPE_READER]
+        assert argv[5:] == [str(self.path)]
+        expected = usage_report._report_prefixes(self.snapshots[0], argv[5:]) if self.snapshots else {}
+        assert json.loads(argv[4]) == expected
+        raw = self.replies.pop(0)
+        if self.rotate and self.snapshots:
+            self.path.rename(self.path.with_suffix(".original"))
+        if raw is not None:
+            self.path.write_bytes(raw)
+
+        def process_file(name, mode="r"):
+            if name == "/proc/1/environ" and mode == "rb":
+                return io.BytesIO(b"VLLM_NO_USAGE_STATS=0\0")
+            assert name == "/proc/1/stat" and mode == "r"
+            return io.StringIO("1 (fixture) " + "0 " * 19 + "7")
+
+        stdout = io.StringIO()
+        with self.monkeypatch.context() as fixture, redirect_stdout(stdout):
+            fixture.setattr(sys, "argv", ["reader", *argv[3:]])
+            exec(compile(usage_report._SCOPE_READER, "owned usage scope fixture", "exec"), {"open": process_file})
+        self.calls.append(container)
+        self.snapshots.append(json.loads(stdout.getvalue()))
+        return SimpleNamespace(returncode=0, stdout_bytes=stdout.getvalue().encode(),
+                               capture={"complete": True, "truncated": False, "timed_out": False})
+
+
 USAGE = {"usage_allowed": False, "usage_report_paths": ["/root/usage.jsonl"], "usage_settings_fresh_process": True}
 
 
 REAL_USAGE = usage_report.UsageReportExecutor
 
 
-def usage_run(tmp_path, cid, docker, values, monkeypatch, sink=None):
+def usage_run(tmp_path, cid, docker, values, monkeypatch, sink=None, *, pack=PACK):
     probe = lambda n, rs, t: [completion_response(r) for r in rs]
-    monkeypatch.setattr(REAL_USAGE, "_sink_rows", lambda self, ctx: sink.pop(0) if sink else None)
+    extra_cfg = _attach_sink_fixture(docker, sink, monkeypatch) if sink is not None else None
     monkeypatch.setattr(usage_report, "UsageReportExecutor", lambda c, docker=None: REAL_USAGE(c, container_probe=probe, docker=docker))
-    return pipeline(tmp_path, cid, lambda cfg: usage_report.BoundaryEgressDispatch({**cfg, "usage_wait_seconds": 0}, docker=docker), values)
+    return pipeline(tmp_path, cid, lambda cfg: usage_report.BoundaryEgressDispatch({**cfg, "usage_wait_seconds": 0}, docker=docker),
+                    values, extra_cfg=extra_cfg, pack=pack)
 
 
 def receipt(fields, sink="sink"):
@@ -203,6 +249,49 @@ def receipt(fields, sink="sink"):
 
 
 START = {"schema": usage_report.START_SCHEMA}
+
+
+def _sink_fixture(rows, *, owner="a" * 64, inode=1, closed=True, reformatted=False):
+    raw = b"\n".join(json.dumps(row, sort_keys=True, separators=(",", ":")).encode() for row in rows)
+    if reformatted:
+        raw = b" " + raw
+    if closed:
+        raw += b"\n"
+    return raw, {"device": 1, "inode": inode, "size": len(raw), "mtime_ns": len(raw), "ctime_ns": len(raw)}, owner
+
+
+def _attach_sink_fixture(docker, captures, monkeypatch):
+    snapshots = [_sink_fixture(rows) if type(rows) is list else rows for rows in captures]
+    source = {"container": "fixture-sink", "image": "fixture@sha256:" + "b" * 64, "path": "/guard-usage/receipts.jsonl"}
+    engine_exec = docker.exec_bounded
+    inspected = 0
+
+    def inspect_json(container, *, timeout):
+        nonlocal inspected
+        assert container == source["container"]
+        _, _, owner = snapshots[inspected // 2]
+        inspected += 1
+        return {"Name": "/" + container, "Id": owner, "Image": "sha256:" + "c" * 64,
+                "Config": {"Image": source["image"], "Labels": {"guard.run": "run"}},
+                "State": {"Running": True, "StartedAt": "2026-11-19T00:00:00Z"}}
+
+    def exec_bounded(container, argv, **kwargs):
+        if container != source["container"]:
+            return engine_exec(container, argv, **kwargs)
+        assert inspected % 2 == 1
+        assert argv == ["python3", "-c", owned_capture._FILE_READER, source["path"], str(owned_capture.MAX_BYTES)]
+        assert kwargs["max_bytes"] == 2 * owned_capture.MAX_BYTES
+        raw, identity, _ = snapshots[inspected // 2]
+        packet = {"schema": "guard-container-file/2", "source_complete": True,
+                  "file_identity_stable": True, "truncated": False, "nofollow_components": True, "regular_file": True,
+                  "raw_base64": b64encode(raw).decode(), "raw_retained_bytes": len(raw), "raw_retained_sha256": sha256_hex(raw),
+                  "file_before": identity, "file_after": identity, "path_after": identity}
+        return SimpleNamespace(returncode=0, stdout=json.dumps(packet),
+                               capture={"complete": True, "bounded_at_source": True, "truncated": False, "timed_out": False})
+
+    monkeypatch.setattr(docker, "inspect_json", inspect_json, raising=False)
+    monkeypatch.setattr(docker, "exec_bounded", exec_bounded)
+    return {"usage_sink": source}
 
 
 @pytest.mark.parametrize("after,sink,security", [
@@ -246,14 +335,14 @@ ALLOWED = {**USAGE, "usage_allowed": True, "allowed_usage_fields": ["event"], "a
 
 @pytest.mark.parametrize("fields,sink_name,security", [(["event"], "sink", "PASS"), (["event", "prompt"], "sink", "FAIL"), (["event"], "other", "FAIL")])
 def test_obs05_fields_and_sinks_are_compared_to_the_approved_lists(tmp_path, monkeypatch, fields, sink_name, security):
-    _, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), usage_snapshot()]), ALLOWED, monkeypatch,
+    _, result = usage_run(tmp_path, "OBS-05", HelperDocker([scope_snapshot(), scope_snapshot()]), ALLOWED, monkeypatch,
                           [[START], [START, receipt(fields, sink_name)]])
     assert result.verdicts.security.value == security
 
 
-@pytest.mark.parametrize("after", [usage_snapshot(), usage_snapshot(sha="b" * 64)])
+@pytest.mark.parametrize("after", [scope_snapshot(), scope_snapshot(sha="b" * 64)])
 def test_obs05_no_sink_arrival_never_passes(tmp_path, monkeypatch, after):
-    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), after]),
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([scope_snapshot(), after]),
                             ALLOWED, monkeypatch, [[START], [START]])
     assert evd.observations["usage_send_sensor_available"].value is True
     assert evd.observations["usage_report_observed"].collected is True
@@ -261,16 +350,122 @@ def test_obs05_no_sink_arrival_never_passes(tmp_path, monkeypatch, after):
     assert result.verdicts.security.value == "UNKNOWN"
 
 
+def test_obs05_denied_policy_preserves_unchanged_receipts_without_local_attribution(tmp_path, monkeypatch):
+    old = usage_snapshot(fields=("historical_only",))
+    values = {**ALLOWED, "usage_allowed": False, "allowed_usage_fields": [], "allowed_usage_sinks": []}
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([old, deepcopy(old)]), values, monkeypatch,
+                            [[START], [START]])
+    assert evd.execution.status is ExecStatus.COMPLETED
+    assert evd.observations["usage_policy_forbidden"].value is True
+    assert evd.observations["usage_sink_receipts"].value == []
+    assert evd.observations["usage_fields_seen"].value == []
+    assert not evd.observations["usage_new_local_reports"].collected
+    assert result.verdicts.security.value == "UNKNOWN"
+
+
 @pytest.mark.parametrize("local_fields,security", [(("event",), "UNKNOWN"), (("event", "extra"), "FAIL")])
 def test_obs05_changed_sink_prefix_keeps_only_qualified_local_fields(tmp_path, monkeypatch, local_fields, security):
-    after = usage_snapshot(sha="b" * 64, fields=local_fields)
+    path = tmp_path / "usage.jsonl"
+    before = b'{"event":0,"historical_only":"fixture-before"}\n'
+    after = before + json.dumps(dict.fromkeys(local_fields, 1)).encode() + b"\n"
     sink = [[START, receipt(["event"])], [START, receipt(["changed"]), receipt(["unverified"], "other")]]
-    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), after]), ALLOWED, monkeypatch, sink)
+    evd, result = usage_run(tmp_path, "OBS-05", UsageAppendDocker(path, before, after, monkeypatch),
+                            {**ALLOWED, "usage_report_paths": [str(path)]}, monkeypatch, sink)
     assert evd.observations["usage_send_sensor_available"].value is False
     assert evd.observations["usage_sink_receipts"].collected is False
     assert evd.observations["usage_report_observed"].collected is False
     assert evd.observations["usage_fields_seen"].value == list(local_fields)
     assert result.verdicts.security.value == security
+
+
+@pytest.mark.parametrize("mode", ["append", "reformatted", "file-replaced", "owner-replaced", "unclosed"])
+def test_obs05_sink_arrival_requires_the_same_closed_byte_prefix(tmp_path, monkeypatch, mode):
+    baseline = [START, receipt(["event"])]
+    new_receipt = {**receipt(["event"]), "received_monotonic_ns": 2}
+    before = _sink_fixture(baseline)
+    after = _sink_fixture([*baseline, new_receipt],
+                          inode=2 if mode == "file-replaced" else 1,
+                          owner=("d" if mode == "owner-replaced" else "a") * 64,
+                          closed=mode != "unclosed", reformatted=mode == "reformatted")
+    if mode == "reformatted":
+        assert [json.loads(line) for line in after[0].splitlines()[:len(baseline)]] == baseline
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([scope_snapshot(), scope_snapshot()]), ALLOWED,
+                            monkeypatch, [before, after])
+    received = evd.observations["usage_sink_receipts"]
+    assert received.collected is (mode == "append")
+    assert evd.observations["usage_report_observed"].collected is (mode == "append")
+    assert result.verdicts.security.value == ("PASS" if mode == "append" else "UNKNOWN")
+    if mode == "append":
+        assert received.value == [new_receipt]
+
+
+@pytest.mark.parametrize("timestamps,security", [
+    ([2, 2], "PASS"),
+    ([2, 3, 3], "PASS"),
+    ([2, 1], "UNKNOWN"),
+    ([2, 3, 2], "UNKNOWN"),
+    ([2, -1], "UNKNOWN"),
+])
+def test_obs05_sink_receipts_follow_the_same_monotonic_clock(tmp_path, monkeypatch, timestamps, security):
+    rows = [{**receipt(["event"]), "received_monotonic_ns": value} for value in timestamps]
+    evd, result = usage_run(tmp_path, "OBS-05", HelperDocker([scope_snapshot(), scope_snapshot()]), ALLOWED,
+                            monkeypatch, [[START, rows[0]], [START, *rows]])
+    collected = security == "PASS"
+    assert evd.observations["usage_sink_receipts"].collected is collected
+    assert evd.observations["usage_report_observed"].collected is collected
+    if collected:
+        assert evd.observations["usage_sink_receipts"].value == rows[1:]
+    assert result.verdicts.security.value == security
+
+
+@pytest.mark.parametrize("mode", [
+    "append", "zero-append", "created-empty", "new-file", "empty-before",
+    "changed-prefix", "rotated-same-prefix", "truncated", "partial-before", "partial-after",
+])
+def test_obs05_new_fields_require_a_stable_and_complete_append(tmp_path, monkeypatch, mode):
+    path = tmp_path / "usage.jsonl"
+    historical = b'{"retired_field":"historical-value"}\n'
+    ordinary = b'{"event":"fixture-current-value"}\n'
+    before, after = {
+        "append": (historical, historical + ordinary),
+        "zero-append": (historical, historical),
+        "created-empty": (None, b""),
+        "new-file": (None, ordinary),
+        "empty-before": (b"", ordinary),
+        "changed-prefix": (historical, historical.replace(b"retired_field", b"rotated_field") + ordinary),
+        "rotated-same-prefix": (historical, historical + ordinary),
+        "truncated": (historical, historical + ordinary * (4194304 // len(ordinary) + 1)),
+        "partial-before": (historical.rstrip(b"\n"), historical + ordinary),
+        "partial-after": (historical, historical + ordinary.rstrip(b"\n")),
+    }[mode]
+    docker = UsageAppendDocker(path, before, after, monkeypatch, rotate=mode == "rotated-same-prefix")
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    values = {**ALLOWED, "usage_report_paths": [str(path)],
+              "allowed_usage_fields": ["event", "received_independently"]}
+    arrived = [receipt(["received_independently"])]
+    sink = [[START], [START, *arrived]]
+    evd, res = usage_run(tmp_path, "OBS-05", docker, values, monkeypatch, sink, pack=pack)
+    assert len(docker.calls) == 2 and not docker.replies
+    assert evd.observations["usage_sink_receipts"].value == arrived
+    assert evd.observations["usage_send_sensor_available"].value is True
+    completed = mode in {"append", "zero-append", "created-empty", "new-file", "empty-before"}
+    appended = mode in {"append", "new-file", "empty-before"}
+    assert evd.execution.status is (ExecStatus.COMPLETED if completed else ExecStatus.ABORTED)
+    local = evd.observations["usage_new_local_reports"]
+    assert local.collected is completed
+    assert evd.observations["usage_fields_seen"].value == (["event", "received_independently"]
+                                                         if appended else ["received_independently"])
+    if appended:
+        report, = local.value
+        assert report["fields"] == ["event"] and report["sha256"] == sha256_hex(after)
+        assert report["prefix_bytes"] == len(before or b"") and report["prefix_sha256"] == sha256_hex(before or b"")
+        assert report["file_generation_sha256"] == docker.snapshots[1]["files"][0]["generation_sha256"]
+    else:
+        assert local.value == ([] if completed else None)
+    assert res.verdicts.security.value == ("PASS" if completed else "UNKNOWN")
+    for artifact in evd.artifacts:
+        saved = (tmp_path / "store" / artifact.path).read_bytes()
+        assert all(value not in saved for value in (b"retired_field", b"historical-value", b"fixture-current-value"))
 
 
 def test_usage_sink_rejects_open_records():
@@ -441,6 +636,26 @@ def test_obs11_evaluate_deadlines_alerts_and_dependent_verdicts(row, reasons):
 def test_obs11_clock_uncertainty_and_missing_record_are_not_clean():
     assert log_collection_gap.evaluate({"events": [gap_row(clock_uncertainty_ms=99)]}, GAP)["unverified"] == ["access"]
     assert log_collection_gap.evaluate({"events": [{**gap_row(), "record": "other"}]}, GAP)["missing"] == ["access"]
+
+
+@pytest.mark.parametrize("row,normal,unverified,reasons", [
+    (gap_row(arrived_at_ms=1098, clock_uncertainty_ms=2), ["access"], [], []),
+    (gap_row(arrived_at_ms=1100, clock_uncertainty_ms=2, dependent_result="PASS"), [], ["access"], []),
+    (gap_row(arrived_at_ms=1101, clock_uncertainty_ms=2, dependent_result="PASS"), [], ["access"], []),
+    (gap_row(arrived_at_ms=1103, clock_uncertainty_ms=2, dependent_result="PASS"),
+     [], [], ["dependent_test_passed_without_record"]),
+    (gap_row(gap_marked_at_ms=1201, alert_at_ms=1303, clock_uncertainty_ms=2),
+     [], ["access"], ["alert_not_raised_in_time"]),
+    (gap_row(gap_marked_at_ms=1203, alert_at_ms=1299, clock_uncertainty_ms=2),
+     [], ["access"], ["gap_not_marked_in_time"]),
+    (gap_row(arrived_at_ms=1001, clock_uncertainty_ms=2), [], ["access"], []),
+], ids=["arrival-upper-bound", "arrival-at-limit", "arrival-just-after-limit", "arrival-confirmed-late",
+        "detection-uncertain-alert-late", "detection-late-alert-uncertain", "arrival-order-uncertain"])
+def test_obs11_keeps_deadlines_uncertain_within_clock_error(row, normal, unverified, reasons):
+    result = log_collection_gap.evaluate({"events": [row]}, GAP)
+    assert result["normal"] == normal
+    assert result["unverified"] == unverified
+    assert result["violations"] == [{"record": "access", "reason": reason} for reason in reasons]
 
 
 @pytest.mark.parametrize("row", [

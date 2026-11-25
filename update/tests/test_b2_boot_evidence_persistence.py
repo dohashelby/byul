@@ -69,7 +69,8 @@ def storage_fault(patch, workdir, fault):
     elif fault == "write":
         original = Path.open
         def opened(path, mode="r", *args, **kwargs):
-            if path == summary and any(flag in mode for flag in "wx"):
+            staged_summary = path.name == summary.name and path.parent.parent == workdir
+            if (path == summary or staged_summary) and mode.startswith(("w", "x")):
                 raise PermissionError("EXAMPLE-PRIVATE-STORAGE-ERROR")
             return original(path, mode, *args, **kwargs)
         patch.setattr(Path, "open", opened)

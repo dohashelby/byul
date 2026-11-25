@@ -366,7 +366,8 @@ def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
     assert result.verdicts.security.value == expected
     assert result.verdicts.functional.value == result.verdicts.performance.value == "UNKNOWN"
     originals = {obj.id: obj.to_dict() for obj in (env, pol, plan, evidence, result)}
-    report = build_report(store, current_pack, plan, T0 + timedelta(days=1))
+    report = build_report(store, current_pack, plan, None)
+    assert report.as_of == result.as_of == T0
     rpt = report.to_dict()
     before = deepcopy(rpt)
     converted = rpt_to_verification_result(rpt)

@@ -8,7 +8,9 @@ from types import MappingProxyType
 from typing import Mapping
 from urllib.parse import urlsplit
 
+from . import vllm_consumption_callback as v1, vllm_consumption_v2_callback as v2
 from . import vllm_engine_callback_sensor as sensor
+from .vllm_observer_pin_rows import ROWS
 from .vllm import REQUEST_BINDING_GPU_IMAGE
 
 SOURCE_COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
@@ -128,3 +130,27 @@ PROFILES = MappingProxyType({
 
 def profile(version):
     return PROFILES.get(version)
+
+
+# The V2 runner is in a different installed module than the legacy capture.
+_SCOPED_V2_SOURCE_PINS = {
+    '0.30.0': ROWS[v2.RUNNER]['sha256'],
+    '0.31.0': v2.SOURCES[v2.RUNNER],
+}
+
+
+def scoped_record_sources(scope):
+    """Exact source files for a reviewed release/image, without runtime qualification."""
+    if type(scope) is not dict or scope.get('engine') != 'vllm':
+        return None
+    version, image = scope.get('engine_version'), scope.get('image_digest')
+    if type(version) is not str or version not in _SCOPED_V2_SOURCE_PINS or type(image) is not str:
+        return None
+    selected = profile(version)
+    if image.removeprefix('docker.io/') != selected.image.removeprefix('docker.io/'):
+        return None
+    return {
+        v1.INPUT: selected.sources['v1/engine/input_processor.py'],
+        v1.RUNNER: selected.sources.get('v1/worker/gpu_model_runner.py', v1.cache.base.SOURCE_SHA[v1.RUNNER]),
+        v2.RUNNER: _SCOPED_V2_SOURCE_PINS[version],
+    }

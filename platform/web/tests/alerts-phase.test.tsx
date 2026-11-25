@@ -7,7 +7,7 @@ import { AlertsPage } from "../src/pages/runtime/AlertsPage";
 import { PhaseTimelinePage } from "../src/pages/runtime/PhaseTimelinePage";
 import { groupAlerts } from "../src/lib/alerts";
 import { isTetragonOverride } from "../src/lib/tetragon";
-import { alertSeverity, GATEWAY_REASON, PHASE, EXEC_VERDICT } from "../src/lib/labels";
+import { alertSeverity, GATEWAY_REASON, GATEWAY_PRE_ENGINE_REASONS, PHASE, EXEC_VERDICT } from "../src/lib/labels";
 import type { RuntimeEvent } from "../src/api/types";
 import { SOURCE, mockApi, renderAt } from "./helpers";
 
@@ -28,8 +28,14 @@ function flagged(id: string, verdict: string): RuntimeEvent {
 }
 
 describe("알림 심각도와 묶음", () => {
-  it("Gateway 사유 59개를 전문 용어로 표시하고 미전달 사유를 명시한다", () => {
-    expect(Object.keys(GATEWAY_REASON)).toHaveLength(59);
+  it("Gateway 사유 62개를 전문 용어로 표시하고 미전달 사유를 명시한다", () => {
+    expect(Object.keys(GATEWAY_REASON)).toHaveLength(62);
+    expect(GATEWAY_REASON.CODE_SELECTION_FIELD).toBe("요청의 코드 선택 필드 거부");
+    expect(GATEWAY_REASON.INPUT_PROCESSOR_FIELD).toBe("요청의 입력 처리기 선택 거부");
+    expect(GATEWAY_REASON.INVALID_UNICODE).toBe("유효하지 않은 문자 인코딩");
+    for (const code of ["CODE_SELECTION_FIELD", "INPUT_PROCESSOR_FIELD", "INVALID_UNICODE"]) {
+      expect(GATEWAY_PRE_ENGINE_REASONS.has(code)).toBe(true);
+    }
     expect(GATEWAY_REASON.TARGET_UNVERIFIED).toBe("대상 미확인 (엔진 미전달)");
     expect(GATEWAY_REASON.REQUEST_HEADER_TIMEOUT).toBe("요청 헤더 수신 시간 초과 (엔진 미전달)");
     expect(GATEWAY_REASON.UNSUPPORTED_MEDIA_TYPE).toBe("JSON 외 미디어 유형 (엔진 미전달)");
@@ -110,7 +116,7 @@ describe("통합 개요", () => {
       "/api/runtime/events": { items: [], invalid: [], source: SOURCE, truncated: false },
     });
     function Destination() { const location = useLocation(); return <span>{location.pathname}{location.search}</span>; }
-    for (const [button, section] of [["차단 내역의 엔진 미전달 요청 보기", "requests"], ["차단 내역의 네트워크 차단 보기", "network"]]) {
+    for (const [button, section] of [["차단 내역의 엔진 미전달 요청 보기", "requests"], ["Hubble 드롭 관측 내역 보기", "network"]]) {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/runtime/overview"]}><Routes>
         <Route path="/runtime/overview" element={<DashboardPage />} />
@@ -147,10 +153,10 @@ describe("통합 개요", () => {
       "/api/runtime/events": { items: [...gatewayEvents, ...observations], invalid: [], source: SOURCE, truncated: false },
     });
     renderAt("/dashboard", "/dashboard", <DashboardPage />);
-    const chart = (await screen.findByRole("heading", { name: "시간별 요청" })).closest("article")!;
+    const chart = (await screen.findByRole("heading", { name: "요청 추이" })).closest("article")!;
     const eventChart = screen.getByRole("heading", { name: "시간별 관측 이벤트" }).closest("article")!;
     expect(screen.queryByRole("heading", { name: "시간대별 추이" })).toBeNull();
-    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56조회된 요청 · 선택한 기간");
+    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56");
     expect(eventChart.textContent).toContain("관측 이벤트 5건");
     expect(eventChart.textContent).toContain("기타(관측·허용 등)");
     const totalTab = within(chart).getByRole("tab", { name: "전체" });
@@ -168,12 +174,12 @@ describe("통합 개요", () => {
     expect(chartRow.children).toHaveLength(2);
     expect(chartRow.className).toContain("dashboardChartRow");
     const left = chartRow.children[0];
-    expect(Array.from(left.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["시간별 요청", "시간별 관측 이벤트"]);
+    expect(Array.from(left.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["요청 추이", "시간별 관측 이벤트"]);
     expect(eventChart.querySelector(".bigNumber")).toBeNull();
     const side = chartRow.children[1];
-    expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["구성 비율", "거부·오류 사유"]);
-    expect(screen.getAllByRole("heading", { name: "구성 비율" })).toHaveLength(1);
-    const donut = side.children[0].querySelector(".row")!;
+    expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["거부·오류 사유", "요청 처리 결과"]);
+    expect(screen.getAllByRole("heading", { name: "요청 처리 결과" })).toHaveLength(1);
+    const donut = side.children[1].querySelector(".row")!;
     expect(donut.className).not.toContain("donutCompact");
     expect((donut as HTMLElement).style.height).toBe("240px");
     expect(donut.children).toHaveLength(2);
@@ -193,8 +199,8 @@ describe("통합 개요", () => {
     expect(ranked.map((item) => item.querySelector("button > span:first-child")?.textContent)).toEqual(["1", "2", "3", "4", "5"]);
     expect(ranked[0].querySelector("button > span:first-child")?.className).toContain("reasonRankFirst");
     expect(ranked.slice(1).every((item) => !item.querySelector("button > span:first-child")?.className.includes("reasonRankFirst"))).toBe(true);
-    expect(ranked[0].querySelector("small")?.textContent).toBe("엔진 미전달");
-    expect(ranked[0].querySelector("button > span:nth-child(2)")?.textContent).toBe("정책 외 모델엔진 미전달");
+    expect(ranked[0].querySelector("button")?.getAttribute("title")).toBe("엔진에 전달하기 전에 거부된 요청");
+    expect(ranked[0].querySelector("button > span:nth-child(2)")?.textContent).toBe("정책 외 모델");
     expect(ranked.map((item) => item.querySelector("button > span:last-child strong")?.textContent)).toEqual(["5", "4", "3", "2", "1"]);
     expect(reasons.querySelector(".bigNumber")).toBeNull();
   });
@@ -211,7 +217,7 @@ describe("통합 개요", () => {
       <Route path="/runtime/overview" element={<DashboardPage />} />
       <Route path="/runtime/requests" element={<Destination />} />
     </Routes></MemoryRouter></QueryClientProvider>);
-    fireEvent.click(await screen.findByRole("button", { name: /정책 외 모델.*엔진 미전달.*1건/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /정책 외 모델.*1건/ }));
     expect(await screen.findByText("/runtime/requests?reason=MODEL_NOT_ALLOWED")).toBeTruthy();
   });
 });

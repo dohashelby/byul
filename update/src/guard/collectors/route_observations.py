@@ -4,9 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from guard.collectors.file import load_environment
+from guard.collectors.file import load_bounded_json, load_environment
 from guard.executors.native_observations import validate_capture
-from guard.executors.owned_capture import read_owned_json, strict_json, validate_owned_source
+from guard.executors.owned_capture import read_owned_json, validate_owned_source
 from guard.models import DataOrigin
 
 
@@ -21,8 +21,7 @@ def validate_inputs(env, target, source):
 
 def load_inputs(env_path, target_path, source):
     env = load_environment(Path(env_path))
-    with Path(target_path).open("rb") as stream:
-        target = strict_json(stream.read(65537))
+    target = load_bounded_json(target_path)
     validate_inputs(env, target, source)
     return env, target
 

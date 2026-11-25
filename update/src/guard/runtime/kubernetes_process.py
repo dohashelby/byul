@@ -11,6 +11,7 @@ import stat
 
 from guard.credential_policy import candidate_paths as validate_paths
 from guard.models import canonical_json, sha256_hex, utcnow
+from .source_assets import read_pinned_source
 
 PROFILE = 'kubernetes-owned-process-observations-v1'
 SCHEMA = 'guard-container-process-observations/1'
@@ -151,10 +152,8 @@ def decode(packet, expected_paths):
 
 
 def source():
-    raw = (Path(__file__).parent/'assets/process_observations_v1.py.txt').read_bytes()
-    if sha256_hex(raw) != SOURCE_SHA256:
-        raise ValueError('KUBERNETES_PROCESS_SOURCE_UNAVAILABLE')
-    return raw.decode('utf-8')
+    return read_pinned_source(Path(__file__).parent / "assets/process_observations_v1.py.txt",
+                              SOURCE_SHA256, "KUBERNETES_PROCESS_SOURCE_UNAVAILABLE")
 
 
 def _mounts(pod, binding):

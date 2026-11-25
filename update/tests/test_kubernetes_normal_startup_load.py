@@ -1,12 +1,13 @@
 """Check the owned startup capture and exact-byte replay using EXAMPLE process output."""
 
+from copy import deepcopy
 import json
 
 import pytest
 
 from guard.core.run import _normalize
 from guard.executors.kubernetes_normal_startup_load import (
-    KubernetesNormalStartupLoadExecutor, _load_cost, capture_startup_log_prefix,
+    KubernetesNormalStartupLoadExecutor, _load_cost, capture_startup_log_prefix, normal_startup_load_transport,
 )
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, load_pack, sha256_hex
@@ -45,6 +46,7 @@ class StartupWorld(World):
         self.adapter = adapter
         self.fault = fault
         self.log_calls = []
+        self.ready_samples = []
         self.hash_calls = []
         self.mutate = self.pod_readback
         prefix = "(EngineCore pid=96) " if modern else ""
@@ -71,6 +73,7 @@ class StartupWorld(World):
         document["status"]["conditions"][0]["lastTransitionTime"] = READY
         if self.fault == "ready-changed" and self.log_calls:
             document["status"]["conditions"][0]["lastTransitionTime"] = "2026-10-26T00:00:13Z"
+        self.ready_samples.append((len(self.log_calls), document["status"]["conditions"][0]["lastTransitionTime"]))
         if self.fault == "owner-changed" and self.log_calls:
             document["metadata"]["uid"] = "other-generation"
         if self.fault == "source-mount":
@@ -169,6 +172,34 @@ def _run(tmp_path, version, fault=None, *, values=VALUES):
     return draft, json.loads(raw), check, world
 
 
+@pytest.mark.parametrize("fault", (None, "retained", "current"), ids=("same", "retained-drift", "current-drift"))
+def test_lif01_prefix_correlates_saved_ready_with_the_current_window(tmp_path, fault):
+    env, target, _, world = _inputs(tmp_path, "0.31.0", "ready-changed" if fault == "current" else None)
+    window = {"container_started_at": STARTED, "ready_at": READY}
+    target["startup_ready_window"] = dict(window)
+    if fault == "retained":
+        target["startup_ready_window"]["ready_at"] = "2026-10-26T00:00:12.000000001Z"
+    if fault is not None:
+        with pytest.raises(ValueError, match="^LIF01_BOOT_PREFIX_UNVERIFIED$"):
+            capture_startup_log_prefix(target, env, runner=world.runner)
+        assert len(world.log_calls) == int(fault == "current")
+        return
+
+    prefix = capture_startup_log_prefix(target, env, runner=world.runner)
+    assert world.ready_samples[0] == (0, READY)
+    assert world.ready_samples[-1] == (1, READY)
+    assert prefix == {"byte_count": len(world.raw), "sha256": sha256_hex(world.raw), **window}
+    target["startup_log_prefix"] = prefix
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Retained Ready window validation cannot contact a target")
+
+    normal_startup_load_transport(target, env, duration=1, runner=forbidden)
+    target["startup_ready_window"]["ready_at"] = "2026-10-26T00:00:12.000000001Z"
+    with pytest.raises(ValueError, match="^LIF01_BOOT_WINDOW_UNVERIFIED$"):
+        normal_startup_load_transport(target, env, duration=1, runner=forbidden)
+
+
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
 def test_lif01_observes_only_current_startup_elapsed_and_reported_gpu_delta(tmp_path, version):
     draft, observation, check, world = _run(tmp_path, version)
@@ -188,6 +219,146 @@ def test_lif01_observes_only_current_startup_elapsed_and_reported_gpu_delta(tmp_
     assert projected["supply_boot_normal_verified"]["collected"] is False
     evd = evidence(check_id=check.id, observations=projected)
     assert RuleTableJudge().judge(check, evd, check.judge.params, VALUES).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("side", ["baseline", "candidate"])
+@pytest.mark.parametrize(("runner_mode", "fault"), [
+    ("v1", None), ("v1", "missing-rank"), ("v1", "same-pid"), ("v1", "source-changed"),
+    ("v1", "launcher-mounted"), ("default", None), ("default", "wrong-file"),
+    ("default", "wrong-call-site"), ("default", "source-changed"), ("default", "runner-override"),
+    ("default", "ambiguous-marker"),
+])
+def test_lif01_reads_two_source_pinned_native_rank_reports(tmp_path, side, runner_mode, fault):
+    from guard.adapters.engine_provider import get_provider
+    from guard.application import _scoped_target_sha256
+    from guard.executors.kubernetes_normal_startup_load import RANKED_PROFILE
+    from tests.test_gpu_a_run_inputs import deployed
+    from tools import gpu_a_aws_lab, gpu_a_run_inputs, mvp_live_readiness
+    from tools.mvp_versions import versions
+
+    selected = versions()[side]
+    version = selected["version"]
+    generation = "v2-template" if runner_mode == "default" else gpu_a_aws_lab.NORMAL_TP2_V1_EAGER_GENERATION
+    pods, render = deployed(tmp_path, generation, engine_version=version, engine_image=selected["image"],
+                            release_launch=True, normal_tp2=True)
+    namespace = json.loads((tmp_path / "namespace.json").read_bytes())
+    for pod in pods.values():
+        pod["kind"] = "Pod"
+    ready = "2026-11-04T01:00:18.000000001Z"
+    pods["engine"]["status"]["conditions"][0]["lastTransitionTime"] = ready
+    env = gpu_a_run_inputs.environment(render, inventory="b" * 64, gpu_model="EXAMPLE L4", driver="EXAMPLE driver",
+        observed_engine_version=version, external_platform="Linux x86_64", observed_gpu_count=2,
+        engine_pod=pods["engine"], namespace=namespace)
+    if fault == "ambiguous-marker":
+        runtime = env.runtime.model_copy(update={"platform": f"{env.runtime.platform}; runner=v1"})
+        env = env.model_copy(update={"runtime": runtime}).seal()
+    target = gpu_a_run_inputs.target(env, render, namespace, pods["engine"], pods["probe"], context="fixture-context",
+                                    observed_engine_version=version)
+    provider = get_provider(env.engine.name)
+    adapter = provider.adapter()
+    stock_line = {"0.30.0": 428, "0.31.0": 407}[version]
+    logger_line = stock_line if runner_mode == "default" else {"0.30.0": 5416, "0.31.0": 5354}[version]
+    logger_file = "model_runner.py" if runner_mode == "default" else "gpu_model_runner.py"
+    source_file = "v1/worker/gpu/model_runner.py" if runner_mode == "default" else "utils/system_utils.py"
+    source = provider.evidence_contract("startup_load_source", env) if fault != "ambiguous-marker" else None
+    if fault == "wrong-call-site":
+        logger_line += 1
+    reported_file = "gpu_model_runner.py" if fault == "wrong-file" else logger_file
+    elapsed = ["4.000001", "6.000002"]  # One exceeds the budget if misread as a whole-stage finding.
+    timestamps = ["2026-11-04T01:00:05.000000001Z", "2026-11-04T01:00:08.000000002Z"]
+    pids = [211011, 211011 if fault == "same-pid" else 211012]
+    rows = [f"{timestamps[rank]} (Worker_TP{rank} pid={pids[rank]}) INFO 11-04 01:00:08 "
+            f"[{reported_file}:{logger_line}] Model loading took 0.47 GiB memory and {elapsed[rank]} seconds\n"
+            for rank in (0, 1)]
+    raw = "".join(rows[:1] if fault == "missing-rank" else rows).encode()
+    hashes, logs = [], []
+    replaying = False
+
+    def runner(argv, **kwargs):
+        assert argv[:2] == ["kubectl", "--context=fixture-context"]
+        command = argv[3:]
+        if command == ["get", "namespaces", "serving-lab", "-o", "json"]:
+            stdout = canonical_json({"kind": "List", "items": [namespace]})
+        elif "get" in command:
+            pod, = (pod for pod in pods.values() if pod["metadata"]["name"] in command)
+            if replaying and pod is pods["engine"] and fault in {"launcher-mounted", "runner-override"}:
+                pod = deepcopy(pod)
+                container = pod["spec"]["containers"][0]
+                if fault == "launcher-mounted":
+                    container["volumeMounts"].append({"name": "model", "mountPath": "/usr/local/nvidia/bin"})
+                else:
+                    container["env"].append({"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "1"})
+            stdout = canonical_json(pod)
+        elif "logs" in command:
+            assert command[3:5] == ["--container=engine", "--timestamps"]
+            assert "--since-time=" + target["startup_ready_window"]["container_started_at"] in command
+            logs.append(kwargs["max_stdout_bytes"])
+            stdout = raw
+        else:
+            assert command[1:9] == ["exec", "-i", pods["engine"]["metadata"]["name"],
+                                     "--container=engine", "--", "python3", "-I", "-S"]
+            payload = json.loads(kwargs["input_bytes"])
+            hashes.append(payload)
+            assert payload["roots"] == [source["source_root"]]
+            assert {row["relative"] for row in payload["files"]} == source["file_sha256"].keys()
+            files = [{**row, "state": "hashed", "sha256": source["file_sha256"][row["relative"]]}
+                     for row in payload["files"]]
+            if fault == "source-changed" and len(hashes) == 2:
+                for row in files:
+                    if row["relative"] == source_file:
+                        row["sha256"] = "0" * 64
+            stdout = canonical_json({"files": files})
+        return {"returncode": 0, "stdout_bytes": stdout, "capture": {
+            "complete": True, "bounded_at_source": True, "truncated": False, "timed_out": False}}
+
+    target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=runner)
+    replaying = True
+    assert logs == [65536] and not hashes
+    path = tmp_path / "bound-target.json"
+    target_raw = canonical_json(target)
+    path.write_bytes(target_raw)
+    pin = sha256_hex(target_raw)
+    executor = KubernetesNormalStartupLoadExecutor(
+        {"normal_startup_load_only": True, "target": str(path)}, expected_target_sha256=pin, runner=runner)
+    check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["LIF-01"]
+    values = deepcopy(VALUES)
+    values["supply_stage_budget_ms"]["load"] = 5000
+    if fault == "ambiguous-marker":
+        with pytest.raises(ValueError, match="^LIF01_BOOT_TARGET_OR_SOURCE_UNVERIFIED$"):
+            executor.prepared_normal_startup_load(check, env, values, expected_target_sha256=pin)
+        assert mvp_live_readiness.startup_observer_reason(check.id, target, env) == "NORMAL_STARTUP_LOAD_TARGET_UNAVAILABLE"
+        assert not hashes and logs == [65536]
+        return
+    assert mvp_live_readiness.startup_observer_reason(check.id, target, env) is None
+    assert _scoped_target_sha256(target_raw, env, scoped_check=check.id) == pin
+    with pytest.raises(ValueError, match="^LIF01_BOOT_TARGET_UNVERIFIED$"):
+        normal_startup_load_transport(target, env, duration=1, runner=runner)
+    executor.prepared_normal_startup_load(check, env, values, expected_target_sha256=pin)
+    draft = executor.run(check, env, values, adapter, tmp_path / "result")
+    summary = json.loads(draft.artifacts[0].path.read_bytes())
+    if fault:
+        assert draft.status == ExecStatus.ABORTED and summary["observation"] is None
+        gaps = {"source-changed": "LIF01_BOOT_OWNER_AFTER_UNVERIFIED",
+                "launcher-mounted": "LIF01_BOOT_OWNER_BEFORE_UNVERIFIED",
+                "runner-override": "LIF01_BOOT_OWNER_BEFORE_UNVERIFIED"}
+        if fault == "runner-override":
+            assert not hashes and logs == [65536]
+        assert summary["gap"] == gaps.get(fault, "LIF01_BOOT_RANK_REPORT_UNAVAILABLE")
+        return
+    assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
+    assert logs == [65536, len(raw)] and len(hashes) == 2
+    assert summary["profile"] == RANKED_PROFILE and summary["reported_load_time_budget"] is None
+    assert summary["source_log_call_filename"] == logger_file
+    assert summary["source_log_call_linenumber"] == logger_line
+    assert source_file in summary["installed_source_sha256"]
+    assert summary["observation"]["worker_identity_verified"] is False
+    projected = summary["observation"]["engine_reported_rank_load_costs"]
+    assert [row["reported_rank"] for row in projected] == [0, 1]
+    assert [row["elapsed_us"] for row in projected] == [4000001, 6000002]
+    assert [row["log_timestamp"] for row in projected] == timestamps
+    assert "pid=" not in draft.artifacts[0].path.read_text()
+    evd = evidence(check_id=check.id, observations=_normalize(check, draft)["observations"])
+    assert RuleTableJudge().judge(check, evd, check.judge.params, values).verdicts["security"] == Verdict.UNKNOWN
 
 
 @pytest.mark.parametrize("instant,observed_at", [

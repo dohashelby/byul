@@ -25,7 +25,7 @@ from typing import Any
 from .config import DEFAULT_CONTRACTS_DIR
 from .contracts import Contracts
 from .sources.runtime import gateway_event, lab_report_doc, observation_event, request_detail_doc, runtime_status
-from .sources.update import rpt_to_verification_result
+from .sources.update import report_content_sha256, rpt_to_verification_result
 
 TARGET = "mock-engine-001"
 SESSION = "d3m0" + "0" * 28
@@ -478,9 +478,9 @@ def rpt_report(g: Gen, mode: str, created: datetime) -> dict[str, Any]:
                 for name, items in groups.items()}
 
     refs = [g.ref("ENV"), g.ref("POL"), g.ref("PLAN")] + ([g.ref("ENV"), g.ref("CHG")] if update else [])
-    return {
+    data = {
         "kind": "RPT", "id": g.ulid("RPT"), "revision": 1, "created_at": iso(created), "data_origin": "EXAMPLE",
-        "content_sha256": g.hex(64), "refs": refs, "mode": mode, "official": False,
+        "refs": refs, "mode": mode, "official": False,
         "inputs_manifest": [{"kind": "PACK", "id": "PACK-BASELINE", "revision": 22, "sha256": g.hex(64)}] + refs,
         "pack_review_status": "DRAFT", "policy_status": "DRAFT",
         "by_check": rows, "by_purpose": axis("purpose"), "by_area": axis("area"),
@@ -489,6 +489,8 @@ def rpt_report(g: Gen, mode: str, created: datetime) -> dict[str, Any]:
                         "EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음"],
         "approval": None, "evidence_counts": counts,
     }
+    data["content_sha256"] = report_content_sha256(data)
+    return data
 
 
 def evidence(g: Gen, out: Path, events: list[dict[str, Any]]) -> dict[str, Any]:

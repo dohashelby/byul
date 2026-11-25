@@ -1,0 +1,73 @@
+"""Optional writer identity proof around the existing acknowledged page reader."""
+from itertools import islice
+
+_CUT_ERROR = 'NORMAL_TP2_CALLBACK_CUT_UNVERIFIED'
+_WRITER_STATE = re.compile(r'callbacks-([1-9][0-9]*)\.state\.json')
+
+
+def _writer_scope(root):
+    info = root.lstat()
+    uid, gid = os.geteuid(), os.getegid()
+    if not stat.S_ISDIR(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o700 or (info.st_uid, info.st_gid) != (uid, gid):
+        raise ValueError(_CUT_ERROR)
+    entries = list(islice(root.iterdir(), 4097))
+    if len(entries) > 4096:
+        raise ValueError(_CUT_ERROR)
+    writers = {}
+    for state in entries:
+        match = _WRITER_STATE.fullmatch(state.name)
+        if match is None:
+            continue
+        pid = match[1]
+        value = state.lstat()
+        ticks = _start_ticks(pid)
+        if (not stat.S_ISREG(value.st_mode) or not 0 < value.st_size <= 4096
+                or (value.st_uid, value.st_gid) != (uid, gid) or type(ticks) is not int or ticks <= 0):
+            raise ValueError(_CUT_ERROR)
+        writers[pid] = ticks
+    if not 0 < len(writers) <= 256:
+        raise ValueError(_CUT_ERROR)
+    identity = json.dumps((info.st_dev, info.st_ino), separators=(',', ':')).encode()
+    return {'session_directory_sha256': hashlib.sha256(identity).hexdigest(), 'writers': writers}
+
+
+def _verify_writer_checkpoints(root, capture_id, snapshot, writers):
+    # A newly started writer already acknowledges an empty offset map before
+    # its first event. A missing journal and a verified empty cut are distinct.
+    offsets = {pid: {} for pid in writers}
+    for name, entry in snapshot.items():
+        pid = str(entry['pid'])
+        if writers.get(pid) != entry['start_ticks'] or pid not in offsets or not NAME.fullmatch(name):
+            raise ValueError(_CUT_ERROR)
+        current = (root / name).lstat()
+        if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1
+                or (current.st_uid, current.st_gid) != (os.geteuid(), os.getegid())
+                or (current.st_dev, current.st_ino) != (entry['device'], entry['inode'])
+                or current.st_size < entry['size']):
+            raise ValueError(_CUT_ERROR)
+        offsets[pid][name] = entry['size']
+    for pid, files in offsets.items():
+        raw = _terminal_bytes(root / f'checkpoint-{pid}-{capture_id}.json', 65536)
+        ack = json.loads(raw)
+        if (type(ack) is not dict or ack.get('schema') != 'guard-observer-checkpoint/1'
+                or ack.get('capture_id') != capture_id or type(ack.get('pid')) is not int or ack['pid'] != int(pid)
+                or any(type(ack.get(key)) is not int or ack[key] < 0
+                       for key in ('accepted', 'processed', 'written', 'dropped', 'errors'))
+                or ack['accepted'] != ack['processed'] or ack['accepted'] != ack['written']
+                or ack['dropped'] or ack['errors'] or ack.get('offsets') != files):
+            raise ValueError(_CUT_ERROR)
+
+
+_native_page = page
+
+
+def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False, *, session=None):
+    if type(capture_id) is not str or re.fullmatch('[0-9a-f]{32}', capture_id) is None:
+        raise ValueError(_CUT_ERROR)
+    root = Path(root)
+    scope = _writer_scope(root)
+    result = _native_page(root, snapshot, cursor, capture_id, seek_end, session=session)
+    _verify_writer_checkpoints(root, capture_id, result['snapshot'], scope['writers'])
+    if _writer_scope(root) != scope:
+        raise ValueError(_CUT_ERROR)
+    return {**result, 'normal_callback_writers': scope}

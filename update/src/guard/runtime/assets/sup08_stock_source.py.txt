@@ -1,0 +1,127 @@
+"""Read only the two fixed model configs and installed Qwen code, without importing it."""
+
+import ast
+from email.parser import BytesParser
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import sys
+import sysconfig
+
+
+CONFIGS = ('config.json', 'preprocessor_config.json')
+DISTRIBUTIONS = {
+    'transformers': ('transformers/models/qwen2_vl/processing_qwen2_vl.py', 'Qwen2VLProcessor'),
+    'vllm': ('vllm/model_executor/models/qwen2_vl.py', 'Qwen2VLForConditionalGeneration'),
+}
+FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+def fingerprint(info):
+    return info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
+def directory(path):
+    if not path.is_absolute() or '..' in path.parts or len(path.parts) > 16:
+        raise ValueError()
+    fd = os.open('/', FLAGS)
+    try:
+        for part in path.parts[1:]:
+            child = os.open(part, FLAGS, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        return os.dup(fd)
+    finally:
+        os.close(fd)
+
+
+def read(path, limit):
+    parent = directory(path.parent)
+    try:
+        fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        with os.fdopen(fd, 'rb') as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= limit:
+                raise ValueError()
+            data = stream.read(before.st_size + 1)
+            if (len(data) != before.st_size or fingerprint(os.fstat(stream.fileno())) != fingerprint(before)
+                    or fingerprint(os.stat(path.name, dir_fd=parent, follow_symlinks=False)) != fingerprint(before)):
+                raise ValueError()
+        check = directory(path.parent)
+        try:
+            if fingerprint(os.fstat(check)) != fingerprint(os.fstat(parent)):
+                raise ValueError()
+        finally:
+            os.close(check)
+        return data
+    finally:
+        os.close(parent)
+
+
+def installed_roots():
+    if not (sys.flags.isolated and sys.flags.no_site and sys.flags.dont_write_bytecode):
+        raise ValueError()
+    executable, prefix = Path(sys.executable), Path(sys.prefix)
+    # On Python 3.12 the -S exec can expose the base prefix even inside a venv.
+    if executable.parent.name == 'bin':
+        candidate = executable.parent.parent
+        try:
+            read(candidate / 'pyvenv.cfg', 16384)
+        except FileNotFoundError:
+            pass
+        else:
+            prefix = candidate
+    roots = tuple(sorted({Path(sysconfig.get_path(key, vars={'base': str(prefix), 'platbase': str(prefix)}))
+                          for key in ('purelib', 'platlib')}))
+    if (not 1 <= len(roots) <= 2 or any(not path.is_relative_to(prefix) or path == prefix
+            or path.name not in {'site-packages', 'dist-packages'} for path in roots)):
+        raise ValueError()
+    return roots
+
+
+def selected_files(roots):
+    found = {name: [] for name in DISTRIBUTIONS}
+    for root in roots:
+        fd = directory(root)
+        try:
+            before = fingerprint(os.fstat(fd))
+            with os.scandir(fd) as listing:
+                for index, item in enumerate(listing):
+                    if index >= 4096:
+                        raise ValueError()
+                    match = re.fullmatch(r'(vllm|transformers)-[0-9][A-Za-z0-9_.+!-]{0,127}\.dist-info', item.name)
+                    if match:
+                        found[match[1]].append((root, item.name))
+            if fingerprint(os.fstat(fd)) != before:
+                raise ValueError()
+        finally:
+            os.close(fd)
+    if any(len(rows) != 1 for rows in found.values()):
+        raise ValueError()
+    result = {}
+    for name, ((root, dist),) in found.items():
+        relative, class_name = DISTRIBUTIONS[name]
+        metadata = read(root / dist / 'METADATA', 1024**2)
+        document = BytesParser().parsebytes(metadata, headersonly=True)
+        actual_name, = document.get_all('Name', [])
+        version, = document.get_all('Version', [])
+        if actual_name.lower() != name or not re.fullmatch(r'[0-9][A-Za-z0-9._+!-]{0,127}', version):
+            raise ValueError()
+        source = read(root / relative, 1024**2)
+        parsed = ast.parse(source)
+        if sum(isinstance(node, ast.ClassDef) and node.name == class_name for node in parsed.body) != 1:
+            raise ValueError()
+        result[name] = {'version': version, 'metadata_sha256': hashlib.sha256(metadata).hexdigest(),
+                        'source_file': relative, 'source_sha256': hashlib.sha256(source).hexdigest()}
+    return result
+
+
+try:
+    model = {name: hashlib.sha256(read(Path('/models') / name, 65536)).hexdigest() for name in CONFIGS}
+    print(json.dumps({'schema': 'guard-sup08-stock-source/1', 'model_files': model,
+                      'packages': selected_files(installed_roots())}, sort_keys=True, separators=(',', ':')))
+except (OSError, TypeError, ValueError, SyntaxError, RecursionError):
+    print(json.dumps({'schema': 'guard-sup08-stock-source/1', 'unavailable': True}))

@@ -129,9 +129,13 @@ def project(packet,required_ranks=()):
         fields=('schema','point','parent_call_sha256','owner_sha256','asgi_request_sha256','asgi_invocation_sha256','registered_handler_observed','is_start','state_before')
         if first['schema']==sensor.EVENT_SCHEMA:
             fields+=('schema','backend_before','trace_before')
+        clock_contained = (first['monotonic_ns'] <= last['operation_started_ns']
+                           <= last['operation_finished_ns'] <= last['monotonic_ns'])
         # Same gap code as before; the separate counts only say which condition was missing.
         reasons=[name for name,failed in (('call_fields_changed',any(first[k]!=last[k] for k in fields)),
-            ('call_order_invalid',first['seq']>=last['seq']),('source_unverified',not first['source_verified'] or not last['source_verified']),
+            ('call_order_invalid',first['seq']>=last['seq']),
+            ('call_clock_window_unverified',not clock_contained),
+            ('source_unverified',not first['source_verified'] or not last['source_verified']),
             ('physical_process_binding_unverified',not first['physical_process_binding_verified'] or not last['physical_process_binding_verified']),
             ('recording_not_closed',not last['recording_closed'])) if failed]
         if reasons:

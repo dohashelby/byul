@@ -38,7 +38,7 @@ _STATUS_CAP = 512 * 1024
 
 
 class _CollectionStatusReader(KubernetesLifecycleReader):
-    def __init__(self, transport, target, session):
+    def __init__(self, transport, target, session, *, snapshot_only=False):
         if (transport.profile != LOG_INTEGRITY_PROFILE or transport.target_sha256 != sha256_hex(canonical_json(target))):
             raise KubernetesCaptureError()
         binding = {"context": transport.binding["context"], "run_id": transport.binding["run_id"],
@@ -50,13 +50,24 @@ class _CollectionStatusReader(KubernetesLifecycleReader):
         self.file_read_limit = _STATUS_CAP
         self.file_read_profile = EXTENDED_RECORDING_PROFILE
         self.path = f"/guard-collection/data/{self.session}/collection-status.json"
+        self.snapshot_only = snapshot_only
 
     def _owner(self, timeout):
         # Reuse the original engine/probe binding checks under this read's budget.
         # The shallow copy keeps the same transport runner, lock and cleanup list.
         transport = copy(self.transport)
         transport.deadline = min(transport.deadline, transport.clock() + timeout)
-        transport._verify()
+        if self.snapshot_only:
+            # The engine must be the same Running generation, but it does
+            # not serve this read. Only the probe hosts the status file.
+            probe_status = transport._verify(require_ready=False)["probe"]["status"]
+            states = [row for row in probe_status["containerStatuses"] if row["name"] == self.binding["engine"]["container"]]
+            if (len(states) != 1 or states[0].get("ready") is not True
+                    or not any(row.get("type") == "Ready" and row.get("status") == "True"
+                               for row in probe_status.get("conditions", []))):
+                raise KubernetesCaptureError()
+        else:
+            transport._verify()
         return self.binding["engine"]
 
     def _program(self, container, argv, max_bytes):
@@ -67,7 +78,8 @@ class _CollectionStatusReader(KubernetesLifecycleReader):
 
 
 def _read_collection_status(ctx, session):
-    reader = _CollectionStatusReader(ctx.cprobe, ctx._collection_target, session)
+    reader = _CollectionStatusReader(ctx.cprobe, ctx._collection_target, session,
+                                     snapshot_only=getattr(ctx, "_collection_status_snapshot_only", False))
     role = reader.binding["engine"]
     try:
         raw, proof = reader.read_file(reader, ctx._collection_target, container=role["container"], image=role["image"],
@@ -75,7 +87,9 @@ def _read_collection_status(ctx, session):
         if proof.get("owner_binding_verified") is not True or reader.gap:
             raise KubernetesCaptureError()
         return strict_json(raw, limit=_STATUS_CAP), {"file_sha256": proof["capture_sha256"],
-            "file_bytes": proof["bytes"], "owner_binding_verified": True}
+            "file_bytes": proof["bytes"], "owner_binding_verified": True,
+            "file_identity_sha256": sha256_hex(canonical_json(proof["file_identity"])),
+            "owner_sha256": sha256_hex(canonical_json(proof["owner"]))}
     finally:
         if reader.report().get("parent_cleanup_unverified"):
             ctx._collection_status_cleanup.append("COLLECTION_STATUS_PARENT_CLEANUP_UNVERIFIED")
@@ -101,8 +115,7 @@ def align_attach(lines, attach_raw):
     if type(attach_raw) is not bytes or not lines:
         diag["reason"] = "attach stdout or CRI window lines unavailable"
         return None, diag
-    decoded = attach_raw.decode("utf-8", "replace")
-    physical = decoded.split("\n")[:-1]  # 끝나지 않은 마지막 조각은 쓰지 않는다
+    physical = attach_raw.split(b"\n")[:-1]  # 끝나지 않은 마지막 조각은 쓰지 않는다
     diag["attach_lines"] = len(physical)
     stamped = []
     for line in lines:
@@ -110,8 +123,13 @@ def align_attach(lines, attach_raw):
         if found is None or not line.endswith("\n"):
             diag["reason"] = "CRI window line without time or LF"
             return None, diag
-        stamped.append((line[:found.end()], line[found.end():-1]))
-    normal = [item[:-1] if item.endswith("\r") else item for item in physical]
+        try:
+            body = line[found.end():-1].encode("utf-8")
+        except UnicodeEncodeError:
+            diag["reason"] = "invalid UTF-8 in selected CRI window"
+            return None, diag
+        stamped.append((line[:found.end()], body))
+    normal = [item[:-1] if item.endswith(b"\r") else item for item in physical]
     width = len(stamped)
     offsets = [k for k in range(len(normal) - width + 1)
                if all(normal[k + i] == stamped[i][1] for i in range(width))]
@@ -120,7 +138,7 @@ def align_attach(lines, attach_raw):
         diag["reason"] = "CRI window lines are not one contiguous run of attach stdout lines"
         return None, diag
     start = offsets[0]
-    merged = [stamp + physical[start + i] + "\n" for i, (stamp, _) in enumerate(stamped)]
+    merged = [stamp + physical[start + i].decode("utf-8") + "\n" for i, (stamp, _) in enumerate(stamped)]
     diag["aligned"] = True
     diag["cr_restored_lines"] = sum(1 for i in range(width) if physical[start + i] != stamped[i][1])
     return "".join(merged), diag
@@ -141,10 +159,11 @@ def _instant(value):
 class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
     version = "0.3.1+k8s.2"
 
-    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
+    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None, expected_target_file_sha256=None):
         super().__init__(cfg, environ=environ, docker=object(), capture=None)
         self._kubectl_runner = runner
         self._expected_target_sha256 = expected_target_sha256
+        self._expected_target_file_sha256 = expected_target_file_sha256
 
     def validate_policy(self, check, values):
         if type(self.cfg) is not dict or set(self.cfg) - _SETTINGS:
@@ -172,7 +191,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         pins = [pin for pin in (expected_target_sha256, self._expected_target_sha256) if pin is not None]
         if snapshot and not pins:
             raise ValueError
-        raw = dependency(self.cfg["target"], None)
+        raw = dependency(self.cfg["target"], self._expected_target_file_sha256 if snapshot else None)
         target = _snapshot_target(raw, env) if snapshot else strict_json(raw)
         if type(target) is not dict:
             raise ValueError
@@ -220,6 +239,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
                   cprobe=transport, workdir=workdir, started=utcnow())
         if status_profile:
             ctx._collection_target = target
+            ctx._collection_status_snapshot_only = self.cfg.get(COLLECTION_STATUS_SNAPSHOT_OPTION) is True
             ctx._collection_status_cleanup = []
         draft = self._finish(ctx)
         draft.cleanup_errors.extend(transport.report()["cleanup_errors"])
@@ -268,7 +288,8 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
         try:
             result = ctx.cprobe.engine_logs(since, MAX_CAPTURE_BYTES)
             raw, pipe = result["stdout_bytes"], result.get("capture") or {}
-            decoded = raw.decode("utf-8", "replace")
+            # Keep malformed bytes distinguishable until the original window has been aligned.
+            decoded = raw.decode("utf-8", "surrogateescape")
             kept, unstamped = [], False
             start, end = _instant(since), _instant(until)
             # 런타임은 \n 단위로만 시각을 붙인다. \r은 메시지 안의 내용이므로 나누지 않는다(OBS-09가 보는 경계다).
@@ -291,7 +312,8 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
                 merged, diag = None, {**diag, "aligned": False, "reason": "attach stream incomplete"}
             source.update(alignment=diag)
             self._source = source
-            text = merged if merged is not None else "".join(kept)
+            text = merged if merged is not None else (
+                "".join(kept).encode("utf-8", "surrogateescape").decode("utf-8", "replace"))
             data = text.encode("utf-8")
             retained = attached["stdout_bytes"] if merged is not None else raw
             return {"text": text, "stderr_text": "", "returncode": result["returncode"],
@@ -365,5 +387,7 @@ class KubernetesLogIntegrityExecutor(LogIntegrityExecutor):
                        packet, values["required_records"]) if collected else None,
                    "producer_authenticated": False, "independent_event_verified": False,
                    "fixture": {"profile": log_collection_gap.PROFILE, "schema": log_collection_gap.SCHEMA}}
+        if self.cfg.get(COLLECTION_STATUS_SNAPSHOT_OPTION) is True and self._expected_target_file_sha256 is not None:
+            summary["target_file_sha256"] = self._expected_target_file_sha256
         normal = {"attempted": collected, "succeeded": None, "detail": "상태 기록의 정상 도착은 생산자 미인증 주장이다."}
         return obs, normal, [{"step": step, "attempted": False} for step in ctx.check.challenge_steps], summary

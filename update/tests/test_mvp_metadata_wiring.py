@@ -15,9 +15,9 @@ from guard.core.execution_recipe import bind_recipe, configuration_sha256
 from guard.core.select import select
 from guard.executors import kubernetes_template_supply as template_executor, registry
 from guard.executors.base import EvidenceDraft
-from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
+from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
-from tests.builders import T0, policy
+from tests.builders import T0, policy, run_under_plan_lock
 from tests.test_lifecycle_capture import REPOSITORY, external  # noqa: F401
 from tests.test_model_preparation_integration import full_inputs
 from tests.test_template_supply_approval import SHA
@@ -131,6 +131,39 @@ def test_prebound_publication_rejects_target_replacement_after_assembly(tmp_path
     assert not any(output.iterdir())
 
 
+@pytest.mark.parametrize('input_name', ['baseline', 'candidate', 'policy'])
+def test_prebound_cli_rejects_shared_input_change_after_readiness_audit(tmp_path, monkeypatch, sources, input_name):
+    _, sides, policy_path = sources
+    source = policy_path if input_name == 'policy' else sides[input_name]['environment']
+    raw = source.read_bytes()
+    audit = tool.readiness.audit
+
+    def audit_then_change(*args, **kwargs):
+        result = audit(*args, **kwargs)
+        assert result['file_binding_valid_sides'] > 0
+        source.write_bytes(raw + b'\n')
+        return result
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Prebound publication must stay offline')
+
+    output, store = tmp_path / 'prebound', tmp_path / 'store'
+    args = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(store), '--output', str(output)]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            args.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', args)
+    monkeypatch.setattr(tool.readiness, 'audit', audit_then_change)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+
+    with pytest.raises(ValueError, match='^MVP_INPUT_FILE_CHANGED$'):
+        tool.main()
+    assert source.read_bytes() == raw + b'\n'
+    assert not any(output.iterdir())
+    assert not store.exists()
+
+
 def test_a_target_from_the_other_release_cannot_be_reused(tmp_path, sources):
     pack, sides, policy_path = sources
     sides['candidate']['target'] = sides['baseline']['target']
@@ -161,9 +194,64 @@ def test_shared_template_siblings_stop_before_any_target_or_transport_access(tmp
                     executor.run(pack.checks[check_id], env, {}, object(), tmp_path / 'unused')
 
 
-def test_staged_configuration_requires_a_fresh_candidate_before_hash_binding(tmp_path, sources):
+def test_sup13_normal_only_prepares_both_owned_targets_without_dispatch(tmp_path, monkeypatch, sources):
+    from guard.configuration import SUP13_NORMAL_OPTION, SUP13_NORMAL_SCOPE_ERROR, bounded_metadata_scopes
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Saved normal template preparation must not dispatch')
+
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
     pack, sides, policy_path = sources
-    config, _, _ = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store')
+    store = tmp_path / 'store'
+    config, bindings, decisions = tool.assemble(sides, policy_path, pack=pack, store=store, sup13_normal=True)
+    assert decisions['SUP-13']['configuration_enabled']
+    assert config['check_config']['SUP-13'] == {SUP13_NORMAL_OPTION: True}
+    assert {'SUP-03', 'REQ-07', 'SUP-13'} <= set(config['update']['allowed_checks'])
+    for row in (row for row in bindings if row['check_id'] == 'SUP-13'):
+        target = sides[row['side']]['target']
+        assert row['target'] == {'path': str(target), 'sha256': sha256_hex(target.read_bytes())}
+
+    output = tmp_path / 'prebound'
+    output.mkdir()
+    tool._publish_prebound(output, config=config, bindings=bindings, checks=decisions, pack=pack,
+                           preparations=None, record_checks=set())
+    rows = tool.readiness.audit(output / 'input-sources.json', pack=pack)['rows']
+    matching = [row for row in rows if row['check_id'] == 'SUP-13']
+    assert len(matching) == 2 and all(row['file_binding_valid'] and not row['engine_executed'] for row in matching)
+
+    envs = [tool.Environment.model_validate_json(row['environment'].read_bytes()) for row in sides.values()]
+    policy = tool.Policy.model_validate_json(policy_path.read_bytes())
+    template_config = deepcopy(config)
+    template_config['update']['allowed_checks'] = ['SUP-03', 'REQ-07', 'SUP-13']
+    prepared = application.update_readiness(pack, envs, policy, template_config)
+    assert prepared['execution_scope']['static_preparation_ready'] is True
+    invalid = deepcopy(config)
+    invalid['check_config']['REQ-07'].clear()
+    with pytest.raises(ValueError, match=SUP13_NORMAL_SCOPE_ERROR):
+        bounded_metadata_scopes((merge_config(invalid, side) for side in invalid['sides'].values()),
+                                pack, update_allowed_checks(invalid, pack))
+    with pytest.raises(ValueError, match=SUP13_NORMAL_SCOPE_ERROR):
+        application._validation_inputs(envs[0], config)
+
+    candidate = sides['candidate']['target']
+    target = json.loads(candidate.read_bytes())
+    target['comparison_config']['launch'].pop('chat_template')
+    _write(candidate, target)
+    _, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=store, sup13_normal=True)
+    assert not decisions['SUP-13']['configuration_enabled']
+    assert decisions['SUP-13']['sides']['baseline'] is None
+    assert decisions['SUP-13']['sides']['candidate'] == 'KUBERNETES_SUP13_NORMAL_CONFIGURATION_INVALID'
+
+@pytest.mark.parametrize('sup13_normal', (False, True))
+def test_staged_configuration_requires_a_fresh_candidate_before_hash_binding(
+        tmp_path, sources, sup13_normal, monkeypatch):
+    pack, sides, policy_path = sources
+    config, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
+                                         sup13_normal=sup13_normal)
+    assert ('SUP-13' in config['update']['allowed_checks']) is sup13_normal
+    if sup13_normal:
+        assert decisions['SUP-13']['configuration_enabled']
     path = sides['candidate']['target']
     preliminary, pointer = tool._source(path)
     env = tool.Environment.model_validate_json(sides['candidate']['environment'].read_bytes())
@@ -174,6 +262,12 @@ def test_staged_configuration_requires_a_fresh_candidate_before_hash_binding(tmp
     assert staged['update']['kubernetes_candidate_binding'] == 'after_baseline'
     assert config['sides']['candidate']['credential_exposure']['target'] == str(path)
     assert staged['sides']['candidate']['credential_exposure']['target'] == str(fresh)
+    if sup13_normal:
+        envs = [tool.Environment.model_validate_json(row['environment'].read_bytes()) for row in sides.values()]
+        only_sup13 = deepcopy(staged)
+        only_sup13['update']['allowed_checks'] = ['SUP-13']
+        pol = tool.Policy.model_validate_json(policy_path.read_bytes())
+        plan = bind_recipe(select(pack, envs, pol, mode='update'), only_sup13, envs)
     _write(fresh, preliminary)
     with pytest.raises(ValueError, match='METADATA_CANDIDATE_GENERATION_NOT_FRESH'):
         tool.revalidate_candidate(staged, env, pointer)
@@ -184,6 +278,34 @@ def test_staged_configuration_requires_a_fresh_candidate_before_hash_binding(tmp
     _write(fresh, current)
     assert tool.revalidate_candidate(staged, env, pointer) == dict.fromkeys(
         config['executors'], sha256_hex(canonical_json(current)))
+    if sup13_normal:
+        # The sealed recipe defers the candidate file. Its existence alone
+        # cannot give the collector a fresh, owner-verified target pin.
+        assert bind_recipe(plan, only_sup13, envs) == plan
+        store = Store(tmp_path / 'store')
+        store.put_many([*envs, pol, plan])
+
+        def forbidden(*args, **kwargs):
+            pytest.fail('An unbound staged SUP-13 must never dispatch')
+
+        monkeypatch.setattr(template_executor.KubernetesTemplateSupplyExecutor, 'run', forbidden)
+        evidence = run_under_plan_lock(store, pack, plan, application.run_config(only_sup13),
+                                       only_side=Side.candidate)
+        withheld, = (row for row in evidence if row.check_id == 'SUP-13')
+        assert withheld.execution.status == ExecStatus.NOT_RUN
+        assert withheld.execution.abort_reason == 'KUBERNETES_SUP13_NORMAL_TARGET_UNAVAILABLE'
+        run = application.run_config(staged)
+        assert tool.bind_staged_candidate(run, env, pointer) == {}
+        assert run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_executor']['template_validation'] == (
+            sha256_hex(canonical_json(current)))
+        synthetic = {**current, 'synthetic': True}
+        _write(fresh, synthetic)
+        assert tool.bind_staged_candidate(run, env, pointer) == {
+            'SUP-13': 'KUBERNETES_SUP13_NORMAL_CONFIGURATION_INVALID'}
+        assert run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_executor']['template_validation'] == (
+            sha256_hex(canonical_json(synthetic)))
+        assert run.side_configs['candidate'].raw['_kubernetes_target_sha256_by_check'] == {}
+        _write(fresh, current)
     assert json.loads(path.read_bytes()) == preliminary
     for ownership_change in ('context', 'namespace_uid'):
         moved = deepcopy(current)
@@ -377,10 +499,14 @@ def test_local_metadata_scope_pins_public_update_targets_and_withholds_shared_si
             assert row.execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
 
 
-@pytest.mark.parametrize("case", ["ready", "invalid-candidate", "empty"])
+@pytest.mark.parametrize("case", [
+    "ready", "invalid-candidate", "missing-container-target", "wrong-container-target", "wrong-node-profile", "empty",
+])
 def test_prepare_update_reports_static_prebound_scope(tmp_path, monkeypatch, sources, case):
     from typer.testing import CliRunner
     from guard.cli import app
+    from guard.executors import node_image_proof
+    from guard.executors.kubernetes_container_config import KubernetesContainerConfigExecutor
 
     pack, sides, policy_path = sources
     prior = tool.Policy.model_validate_json(policy_path.read_bytes())
@@ -388,13 +514,19 @@ def test_prepare_update_reports_static_prebound_scope(tmp_path, monkeypatch, sou
     pol = prior.model_copy(update={"scope": prior.scope.model_copy(update={"include": selected})}).seal()
     _write(policy_path, pol.to_dict())
     store = tmp_path / "store"
-    config, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=store,
+    config, bindings, decisions = tool.assemble(sides, policy_path, pack=pack, store=store,
         node_image_verification="local-k3s-containerd-v1", installed_plugin_inventory=True)
     assert all(decisions[check]["configuration_enabled"] for check in selected), decisions
     included = ["SUP-04", "SUP-10"]
     config["update"]["allowed_checks"] = included
     if case == "invalid-candidate":
         config["sides"]["candidate"]["check_config"] = {"SUP-10": {"max_duration_seconds": 0}}
+    elif case == "missing-container-target":
+        config["sides"]["candidate"]["check_config"] = {"SUP-04": {"target": str(tmp_path / "missing.json")}}
+    elif case == "wrong-container-target":
+        config["sides"]["candidate"]["check_config"] = {"SUP-04": {"target": str(sides["baseline"]["target"])}}
+    elif case == "wrong-node-profile":
+        config["sides"]["candidate"]["check_config"] = {"SUP-04": {"node_image_verification": "unsupported"}}
     elif case == "empty":
         config = {"update": {"mode": "external", "allowed_checks": []}}
         included = []
@@ -405,6 +537,8 @@ def test_prepare_update_reports_static_prebound_scope(tmp_path, monkeypatch, sou
         pytest.fail("Static preparation must not dispatch or inspect Docker")
 
     monkeypatch.setattr(application, "Docker", forbidden)
+    monkeypatch.setattr(KubernetesContainerConfigExecutor, "keys", forbidden)
+    monkeypatch.setattr(node_image_proof, "collect_local_node_image_proof", forbidden)
     monkeypatch.setattr(socket, "socket", forbidden)
     monkeypatch.setattr(subprocess, "Popen", forbidden)
     result = CliRunner().invoke(app, ["prepare-update", "--pack", str(tool.readiness.ROOT / "packs/PACK-BASELINE"),
@@ -420,9 +554,37 @@ def test_prepare_update_reports_static_prebound_scope(tmp_path, monkeypatch, sou
     assert checks["execution-scope"] == {"check": "execution-scope", "ok": False,
         "detail": f"{len(excluded)} selected checks are outside the configured update execution scope"}
     assert checks["kubernetes-static-preparation"]["ok"] is True
-    assert checks["inputs"]["ok"] is (case != "invalid-candidate")
-    if case == "invalid-candidate":
-        assert checks["inputs"]["detail"] == "SUP10_INVENTORY_TARGET_UNVERIFIED"
+    errors = {
+        "invalid-candidate": "SUP10_INVENTORY_TARGET_UNVERIFIED",
+        "missing-container-target": "KUBERNETES_CONTAINER_CONFIGURATION_INVALID",
+        "wrong-container-target": "KubernetesBindingError",
+        "wrong-node-profile": "KUBERNETES_CONTAINER_CONFIGURATION_INVALID",
+    }
+    assert checks["inputs"]["ok"] is (case not in errors)
+    if case in errors:
+        assert checks["inputs"]["detail"] == errors[case]
+
+    if "SUP-04" in included:
+        index = tmp_path / "sup04-sources.json"
+        sources_for_check = [row for row in bindings if row["check_id"] == "SUP-04"]
+        tool._write_input_sources(index, pack, sources_for_check,
+                                  {"path": str(config_path), "sha256": sha256_hex(config_path.read_bytes())})
+        audited = tool.readiness.audit(index, pack=pack, issued_at=T0)
+        rows = {row["side"]: row for row in audited["rows"] if row["check_id"] == "SUP-04"}
+        offline_errors = {
+            "wrong-node-profile": "KUBERNETES_CONTAINER_CONFIGURATION_INVALID",
+            "missing-container-target": "MVP_TARGET_REFERENCE_PATH_MISMATCH",
+            "wrong-container-target": "MVP_TARGET_REFERENCE_PATH_MISMATCH",
+        }
+        for side, row in rows.items():
+            expected_gap = offline_errors.get(case) if side == "candidate" else None
+            assert row["file_binding_valid"] is (expected_gap is None)
+            if expected_gap is None:
+                assert row["node_image_verification"] == "local-k3s-containerd-v1"
+                assert row["blocking_codes"] == ["LIVE_EXECUTOR_PREFLIGHT_REQUIRED"]
+            else:
+                assert row["blocking_codes"] == [expected_gap]
+            assert not row["live_target_verified"] and row["actual_results"] is None
     assert not store.exists()
 
 
@@ -551,7 +713,6 @@ def test_plt07_cilium_status_and_obs04_local_mode_use_independent_owned_bindings
     ('changed', 'CILIUM_AGENT_GENERATION_CHANGED'),
 ])
 def test_staged_candidate_cilium_gap_does_not_abort_other_admitted_checks(tmp_path, sources, monkeypatch, gap, reason):
-    from guard.core.run import run_plan
     from guard.executors.kubernetes_egress_product import KubernetesEgressProductExecutor
     from guard.executors.kubernetes_ipc_product import KubernetesIPCProductExecutor
     from guard.executors.kubernetes_passive_egress_policy import KubernetesPassiveEgressPolicyExecutor
@@ -605,7 +766,7 @@ def test_staged_candidate_cilium_gap_does_not_abort_other_admitted_checks(tmp_pa
         lambda self, check, env, *_: collect(check, env, self._expected_target_sha256))
     monkeypatch.setattr(KubernetesEgressProductExecutor, 'run',
         lambda self, check, env, *_: collect(check, env, None))
-    baseline_rows = {row.check_id: row for row in run_plan(store, pack, plan, run, only_side=Side.baseline)}
+    baseline_rows = {row.check_id: row for row in run_under_plan_lock(store, pack, plan, run, only_side=Side.baseline)}
     assert all(baseline_rows[cid].execution.status == ExecStatus.COMPLETED for cid in admitted)
 
     current, preliminary_ref = tool._source(sides['candidate']['target'])
@@ -624,7 +785,7 @@ def test_staged_candidate_cilium_gap_does_not_abort_other_admitted_checks(tmp_pa
     candidate = run.side_configs['candidate']
     assert candidate.raw['_kubernetes_target_sha256_by_executor'] == {'unix_ipc': expected[envs[1].id]}
     assert candidate.raw['_kubernetes_target_sha256_by_check'] == {'OBS-04': expected[envs[1].id], 'PLT-07': None}
-    rows = {row.check_id: row for row in run_plan(store, pack, plan, run, only_side=Side.candidate)}
+    rows = {row.check_id: row for row in run_under_plan_lock(store, pack, plan, run, only_side=Side.candidate)}
     assert rows['OBS-04'].execution.status == rows['PLT-06'].execution.status == ExecStatus.COMPLETED
     assert rows['OBS-05'].execution.abort_reason == 'UPDATE_CHECK_OUTSIDE_EXECUTION_SCOPE'
     failed = rows['PLT-07']
@@ -632,7 +793,7 @@ def test_staged_candidate_cilium_gap_does_not_abort_other_admitted_checks(tmp_pa
     assert failed.execution.executor is None and not failed.normal_control.attempted and not failed.artifacts
 
     candidate.check_abort_reasons.clear()
-    without_diagnostic = {row.check_id: row for row in run_plan(store, pack, plan, run, only_side=Side.candidate)}
+    without_diagnostic = {row.check_id: row for row in run_under_plan_lock(store, pack, plan, run, only_side=Side.candidate)}
     assert without_diagnostic['PLT-07'].execution.status == ExecStatus.NOT_RUN
     assert without_diagnostic['PLT-07'].execution.abort_reason == 'RUN_BINDING_PLT07_NORMAL_TARGET_UNAVAILABLE'
     assert set(dispatched) == {(cid, envs[0].id) for cid in admitted} | {
@@ -645,7 +806,6 @@ def test_staged_candidate_cilium_gap_does_not_abort_other_admitted_checks(tmp_pa
 
 
 def test_plt07_cilium_status_cannot_enable_legacy_or_unmarked_scope(tmp_path, sources, monkeypatch):
-    from guard.core.run import run_plan
 
     pack, sides, policy_path = sources
     pol = tool.Policy.model_validate_json(policy_path.read_bytes())
@@ -673,7 +833,7 @@ def test_plt07_cilium_status_cannot_enable_legacy_or_unmarked_scope(tmp_path, so
             application.execute_update(store, pack, envs, pol, invalid, tmp_path / 'run', utcnow())
     assert not (tmp_path / 'run').exists()
     with pytest.raises(ValueError, match='CILIUM_EGRESS_STATUS_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, select(pack, envs[:1], pol, mode='audit'), application.run_config(cfg))
+        run_under_plan_lock(store, pack, select(pack, envs[:1], pol, mode='audit'), application.run_config(cfg))
 
 
 def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, sources):
@@ -686,7 +846,8 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
            'boundary_egress': {'target': str(target_path)},
            'check_config': {'OBS-04': {'target': str(target_path), 'local_observation_only': True}}}
     plan = select(pack, envs, pol, mode='update')
-    expected_recipe = configuration_sha256(cfg, envs)
+    requested = deepcopy(cfg)
+    expected_recipe = configuration_sha256(requested, envs)
     paths = application._bounded_kubernetes_targets(cfg, {'OBS-04': 'boundary_egress'})
     snapshots = {target_path: None}
     reads = []
@@ -708,7 +869,66 @@ def test_bounded_prebound_target_identity_uses_the_recipe_snapshot(monkeypatch, 
         assert reads == [target_path]
     assert cfg['_kubernetes_target_sha256_by_check'] == {
         'OBS-04': sha256_hex(canonical_json(json.loads(original_bytes)))}
-    assert configuration_sha256(cfg, envs) != expected_recipe
+    assert configuration_sha256(requested, envs) != expected_recipe
+    with pytest.raises(ValueError, match='REQUESTED_CONFIG_RESERVED_KEY'):
+        configuration_sha256(cfg, envs)
+
+
+@pytest.mark.parametrize('replace_target', [False, True], ids=['stable', 'changed-owner'])
+def test_obs03_prebound_update_uses_the_locked_effective_target(tmp_path, sources, monkeypatch, replace_target):
+    from guard.executors.kubernetes_log_analysis import KubernetesLogAnalysisExecutor
+    from tests.test_kubernetes_passive_log_analysis import VALUES
+
+    pack, sides, policy_path = sources
+    check_id, executor = 'OBS-03', 'log_analysis'
+    original = tool.Policy.model_validate_json(policy_path.read_bytes())
+    pol = original.model_copy(update={'values': {check_id: VALUES},
+        'scope': original.scope.model_copy(update={'include': [check_id]})}).seal()
+    envs = [tool.Environment.model_validate_json(side['environment'].read_bytes()) for side in sides.values()]
+    decoy = _write(tmp_path / 'default-target.json', {})
+    config = {'adapter': {'name': 'vllm'}, 'update': {'mode': 'external', 'allowed_checks': [check_id]},
+              'executors': {executor: 'kubernetes'}, executor: {'target': str(decoy)},
+              'sides': {side: {'check_config': {check_id: {'target': str(paths['target'])}}}
+                        for side, paths in sides.items()}}
+    path = sides['candidate']['target']
+    raw = path.read_bytes()
+    replacement = json.loads(raw)
+    replacement['kubernetes']['engine']['pod_uid'] = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    replacement['kubernetes']['engine']['container_id'] = 'containerd://' + 'a' * 64
+    expected = {env.id: sha256_hex(sides[side]['target'].read_bytes()) for side, env in zip(sides, envs)}
+    prepared = KubernetesLogAnalysisExecutor.prepared_container_configuration
+    collected = []
+
+    def prepare(executor, check, env):
+        if replace_target and env == envs[1]:
+            assert executor.cfg['target'] == str(path)
+            _write(path, replacement)
+            try:
+                return prepared(executor, check, env)
+            finally:
+                path.write_bytes(raw)
+        return prepared(executor, check, env)
+
+    def collect(executor, ctx):
+        collected.append((ctx.env.id, executor._expected_target_sha256, sha256_hex(canonical_json(ctx.target))))
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False, 'succeeded': None, 'detail': ''})
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('OBS-03 recipe custody regression cannot dispatch')
+
+    monkeypatch.setattr(KubernetesLogAnalysisExecutor, 'prepared_container_configuration', prepare)
+    monkeypatch.setattr(KubernetesLogAnalysisExecutor, '_finish', collect)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    store = Store(tmp_path / 'store')
+    application.execute_update(store, pack, envs, pol, config, tmp_path / 'update', utcnow())
+    rows = {row.side: row.execution for row in store.iter_kind('EVD') if row.check_id == check_id}
+    assert rows[Side.baseline].status == ExecStatus.COMPLETED
+    assert rows[Side.candidate].status == (ExecStatus.ABORTED if replace_target else ExecStatus.COMPLETED)
+    assert rows[Side.candidate].abort_reason == ('EXECUTOR_FAILURE' if replace_target else None)
+    assert collected == [(env.id, expected[env.id], expected[env.id]) for env in (envs[:1] if replace_target else envs)]
+    assert path.read_bytes() == raw
 
 
 def test_obs02_normal_readiness_binds_the_same_product_plan_and_owned_targets(tmp_path, sources, monkeypatch):
@@ -790,7 +1010,6 @@ def test_obs02_normal_readiness_binds_the_same_product_plan_and_owned_targets(tm
 
 
 def test_obs02_normal_marker_cannot_dispatch_legacy_or_unpaired_paths(tmp_path, sources, monkeypatch):
-    from guard.core.run import run_plan
     from guard.executors.kubernetes_normal_serving_readiness import KubernetesNormalServingReadinessExecutor
 
     pack, sides, policy_path = sources
@@ -821,7 +1040,7 @@ def test_obs02_normal_marker_cannot_dispatch_legacy_or_unpaired_paths(tmp_path, 
     with pytest.raises(ValueError, match='NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID'):
         application._validation_inputs(envs[0], scoped)
     with pytest.raises(ValueError, match='NORMAL_SERVING_READINESS_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(scoped))
+        run_under_plan_lock(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(scoped))
 
     cfg = {'observation_state': {'target': str(sides['baseline']['target']), option: False}}
     executor = registry.build_executor('observation_state', 'kubernetes', cfg,
@@ -924,7 +1143,6 @@ def test_req09_pair_checks_owned_targets_and_withholds_legacy_siblings(tmp_path,
 
 
 def test_req09_rejects_mixed_legacy_dispatch_before_any_executor(tmp_path, sources, monkeypatch):
-    from guard.core.run import run_plan
     from guard.executors.kubernetes_input_matrix import KubernetesMatrixInputValidationExecutor
     from guard.executors.kubernetes_normal_token_input import KubernetesNormalTokenInputExecutor
     from guard.store.packs import put_pack
@@ -973,14 +1191,14 @@ def test_req09_rejects_mixed_legacy_dispatch_before_any_executor(tmp_path, sourc
     run = application.run_config(scoped)
     run.side_configs['candidate'].raw['check_config'].pop('REQ-09')
     with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, plan, run)
+        run_under_plan_lock(store, pack, plan, run)
     run.side_configs['baseline'].raw['check_config'].pop('REQ-09')
     with pytest.raises(ValueError, match='OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID'):
-        run_plan(store, pack, plan, run)
+        run_under_plan_lock(store, pack, plan, run)
 
     audit = select(pack, envs[:1], pol, mode='audit')
     with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, audit, application.run_config(scoped))
+        run_under_plan_lock(store, pack, audit, application.run_config(scoped))
     with pytest.raises(ValueError, match='NORMAL_TOKEN_INPUT_EXECUTION_SCOPE_INVALID'):
         application._validation_inputs(envs[0], scoped)
 
@@ -1001,7 +1219,6 @@ def test_req09_rejects_mixed_legacy_dispatch_before_any_executor(tmp_path, sourc
 
 
 def test_req10_pair_preserves_policy_scope_and_pins_the_staged_candidate(tmp_path, sources, monkeypatch):
-    from guard.core.run import run_plan
     from guard.store.packs import put_pack
 
     pack, sides, policy_path = sources
@@ -1057,10 +1274,10 @@ def test_req10_pair_preserves_policy_scope_and_pins_the_staged_candidate(tmp_pat
     run = application.run_config(staged)
     run.side_configs['candidate'].raw['check_config'].pop('REQ-10')
     with pytest.raises(ValueError, match='NORMAL_SAMPLING_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, plan, run)
+        run_under_plan_lock(store, pack, plan, run)
     run.side_configs['baseline'].raw['check_config'].pop('REQ-10')
     with pytest.raises(ValueError, match='OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID'):
-        run_plan(store, pack, plan, run)
+        run_under_plan_lock(store, pack, plan, run)
 
 
 def test_lif04_normal_preparation_binds_actual_target_without_enabling_stream_sibling(tmp_path, sources):
@@ -1170,7 +1387,6 @@ def test_paired_lif03_and_lif04_keep_independent_executors_on_the_same_owned_tar
 
 
 def test_lif03_scope_rejects_combined_or_incomplete_flags_before_preparation(tmp_path, sources, monkeypatch):
-    from guard.core.run import run_plan
 
     pack, sides, policy_path = sources
     policy = tool.Policy.model_validate_json(policy_path.read_bytes())
@@ -1199,7 +1415,7 @@ def test_lif03_scope_rejects_combined_or_incomplete_flags_before_preparation(tmp
         with pytest.raises(ValueError, match='NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID'):
             application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
     with pytest.raises(ValueError, match='NORMAL_REQUEST_LATENCY_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
+        run_under_plan_lock(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
     assert not (tmp_path / 'run').exists()
 
 
@@ -1384,6 +1600,101 @@ def test_gateway_audit_wiring_is_prebound_and_requires_two_distinct_owned_reques
         tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', gateway_record_inputs=gateway_inputs)
 
 
+@pytest.mark.parametrize('damage', [None, 'missing-pin', 'wrong-hash', 'other-context', 'no-gateway', 'linked-target'])
+def test_gateway_audit_cli_preserves_separately_pinned_ordinary_targets(tmp_path, sources, monkeypatch, damage):
+    from tools import mvp_gateway_preparation as preparation
+
+    pack, sides, policy_path = sources
+    seed = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {
+        'SUP-04': seed.values['SUP-04'],
+        'OBS-01': {'observation_required_events': ['ACCESS_ALLOWED'],
+                   'observation_required_fields': ['actor_sha256', 'target_sha256', 'run_sha256', 'policy_sha256'],
+                   'observation_max_delay_ms': 5000},
+    }
+    policy = seed.model_copy(update={'values': values,
+        'scope': seed.scope.model_copy(update={'include': list(values)})}).seal()
+    _write(policy_path, policy.to_dict())
+    producer_bytes = b'# fixture producer\n'
+    monkeypatch.setattr(preparation, 'PRODUCER_SHA256', sha256_hex(producer_bytes))
+    gateway = {}
+    originals = {}
+    for number, (side, paths) in enumerate(sides.items(), 1):
+        target = json.loads(paths['target'].read_bytes())
+        engine = target['kubernetes']['engine']
+        target['kubernetes']['probe'].update(namespace=engine['namespace'], namespace_uid=engine['namespace_uid'])
+        _write(paths['target'], target)
+        gateway_target = {**deepcopy(target), 'kubernetes_gateway': {**engine, 'pod': f'gateway-{side}',
+            'container': 'gateway', 'pod_uid': f'00000000-0000-0000-0001-{number:012d}',
+            'container_id': f'containerd://{90 + number:064x}', 'pod_ip': f'10.2.3.{number}',
+            'image': preparation.GATEWAY_IMAGE, 'image_id': preparation.GATEWAY_IMAGE}}
+        if side == 'candidate' and damage == 'other-context':
+            gateway_target['kubernetes']['context'] = 'other-fixture-context'
+        if side == 'candidate' and damage == 'no-gateway':
+            del gateway_target['kubernetes_gateway']
+        target_path = _write(tmp_path / f'{side}-gateway-target.json', gateway_target)
+        producer = tmp_path / f'{side}-gateway-producer.py'
+        producer.write_bytes(producer_bytes)
+        target_pointer = {'path': str(target_path), 'sha256': sha256_hex(target_path.read_bytes())}
+        gateway[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
+            'test_actors': {'allowed': 'a' * 64}, 'target': target_pointer,
+            'gateway_record_source': {'environment': preparation.GATEWAY_ENV, 'target_id': 'fixture-target',
+                'runtime_policy_sha256': 'f' * 64, 'request_sha256': f'{number:064x}'}}
+        for path in (target_path, paths['target'], producer):
+            originals[path] = path.read_bytes()
+    if damage == 'missing-pin':
+        del gateway['candidate']['target']
+    if damage == 'wrong-hash':
+        gateway['candidate']['target']['sha256'] = 'e' * 64
+    if damage == 'linked-target':
+        alias = tmp_path / 'linked-candidate-target.json'
+        alias.symlink_to(gateway['candidate']['target']['path'])
+        gateway['candidate']['target']['path'] = str(alias)
+    binding_path = _write(tmp_path / 'gateway-bindings.json', gateway)
+    output = tmp_path / 'prebound'
+    argv = ['mvp_metadata_wiring', '--gateway-record-inputs', str(binding_path), '--policy', str(policy_path),
+            '--store', str(tmp_path / 'store'), '--output', str(output)]
+    for side, paths in sides.items():
+        for role, path in paths.items():
+            argv.extend([f'--{side}-{role}', str(path)])
+    monkeypatch.setattr(sys, 'argv', argv)
+
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('The saved Gateway receipt must be validated offline')
+
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    if damage:
+        with pytest.raises(ValueError, match='^GATEWAY_RECORD_TARGETS_UNVERIFIED$'):
+            tool.main()
+        assert not output.exists()
+        assert all(path.read_bytes() == raw for path, raw in originals.items())
+        return
+
+    tool.main()
+    cfg = tomllib.loads((output / 'guard.toml').read_text())
+    index = output / 'input-sources.json'
+    rows = {(row['check_id'], row['side']): row for row in json.loads(index.read_bytes())['inputs']}
+    assert set(cfg['update']['allowed_checks']) == {'OBS-01', 'SUP-04'}
+    for side, paths in sides.items():
+        merged = merge_config(cfg, cfg['sides'][side])
+        effective = for_check(merged, 'required_event_record', 'OBS-01')['required_event_record']
+        assert merged['required_event_record']['target'] == str(paths['target'])
+        assert effective['target'] == gateway[side]['target']['path']
+        assert rows['OBS-01', side]['target'] == gateway[side]['target']
+        assert rows['OBS-01', side]['record_inputs']['target_file_sha256'] == gateway[side]['target']['sha256']
+        assert rows['SUP-04', side]['target'] == {'path': str(paths['target']), 'sha256': sha256_hex(originals[paths['target']])}
+    result = tool.readiness.audit(index, pack=pack)
+    assert result['file_binding_valid_sides'] == 4
+    assert all(not row['engine_executed'] and row['actual_results'] is None for row in result['rows'])
+    assert all(path.read_bytes() == raw for path, raw in originals.items())
+    changed = Path(gateway['candidate']['target']['path'])
+    changed.write_bytes(originals[changed] + b'\n')
+    audited = {(row['check_id'], row['side']): row for row in tool.readiness.audit(index, pack=pack)['rows']}
+    assert audited['OBS-01', 'candidate']['blocking_codes'] == ['MVP_INPUT_HASH_MISMATCH']
+    assert all(audited[key]['file_binding_valid'] for key in rows if key != ('OBS-01', 'candidate'))
+
+
 def test_sup10_installed_inventory_uses_exact_pair_and_empty_policy(tmp_path, sources, monkeypatch):
     from guard.executors import run_binding
     from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
@@ -1460,7 +1771,6 @@ def test_sup10_installed_inventory_uses_exact_pair_and_empty_policy(tmp_path, so
 
 
 def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_path, sources, monkeypatch):
-    from guard.core.run import run_plan
 
     pack, sides, policy_path = sources
     policy = tool.Policy.model_validate_json(policy_path.read_bytes())
@@ -1488,7 +1798,7 @@ def test_sup10_installed_inventory_scope_cannot_fall_through_to_supply_boot(tmp_
             application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
     assert not (tmp_path / 'run').exists()
     with pytest.raises(ValueError, match='INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID'):
-        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
+        run_under_plan_lock(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(cfg))
 
 
 def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(tmp_path, external, monkeypatch):
@@ -1603,7 +1913,12 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
     assert not nested.exists()
 
     prepared = Path(outputs['candidate']['normal']['prepared'])
+    reference_manifest = Path(outputs['candidate']['normal']['reference_manifest'])
     original_bytes = prepared.read_bytes()
+    normal_file_hashes = {}
+    recipe = configuration_sha256(config, envs, normal_file_hashes=normal_file_hashes)
+    assert normal_file_hashes[str(prepared)] == sha256_hex(original_bytes)
+    assert normal_file_hashes[str(reference_manifest)] == sha256_hex(reference_manifest.read_bytes())
     assemble = tool.assemble
 
     def change_after_assembly(*args, **kwargs):
@@ -1620,6 +1935,7 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
             tool.main()
     assert declined.is_dir() and not any(declined.iterdir())
     assert prepared.read_bytes() == original_bytes + b'\n'
+    assert configuration_sha256(config, envs) != recipe
     stale = tool.readiness.audit(index, pack=pack)
     assert stale['file_binding_valid_sides'] == 3
     candidate = next(row for row in stale['rows'] if row['check_id'] == 'SUP-05' and row['side'] == 'candidate')
@@ -1627,6 +1943,168 @@ def test_sup05_cli_binds_both_saved_preparations_and_keeps_the_ordinary_sibling(
     blocked = application.update_readiness(pack, envs, pol, config)
     inputs_check = next(row for row in blocked['checks'] if row['check'] == 'inputs')
     assert not inputs_check['ok'] and inputs_check['detail'] == 'SUP05_PREPARATION_RECEIPT_INVALID'
+
+
+@pytest.mark.parametrize('damage', [None, 'one-side', 'format-change', 'ready-change',
+                                   'other-owner', 'reused-owner', 'late-original'])
+def test_tp2_prefix_outputs_keep_the_original_ordinary_and_gateway_bindings(
+        tmp_path, sources, monkeypatch, capsys, damage):
+    from guard.executors import kubernetes_normal_startup_load as startup
+    from tests.test_gpu_a_run_inputs import deployed
+    from tools import gpu_a_run_inputs, mvp_gateway_preparation, mvp_lifecycle_transition_inputs
+
+    pack, _, policy_path = sources
+    seed = tool.Policy.model_validate_json(policy_path.read_bytes())
+    values = {'LIF-01': {'supply_stage_budget_ms': {'load': 600000},
+                         'supply_stage_budget_bytes': {'load': 17179869184}, 'supply_total_budget_ms': 1800000},
+              'SUP-12': {'supply_allowed_readers': ['safetensors']}}
+    if damage != 'late-original':
+        values.update({'SUP-04': seed.values['SUP-04'],
+                       'OBS-01': {'observation_required_events': ['ACCESS_ALLOWED'],
+                                  'observation_required_fields': ['actor_sha256', 'target_sha256',
+                                                                  'run_sha256', 'policy_sha256'],
+                                  'observation_max_delay_ms': 5000}})
+    selected = seed.model_copy(update={'values': values,
+        'scope': seed.scope.model_copy(update={'include': [*values, 'REQ-20', 'SUP-07', 'SUP-10']})}).seal()
+    _write(policy_path, selected.to_dict())
+
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('A saved startup pair must not contact the workload')
+
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    monkeypatch.setattr(startup, 'capture_startup_log_prefix',
+                        lambda target, env: {**target[startup.STARTUP_READY_WINDOW],
+                                             'byte_count': 128, 'sha256': sha256_hex(env.engine.version.encode())})
+    producer_bytes = b'# fixture Gateway producer\n'
+    monkeypatch.setattr(mvp_gateway_preparation, 'PRODUCER_SHA256', sha256_hex(producer_bytes))
+
+    def pointer(path):
+        return {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+
+    prefix_inputs, gateway_inputs, environments, originals = {}, {}, {}, {}
+    output = tmp_path / 'prepared'
+    argv = ['mvp_metadata_wiring', '--policy', str(policy_path), '--store', str(tmp_path / 'store'),
+            '--output', str(output), '--normal-startup-load', '--normal-graph-capture',
+            '--normal-compile-cache', '--normal-safetensors-reader', '--installed-plugin-inventory']
+    for number, (side, release) in enumerate(tool.versions().items(), 1):
+        folder = tmp_path / side
+        folder.mkdir()
+        pods, render = deployed(folder, 'v2-default', run_id=f'fixture-{side}', normal_tp2=True,
+                               engine_version=release['version'], engine_image=release['image'], release_launch=True)
+        namespace = json.loads((folder / 'namespace.json').read_bytes())
+        for offset, pod in enumerate(pods.values(), 1):
+            pod['kind'] = 'Pod'
+            generation = offset if damage == 'reused-owner' else 10 * number + offset
+            pod['metadata']['uid'] = f'00000000-0000-0000-0000-{generation:012d}'
+            pod['status']['containerStatuses'][0]['containerID'] = f'containerd://{generation:064x}'
+        pods['engine']['status']['conditions'][0]['lastTransitionTime'] = '2026-11-04T01:00:35.123456789Z'
+        env = gpu_a_run_inputs.environment(render, inventory='b' * 64, gpu_model='NVIDIA L4', driver='Fixture driver',
+            observed_engine_version=release['version'], external_platform='Linux x86_64',
+            engine_pod=pods['engine'], namespace=namespace, observed_gpu_count=2)
+        original = gpu_a_run_inputs.target(env, render, namespace, pods['engine'], pods['probe'],
+                                         context='fixture-context', observed_engine_version=release['version'])
+        environment = _write(folder / 'environment.json', env.to_dict())
+        target = _write(folder / 'target.json', original)
+        captured = folder / 'prefixed.json'
+        env_pointer, target_pointer = pointer(environment), pointer(target)
+        gpu_a_run_inputs.main(['startup-prefix', '--env', env_pointer['path'], '--env-sha256', env_pointer['sha256'],
+                               '--target', target_pointer['path'], '--target-sha256', target_pointer['sha256'],
+                               '--out', str(captured)])
+        receipt = json.loads(capsys.readouterr().out)
+        prefix_pointer = {'path': receipt['target'], 'sha256': receipt['target_file_sha256']}
+        if side == 'candidate' and damage in ('ready-change', 'other-owner'):
+            updated = json.loads(captured.read_bytes())
+            if damage == 'ready-change':
+                updated['startup_log_prefix']['ready_at'] = '2026-11-04T01:00:35.123456790Z'
+            else:
+                updated['kubernetes']['engine']['container_id'] = 'containerd://' + 'f' * 64
+            _write(captured, updated)
+            prefix_pointer = pointer(captured)
+        prefix_inputs[side] = {'environment': env_pointer, 'target': target_pointer, 'prefixed_target': prefix_pointer}
+        if side == 'candidate' and damage == 'format-change':
+            captured.write_bytes(captured.read_bytes() + b'\n')
+        environments[side] = env
+        argv.extend([f'--{side}-environment', str(environment), f'--{side}-target', str(target)])
+
+        gateway_image = mvp_gateway_preparation.GATEWAY_IMAGE
+        gateway = {**original['kubernetes']['engine'], 'pod': f'gateway-{side}', 'container': 'gateway',
+                   'pod_uid': f'10000000-0000-0000-0000-{number:012d}', 'container_id': f'containerd://{90 + number:064x}',
+                   'pod_ip': f'10.2.3.{number}', 'image': gateway_image, 'image_id': gateway_image}
+        gateway_path = _write(folder / 'gateway-target.json', {**original, 'kubernetes_gateway': gateway})
+        producer = folder / 'gateway-producer.py'
+        producer.write_bytes(producer_bytes)
+        gateway_inputs[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
+            'test_actors': {'allowed': 'a' * 64}, 'target': pointer(gateway_path),
+            'gateway_record_source': {'environment': mvp_gateway_preparation.GATEWAY_ENV, 'target_id': 'fixture-target',
+                'runtime_policy_sha256': 'f' * 64, 'request_sha256': f'{number:064x}'}}
+        originals.update({path: path.read_bytes() for path in (environment, target, captured, gateway_path, producer)})
+
+    if damage == 'one-side':
+        del prefix_inputs['candidate']
+    prefix_declaration = _write(tmp_path / 'startup-prefix-inputs.json', prefix_inputs)
+    argv += ['--startup-prefix-inputs', str(prefix_declaration)]
+    if damage != 'late-original':
+        gateway_path = _write(tmp_path / 'gateway-inputs.json', gateway_inputs)
+        argv += ['--gateway-record-inputs', str(gateway_path)]
+    monkeypatch.setattr(sys, 'argv', argv)
+
+    if damage == 'late-original':
+        audit = tool.readiness.audit
+        original = Path(prefix_inputs['candidate']['target']['path'])
+
+        def audit_then_change(*args, **kwargs):
+            report = audit(*args, **kwargs)
+            original.write_bytes(originals[original] + b'\n')
+            return report
+
+        monkeypatch.setattr(tool.readiness, 'audit', audit_then_change)
+    if damage:
+        code = {'late-original': 'STARTUP_PREFIX_INPUTS_PUBLICATION_UNVERIFIED',
+                'reused-owner': 'STARTUP_PREFIX_PAIR_OWNERS_REUSED'}.get(damage, 'STARTUP_PREFIX_INPUTS_UNVERIFIED')
+        with pytest.raises(ValueError, match=f'^{code}$'):
+            tool.main()
+        assert not output.exists() or not list(output.iterdir())
+        if damage != 'late-original':
+            assert all(path.read_bytes() == raw for path, raw in originals.items())
+        return
+
+    tool.main()
+    config = tomllib.loads((output / 'guard.toml').read_text())
+    index_path = output / 'input-sources.json'
+    entries = {(row['check_id'], row['side']): row for row in json.loads(index_path.read_bytes())['inputs']}
+    startup = {'LIF-01', 'REQ-20', 'SUP-07', 'SUP-12'}
+    expected = startup | {'SUP-10', 'SUP-04', 'OBS-01'}
+    assert set(config['update']['allowed_checks']) == expected
+    for side in environments:
+        effective = merge_config(config, config['sides'][side])
+        prefixed = prefix_inputs[side]['prefixed_target']
+        for check_id in startup | {'SUP-10'}:
+            executor = tool.CHECK_EXECUTORS[check_id]
+            assert for_check(effective, executor, check_id)[executor]['target'] == prefixed['path']
+            assert entries[check_id, side]['target'] == prefixed
+        assert entries['SUP-04', side]['target'] == prefix_inputs[side]['target']
+        assert entries['OBS-01', side]['target'] == gateway_inputs[side]['target']
+    report = json.loads((output / 'readiness.json').read_bytes())
+    assert report['startup_prefix_inputs'] == prefix_inputs
+    assert report['file_binding_valid_sides'] == 2 * len(expected)
+    assert report['actual_results'] is None
+
+    retained = {'index': pointer(index_path), 'targets': {side: row['target'] for side, row in prefix_inputs.items()}}
+    env_refs = {side: env.ref().model_dump(mode='json') for side, env in environments.items()}
+    captured_files = []
+    assembled, bindings, _, _ = mvp_lifecycle_transition_inputs._prebound_metadata(
+        retained, pack, selected, env_refs, captured_files)
+    assert assembled == config
+    assert {(row['check_id'], row['side']): row['target'] for row in bindings} == {
+        key: row['target'] for key, row in entries.items()}
+    for side in environments:
+        expected_prefix = prefix_inputs[side]['prefixed_target']
+        assert any(str(path) == expected_prefix['path'] and sha256_hex(raw) == expected_prefix['sha256']
+                   for path, raw, *_ in captured_files)
+    prepared = application.update_readiness(pack, list(environments.values()), selected, assembled)
+    assert prepared['execution_scope']['static_preparation_ready'], prepared
+    assert all(path.read_bytes() == raw for path, raw in originals.items())
 
 
 def _startup_declaration(paths, *, source_commit=None):
@@ -1676,7 +2154,12 @@ def test_startup_tools_check_exact_declared_provider_source(tmp_path, sources, m
     for check_id, reason in required.items():
         assert decisions[check_id]['sides'] == {'baseline': None, 'candidate': reason}
     prepared = application.update_readiness(pack, envs, pol, cfg)
-    assert next(row for row in prepared['checks'] if row['check'] == 'inputs')['detail'] == 'KUBERNETES_SCOPED_TARGET_INVALID'
+    assert next(row for row in prepared['checks'] if row['check'] == 'inputs') == {
+        'check': 'inputs', 'ok': False, 'detail': '2 preparation input errors are listed below'}
+    blocked_inputs = {row['check']: (row['ok'], row['detail']) for row in prepared['checks']
+                      if row['check'].startswith('inputs:')}
+    assert blocked_inputs == {f'inputs:candidate/{check_id}': (False, 'KUBERNETES_SCOPED_TARGET_INVALID')
+                              for check_id in required}
 
     configuration = tmp_path / 'guard.toml'
     tool.write_config(cfg, configuration)
@@ -1701,7 +2184,6 @@ def test_startup_tools_check_exact_declared_provider_source(tmp_path, sources, m
 def test_startup_checks_prepare_separate_owned_bindings(
         tmp_path, sources, monkeypatch, compile_enabled, reader_enabled, graph_enabled):
     from guard.adapters.engine_provider import get_provider
-    from guard.core.run import run_plan
     from guard.executors import run_binding
     from guard.executors.engine_sensor import EngineSensorExecutor
     from guard.executors.kubernetes_installed_plugin_inventory import KubernetesInstalledPluginInventoryExecutor
@@ -1913,7 +2395,7 @@ def test_startup_checks_prepare_separate_owned_bindings(
     monkeypatch.setattr(KubernetesNormalCompileCacheExecutor, 'run', forbid_legacy)
     monkeypatch.setattr(KubernetesNormalSafetensorsReaderExecutor, 'run', reader_run)
     monkeypatch.setattr(KubernetesNormalGraphCaptureExecutor, 'run', graph_run)
-    actual = {row.check_id: row for row in run_plan(staged_store, pack, plan, run, only_side=Side.candidate)}
+    actual = {row.check_id: row for row in run_under_plan_lock(staged_store, pack, plan, run, only_side=Side.candidate)}
     for check_id, reason in startup_gaps.items():
         evidence = actual[check_id]
         assert evidence.execution.status == ExecStatus.ABORTED and evidence.execution.abort_reason == reason
@@ -1933,7 +2415,6 @@ def test_startup_checks_prepare_separate_owned_bindings(
     ('SUP-12', 'normal_safetensors_reader_only', 'NORMAL_SAFETENSORS_READER_EXECUTION_SCOPE_INVALID'),
 ])
 def test_startup_supply_checks_cannot_enable_legacy_dispatch(tmp_path, sources, monkeypatch, check_id, marker, scope_error):
-    from guard.core.run import run_plan
 
     pack, sides, policy_path = sources
     policy = tool.Policy.model_validate_json(policy_path.read_bytes())
@@ -1963,13 +2444,12 @@ def test_startup_supply_checks_cannot_enable_legacy_dispatch(tmp_path, sources, 
     audit = select(pack, envs[:1], policy, mode='audit')
     startup_only = {**missing, 'update': {'allowed_checks': [check_id]}}
     with pytest.raises(ValueError, match=f'^{scope_error}$'):
-        run_plan(store, pack, audit, application.run_config(startup_only))
+        run_under_plan_lock(store, pack, audit, application.run_config(startup_only))
     with pytest.raises(ValueError, match='^INSTALLED_PLUGIN_INVENTORY_EXECUTION_SCOPE_INVALID$'):
-        run_plan(store, pack, audit, application.run_config(config))
+        run_under_plan_lock(store, pack, audit, application.run_config(config))
 
 
 def test_req20_capture_scope_rejects_native_siblings_before_target_preparation(tmp_path, sources, monkeypatch):
-    from guard.core.run import run_plan
     from guard.executors.engine_sensor import EngineSensorExecutor
 
     pack, sides, policy_path = sources
@@ -2002,7 +2482,7 @@ def test_req20_capture_scope_rejects_native_siblings_before_target_preparation(t
         with pytest.raises(ValueError, match=scope_error):
             application.execute_update(store, pack, envs, policy, invalid, tmp_path / 'run', utcnow())
     with pytest.raises(ValueError, match=scope_error):
-        run_plan(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(config))
+        run_under_plan_lock(store, pack, select(pack, envs[:1], policy, mode='audit'), application.run_config(config))
 
 
 def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path, sources, monkeypatch):
@@ -2078,6 +2558,8 @@ def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path,
     staged = tool.staged_config(cfg, fresh)
     assert staged['sides']['candidate']['run_binding'] == cfg['sides']['candidate']['run_binding']
     assert staged['sides']['candidate']['required_event_record']['target'] == str(fresh)
+    recipe = configuration_sha256(staged, envs)
+    plan = bind_recipe(select(pack, envs, pol, mode='update'), staged, envs)
     _, pointer = tool._source(sides['candidate']['target'])
     target = json.loads(sides['candidate']['target'].read_bytes())
     for number, role in enumerate(('engine', 'probe'), 100):
@@ -2086,12 +2568,15 @@ def test_obs01_preparation_preserves_side_run_bindings_and_holds_plt12(tmp_path,
     _write(fresh, target)
     assert tool.revalidate_candidate(staged, envs[1], pointer) == {
         'required_event_record': sha256_hex(canonical_json(target))}
-    recipe = configuration_sha256(staged, envs)
+    assert configuration_sha256(staged, envs) == recipe
+    assert bind_recipe(plan, staged, envs).ref() == plan.ref()
     Path(obs_bindings['candidate']['record_producer']).write_text('# changed producer bytes\n')
     assert configuration_sha256(staged, envs) != recipe
+    with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+        bind_recipe(plan, staged, envs)
 
 
-def test_copy_and_observation_share_executor_with_separate_pinned_record_inputs(tmp_path, sources):
+def _copy_and_observation_inputs(tmp_path, sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())
     env_by_side = {side: tool.Environment.model_validate_json(settings['environment'].read_bytes())
@@ -2121,6 +2606,12 @@ def test_copy_and_observation_share_executor_with_separate_pinned_record_inputs(
                              'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64}}
         copies[side] = {'record_session': f'{number + 10:032x}', 'record_producer': str(copy_source),
                         'copy_inventory': str(_write(tmp_path / f'{side}-copy-inventory.json', inventory))}
+    return env_by_side, base, policy, inventory, observation, copies
+
+
+def test_copy_and_observation_share_executor_with_separate_pinned_record_inputs(tmp_path, sources):
+    pack, sides, policy_path = sources
+    env_by_side, _, policy, inventory, observation, copies = _copy_and_observation_inputs(tmp_path, sources)
     cfg, _, decisions = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store',
                                       observation_run_bindings=observation, copy_record_inputs=copies)
     assert cfg['update']['allowed_checks'] == ['OBS-01', 'PLT-12']
@@ -2166,6 +2657,121 @@ def test_copy_and_observation_share_executor_with_separate_pinned_record_inputs(
     assert next(row for row in invalid['checks'] if row['check'] == 'inputs')['detail'] == 'COPY_CONFIGURATION_INVALID'
 
 
+@pytest.mark.parametrize('rewrite_target', [False, True], ids=['stable', 'changed-format'])
+def test_copy_snapshot_keeps_the_locked_target_bytes(tmp_path, monkeypatch, sources, rewrite_target):
+    from guard.executors.kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
+    from guard.store.packs import put_pack
+
+    pack, sides, policy_path = sources
+    env_by_side, previous_policy, policy, _, _, copies = _copy_and_observation_inputs(tmp_path, sources)
+    cfg, _, _ = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', copy_record_inputs=copies)
+    assert cfg['update']['allowed_checks'] == ['PLT-12']
+    path = sides['candidate']['target']
+    original = path.read_bytes()
+    replacement = original + b'\n'
+    assert sha256_hex(replacement) != sha256_hex(original)
+    assert json.loads(replacement) == json.loads(original)
+    collected = []
+    run_copy = KubernetesCredentialCopyRecordExecutor.run
+
+    def run(executor, check, env, values, adapter, workdir):
+        if rewrite_target and env.ref() == env_by_side['candidate'].ref():
+            path.write_bytes(replacement)
+            try:
+                return run_copy(executor, check, env, values, adapter, workdir)
+            finally:
+                path.write_bytes(original)
+        return run_copy(executor, check, env, values, adapter, workdir)
+
+    def collect(executor, ctx):
+        collected.append(ctx.env.ref())
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False})
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('PLT-12 recipe custody regression cannot dispatch network or subprocess calls')
+
+    monkeypatch.setattr(KubernetesCredentialCopyRecordExecutor, 'run', run)
+    monkeypatch.setattr(KubernetesCredentialCopyRecordExecutor, '_finish', collect)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    store = Store(tmp_path / 'store')
+    put_pack(store, pack.path)
+    store.put(previous_policy)
+    application.execute_update(store, pack, list(env_by_side.values()), policy, cfg, tmp_path / 'update', utcnow())
+    rows = {row.side: row.execution for row in store.iter_kind('EVD') if row.check_id == 'PLT-12'}
+    assert rows[Side.baseline].status is ExecStatus.COMPLETED
+    assert rows[Side.candidate].status is (ExecStatus.ABORTED if rewrite_target else ExecStatus.COMPLETED)
+    assert rows[Side.candidate].abort_reason == ('EXECUTOR_FAILURE' if rewrite_target else None)
+    assert collected == [env_by_side['baseline'].ref()] + ([] if rewrite_target else [env_by_side['candidate'].ref()])
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize('changed_input', [None, 'record_producer', 'copy_inventory'],
+                         ids=['exact', 'changed-producer', 'changed-inventory'])
+def test_copy_snapshot_matches_recipe_pinned_inputs(tmp_path, monkeypatch, sources, changed_input):
+    from guard.core import run
+    from guard.executors.kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
+    from guard.store.packs import put_pack
+
+    pack, sides, policy_path = sources
+    env_by_side, previous_policy, policy, _, _, copies = _copy_and_observation_inputs(tmp_path, sources)
+    input_keys = {'record_producer': 'copy_record_source_sha256', 'copy_inventory': 'copy_inventory_sha256'}
+    paths = {side: {key: Path(copies[side][key]) for key in input_keys} for side in sides}
+    # Keep both inputs valid but distinguish the two sides' raw pins.
+    for path in paths['candidate'].values():
+        path.write_bytes(path.read_bytes() + b'\n')
+    expected = {side: {binding_key: sha256_hex(by_name[key].read_bytes()) for key, binding_key in input_keys.items()}
+                for side, by_name in paths.items()}
+    assert all(expected['baseline'][key] != expected['candidate'][key] for key in input_keys.values())
+    cfg, _, _ = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', copy_record_inputs=copies)
+    assert cfg['update']['allowed_checks'] == ['PLT-12']
+    collects = {}
+    run_one = run._run_one
+
+    def replace_after_verification(store, check, item, env, *args, **kwargs):
+        if changed_input and check.id == 'PLT-12' and env.ref() == env_by_side['candidate'].ref():
+            path = paths['candidate'][changed_input]
+            original = path.read_bytes()
+            path.write_bytes(original + b'\n')
+            try:
+                return run_one(store, check, item, env, *args, **kwargs)
+            finally:
+                path.write_bytes(original)
+        return run_one(store, check, item, env, *args, **kwargs)
+
+    def collect(executor, ctx):
+        collects[ctx.env.id] = {key: ctx.policy_values[key] for key in input_keys.values()}
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False})
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('PLT-12 recipe custody regression cannot dispatch network or subprocess calls')
+
+    monkeypatch.setattr(run, '_run_one', replace_after_verification)
+    monkeypatch.setattr(KubernetesCredentialCopyRecordExecutor, '_finish', collect)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    store = Store(tmp_path / 'store')
+    put_pack(store, pack.path)
+    store.put(previous_policy)
+    application.execute_update(store, pack, list(env_by_side.values()), policy, cfg, tmp_path / 'update', utcnow())
+    rows = {row.side: row.execution for row in store.iter_kind('EVD') if row.check_id == 'PLT-12'}
+    assert set(rows) == {Side.baseline, Side.candidate}
+    for side, execution in rows.items():
+        if side is Side.candidate and changed_input:
+            assert execution.status is ExecStatus.NOT_RUN
+            assert execution.abort_reason == 'RUN_BINDING_COPY_SNAPSHOT_FILES_CHANGED'
+            assert execution.run_binding is None and execution.executor is None
+            assert env_by_side[side.value].id not in collects
+        else:
+            assert execution.status is ExecStatus.COMPLETED
+            verified = expected[side.value]
+            assert collects[env_by_side[side.value].id] == verified
+            assert execution.run_binding['files']['record_producer_sha256'] == verified['copy_record_source_sha256']
+            assert execution.run_binding['files']['copy_inventory_sha256'] == verified['copy_inventory_sha256']
+
+
 def _obs11_inputs(sources):
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())
@@ -2193,7 +2799,7 @@ def test_obs11_canonical_prepare_uses_exact_side_sessions_without_default_activa
     assert next(row for row in blocked['checks'] if row['check'] == 'inputs')['detail'] == 'RUN_BINDING_CONFIG_INVALID'
 
 
-@pytest.mark.parametrize('case', ['exact', 'unsealed', 'replacement', 'audit', 'changed-session', 'sibling'])
+@pytest.mark.parametrize('case', ['exact', 'unsealed', 'replacement', 'format-replacement', 'audit', 'changed-session', 'sibling'])
 def test_obs11_snapshot_uses_the_locked_plan_owner_and_side_session(tmp_path, monkeypatch, sources, case):
     from guard.configuration import COLLECTION_STATUS_SNAPSHOT_OPTION
     from guard.core import run
@@ -2225,19 +2831,22 @@ def test_obs11_snapshot_uses_the_locked_plan_owner_and_side_session(tmp_path, mo
         plan = bind_recipe(plan, cfg, use_envs)
     store.put_many([*use_envs, pol, plan])
     path = sides['candidate']['target']
-    digest = sha256_hex(canonical_json(json.loads(path.read_bytes())))
+    target_bytes = path.read_bytes()
+    digest = sha256_hex(canonical_json(json.loads(target_bytes)))
     rc = application.run_config(cfg)
     # Runtime-only target pins are never the source of this scoped binding.
     rc.side_configs['candidate'].raw['_kubernetes_target_sha256_by_check'] = {'OBS-11': '0' * 64}
+    rc.side_configs['candidate'].raw['_collection_status_target_file_sha256'] = '0' * 64
     original = observer.KubernetesLogIntegrityExecutor.run
     seen = []
 
     def inspect_pin(executor, check, env, values, adapter, workdir):
-        assert case in {'exact', 'replacement'}
+        assert case in {'exact', 'replacement', 'format-replacement'}
         assert executor._expected_target_sha256 == digest
+        assert executor._expected_target_file_sha256 == sha256_hex(target_bytes)
         assert values['collection_session'] == cfg['sides']['candidate']['run_binding']['OBS-11']['record_session']
         seen.append(env.ref())
-        if case == 'replacement':
+        if case in {'replacement', 'format-replacement'}:
             return original(executor, check, env, values, adapter, workdir)
         return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
                              normal_control={'attempted': False})
@@ -2251,47 +2860,46 @@ def test_obs11_snapshot_uses_the_locked_plan_owner_and_side_session(tmp_path, mo
             application.execute_validation(store, pack, envs[0], pol, managed, tmp_path / 'managed', utcnow())
         assert not (tmp_path / 'managed').exists()
         with pytest.raises(ValueError, match='^COLLECTION_STATUS_SNAPSHOT_SCOPE_INVALID$'):
-            run.run_plan(store, pack, plan, rc)
+            run_under_plan_lock(store, pack, plan, rc)
         assert not seen and not list(store.iter_kind('EVD'))
         return
     if case == 'changed-session':
         rc.side_configs['candidate'].raw['run_binding']['OBS-11']['record_session'] = 'f' * 32
         with pytest.raises(ValueError, match='^OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID$'):
-            run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+            run_under_plan_lock(store, pack, plan, rc, only_side=Side.candidate)
         assert not seen and not list(store.iter_kind('EVD'))
         return
-    if case == 'replacement':
+    if case in {'replacement', 'format-replacement'}:
         original_run_one = run._run_one
 
         def replace_after_lock(*args, **kwargs):
-            edited = json.loads(path.read_bytes())
-            edited['kubernetes']['probe']['pod_uid'] = '00000000-0000-0000-0000-000000000003'
-            _write(path, edited)
+            if case == 'format-replacement':
+                path.write_bytes(target_bytes + b'\n')
+                assert sha256_hex(canonical_json(json.loads(path.read_bytes()))) == digest
+            else:
+                edited = json.loads(path.read_bytes())
+                edited['kubernetes']['probe']['pod_uid'] = '00000000-0000-0000-0000-000000000003'
+                _write(path, edited)
             return original_run_one(*args, **kwargs)
 
         monkeypatch.setattr(run, '_run_one', replace_after_lock)
 
-    evd, = run.run_plan(store, pack, plan, rc, only_side=Side.candidate)
+    evd, = run_under_plan_lock(store, pack, plan, rc, only_side=Side.candidate)
     if case == 'unsealed':
         assert not seen and evd.execution.status is ExecStatus.NOT_RUN
         assert evd.execution.abort_reason == 'RUN_BINDING_COLLECTION_STATUS_TARGET_UNAVAILABLE'
     else:
         assert seen == [envs[1].ref()]
-        if case == 'replacement':
+        if case in {'replacement', 'format-replacement'}:
             assert evd.execution.status is ExecStatus.ABORTED and not evd.artifacts
         else:
             assert evd.execution.status is ExecStatus.COMPLETED and evd.data_origin is DataOrigin.EXAMPLE
             assert evd.execution.run_binding['values']['collection_session'] == '0' * 31 + '2'
 
 
-def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path, monkeypatch, sources):
+def _retry_and_status_inputs(tmp_path, sources):
     from tests.test_a1_retry_record_contract import example as retry_example
 
-    def forbid_io(*_args, **_kwargs):
-        pytest.fail('Saved record input assembly must not start a runtime or contact a target')
-
-    monkeypatch.setattr(socket, 'socket', forbid_io)
-    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
     pack, sides, policy_path = sources
     original = tool.Policy.model_validate_json(policy_path.read_bytes())
     approved = json.loads((tool.readiness.ROOT / 'docs/dev-1/mvp-enterprise-policy-20261116.json').read_bytes())
@@ -2317,6 +2925,64 @@ def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path,
         retries[side] = {'record_session': f'{number:032x}', 'record_producer': str(producer),
                          'retry_scope': str(_write(tmp_path / f'{side}-retry-scope.json', scope))}
         status[side] = {'record_session': f'{10 + number:032x}'}
+    return envs, pol, retries, status
+
+
+@pytest.mark.parametrize('rewrite_target', [False, True], ids=['stable', 'changed-format'])
+def test_retry_snapshot_keeps_the_locked_target_bytes(tmp_path, monkeypatch, sources, rewrite_target):
+    from guard.executors.kubernetes_retry_records import KubernetesRetryRecordExecutor
+
+    pack, sides, policy_path = sources
+    envs, policy, retries, _ = _retry_and_status_inputs(tmp_path, sources)
+    cfg, _, _ = tool.assemble(sides, policy_path, pack=pack, store=tmp_path / 'store', retry_record_inputs=retries)
+    assert cfg['update']['allowed_checks'] == ['LIF-12']
+    path = sides['candidate']['target']
+    original = path.read_bytes()
+    replacement = original + b'\n'
+    assert sha256_hex(replacement) != sha256_hex(original)
+    assert json.loads(replacement) == json.loads(original)
+    collected = []
+    run_retry = KubernetesRetryRecordExecutor.run
+
+    def run(executor, check, env, values, adapter, workdir):
+        if rewrite_target and env.ref() == envs[1].ref():
+            path.write_bytes(replacement)
+            try:
+                return run_retry(executor, check, env, values, adapter, workdir)
+            finally:
+                path.write_bytes(original)
+        return run_retry(executor, check, env, values, adapter, workdir)
+
+    def collect(executor, ctx):
+        collected.append(ctx.env.ref())
+        return EvidenceDraft(status=ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+                             normal_control={'attempted': False})
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('LIF-12 recipe custody regression cannot dispatch network or subprocess calls')
+
+    monkeypatch.setattr(KubernetesRetryRecordExecutor, 'run', run)
+    monkeypatch.setattr(KubernetesRetryRecordExecutor, '_finish', collect)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    store = Store(tmp_path / 'store')
+    application.execute_update(store, pack, envs, policy, cfg, tmp_path / 'update', utcnow())
+    rows = {row.side: row.execution for row in store.iter_kind('EVD') if row.check_id == 'LIF-12'}
+    assert rows[Side.baseline].status is ExecStatus.COMPLETED
+    assert rows[Side.candidate].status is (ExecStatus.ABORTED if rewrite_target else ExecStatus.COMPLETED)
+    assert rows[Side.candidate].abort_reason == ('EXECUTOR_FAILURE' if rewrite_target else None)
+    assert collected == [env.ref() for env in (envs[:1] if rewrite_target else envs)]
+    assert path.read_bytes() == original
+
+
+def test_prebound_record_inputs_publish_only_after_both_sides_validate(tmp_path, monkeypatch, sources):
+    def forbid_io(*_args, **_kwargs):
+        pytest.fail('Saved record input assembly must not start a runtime or contact a target')
+
+    monkeypatch.setattr(socket, 'socket', forbid_io)
+    monkeypatch.setattr(subprocess, 'Popen', forbid_io)
+    pack, sides, policy_path = sources
+    envs, pol, retries, status = _retry_and_status_inputs(tmp_path, sources)
 
     pinned_retries = {side: {**entry, 'input_sha256': {
         'retry_scope_sha256': sha256_hex(Path(entry['retry_scope']).read_bytes()),

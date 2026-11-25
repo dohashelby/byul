@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import math
 import re
 import time
 import uuid
@@ -23,11 +22,12 @@ from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor
 from guard.adapters import vllm_worker_generation_metadata as generation_metadata
 from guard.adapters import vllm_ready_endpoint_metadata as endpoint_metadata
 from guard.adapters.vllm_route_authentication import selection_index
-from guard.collectors.file import load_environment
+from guard.collectors.file import load_bounded_json, load_environment
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesBindingError, KubernetesHTTP, REQUEST_BINDING_PROFILE
 from guard.runtime.kubernetes_binding import validate_container_binding, verify_owned_pod
+from guard.transport_options import valid_duration
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader, validate_target
 from .lifecycle_session import capture_session, request_index
@@ -154,8 +154,7 @@ def inputs_manifest(cfg, *, generation_identities=None):
         for row in rows:
             if type(row) is not dict or set(row) != {'id', 'target', 'prepared', 'environment'}:
                 raise ValueError
-            with Path(row['target']).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(row['target'])
             env = load_environment(Path(row['environment']))
             prepared = load_prepared(row['prepared'])
             manifest.append(_manifest_row(row['id'], env, target, prepared))
@@ -244,8 +243,7 @@ def load_generations(cfg, env, values, check_id=None):
             selected_env = load_environment(Path(row['environment']))
             if not supports(selected_env.engine.name, selected_env.engine.version):
                 raise ValueError
-            with Path(row['target']).open('rb') as stream:
-                target = strict_json(stream.read(65537), limit=65536)
+            target = load_bounded_json(row['target'])
             prepared = load_prepared(row['prepared'])
             if row['id'] in generations or prepared['session'] in sessions:
                 raise ValueError
@@ -472,11 +470,11 @@ class LifecycleTransitionExecutor:
 
     def _transport_settings(self):
         timeout = self.cfg.get('request_timeout', 30)
-        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+        if not valid_duration(timeout, 30):
             raise ValueError('TRANSITION_CONFIGURATION_INVALID')
         duration = self.cfg.get('max_duration_seconds', 300)
         binary = self.cfg.get('kubectl_binary', 'kubectl')
-        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
+        if (not valid_duration(duration, 300)
                 or type(binary) is not str or not binary.strip()):
             raise ValueError('TRANSITION_CONFIGURATION_INVALID')
         return timeout, duration, binary

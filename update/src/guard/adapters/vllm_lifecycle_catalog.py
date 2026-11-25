@@ -165,27 +165,29 @@ def render_source(profile, *, request_key_sha256=None, model_read_scope_sha256=N
     # Canonical ordering keeps the same selected row byte-identical when unrelated
     # release rows are added. This literal is data, not executable input.
     spec = json.loads(json.dumps(runtime_spec(profile), sort_keys=True))
-    extension = b''
+    extensions = []
     if request_binding(profile):
         if type(request_key_sha256) is not str or re.fullmatch('[0-9a-f]{64}', request_key_sha256) is None:
             raise ValueError('REQUEST_BINDING_KEY_PIN_REQUIRED')
         spec['request_key_sha256'] = request_key_sha256
-        extension = b'\n' + Path(__file__).with_name('vllm_fresh_request_binding.py').read_bytes()
+        extensions.append(Path(__file__).with_name('vllm_fresh_request_binding.py'))
     elif request_key_sha256 is not None:
         raise ValueError('REQUEST_BINDING_PROFILE_REQUIRED')
-    if startup_observation(profile):
-        extension += b'\n' + Path(startup.__file__).read_bytes()
-    if profiler_observation(profile):
-        extension += b'\n' + Path(startup.__file__).read_bytes() + b'\n' + Path(direct_profiler.__file__).read_bytes()
+    local_profiler = profiler_observation(profile)
+    if startup_observation(profile) or local_profiler:
+        extensions.append(Path(startup.__file__))
+    if local_profiler:
+        extensions.append(Path(direct_profiler.__file__))
     if stream_observation(profile):
-        extension += b'\n' + Path(baseline_stream.__file__).read_bytes()
+        extensions.append(Path(baseline_stream.__file__))
     if approved_file_read(profile):
         if type(model_read_scope_sha256) is not str or re.fullmatch('[0-9a-f]{64}', model_read_scope_sha256) is None:
             raise ValueError('APPROVED_FILE_READ_SCOPE_PIN_REQUIRED')
         spec['model_read_scope_sha256'] = model_read_scope_sha256
-        extension += b'\n' + Path(file_read.__file__).read_bytes()
+        extensions.append(Path(file_read.__file__))
     elif model_read_scope_sha256 is not None:
         raise ValueError('APPROVED_FILE_READ_PROFILE_REQUIRED')
+    extension = b''.join(b'\n' + path.read_bytes() for path in extensions)
     return Path(template.__file__).read_bytes() + extension + (
         '\nSPEC = ' + repr(spec) + "\nif __name__ == '__main__':\n    main()\n").encode()
 

@@ -3,9 +3,11 @@
 from contextlib import contextmanager
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -234,6 +236,21 @@ def test_sup06_boot_role_consumes_callback_bound_worker_shard_prefix(external, m
     assert reported['prepared_sha256'] == callback_digest and reported['session_sha256'] == sha256_hex(session.encode())
     assert reported['environment_ref'] == scope['environment_ref'] and reported['events'] == record['events']
     assert not reported['owner_binding_verified']
+
+    draft = executor.run(check, env, values, None, external / 'whole-executor')
+    assert draft.status is ExecStatus.ABORTED and draft.data_origin is DataOrigin.EXAMPLE
+    assert draft.abort_reason == 'SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE'
+    assert not draft.normal_control.attempted and not any(step.attempted for step in draft.challenges)
+    normal_session, other_session = draft.observations['supply_boot_sessions'].value
+    assert normal_session == row and 'worker_shard_input' not in other_session
+    assert draft.observations['supply_boot_complete'].value is False
+    assert draft.observations['supply_boot_record_authenticated'].value is False
+    assert not draft.observations['supply_boot_native_consumption'].collected
+    assert not draft.observations['supply_boot_violations'].collected
+    artifact, = draft.artifacts
+    assert artifact.name == 'supply_boot_summary.json'
+    summary = json.loads(artifact.path.read_bytes())
+    assert summary['sessions'] == [normal_session, other_session]
 
 
 @pytest.mark.parametrize(('check_id', 'version'), [('SUP-09', '0.30.0'), ('SUP-11', '0.31.0')])
@@ -567,3 +584,150 @@ def test_sup15_requires_owner_after_record_read_and_keeps_earlier_role(tmp_path,
         assert challenge["collected"] and challenge["owner_binding_verified"]
         assert artifacts["supply_boot_challenge_record.json"].read_bytes() == records["challenge"]
         assert verdict is Verdict.FAIL
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("lost_owner", [False, True])
+def test_sup16_keeps_only_owned_boot_records_without_a_native_witness(
+        tmp_path, external, monkeypatch, version, lost_owner):
+    from guard.executors import kubernetes_supply_boot as boot
+
+    env = environment(engine={"name": "vllm", "version": version,
+                              "image_digest": release_profile(version)["images"][0]})
+    settings, pins, worlds, _ = _prepare_roles(external, env, late_owner_change=False)
+    records, native_sessions = {}, []
+    for role in ("normal", "challenge"):
+        packet = good_packet(env.ref().model_dump(mode="json"), pins[f"supply_{role}_target_sha256"], "SUP-16")
+        packet.update(role=role, change=change(applied=False), rows=[{
+            "artifact_sha256": sha256_hex(b"EXAMPLE complete model contents"),
+            "artifact_bytes": len(b"EXAMPLE complete model contents"),
+            "partial_LAB_publication": False, "worker_consumption_claimed": False,
+        }])
+        records[role] = canonical_json(packet)
+        world = worlds[f"guard-{role}"]
+        world.docker = Docker(SimpleNamespace(raw=records[role]))
+        if role == "normal" and lost_owner:
+            world.mode = "late-file-owner"
+
+    def runner(argv, **kwargs):
+        namespace = argv[5] if argv[3:5] == ["get", "namespace"] else argv[3].removeprefix("--namespace=")
+        return worlds[namespace].runner(argv, **kwargs)
+
+    def native_unavailable(reader, target, *, prepared, **kwargs):
+        native_sessions.append(prepared["session"])
+        raise ValueError("EXAMPLE native journal unavailable")
+
+    monkeypatch.setattr(boot.SupplyBootReader, "seal_session", lambda self: {"sealed": False})
+    monkeypatch.setattr(boot, "capture_session", native_unavailable)
+    raw_pins = {role: sha256_hex(Path(entry["prepared"]).read_bytes()) for role, entry in settings.items()}
+    check = PACK.checks["SUP-16"]
+    executor = KubernetesSupplyBootExecutor(settings, runner=runner, expected_prepared_sha256_by_role=raw_pins)
+    draft = executor.run(check, env, base_values(env, check.id, pins), None, tmp_path / "evidence")
+
+    assert draft.status is ExecStatus.ABORTED and draft.data_origin is DataOrigin.EXAMPLE
+    assert not any(step.attempted for step in draft.challenges)
+    assert len(set(native_sessions)) == 2 and all(world.files == 1 for world in worlds.values())
+    assert worlds["guard-normal"].bad_owner is lost_owner
+    normal, sibling = draft.observations["supply_boot_sessions"].value
+    artifacts = {artifact.name: artifact.path for artifact in draft.artifacts}
+    assert sibling["owner_binding_verified"] and sibling["record_sha256"] == sha256_hex(records["challenge"])
+    assert artifacts["supply_boot_challenge_record.json"].read_bytes() == records["challenge"]
+    name = "supply_boot_normal_record.json"
+    if lost_owner:
+        assert not normal["collected"] and not normal["owner_binding_verified"]
+        assert normal["record_sha256"] is None and "reported_boot_record" not in normal
+        assert "SUPPLY_BOOT_RECORD_UNAVAILABLE" in normal["diagnostic_codes"] and name not in artifacts
+    else:
+        assert normal["collected"] and normal["owner_binding_verified"]
+        assert normal["record_sha256"] == sha256_hex(records["normal"])
+        assert artifacts[name].read_bytes() == records["normal"]
+    assert not draft.observations["supply_boot_record_authenticated"].value
+    assert not draft.observations["supply_boot_complete"].value
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or os.uname().machine != "x86_64"
+    or sys.version_info[:3] != (3, 12, 3) or sys.flags.optimize != 0,
+    reason="the selected GPU observer ABI is Linux x86_64 CPython 3.12.3",
+)
+@pytest.mark.parametrize("release", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("mode", [None, "unsealed", "late-file-owner", "unverified-cleanup", "source-collision"])
+def test_sup16_passively_consumes_only_sealed_approved_normal_records(external, monkeypatch, release, mode):
+    from guard.executors import kubernetes_supply_boot as boot
+    from tests.test_sup05_normal_file_reads import normal_case
+
+    capture_mode = mode if mode in {"unsealed", "late-file-owner"} else None
+    case = normal_case(external / "case", monkeypatch, release=release, mode=capture_mode)
+    settings = {"normal": {key: case.cfg["normal"][key] for key in ("target", "prepared")},
+                "challenge": {"target": str(external / "no-target.json"),
+                              "prepared": str(external / "no-prepared.json")}}
+    prepared_path = Path(settings["normal"]["prepared"])
+    prepared = load_prepared(prepared_path)
+    raw_pins = {"normal": sha256_hex(prepared_path.read_bytes()),
+                "challenge": sha256_hex(b"EXAMPLE missing alternate input")}
+    pins = {key: case.values[key] for key in ("supply_normal_target_sha256", "supply_normal_prepared_sha256")}
+    record_location = boot.record_path(prepared["session"])
+    receipt_reads = []
+    workdir = external / "evidence"
+    source_name = "supply_boot_normal_source_000.jsonl"
+    if mode == "source-collision":
+        workdir.mkdir()
+        (workdir / source_name).write_bytes(b"EXAMPLE preexisting artifact")
+
+    def runner(argv, **kwargs):
+        if "exec" in argv and record_location in argv:
+            receipt_reads.append(record_location)
+            return {"returncode": 1, "stdout_bytes": b"", "stderr_bytes": b"",
+                    "capture": {"complete": mode != "unverified-cleanup", "bounded_at_source": True, "timed_out": False,
+                                "pipes_closed": mode != "unverified-cleanup", "truncated": False}}
+        return case.runner(argv, **kwargs)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("The approved normal journal is read as saved, without requesting a seal")
+
+    monkeypatch.setattr(boot.SupplyBootReader, "seal_session", forbidden)
+    check = PACK.checks["SUP-16"]
+    executor = KubernetesSupplyBootExecutor(settings, runner=runner, expected_prepared_sha256_by_role=raw_pins)
+    draft = executor.run(check, case.env, base_values(case.env, check.id, pins), None, workdir)
+
+    assert draft.status is ExecStatus.ABORTED and draft.data_origin is DataOrigin.EXAMPLE
+    assert receipt_reads == [record_location]
+    assert not draft.normal_control.attempted and not any(step.attempted for step in draft.challenges)
+    assert not draft.observations["supply_boot_complete"].value
+    assert not draft.observations["supply_boot_record_authenticated"].value
+    ordinary, _ = draft.observations["supply_boot_sessions"].value
+    assert not ordinary["collected"] and ordinary["record_sha256"] is None
+    assert "SUPPLY_BOOT_RECORD_UNAVAILABLE" in ordinary["diagnostic_codes"]
+    native = draft.observations["supply_boot_native_consumption"]
+    artifacts = {artifact.name: artifact.path for artifact in draft.artifacts}
+    summary = json.loads(artifacts["supply_boot_summary.json"].read_bytes())
+    if capture_mode is not None:
+        assert not native.collected and not ordinary["sealed"]
+        assert "SUPPLY_BOOT_NORMAL_APPROVED_NATIVE_UNVERIFIED" in ordinary["diagnostic_codes"]
+    else:
+        assert native.collected and ordinary["sealed"] and ordinary["native_files_covered"]
+        projection, = native.value
+        assert projection["role"] == "normal"
+        assert projection["source_binding"]["session"] == prepared["session"]
+        read, = projection["rows"]
+        assert read["matches_approved"] and read["full_read"]
+        binding = read["source_binding"]
+        assert binding["recording_sha256"] == sha256_hex(case.raw)
+        assert binding["recording_owner_binding_verified"] is True
+        assert summary["native"] == native.value
+        if mode is None:
+            assert binding["recording_artifact"] == source_name
+            original = artifacts[source_name].read_bytes()
+            assert original == case.raw and sha256_hex(original) == binding["recording_sha256"]
+        else:
+            assert "recording_artifact" not in binding
+    if mode is not None:
+        assert set(artifacts) == {"supply_boot_summary.json"}
+    if mode == "unverified-cleanup":
+        assert draft.cleanup_errors == ["SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"]
+        assert not (workdir / source_name).exists()
+    if mode == "source-collision":
+        code = "SUPPLY_BOOT_NORMAL_SOURCE_ARTIFACT_UNAVAILABLE"
+        assert code in draft.cleanup_errors and code in summary["missing"]
+        assert code in draft.observations["supply_boot_missing"].value
+        assert (workdir / source_name).read_bytes() == b"EXAMPLE preexisting artifact"

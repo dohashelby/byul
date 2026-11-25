@@ -1,6 +1,7 @@
 """Same kubectl/stdin interface and existing REQ11 analyzer; no cluster or GPU."""
 from copy import deepcopy
 import json
+from pathlib import Path
 import socket
 import subprocess
 
@@ -10,10 +11,11 @@ from typer.testing import CliRunner
 from guard.adapters.vllm import VllmAdapter
 from guard.cli import app
 from guard.executors import registry
-from guard.executors.kubernetes_request_binding import KubernetesRequestBindingExecutor
-from guard.models import canonical_json
+from guard.executors.kubernetes_request_binding import KubernetesRequestBindingExecutor, NORMAL_OPTION
+from guard.judges.rule_table import RuleTableJudge
+from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, T0
+from tests.builders import baseline_pack, environment, evidence, policy, T0
 from tests.test_kubernetes_sampling import World as PodWorld, inputs, PRIVATE
 from tests.test_request_binding import World as RequestWorld, IMAGE, SHA, TEMPLATE_PATH, VALUES, target as docker_target, judge
 
@@ -77,6 +79,109 @@ def run(tmp_path,world=None):
     world=world or World();path=tmp_path/"target.json";path.write_text(json.dumps(world.target),encoding="utf-8")
     executor=KubernetesRequestBindingExecutor({"target":str(path)},runner=world.runner,environ={})
     return executor.run(baseline_pack().checks["REQ-11"],env(),deepcopy(VALUES),VllmAdapter(),tmp_path/"work"),world
+
+
+def normal_inputs(tmp_path, side):
+    from tools.mvp_versions import versions
+
+    selected = versions()[side]
+    engine = dict(name=selected["engine"], version=selected["version"], image_digest=selected["image"])
+    environment_ = environment(engine=engine, model={"id": "fixture-model", "revision": "fixture-revision"})
+    value = target(environment_)
+    value.update(lab=False, observed_version=selected["version"])
+    value["engine"]["image_digest"] = selected["image"]
+    value["kubernetes"]["engine"].update(image=selected["image"], image_id=selected["image"])
+    path = tmp_path / "normal-target.json"
+    path.write_bytes(canonical_json(value) + b"\n")
+    cfg = {"target": str(path), NORMAL_OPTION: True}
+    pins = {"expected_target_sha256": sha256_hex(canonical_json(value)),
+            "expected_target_file_sha256": sha256_hex(path.read_bytes())}
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    return cfg, pins, path, value, environment_, pack.checks["REQ-11"]
+
+
+@pytest.mark.parametrize(("side", "gap"), [
+    ("baseline", None), ("candidate", None), ("baseline", "owner-replaced"), ("candidate", "wrong-method"),
+    ("baseline", "bad-body-digest"), ("candidate", "incomplete"),
+])
+def test_req11_ordinary_control_keeps_only_same_owner_complete_json(tmp_path, side, gap):
+    cfg, pins, _, value, environment_, check = normal_inputs(tmp_path, side)
+    world = PodWorld(value)
+    owners = []
+
+    def runner(argv, **kwargs):
+        result = world.runner(argv, **kwargs)
+        if "get" in argv and "engine-pod" in argv:
+            owners.append(world.after_exec)
+            if gap == "owner-replaced" and world.after_exec:
+                pod = json.loads(result["stdout_bytes"])
+                pod["metadata"]["uid"] = "replacement"
+                result["stdout_bytes"] = canonical_json(pod)
+        if "exec" in argv:
+            body = canonical_json({"model": "fixture-model",
+                "choices": [{"message": {"role": "assistant", "content": PRIVATE}, "finish_reason": "length"}],
+                "usage": {"prompt_tokens": 4, "completion_tokens": 1, "total_tokens": 5}})
+            result["stdout_bytes"] = canonical_json([{
+                "id": "before", "outcome": 200, "method": "GET" if gap == "wrong-method" else "POST",
+                "mode": "json", "body": body.decode(), "body_bytes": len(body),
+                "body_sha256": "0" * 64 if gap == "bad-body-digest" else sha256_hex(body),
+                "body_truncated": False, "capture_complete": gap != "incomplete",
+                "eof": True, "utf8_valid": True, "content_type": "application/json",
+            }])
+        return result
+
+    executor = KubernetesRequestBindingExecutor(cfg, runner=runner, environ={}, **pins)
+    assert executor.prepared_normal_control(check, environment_, VALUES, **pins) is None and not world.calls
+    draft = executor.run(check, environment_, VALUES, VllmAdapter(), tmp_path / "work")
+    request, = world.execs
+    probe, = check.functional_probes
+    assert request == {"id": "before", "mode": "json", "method": "POST", "headers": {},
+                       "url": value["engine"]["trusted_url"] + probe.path, "body": {**probe.body, "model": "fixture-model"}}
+    assert owners == [False, True] and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.status == (ExecStatus.COMPLETED if gap is None else ExecStatus.ABORTED)
+    assert (draft.normal_control.succeeded is True) == (gap is None)
+    assert not any(item.attempted for item in draft.challenges)
+    assert not draft.observations["output_binding_verified"].value
+    assert not draft.observations["normal_controls"].value and not draft.observations["collection_complete"].value
+    evd = evidence(check_id=check.id, normal=draft.normal_control.model_dump(),
+                   observations={key: item.model_dump() for key, item in draft.observations.items()})
+    judgment = RuleTableJudge().judge(check, evd, check.judge.params, VALUES)
+    assert judgment.verdicts["security"].value == "UNKNOWN"
+    assert judgment.verdicts["functional"].value == "UNKNOWN"
+    artifact, = draft.artifacts
+    artifact_bytes = artifact.path.read_bytes()
+    assert PRIVATE.encode() not in artifact_bytes and probe.body["messages"][0]["content"].encode() not in artifact_bytes
+    if gap is not None:
+        assert draft.normal_control.succeeded is None
+        assert json.loads(artifact_bytes)["response_capture"] is None
+
+
+@pytest.mark.parametrize("problem", ["raw-rewrite", "raw-alias", "raw-pin", "canonical-pin", "policy", "roles"])
+def test_req11_ordinary_control_rejects_unbound_declared_inputs_before_collecting(tmp_path, problem):
+    cfg, pins, path, value, environment_, check = normal_inputs(tmp_path, "baseline")
+    values = deepcopy(VALUES)
+    caller_pins = {}
+    if problem == "raw-rewrite":
+        path.write_bytes(canonical_json(value))
+    elif problem == "raw-alias":
+        sibling = path.with_name("same-bytes.json")
+        path.rename(sibling)
+        path.symlink_to(sibling)
+    elif problem in {"raw-pin", "canonical-pin"}:
+        key = "expected_target_file_sha256" if problem == "raw-pin" else "expected_target_sha256"
+        caller_pins[key] = "0" * 64
+    elif problem == "policy":
+        values["client_request_id_trust"] = "another-policy"
+    elif problem == "roles":
+        cfg["roles"] = {"allowed": "UNUSED"}
+    world = PodWorld(value)
+    executor = KubernetesRequestBindingExecutor(cfg, runner=world.runner, environ={}, **pins)
+    with pytest.raises(ValueError, match="KUBERNETES_REQUEST_BINDING_NORMAL_CONFIGURATION_INVALID"):
+        executor.prepared_normal_control(check, environment_, values, **caller_pins)
+    if not caller_pins:
+        with pytest.raises(ValueError, match="KUBERNETES_REQUEST_BINDING_NORMAL_CONFIGURATION_INVALID"):
+            executor.run(check, environment_, values, VllmAdapter(), tmp_path / "work")
+    assert not world.calls
 
 
 def test_same_cases_analyzer_and_declared_model_mapping_without_docker(tmp_path,monkeypatch):

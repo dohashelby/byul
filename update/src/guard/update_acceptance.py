@@ -12,10 +12,14 @@ import re
 from guard.core.compare import compare_results, comparison_differences
 from guard.core.judge import pass_gate
 from guard.core.select import check_policy_value
+from guard.executors import passive_api_hop, run_binding
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX_PROFILE, planned as planned_input_matrix
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import canonical_json, sha256_hex, weakest_origin
+from guard.models.artifacts import model_closure_sha256
 from guard.models.objects import object_from_dict
+from guard.store.integrity import ref_key as _key
+from guard.validation_evidence import report_plan_ref
 
 CHECKS = ("REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09")
 SIDES = ("baseline", "candidate")
@@ -23,10 +27,6 @@ AXES = ("security", "functional", "performance")
 _HASH = re.compile(r"[0-9a-f]{64}")
 _IMAGE = re.compile(r".+@sha256:[0-9a-f]{64}")
 _HTTP_STATUS = re.compile(r"[1-5][0-9]{2}")
-
-
-def _key(ref):
-    return (ref.kind, ref.id, ref.revision, ref.sha256)
 
 
 def _input_matrix_coverage_blocks(check, policy_values, value):
@@ -106,7 +106,34 @@ def _coverage_blocks(check, evd, policy_values):
     return blocks
 
 
-def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool = False, profile: str = "legacy-five/1") -> dict:
+def _evidence_refs(evidence, source):
+    expected = {_key(evidence.plan), _key(evidence.environment)}
+    executor = evidence.execution.executor
+    if evidence.check_id != passive_api_hop.CHECK or executor is None or executor.version != passive_api_hop.VERSION:
+        return expected
+
+    binding = evidence.execution.run_binding
+    if (source is None or source.check_id != passive_api_hop.SOURCE_CHECK
+            or source.plan != evidence.plan or source.environment != evidence.environment or source.side != evidence.side
+            or {_key(ref) for ref in source.refs} != expected
+            or not evidence.execution.attempt_id or source.execution.attempt_id != evidence.execution.attempt_id
+            or str(source.execution.status) != "COMPLETED" or source.execution.operator is not None
+            or source.execution.override_reason or source.execution.abort_reason or source.execution.cleanup_errors
+            or run_binding.verify(binding, evidence) or binding["schema"] != run_binding.SCHEMA_2):
+        raise ValueError("passive PLT-08 requires the same RPT side's exact PLT-01 control")
+    files = binding.get("files")
+    artifacts = [artifact.sha256 for artifact in source.artifacts if artifact.name == "probe_log.jsonl"]
+    if (type(files) is not dict or set(files) != {"source_artifact_sha256", "target_sha256"}
+            or any(type(value) is not str or _HASH.fullmatch(value) is None for value in files.values())
+            or artifacts != [files["source_artifact_sha256"]]
+            or binding.get("values") != {"profile": passive_api_hop.PROFILE,
+                                         "source_evidence": source.ref().model_dump(mode="json"), **files}):
+        raise ValueError("passive PLT-08 requires the same RPT side's exact PLT-01 control")
+    return expected | {_key(source.ref())}
+
+
+def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool = False,
+                  profile: str = "legacy-five/1", verified_pack_refs=()) -> dict:
     """Audit pinned rules/refs and require complete, concrete GPU results per side.
 
     A confirmed security FAIL is a valid trial outcome. Missing collection still
@@ -128,12 +155,15 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
         index = {_key(obj.ref()): obj for obj in parsed}
         if len(index) != len(parsed):
             raise ValueError("duplicate stored object identity")
+        historical_packs = {_key(ref) for ref in verified_pack_refs}
 
         def resolve(ref):
             if ref.kind == "PACK":
-                if ref != pack.ref():
-                    raise ValueError("saved pack reference differs from the fixed snapshot")
-                return pack
+                if ref == pack.ref():
+                    return pack
+                if _key(ref) in historical_packs:
+                    return ref
+                raise ValueError("saved pack reference differs from the fixed snapshot")
             if _key(ref) not in index:
                 raise ValueError(f"broken saved reference: {ref.kind} {ref.id}")
             return index[_key(ref)]
@@ -160,10 +190,7 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
         if {_key(ref) for ref in saved.refs} != {_key(ref) for ref in manifest}:
             raise ValueError("RPT refs differ from inputs_manifest")
         inputs = [resolve(ref) for ref in manifest]
-        plan_refs = [ref for ref in manifest if ref.kind == "PLAN"]
-        if len(plan_refs) != 1:
-            raise ValueError("one original update PLAN is required")
-        plan = resolve(plan_refs[0])
+        plan = resolve(report_plan_ref(report, objects))
         if plan.mode.value != "update" or len(plan.inputs.environments) != 2:
             raise ValueError("PLAN must identify exactly two update environments")
         if plan.inputs.environments[0] == plan.inputs.environments[1]:
@@ -206,8 +233,8 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
             comparison_problems.append("two distinct image digests are required; repository aliases do not count")
         else:
             kind = "version-upgrade" if base_env.engine.version != cand_env.engine.version else "image-comparison"
-        if any(getattr(base_env.model, key) != getattr(cand_env.model, key)
-               for key in ("id", "revision", "inventory_sha256")):
+        if ((base_env.model.id, base_env.model.revision, model_closure_sha256(base_env.model))
+                != (cand_env.model.id, cand_env.model.revision, model_closure_sha256(cand_env.model))):
             comparison_problems.append("model identity/revision/inventory differ")
         if base_env.runtime != cand_env.runtime:
             comparison_problems.append("declared GPU/runtime conditions differ (GPU model, driver, GPU count, TP/PP/DP)")
@@ -218,15 +245,18 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
         if profile not in {'plan-scope/2', 'legacy-five/1'}:
             raise ValueError('ACCEPTANCE_PROFILE_UNSUPPORTED')
         required_checks = CHECKS if profile == 'legacy-five/1' else tuple(item.check_id for item in selected)
-        if not selected or (profile == 'legacy-five/1' and {item.check_id for item in selected} != set(CHECKS)):
+        if profile == 'legacy-five/1' and {item.check_id for item in selected} != set(CHECKS):
             raise ValueError('PLAN selection differs from acceptance scope')
+        if not selected:
+            incomplete.append("the original PLAN contains no new measurements to accept")
         if len({row.check_id for row in saved.by_check}) != len(saved.by_check):
             raise ValueError("duplicate report check row")
         rows = {row.check_id: row for row in saved.by_check if row.selected}
         if set(rows) != set(required_checks):
             raise ValueError("selected report checks differ from the exact PLAN scope")
-        evidence = [obj for obj in inputs if getattr(obj, "kind", None) == "EVD"]
-        results = [obj for obj in inputs if getattr(obj, "kind", None) == "RES"]
+        evidence = [obj for obj in inputs if getattr(obj, "kind", None) == "EVD" and obj.plan == plan.ref()]
+        evidence_keys = {_key(obj.ref()) for obj in evidence}
+        results = [obj for obj in inputs if getattr(obj, "kind", None) == "RES" and _key(obj.evidence) in evidence_keys]
         expected_pairs = {(cid, side) for cid in required_checks for side in SIDES}
         if (len(evidence) != len(expected_pairs) or {(obj.check_id, str(obj.side)) for obj in evidence} != expected_pairs
                 or len(results) != len(expected_pairs) or {(obj.check_id, str(obj.side)) for obj in results} != expected_pairs):
@@ -236,11 +266,34 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
         if plan.inputs.change:
             resolve(plan.inputs.change)
             required_refs.append(plan.inputs.change)
-        if {_key(ref) for ref in manifest} != {_key(ref) for ref in required_refs}:
-            raise ValueError("RPT input manifest differs from the original PLAN/EVD/RES graph")
         plan_refs_expected = [pack.ref(), *plan.inputs.environments, policy.ref()]
         if plan.inputs.change:
             plan_refs_expected.append(plan.inputs.change)
+        if plan.inputs.previous_plan:
+            resolve(plan.inputs.previous_plan)
+            required_refs.append(plan.inputs.previous_plan)
+            plan_refs_expected.append(plan.inputs.previous_plan)
+        carried_objects = []
+        all_rows = {row.check_id: row for row in saved.by_check}
+        for item in plan.items:
+            carried = item.carried_over
+            if carried is None:
+                continue
+            historical_evd, historical_res = resolve(carried.evidence), resolve(carried.result)
+            row = all_rows.get(item.check_id)
+            if (not plan.inputs.previous_plan or item.selected or historical_evd.plan == plan.ref()
+                    or historical_evd.check_id != item.check_id or historical_res.check_id != item.check_id
+                    or historical_res.evidence != carried.evidence or historical_res.side != historical_evd.side
+                    or str(historical_res.verdicts.security) != "PASS"
+                    or row is None or row.selected or row.carried_over != carried
+                    or row.single is None or row.single.result != carried.result
+                    or row.single.security != historical_res.verdicts.security):
+                raise ValueError(f"{item.check_id}: carried result differs from the exact PLAN/evidence")
+            carried_objects.extend((historical_evd, historical_res))
+            required_refs.extend((carried.evidence, carried.result))
+            plan_refs_expected.extend((carried.evidence, carried.result))
+        if {_key(ref) for ref in manifest} != {_key(ref) for ref in required_refs}:
+            raise ValueError("RPT input manifest differs from the original PLAN/EVD/RES graph")
         if {_key(ref) for ref in plan.refs} != {_key(ref) for ref in plan_refs_expected}:
             raise ValueError("PLAN refs differ from its original inputs")
         if policy.ref() != plan.inputs.policy or resolve(policy.pack) is not pack:
@@ -248,7 +301,7 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
         if saved.policy_status != policy.status or str(saved.pack_review_status) != ("REVIEWED" if pack.reviewed else "DRAFT"):
             raise ValueError("report policy/pack review status mismatch")
         origins = [env.data_origin for env in environments] + [policy.data_origin, plan.data_origin]
-        origins += [obj.data_origin for obj in [*evidence, *results]]
+        origins += [obj.data_origin for obj in [*evidence, *results, *carried_objects]]
         expected_official = str(policy.status) == "CONFIRMED" and pack.reviewed and all(str(o) != "EXAMPLE" for o in origins)
         if saved.official != expected_official:
             raise ValueError("report official flag differs from original source/review states")
@@ -278,7 +331,10 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                 evd = evd_by_pair[cid, side]
                 if evd.plan != plan.ref() or evd.environment != env.ref():
                     raise ValueError(f"{cid}/{side}: EVD PLAN/environment mismatch")
-                if {_key(ref) for ref in evd.refs} != {_key(plan.ref()), _key(env.ref())}:
+                if saved.execution_attempt_id is not None and evd.execution.attempt_id != saved.execution_attempt_id:
+                    raise ValueError(f"{cid}/{side}: EVD attempt differs from the RPT attempt")
+                source = evd_by_pair.get((passive_api_hop.SOURCE_CHECK, side))
+                if {_key(ref) for ref in evd.refs} != _evidence_refs(evd, source):
                     raise ValueError(f"{cid}/{side}: EVD refs differ from original PLAN/ENV")
                 executor = evd.execution.executor
                 if (str(evd.data_origin) != "MEASURED" or str(evd.execution.status) != "COMPLETED"
@@ -304,7 +360,7 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                     raise ValueError(f"{cid}/{side}: valid original execution timestamps are required")
                 if (evd.comparability.cpu is not None or evd.comparability.gpu != env.runtime.gpu_model
                         or evd.comparability.driver != env.runtime.driver
-                        or evd.comparability.model_inventory_sha256 != env.model.inventory_sha256
+                        or evd.comparability.model_inventory_sha256 != model_closure_sha256(env.model)
                         or not _HASH.fullmatch(evd.comparability.config_sha256 or "")
                         or not _HASH.fullmatch(evd.comparability.fixture_sha256 or "")):
                     raise ValueError(f"{cid}/{side}: explicit EVD GPU/model/fixture/config identity mismatch")
@@ -314,6 +370,10 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                 result = matches[0]
                 if {_key(ref) for ref in result.refs} != {_key(evd.ref()), _key(policy.ref())}:
                     raise ValueError(f"{cid}/{side}: RES refs differ from original EVD/POL")
+                if saved.as_of is not None and result.as_of != saved.as_of:
+                    raise ValueError(f"{cid}/{side}: RES decision time differs from the RPT")
+                if result.evaluation_mode is not None:
+                    raise ValueError(f"{cid}/{side}: a carryover re-evaluation is not an original RES")
                 if (result.judge.name != plugin.name or result.judge.version != plugin.version
                         or result.judge.params_sha256 != sha256_hex(canonical_json(check.judge.params))):
                     raise ValueError(f"{cid}/{side}: original judge version/parameters mismatch")

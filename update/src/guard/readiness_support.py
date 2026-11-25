@@ -15,6 +15,7 @@ import re
 from guard.automation_policy import (string_list, validate_log_integrity_policy,
                                      validate_request_binding_policy, validate_template_policy)
 from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
+                                 NORMAL_REQUEST_BINDING_OPTION, RESPONSE_SNAPSHOT_OPTION,
                                  UPDATE_CHECK_OUTSIDE_SCOPE, for_check)
 from guard.core.select import check_policy_value
 from guard.executors import ipc_trust_scope, log_collection_gap, passive_api_hop, registry, request_field_probe, run_binding
@@ -184,13 +185,11 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
         try:
             check_cfg = config_for_check(executor, check_id)
         except (AttributeError, TypeError, ValueError):
-            if executor == 'engine_sensor':
-                raise
             row["reasons"].append("CHECK_CONFIG_INVALID")
             continue
         executor_cfg = check_cfg.get(executor, {})
         if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-07', 'PLT-12', 'LIF-01', 'LIF-03', 'LIF-04',
-                                 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12'}:
+                                 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-09', 'SUP-10', 'SUP-12'}:
             effective = executor_cfg
             setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
             if type(effective) is dict and effective.get(setting) is True:
@@ -211,6 +210,9 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 elif check_id == 'PLT-07':
                     row["scope"] = "reported Cilium egress policy state for the selected owned endpoint"
                     row["limitations"].append("packet verdicts and process-level egress require separate observations")
+                elif check_id == 'SUP-09':
+                    row["scope"] = "approved stock model Ready with a pinned read-only inventory and installed source"
+                    row["limitations"].append("custom code import and trust setting comparison remain unobserved")
                 elif check_id == 'SUP-10':
                     row["scope"] = "installed vLLM plugin entry-point metadata from the selected owned container"
                     row["limitations"].append("plugin load, invocation and allowlist enforcement require separate observations")
@@ -334,9 +336,13 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                     row["status"] = "UNKNOWN"
                 row["reasons"].append("external target ownership and launch metadata require runtime verification")
                 if kube and executor == "request_binding":
-                    if evidence_contract(adapter, "request_binding_contract", image, version) is None:
-                        unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")
-                    row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
+                    if executor_cfg.get(NORMAL_REQUEST_BINDING_OPTION) is True:
+                        row["scope"] = "one fixed ordinary direct Pod JSON completion"
+                        row["limitations"].append("the owned generation and response still require runtime verification")
+                    else:
+                        if evidence_contract(adapter, "request_binding_contract", image, version) is None:
+                            unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")
+                        row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
                 elif kube and executor == "log_integrity":
                     if evidence_contract(adapter, "native_log_contract", image, version) is None:
                         unsupported("OBS-09 has no inspected native logging contract for the exact image/version")
@@ -407,6 +413,18 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 unsupported("declared sampling constraint version differs from the selected engine")
             row["limitations"].append("runner/count consumption remains unverified; API collection alone cannot establish overall security PASS")
         elif executor == "response_content":
+            if (kube and check_id == "REQ-13" and type(executor_cfg) is dict
+                    and executor_cfg.get(RESPONSE_SNAPSHOT_OPTION) is True):
+                row["scope"] = "reviewed field names from one retained ordinary Gateway response"
+                row["limitations"].append("error paths, private context and return options require independent evidence")
+                try:
+                    selected_factory(check_cfg).validate_policy(check, values)
+                except (TypeError, ValueError):
+                    unsupported("policy must select the retained normal Gateway target", policy_scope=True)
+                else:
+                    row["status"] = "UNKNOWN"
+                    row["reasons"].append("the owned response and its original source pins require static verification")
+                continue
             if set(values.get("forbidden_return_options", [])) - RETURN_OPTIONS.keys():
                 unsupported("valid return-option policy exceeds the existing bounded response profile", policy_scope=True)
             if set(values.get("required_targets", [])) - {"engine", "gateway"}:

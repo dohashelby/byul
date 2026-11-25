@@ -1,4 +1,5 @@
 """Read one immutable file prefix. Stdlib only; never delete or acknowledge data."""
+import base64
 import hashlib
 import json
 import os
@@ -13,17 +14,127 @@ MAX_ROW = 256 * 1024
 NAME = re.compile(r'callbacks-([1-9][0-9]*)(?:-[0-9]{4})?\.jsonl')
 
 
-def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
+TERMINAL = re.compile(r'callbacks-([1-9][0-9]*)\.terminal\.json')
+SHA256 = re.compile('[0-9a-f]{64}')
+MAX_TERMINAL_BYTES = 4096
+MAX_TERMINAL_READ = 32 * 1024**2
+
+
+def _start_ticks(pid):
+    try:
+        return int(Path('/proc/' + str(pid) + '/stat').read_text().rsplit(')', 1)[1].split()[19])
+    except FileNotFoundError:
+        return None
+
+
+def _terminal_bytes(path, limit, *, expected=None):
+    def identity(info):
+        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns, info.st_nlink)
+
+    before = path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or not 0 < before.st_size <= limit
+            or expected is not None and (before.st_dev, before.st_ino, before.st_size)
+            != (expected['device'], expected['inode'], expected['size'])):
+        raise ValueError('CALLBACK_TERMINAL_INCOMPLETE')
+    stamp = identity(before)
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as stream:
+        if identity(os.fstat(stream.fileno())) != stamp:
+            raise ValueError('CALLBACK_TERMINAL_INCOMPLETE')
+        raw = stream.read(before.st_size + 1)
+        if len(raw) != before.st_size or identity(os.fstat(stream.fileno())) != stamp or identity(path.lstat()) != stamp:
+            raise ValueError('CALLBACK_TERMINAL_INCOMPLETE')
+    return raw
+
+
+def _terminal_packets(root, names, files, snapshot, start_cursor, session):
+    candidates = [(name, int(match[1])) for name in sorted(names) if (match := TERMINAL.fullmatch(name))]
+    if not candidates:
+        return []
+    session_sha256 = hashlib.sha256(session.encode()).hexdigest()
+    packets, remaining = [], MAX_TERMINAL_READ
+    for name, pid in candidates[:8]:
+        expected = {file: item for file, item in snapshot.items() if item['pid'] == pid}
+        if (not 1 <= len(expected) <= 32 or set(expected) != {file for file in files if int(NAME.fullmatch(file)[1]) == pid}
+                or any(type(item['size']) is not int or not 0 < item['size'] <= 1024**2
+                       or start_cursor.get(file, 0) != 0 for file, item in expected.items())):
+            continue
+        total = sum(item['size'] for item in expected.values())
+        if total > min(remaining, 16 * 1024**2):
+            continue
+        remaining -= total
+        try:
+            raw = _terminal_bytes(root / name, MAX_TERMINAL_BYTES)
+            marker = json.loads(raw)
+            keys = {'schema', 'pid', 'start_ticks', 'process_sha256', 'session_sha256',
+                    'accepted', 'processed', 'written', 'segments'}
+            if (type(marker) is not dict or marker.keys() != keys
+                    or raw != (json.dumps(marker, sort_keys=True, separators=(',', ':')) + '\n').encode()
+                    or marker['schema'] != 'guard-observer-journal-terminal/1'
+                    or type(marker['pid']) is not int or marker['pid'] != pid
+                    or type(marker['start_ticks']) is not int or marker['start_ticks'] <= 0
+                    or marker['session_sha256'] != session_sha256
+                    or type(marker['process_sha256']) is not str or not SHA256.fullmatch(marker['process_sha256'])
+                    or any(type(marker[key]) is not int or marker[key] <= 0 for key in ('accepted', 'processed', 'written'))
+                    or not marker['accepted'] == marker['processed'] == marker['written']
+                    or type(marker['segments']) is not list or len(marker['segments']) != len(expected)):
+                continue
+            ticks = marker['start_ticks']
+            if (_start_ticks(os.getpid()) is None or _start_ticks(pid) not in (None, ticks)
+                    or any(item['start_ticks'] not in (None, ticks) for item in expected.values())):
+                continue
+            state_path = root / f'callbacks-{pid}.state.json'
+            state_raw = _terminal_bytes(state_path, MAX_TERMINAL_BYTES)
+            state = json.loads(state_raw)
+            if (type(state) is not dict or state.get('schema') != 'guard-observer-journal/3'
+                    or state.get('closed') is not True
+                    or any(type(state.get(key)) is not int or state[key] != marker[key]
+                           for key in ('accepted', 'processed', 'written'))
+                    or any(type(state.get(key)) is not int or state[key] != 0 for key in ('dropped', 'errors'))):
+                continue
+            count = 0
+            for index, segment in enumerate(marker['segments']):
+                file = f'callbacks-{pid}-{index:04d}.jsonl'
+                if (file not in expected or type(segment) is not dict or segment.keys() != {'name', 'bytes', 'sha256'}
+                        or segment['name'] != file or type(segment['bytes']) is not int
+                        or segment['bytes'] != expected[file]['size']):
+                    raise ValueError('CALLBACK_TERMINAL_INCOMPLETE')
+                data = _terminal_bytes(root / file, segment['bytes'], expected=expected[file])
+                if not data.endswith(b'\n') or hashlib.sha256(data).hexdigest() != segment['sha256']:
+                    raise ValueError('CALLBACK_TERMINAL_INCOMPLETE')
+                count += data.count(b'\n')
+            if (count != marker['written'] or _terminal_bytes(state_path, MAX_TERMINAL_BYTES) != state_raw
+                    or _terminal_bytes(root / name, MAX_TERMINAL_BYTES) != raw):
+                continue
+        except (OSError, ValueError, IndexError, RecursionError):
+            continue
+        for item in expected.values():
+            item['start_ticks'] = ticks
+        packets.append({'raw_sha256': hashlib.sha256(raw).hexdigest(), 'raw_b64': base64.b64encode(raw).decode('ascii')})
+    return packets
+
+
+def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False, *, session=None, terminal_epochs=None):
     root = Path(root)
     if root.is_symlink() or not root.is_dir():
         raise ValueError('CALLBACK_ROOT_INVALID')
     names = [p.name for p in root.iterdir()]
+    if terminal_epochs is not None:
+        if (type(terminal_epochs) is not dict or not 1 <= len(terminal_epochs) <= 8 or seek_end
+                or type(session) is not str or not re.fullmatch('[0-9a-f]{32}', session)
+                or type(capture_id) is not str or not re.fullmatch('[0-9a-f]{32}', capture_id)
+                or any(type(pid) is not str or not re.fullmatch('[1-9][0-9]{0,9}', pid)
+                       or type(ticks) is not int or ticks <= 0 or _start_ticks(int(pid)) != ticks
+                       for pid, ticks in terminal_epochs.items())
+                or (snapshot is None and cursor)):
+            raise ValueError('CALLBACK_WORKER_TERMINAL_SCOPE_INVALID')
+        writer_name = re.compile(r'callbacks-([1-9][0-9]*)(?:-[0-9]{4}\.jsonl|\.(?:state|terminal)\.json)')
+        names = [name for name in names if (match := writer_name.fullmatch(name)) and match[1] in terminal_epochs]
     files = sorted(name for name in names if NAME.fullmatch(name))
     if len(files) > 256:
         raise ValueError('CALLBACK_PROCESS_LIMIT')
     start_cursor = dict(cursor or {})
     checkpoints, checkpoint_gaps = {}, []
-    if snapshot is None and capture_id is not None:
+    if terminal_epochs is None and snapshot is None and capture_id is not None:
         if re.fullmatch('[0-9a-f]{32}', capture_id) is None:
             raise ValueError('CALLBACK_CAPTURE_ID_INVALID')
         request = root / 'capture-request.json'
@@ -43,7 +154,7 @@ def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
                     checkpoints[pid] = item
             if pids - checkpoints.keys(): time.sleep(0.01)
         if pids - checkpoints.keys(): checkpoint_gaps.append('CALLBACK_CHECKPOINT_UNAVAILABLE')
-    elif capture_id is not None:
+    elif terminal_epochs is None and capture_id is not None:
         for pid in {v['pid'] for v in snapshot.values()}:
             ack = root / f'checkpoint-{pid}-{capture_id}.json'
             if ack.is_file() and not ack.is_symlink():
@@ -52,9 +163,12 @@ def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
                 if len(raw) > 65536 or item.get('capture_id') != capture_id or item.get('pid') != pid:
                     raise ValueError('CALLBACK_CHECKPOINT_INVALID')
                 checkpoints[pid] = item
-    if snapshot is None:
-        names = [p.name for p in root.iterdir()]
-        files = sorted(name for name in names if NAME.fullmatch(name))
+    terminals = []
+    first = snapshot is None
+    if first:
+        if terminal_epochs is None:
+            names = [p.name for p in root.iterdir()]
+            files = sorted(name for name in names if NAME.fullmatch(name))
         snapshot = {}
         for name in files:
             info = (root / name).lstat()
@@ -64,12 +178,32 @@ def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
             if pid in checkpoints and name not in checkpoints[pid]['offsets']:
                 continue  # A segment born after the acknowledged cut.
             try:
-                ticks = int(Path('/proc/' + str(pid) + '/stat').read_text().rsplit(')', 1)[1].split()[19])
+                ticks = _start_ticks(pid)
             except (OSError, ValueError, IndexError):
                 ticks = None
             snapshot[name] = dict(inode=info.st_ino, device=info.st_dev, size=info.st_size, pid=pid, start_ticks=ticks)
             if pid in checkpoints:
                 snapshot[name]['size'] = checkpoints[pid]['offsets'].get(name, 0)
+        if terminal_epochs is None and capture_id is not None and not seek_end and session is not None:
+            terminals = _terminal_packets(root, names, files, snapshot, start_cursor, session)
+    if terminal_epochs is not None:
+        if (set(files) != set(snapshot)
+                or any(str(item['pid']) not in terminal_epochs or item['start_ticks'] != terminal_epochs[str(item['pid'])]
+                       for item in snapshot.values())):
+            raise ValueError('CALLBACK_WORKER_TERMINAL_SCOPE_INVALID')
+        packets = _terminal_packets(root, names, files, snapshot, {}, session)
+        if len(packets) != len(terminal_epochs):
+            checkpoint_gaps.append('CALLBACK_WORKER_TERMINAL_UNVERIFIED')
+        elif first:
+            terminals = packets
+
+    def result(cursor, rows, gaps, done):
+        value = dict(schema='guard-callback-page/2', snapshot=snapshot, cursor=cursor,
+                     start_cursor=start_cursor, rows=rows, gaps=gaps, done=done, capture_id=capture_id)
+        if terminals:
+            value['journal_terminals'] = terminals
+        return value
+
     cursor = dict(cursor or {})
     rows, size, gaps = [], 0, list(checkpoint_gaps)
     for pid in ({item['pid'] for item in snapshot.values()} | {int(found[1]) for name in names
@@ -97,11 +231,10 @@ def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
             gaps.append('CALLBACK_JOURNAL_STATE_UNAVAILABLE')
     if (not checkpoints and files != sorted(snapshot)) or any(name not in files for name in snapshot):
         gaps.append('CALLBACK_SOURCE_SET_CHANGED')
-    if capture_id is not None and any(item['pid'] not in checkpoints for item in snapshot.values()):
+    if terminal_epochs is None and capture_id is not None and any(item['pid'] not in checkpoints for item in snapshot.values()):
         gaps.append('CALLBACK_CHECKPOINT_UNAVAILABLE')
     if seek_end:
-        return dict(schema='guard-callback-page/2', snapshot=snapshot, cursor={k:v['size'] for k,v in snapshot.items()},
-            start_cursor=start_cursor, rows=[], gaps=gaps, done=True, capture_id=capture_id)
+        return result({name: item['size'] for name, item in snapshot.items()}, [], gaps, True)
     for name, expected in sorted(snapshot.items()):
         if NAME.fullmatch(name) is None:
             raise ValueError('CALLBACK_CURSOR_INVALID')
@@ -124,12 +257,12 @@ def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
                     break
                 if size + len(raw) > MAX_PAGE:
                     cursor[name] = begin
-                    return dict(schema='guard-callback-page/2', snapshot=snapshot, cursor=cursor, start_cursor=start_cursor, rows=rows, gaps=gaps, done=False, capture_id=capture_id)
+                    return result(cursor, rows, gaps, False)
                 value = json.loads(raw)
                 rows.append(dict(file=name, offset=begin, end=stream.tell(), raw_sha256=hashlib.sha256(raw).hexdigest(), event=value))
                 size += len(raw)
                 cursor[name] = stream.tell()
-    return dict(schema='guard-callback-page/2', snapshot=snapshot, cursor=cursor, start_cursor=start_cursor, rows=rows, gaps=gaps, done=True, capture_id=capture_id)
+    return result(cursor, rows, gaps, True)
 
 
 def container_start():
@@ -146,6 +279,7 @@ if __name__ == '__main__':
     spec = json.loads(sys.argv[1])
     if re.fullmatch('[0-9a-f]{32}', spec['session']) is None:
         raise ValueError('CALLBACK_SESSION_INVALID')
-    value = page('/guard-lifecycle/data/' + spec['session'], spec.get('snapshot'), spec.get('cursor'), spec.get('capture_id'), spec.get('seek_end', False))
+    value = page('/guard-lifecycle/data/' + spec['session'], spec.get('snapshot'), spec.get('cursor'),
+                 spec.get('capture_id'), spec.get('seek_end', False), session=spec['session'])
     value['container_start_monotonic_ns'] = container_start()
     print(json.dumps(value, separators=(',', ':')))

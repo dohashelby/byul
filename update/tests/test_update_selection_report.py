@@ -9,7 +9,8 @@ from guard.core.report import build_report
 from guard.core.select import select
 from guard.models import DataOrigin, Evidence, Result, Side, Verdict
 from guard.models.objects import Change
-from guard.store import Store
+from guard.report.change import summarize_change
+from guard.store import IntegrityError, Store
 from tests.builders import T0, baseline_pack, environment, policy
 
 
@@ -195,8 +196,14 @@ def test_corrupt_trace_cannot_confirm_dynamic_reach(tmp_path):
     plan = _with_change(store, pack, initial)
     evd = _evidence(store, plan, env, logs=[{"via": "direct", "route": "POST /new", "basis": "http", "outcome": 200,
                                            "classified": "handler_reached"}])
-    (store.root / evd.artifacts[0].path).write_bytes(b"altered")
-    stage = build_report(store, pack, plan, T0).change_summary["entrypoints"][0]["stages"][0]
+    artifact = evd.artifacts[0]
+    path = store.root / artifact.path
+    path.write_bytes(path.read_bytes().replace(b'"outcome": 200', b'"outcome": 201'))
+    assert path.stat().st_size == artifact.bytes
+    with pytest.raises(IntegrityError, match=r"artifact artifacts/[0-9a-f]{64} missing or changed"):
+        build_report(store, pack, plan, T0)
+    summary = summarize_change(store, pack, plan, {(evd.check_id, evd.side): evd})
+    stage = summary["entrypoints"][0]["stages"][0]
     assert not stage["handler_reached"] and stage["observed"] is None
     assert "TRACE_INTEGRITY_ERROR" in stage["limitations"]
 

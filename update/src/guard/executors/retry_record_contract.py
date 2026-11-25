@@ -1,5 +1,5 @@
 """Closed LIF12 declarations; never authentic automatic retry or cost proof."""
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 
 from guard.models import canonical_json, sha256_hex
@@ -54,6 +54,10 @@ EVENT_DATA = {
     'COST_SAMPLE_CLAIM': {'cost_subject', 'unit', 'epoch_id', 'cumulative_amount', 'counter_source_sha256'},
     'RETURN_CLAIM': {'outcome', 'native_event_ref'},
 }
+_SOURCE_TIMESTAMP = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"(?:[.,]([0-9]+))?(?:Z|[+-][0-9]{2}(?::?[0-9]{2})?)"
+)
 
 
 def fingerprint(value):
@@ -79,6 +83,22 @@ def stamp(value):
     if result.tzinfo is None or result.utcoffset() is None:
         raise ValueError('RETRY_TIME_INVALID')
     return result
+
+
+def source_stamp(value):
+    wall = stamp(value)
+    match = _SOURCE_TIMESTAMP.fullmatch(value)
+    if match is None:
+        raise ValueError('RETRY_TIME_INVALID')
+    # Compare the fractional remainder after datetime's six digits.
+    return wall, (match[1] or '')[6:].rstrip('0')
+
+
+def _source_policy_bound(value, fallback):
+    try:
+        return source_stamp(value)
+    except ValueError:
+        return fallback, ''
 
 
 def require(condition):
@@ -262,8 +282,14 @@ def declaration_remaining_ms(anchor, terminal):
     return max(0, terminal['monotonic_ns'] - anchor['monotonic_ns']) / 1_000_000
 
 
-def project(scope, snapshots, values):
+def project(scope, snapshots, values, *, exact_source_clock=False):
     start, end = normalize_policy(values)
+    window_start, window_end = (start, ''), (end, '')
+    if exact_source_clock:
+        window_start = _source_policy_bound(values['retry_validity_start'], start)
+        window_end = _source_policy_bound(values['retry_validity_end'], end)
+    maximum_delay = values['retry_max_record_delay_ms']
+    delay_limit = timedelta(milliseconds=maximum_delay)
     result = {'events': [], 'attempt_candidates': [], 'family_candidates': [], 'cost_candidates': [],
         'missing': [], 'conflicts': [], 'unverified': ['actual_retry_producer_trigger_work_cost_and_authority_unverified'],
         'producer_authenticated': False, 'automatic_retry_verified': False, 'nonoccurrence_verified': False,
@@ -277,14 +303,30 @@ def project(scope, snapshots, values):
         generations.add(packet['snapshot_generation'])
         if not packet['declared_complete']:
             result['missing'].append('declared_record_partial')
-        if not start <= stamp(packet['recorded_at']) <= end:
+        try:
+            published = source_stamp(packet['recorded_at']) if exact_source_clock else (stamp(packet['recorded_at']), '')
+        except ValueError:
+            published = None
+            result['missing'].append('record_clock_or_delay_unverified')
+        if published is not None and not window_start <= published <= window_end:
             result['missing'].append('record_outside_policy_window')
         for row in packet['events']:
-            if not start <= stamp(row['at']) <= end:
-                result['missing'].append('event_outside_policy_window')
-            delay = (stamp(packet['recorded_at']) - stamp(row['at'])).total_seconds() * 1000
-            if delay < 0 or delay > values['retry_max_record_delay_ms']:
+            try:
+                event = source_stamp(row['at']) if exact_source_clock else (stamp(row['at']), '')
+            except ValueError:
                 result['missing'].append('record_clock_or_delay_unverified')
+            else:
+                if not window_start <= event <= window_end:
+                    result['missing'].append('event_outside_policy_window')
+                if published is not None:
+                    wall_delay = published[0] - event[0]
+                    if exact_source_clock:
+                        delay_ok = event <= published and (wall_delay, published[1]) <= (delay_limit, event[1])
+                    else:
+                        delay = wall_delay.total_seconds() * 1000
+                        delay_ok = 0 <= delay <= maximum_delay
+                    if not delay_ok:
+                        result['missing'].append('record_clock_or_delay_unverified')
             digest = sha256_hex(canonical_json(row))
             if row['event_id'] in unique and unique[row['event_id']][0] != digest:
                 result['conflicts'].append('event_id_payload_conflict')

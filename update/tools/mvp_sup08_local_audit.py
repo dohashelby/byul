@@ -18,6 +18,7 @@ from guard.collectors.file import load_environment
 from guard.executors import request_field_probe as probe
 from guard.models import load_pack, sha256_hex
 from tools import mvp_sup08_inputs as inputs
+from tools.mvp_a_input_preflight import _read
 from tools.mvp_versions import versions
 from tools.prepare_sup08_phi3v_fixture import IMAGE_PROCESSOR_SHA256
 
@@ -27,6 +28,7 @@ SIDES = ('baseline', 'candidate')
 LAUNCH_FILES = {f'{side}/{name}' for side in SIDES for name in (
     'engine.yaml', 'probe.yaml', 'render.json', 'policy.yaml', 'guard.pending-target.toml')}
 LAUNCH_FILES |= {'control.png', 'control-image.txt'}
+_MAX_LOCAL_FILE_BYTES = 16 * 1024**2
 
 
 def verify_file(path, expected, size=None):
@@ -38,7 +40,7 @@ def verify_file(path, expected, size=None):
             raise ValueError('SYMLINK')
         with path.open('rb') as stream:
             before = os.fstat(stream.fileno())
-            limit = size if size is not None else 16 * 1024**2
+            limit = size if size is not None else _MAX_LOCAL_FILE_BYTES
             if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= limit:
                 raise ValueError('FILE_BOUND')
             if size is not None and before.st_size != size:
@@ -60,16 +62,25 @@ def verify_file(path, expected, size=None):
     return row
 
 
+def _launch_bytes(folder, manifest, name):
+    try:
+        raw, _ = _read(folder / name, max_bytes=_MAX_LOCAL_FILE_BYTES)
+        if sha256_hex(raw) != manifest['files_sha256'][name]:
+            raise ValueError
+    except (OSError, ValueError):
+        raise ValueError('LOCAL_LAUNCH_INPUT_CHANGED') from None
+    return raw
+
+
 def _launch_conditions(folder, manifest, fixture, pack):
-    control = (folder / 'control-image.txt').read_text().strip()
+    control = _launch_bytes(folder, manifest, 'control-image.txt').decode('utf-8').strip()
     if (not control.startswith('data:image/png;base64,')
-            or base64.b64decode(control.partition(',')[2], validate=True) != (folder / 'control.png').read_bytes()):
+            or base64.b64decode(control.partition(',')[2], validate=True) != _launch_bytes(folder, manifest, 'control.png')):
         raise ValueError('CONTROL_IMAGE_MISMATCH')
     normalized = []
     for side, expected in versions().items():
-        base = folder / side
-        render = json.loads((base / 'render.json').read_bytes())
-        deployment, _ = list(yaml.safe_load_all((base / 'engine.yaml').read_bytes()))
+        render = json.loads(_launch_bytes(folder, manifest, f'{side}/render.json'))
+        deployment, _ = yaml.safe_load_all(_launch_bytes(folder, manifest, f'{side}/engine.yaml'))
         engine, = deployment['spec']['template']['spec']['containers']
         release = VllmProvider().release_profile(expected['version'])
         if (render['engine_image'] != expected['image'] or render['engine_version'] != expected['version']
@@ -102,8 +113,8 @@ def _launch_conditions(folder, manifest, fixture, pack):
         for name in selection_env:
             env.pop(name)
         marker = env.pop('BYUL_CODE_MARKER_ROOT')
-        settings = tomllib.loads((base / 'guard.pending-target.toml').read_text())['input_validation']
-        policy = yaml.safe_load((base / 'policy.yaml').read_bytes())
+        settings = tomllib.loads(_launch_bytes(folder, manifest, f'{side}/guard.pending-target.toml').decode('utf-8'))['input_validation']
+        policy = yaml.safe_load(_launch_bytes(folder, manifest, f'{side}/policy.yaml'))
         if (marker != render['code_marker_root'] or marker != manifest['sides'][side]['code_marker_root']
                 or marker != settings['code_marker_root'] or env['HF_HUB_OFFLINE'] != '1'
                 or env['TRANSFORMERS_OFFLINE'] != '1' or policy['scope']['include'] != ['SUP-08']
@@ -119,6 +130,7 @@ def _launch_conditions(folder, manifest, fixture, pack):
                            'resources': engine['resources']})
     if normalized[0] != normalized[1]:
         raise ValueError('LAUNCH_COMPARISON_CONDITIONS_MISMATCH')
+    return control
 
 
 def audit(fixture_file, launch_manifest, *, environments=None, targets=None, pack=ROOT / 'packs/PACK-BASELINE'):
@@ -152,9 +164,10 @@ def audit(fixture_file, launch_manifest, *, environments=None, targets=None, pac
     model_valid = bool(model_rows) and all(row['verified'] for row in model_rows) and actual_names == set(inventory)
     code_valid = all(row['verified'] for row in code_rows)
     launch_valid = all(row['verified'] for row in launch_rows)
+    control = None
     if launch_valid:
         try:
-            _launch_conditions(manifest_path.parent, launch, fixture, baseline)
+            control = _launch_conditions(manifest_path.parent, launch, fixture, baseline)
         except (KeyError, ValueError, TypeError, IndexError) as error:
             launch_valid = False
             errors.append(str(error))
@@ -168,7 +181,7 @@ def audit(fixture_file, launch_manifest, *, environments=None, targets=None, pac
             # 임시 복사본만 만들고 바로 정리한다. 최종 실행 입력 폴더는 만들지 않는다.
             with tempfile.TemporaryDirectory(prefix='guard-sup08-contracts-') as temp:
                 inputs.prepare(fixture_file, paths['environments'], paths['targets'], Path(temp) / 'inputs',
-                    control_image=(manifest_path.parent / 'control-image.txt').read_text().strip(), pack=pack)
+                    control_image=control, pack=pack)
             contracts_valid = True
             for side in SIDES:
                 if load_environment(Path(paths['environments'][side])).data_origin.value == 'EXAMPLE':

@@ -138,6 +138,8 @@ def test_update_compares_two_exact_partial_inputs_without_starting_an_engine(tmp
     evidence = list(store.iter_kind('EVD')); results = list(store.iter_kind('RES')); report, = store.iter_kind('RPT')
     assert len(evidence) == len(results) == 2 and not report.official
     assert {e.side.value for e in evidence} == {'baseline', 'candidate'}
+    assert report.execution_attempt_id and {e.execution.attempt_id for e in evidence} == {report.execution_attempt_id}
+    assert len({e.environment.id for e in evidence}) == 2
     for evd in evidence:
         assert evd.execution.status.value == 'ABORTED' and evd.data_origin.value == 'EXAMPLE'
         assert evd.execution.abort_reason == 'RANK_RECORD_INPUT_QUESTION_SCOPE_INCOMPLETE' and not evd.execution.cleanup_errors
@@ -169,6 +171,85 @@ def test_unbound_record_configuration_is_rejected_or_captured_as_gap_before_io(t
         draft = executor.run(check, env, effective, None, tmp_path / 'evd')
         assert not draft.observations['activation_scope_complete'].value and draft.data_origin.value == 'EXAMPLE'
         assert any('B_COMMON_INPUT_' in r for r in draft.observations['activation_missing'].value)
+
+
+def test_record_only_run_reads_each_submitted_file_once(tmp_path, monkeypatch):
+    env, _, cfg, values, _ = world(tmp_path)
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    check = pack.checks["LIF-08"]
+    _, effective = run_binding.effective_values(check, cfg, env, values,
+        side="baseline", attempt_id="EXAMPLE", issued_at=utcnow())
+    originals = {Path(cfg["target"]), Path(cfg["prepared"]),
+                 Path(cfg["common_inputs"]["records"]["rank-fault"])}
+    reads = []
+    original_open = Path.open
+
+    def trace_open(path, *args, **kwargs):
+        if path in originals and kwargs.get("mode", args[0] if args else "r") == "rb":
+            reads.append(path)
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", trace_open)
+    draft = KubernetesRankFailureExecutor(cfg, common_records=True).run(check, env, effective, None, tmp_path / "evd")
+    assert len(reads) == len(originals) and set(reads) == originals
+    report = draft.observations["activation_steps"].value[-1]
+    assert len(report["records"]) == 1
+    assert "B_COMMON_INPUT_PREPARED_RUNTIME_UNVERIFIED" in report["gaps"]
+
+
+def test_cached_rank_record_keeps_runtime_owner_and_preparation_unverified(tmp_path, monkeypatch):
+    import tomllib
+
+    from guard.collectors import check_observations
+    from guard.collectors.file import load_environment, load_policy
+    from guard.core.execution_recipe import configuration_sha256
+    from guard.executors.rank_common_input import recipe_source_files
+    from tests.test_mvp_rank_product_inputs import inputs
+    from tools.mvp_rank_product_inputs import prepare
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Reading a recorded example must not contact a runtime")
+
+    monkeypatch.setattr(socket, "socket", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    output = tmp_path / "saved"
+    prepare(**inputs(tmp_path, wire="guard-gpu-common-input/4"), output=output, side="candidate")
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    env = load_environment(output / "environment.json")
+    values = load_policy(output / "policy.yaml", pack).values["LIF-08"]
+    check = pack.checks["LIF-08"]
+    cfg = tomllib.loads((output / "guard.toml").read_text())
+    settings = cfg["rank_failure"]
+    pins = recipe_source_files(settings)
+    _, effective = run_binding.effective_values(check, settings, env, values,
+        side="candidate", attempt_id="EXAMPLE", issued_at=utcnow(), expected_rank_prepared_file=pins["prepared"])
+    record_path, prepared_path = output / "common-input.json", output / "prepared.json"
+    record_bytes = record_path.read_bytes()
+    record_reads = {}
+    configuration_sha256(cfg, record_reads=record_reads)
+    assert record_reads[record_path].raw == record_bytes
+    reads = []
+    original_open = Path.open
+
+    def trace_open(path, *args, **kwargs):
+        if path in {record_path, prepared_path} and kwargs.get("mode", args[0] if args else "r") == "rb":
+            reads.append(path)
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", trace_open)
+    executor = KubernetesRankFailureExecutor(settings, common_records=True, expected_common_files=pins)
+    with check_observations.bind(record_reads, {}):
+        draft = executor.run(check, env, effective, None, tmp_path / "evd")
+
+    assert reads == [prepared_path]
+    report = draft.observations["activation_steps"].value[-1]
+    row, = report["records"]
+    assert row["record"] == json.loads(record_bytes)
+    assert row["file_sha256"] == sha256_hex(record_bytes)
+    assert {"B_COMMON_INPUT_PREPARED_RUNTIME_UNVERIFIED", "B_COMMON_INPUT_CURRENT_OWNER_UNVERIFIED"} <= set(report["gaps"])
+    assert not report["producer_authenticated"] and not report["whole_question_complete"]
+    assert draft.status.value == "ABORTED" and draft.data_origin.value == "EXAMPLE"
+    assert not draft.normal_control.attempted
 
 
 def test_existing_native_configuration_does_not_accept_record_mode(tmp_path):

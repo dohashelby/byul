@@ -12,7 +12,11 @@ from guard.automation_policy import string_list
 from guard.collectors.manual import build_template, dump_template, import_evidence
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.models import Mode, canonical_json, load_pack, sha256_hex
+from guard.executors.evidence_storage import canonical_digest as _digest
+from guard.executors.evidence_storage import exact_refs as _refs
+from guard.executors.evidence_storage import file_inventory as _inventory
+from guard.executors.evidence_storage import write_evidence_json as _write
+from guard.models import Mode, load_pack
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_binding import validate_capture_target
 from guard.store import Store
@@ -35,25 +39,6 @@ _GAPS = {'CALLER_INPUT_NOT_SENT', 'PRIVATE_SYSTEM_NOT_SENT', 'OTHER_SOURCES_NOT_
     'SOURCE_EVENT_UNLINKED', 'A_CAPABILITY_UNAVAILABLE', 'PRIMARY_UNAVAILABLE',
     'BEFORE_CONTROL_UNAVAILABLE', 'AFTER_CONTROL_UNAVAILABLE', 'HTTP_UNAVAILABLE',
     'SOURCE_POSTCHECK_UNAVAILABLE', 'CLEANUP_UNVERIFIED', 'EXCEPTION_DUMP_NOT_OBSERVED'}
-
-
-def _digest(value):
-    return sha256_hex(canonical_json(value))
-
-
-def _inventory(root):
-    return {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in sorted(Path(root).rglob('*')) if path.is_file()}
-
-
-def _refs(store):
-    return sorted((obj.kind.value, obj.id, obj.revision, obj.content_sha256)
-        for kind in ('ENV', 'POL', 'CHG', 'PLAN', 'EVD', 'RES', 'RPT') for obj in store.iter_kind(kind))
-
-
-def _write(path, value):
-    with Path(path).open('xb') as stream:
-        stream.write(canonical_json(value))
 
 
 def preflight(*, store, plan_id, pack, target, source_id, output, entered_by):

@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import stat
 
 from guard.collectors import gpu_common_inputs, gpu_input_producers
-from guard.executors import common_consumption
+from guard.executors import common_consumption, pinned_input
 from guard.models import Environment, canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 
@@ -27,6 +26,7 @@ MAX_WRAPPER_BYTES = 16 * 1024 * 1024
 _SHA = re.compile(r"[0-9a-f]{64}")
 _SESSION = re.compile(r"[0-9a-f]{32}")
 _WS = re.compile(r"[ \t\r\n]*")
+_IDENTITY_FIELDS = ("dev", "ino", "size", "mtime_ns", "mode", "uid", "gid")
 
 
 class _EnvironmentInputError(ValueError):
@@ -39,10 +39,6 @@ def _sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
-def _identity(value):
-    return {key: getattr(value, "st_" + key) for key in ("dev", "ino", "size", "mtime_ns", "mode", "uid", "gid")}
-
-
 def _read_pin(pointer, *, base, limit):
     if (type(pointer) is not dict or set(pointer) != {"path", "file_sha256"}
             or type(pointer["path"]) is not str or not pointer["path"].strip() or "\x00" in pointer["path"]
@@ -53,16 +49,11 @@ def _read_pin(pointer, *, base, limit):
     before_path = path.lstat()
     if not stat.S_ISREG(before_path.st_mode):
         raise ValueError("B_RUNNER_SOURCE_NOT_REGULAR")
-    with path.open("rb") as stream:
-        before = os.fstat(stream.fileno())
-        if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= limit:
-            raise ValueError("B_RUNNER_SOURCE_BYTE_BOUND")
-        raw = stream.read(limit + 1)
-        after = os.fstat(stream.fileno())
-    if (not (_identity(before_path) == _identity(before) == _identity(after) == _identity(path.lstat()))
-            or len(raw) != before.st_size or _sha(raw) != pointer["file_sha256"]):
-        raise ValueError("B_RUNNER_SOURCE_BYTES_MISMATCH")
-    return raw, {"path": str(path), "file_sha256": _sha(raw), "fd_identity": _identity(after)}
+    digest = pointer["file_sha256"]
+    raw, identity = pinned_input.read_pinned_bytes(path, before_path, limit=limit, expected_sha256=digest,
+        identity_fields=_IDENTITY_FIELDS, bound_error="B_RUNNER_SOURCE_BYTE_BOUND",
+        mismatch_error="B_RUNNER_SOURCE_BYTES_MISMATCH")
+    return raw, {"path": str(path), "file_sha256": digest, "fd_identity": identity}
 
 
 def _member(text, start, name):
@@ -121,6 +112,7 @@ def _validate_spec(spec):
 def source_files():
     """Hashes of the installed implementation, without a source-checkout path."""
     paths = {"src/guard/executors/runner_inputs.py": Path(__file__),
+        "src/guard/executors/pinned_input.py": Path(pinned_input.__file__),
         "src/guard/executors/common_consumption.py": Path(common_consumption.__file__),
         "src/guard/collectors/gpu_common_inputs.py": Path(gpu_common_inputs.__file__),
         "src/guard/collectors/gpu_input_producers.py": Path(gpu_input_producers.__file__)}

@@ -44,11 +44,12 @@ from pathlib import Path
 
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNAPSHOT_OPTION,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
-                                 NORMAL_COMPILE_CACHE_OPTION, NORMAL_FILE_READS_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
-                                 NORMAL_GRAPH_CAPTURE_OPTION,
+                                 NORMAL_CODE_SELECTION_OPTION, NORMAL_COMPILE_CACHE_OPTION, NORMAL_FILE_READS_OPTION,
+                                 NORMAL_REQUEST_LATENCY_OPTION,
+                                 NORMAL_GRAPH_CAPTURE_OPTION, NORMAL_MODEL_CODE_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_STARTUP_LOAD_OPTION,
-                                 NORMAL_STREAM_OPTION, RETRY_RECORD_SNAPSHOT_OPTION)
+                                 NORMAL_STREAM_OPTION, NORMAL_WORKER_SHARDS_OPTION, RETRY_RECORD_SNAPSHOT_OPTION)
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
@@ -65,6 +66,8 @@ _TARGET_ONLY_NORMAL_MODES = {
     'PLT-07': ('boundary_egress', CILIUM_EGRESS_STATUS_OPTION, 'egress_target_sha256'),
     'REQ-20': ('engine_sensor', NORMAL_GRAPH_CAPTURE_OPTION, 'sensor_target_sha256'),
     'SUP-07': ('supply_boot', NORMAL_COMPILE_CACHE_OPTION, 'supply_target_sha256'),
+    'SUP-08': ('input_validation', NORMAL_CODE_SELECTION_OPTION, 'code_selection_target_sha256'),
+    'SUP-09': ('supply_boot', NORMAL_MODEL_CODE_OPTION, 'model_code_target_sha256'),
     'SUP-10': ('supply_boot', INSTALLED_PLUGIN_INVENTORY_OPTION, 'supply_target_sha256'),
     'SUP-12': ('supply_boot', NORMAL_SAFETENSORS_READER_OPTION, 'supply_target_sha256'),
 }
@@ -223,6 +226,7 @@ PROFILE_BY_CHECK = {
     'SUP-05': 'supply-boot-substitution-v1',
     'SUP-06': 'supply-boot-worker-shard-v1',
     'SUP-07': 'supply-boot-cache-tamper-v1',
+    'SUP-08': 'request-code-selection-v1',
     'SUP-09': 'supply-boot-model-code-v1',
     'SUP-10': 'supply-boot-plugin-v1',
     'SUP-11': 'supply-boot-python-mode-v1',
@@ -397,6 +401,13 @@ def native_route_preparation_missing(executor_cfg) -> bool:
     except FileNotFoundError:
         return True
     return False
+
+
+def native_route_record_only_preflight(check, executor_cfg, run_cfg) -> bool:
+    """Recognize the current stored-record-only input in external paired preparation."""
+    return (check.id == "REQ-02" and check.executor == "route_record" and stages_for(check) == (1, 2)
+            and type(run_cfg) is dict and set(run_cfg) == {"record_session"}
+            and native_route_preparation_missing(executor_cfg))
 
 
 def policy_document_sha256(check_id, key, policy_row) -> str:
@@ -620,7 +631,7 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                 or (check.id == 'LIF-03' and NORMAL_STREAM_OPTION in executor_cfg)):
             raise RunBindingUnavailable(f'{error_prefix}_SCOPE_INVALID')
         try:
-            target = file_hash(check.id, key, executor_cfg)
+            target = file_hash(check.id, key, executor_cfg, require_regular_json=check.id in {'SUP-08', 'SUP-09'})
         except (KeyError, OSError, TypeError, ValueError):
             raise RunBindingUnavailable(f'{error_prefix}_TARGET_UNAVAILABLE') from None
         if expected_target_sha256 is not None and target != expected_target_sha256:
@@ -630,6 +641,31 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
                     'issued_at': _stamp(issued_at)}
         return document, {}
     keys = tuple(k for k in KEYS_BY_CHECK.get(check.id, ()) if 1 in stages)
+    if check.id == 'SUP-06' and NORMAL_WORKER_SHARDS_OPTION in executor_cfg:
+        from .sup06_normal_worker_shards import PREPARED_FILE, TARGET_FILE, read_inputs
+
+        if (check.executor != 'supply_boot' or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK[check.id]
+                or executor_cfg[NORMAL_WORKER_SHARDS_OPTION] is not True or 1 not in stages or run_cfg is not None
+                or policy_row):
+            raise RunBindingUnavailable('RUN_BINDING_SUP06_NORMAL_SCOPE_INVALID')
+        try:
+            target, _, _, pins = read_inputs(executor_cfg)
+            canonical = sha256_hex(canonical_json(target))
+            if ((expected_target_sha256 is not None and expected_target_sha256 != canonical)
+                    or (expected_normal_file_sha256 is not None
+                        and expected_normal_file_sha256.get('target') != pins[TARGET_FILE])):
+                raise ValueError
+        except (AttributeError, KeyError, OSError, TypeError, ValueError):
+            raise RunBindingUnavailable('RUN_BINDING_SUP06_NORMAL_FILES_UNAVAILABLE') from None
+        start, end, basis = window(check.executor, issued_at, valid_from, valid_until)
+        files = {'supply_normal_target_sha256': canonical, TARGET_FILE: pins[TARGET_FILE],
+                 PREPARED_FILE: pins[PREPARED_FILE]}
+        document = {'schema': SCHEMA, 'check_id': check.id, 'side': side, 'attempt_id': attempt_id,
+                    'environment_sha256': env.ref().sha256, 'files': files,
+                    'validity': {'start': _stamp(start), 'end': _stamp(end), 'basis': basis},
+                    'issued_at': _stamp(issued_at)}
+        return document, {**files, 'supply_environment_sha256': env.ref().sha256,
+                          'supply_validity_start': _stamp(start), 'supply_validity_end': _stamp(end)}
     normal_file_reads = check.id == 'SUP-05' and NORMAL_FILE_READS_OPTION in executor_cfg
     if normal_file_reads:
         if (check.executor != 'supply_boot' or getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK[check.id]

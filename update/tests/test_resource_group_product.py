@@ -88,13 +88,25 @@ def test_namespace_census_survives_native_evd_report_export_with_selected_absenc
     restored=Store.read_only(tmp_path/'restored');assert restored.resolve(evidence.ref()).to_dict()==evidence.to_dict()
 
 
-@pytest.mark.parametrize('later_unavailable', [False, True])
+@pytest.mark.parametrize(('later_unavailable', 'selection_case'), [
+    (False, 'owner-only'), (True, 'owner-only'), (False, 'exact-selected-object'),
+    (False, 'wrong-inode'), (False, 'mapping-only-after'),
+])
 def test_canonical_lif11_keeps_held_owned_namespace_receipts_from_real_producer(
-        tmp_path, group, native_target, owned_child, later_unavailable):
+        tmp_path, group, native_target, owned_child, later_unavailable, selection_case):
     child, scope = owned_child
     world, _, values, _ = inputs(tmp_path, group, native_target, 'retained', 'runtime-failure')
     selected = {'schema': selected_probe.SELECTION_SCHEMA, 'owners': [
         {**scope['owners'][0], 'rank': 0, 'require_absent': True}], 'resources': []}
+    if selection_case != 'owner-only':
+        source = probe.observe(scope, process_ids=[child.pid])
+        mapped, = [row for row in source['references'] if row['fd'] is None]
+        descriptors = [row['fd'] for row in source['references'] if row['kind'] == 'posix-shm'
+                       and (row['device'], row['inode']) == (mapped['device'], mapped['inode'])
+                       and row['fd'] is not None]
+        selected['resources'] = [{'id': 'e' * 64, 'kind': 'posix-shm-fd', 'owner_id': scope['owners'][0]['id'],
+            'fd': min(descriptors), 'device': mapped['device'],
+            'inode': mapped['inode'] + (selection_case == 'wrong-inode'), 'require_absent': False}]
     values.update(recovery_selection_sha256=sha256_hex(canonical_json(selected)), recovery_expected_ranks=['0'],
         recovery_require_absent_kinds=['process'], recovery_phase='before-failure',
         recovery_deadline_basis='after-verified-failure')
@@ -111,6 +123,10 @@ def test_canonical_lif11_keeps_held_owned_namespace_receipts_from_real_producer(
             if namespace_packets and later_unavailable:
                 raise OSError('EXAMPLE_NAMESPACE_NO_SECOND_READ')
             result = probe.observe(scope, process_ids=[child.pid])
+            if namespace_packets and selection_case == 'mapping-only-after':
+                # Synthetic projection input retaining the producer's exact map row.
+                result['references'] = [row for row in result['references']
+                                        if row['kind'] != 'posix-shm' or row['fd'] is None]
             namespace_packets.append(result)
         elif request.get('schema') == selected_probe.SELECTION_SCHEMA:
             assert request == selected
@@ -145,11 +161,21 @@ def test_canonical_lif11_keeps_held_owned_namespace_receipts_from_real_producer(
             digest = sha256_hex(canonical_json([source['kind'], source['device'], source['inode']]))
             form = 'memory-mapping' if source['fd'] is None else 'file-descriptor'
             source_forms.setdefault((source['kind'], digest), set()).add(form)
-        assert {'file-descriptor', 'memory-mapping'} in source_forms.values()
+        map_only = selection_case == 'mapping-only-after' and row['stage'] == 'after'
+        expected_forms = {'memory-mapping'} if map_only else {'file-descriptor', 'memory-mapping'}
+        assert expected_forms in source_forms.values()
         assert row['held_references'] == [
             {'owner_id': scope['owners'][0]['id'], 'kind': kind, 'resource_sha256': digest, 'reference_forms': sorted(forms)}
             for (kind, digest), forms in sorted(source_forms.items())
         ]
+        if selection_case in {'exact-selected-object', 'mapping-only-after'}:
+            resource, = selected['resources']
+            digest = sha256_hex(canonical_json(['posix-shm', resource['device'], resource['inode']]))
+            assert row['resource_selection_sha256'] == values['recovery_selection_sha256']
+            assert row['selected_posix_shm_mappings'] == [
+                {'selected_resource_id': resource['id'], 'owner_id': resource['owner_id'], 'resource_sha256': digest}]
+        else:
+            assert 'selected_posix_shm_mappings' not in row and 'resource_selection_sha256' not in row
         assert not row['global_release_verified'] and not row['namespace_scan_complete']
     assert ('owned_namespace_held_reference_census_incomplete' in observations['activation_missing']) is later_unavailable
     assert observations['activation_violations'] is None and observations['activation_scope_complete'] is False

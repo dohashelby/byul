@@ -1,6 +1,7 @@
 """LIF04 existing CLI, owned read controls and opt-in actual transport metadata."""
-from pathlib import Path
 import uuid
+
+from guard.collectors.file import load_bounded_json
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.engine_http import KubernetesBindingError
@@ -76,12 +77,14 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
             raise ValueError('STREAM_BUFFER_CONFIGURATION_INVALID') from None
 
     def run(self,check,env,policy_values,adapter,workdir):
+        from guard.adapters.vllm_file_read_sensor import dependency
         from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check,policy_values)
         try:
             if (adapter is None or not self.normal_only and set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+            target = (strict_json(dependency(self.cfg['target'], None), limit=65536)
+                      if self.normal_only else load_bounded_json(self.cfg['target']))
             start,end,profiles=normalize_policy(policy_values,normal_only=self.normal_only)
             self._validate_target(target, env, policy_values)
             if not start<=utcnow()<=end:raise ValueError

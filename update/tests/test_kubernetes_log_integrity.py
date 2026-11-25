@@ -3,6 +3,7 @@
 kubectl은 부르지 않는다. 엔진 응답과 vLLM 원 형식 로그 줄은 기존 OBS-09 시험 대역을 쓰고,
 요청은 실제 전송 검증기(_log_integrity_request)를 통과해야 한다.
 """
+import base64
 from copy import deepcopy
 from contextlib import redirect_stdout
 import io
@@ -202,6 +203,32 @@ def test_owned_writer_window_clips_both_sides_before_attach_alignment(inside_att
     assert [row['message'] for row in parsed['events']] == ['EXAMPLE inclusive start', 'EXAMPLE inclusive end']
 
 
+@pytest.mark.parametrize('invalid_window_source', [None, 'cri', 'attach', 'both'])
+def test_log_window_alignment_preserves_original_utf8_bytes(monkeypatch, invalid_window_source):
+    message = 'EXAMPLE \ufffd'.encode('utf-8')
+    malformed = b'EXAMPLE \xff'
+    cri_body = malformed if invalid_window_source in ('cri', 'both') else message
+    attach_body = malformed if invalid_window_source in ('attach', 'both') else message
+    stamp = b'2026-11-04T00:00:02Z '
+    cri = stamp + cri_body + b'\n2026-11-04T00:00:09Z EXAMPLE \xff\n'
+    attach = attach_body + b'\r\nEXAMPLE \xff\n'
+    record = module.KubernetesLogIntegrityExecutor({'target': 'unused'})
+    monkeypatch.setattr(record, '_stop_attach', lambda: {
+        'returncode': 0, 'stdout_bytes': attach, 'capture': {'complete': True},
+    })
+    ctx = SimpleNamespace(cprobe=SimpleNamespace(engine_logs=lambda *_: {
+        'returncode': 0, 'stdout_bytes': cri, 'capture': {'complete': True},
+    }))
+    result = record._read(ctx, '2026-11-04T00:00:01Z', '2026-11-04T00:00:03Z', float('inf'))
+
+    aligned = invalid_window_source is None
+    assert result['source_complete'] is record._source['alignment']['aligned'] is aligned
+    expected_text = stamp + message + (b'\r\n' if aligned else b'\n')
+    assert result['text'].encode('utf-8') == expected_text
+    assert result['raw_retained_sha256'] == sha256_hex(attach if aligned else cri)
+    assert record._source['cri_raw_sha256'] == sha256_hex(cri)
+
+
 def gap_check():
     return load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['OBS-11']
 
@@ -287,11 +314,13 @@ def test_obs11_preparation_checks_declarations_without_collecting_status(tmp_pat
             executor.run(gap_check(), env, values, VllmAdapter(), tmp_path / 'work')
 
 
-@pytest.mark.parametrize(('change', 'snapshot'), [
-    (None, False), (None, True), ('changed-owner', False), ('duplicate-field', False), ('oversize', False),
+@pytest.mark.parametrize(('change', 'snapshot', 'side'), [
+    (None, False, 'candidate'), (None, True, 'baseline'), (None, True, 'candidate'),
+    ('format-only', False, 'candidate'), ('format-only', True, 'candidate'),
+    ('changed-owner', False, 'candidate'), ('duplicate-field', False, 'candidate'), ('oversize', False, 'candidate'),
 ])
-def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, monkeypatch, change, snapshot):
-    env, declaration = _saved_status_target('candidate')
+def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, monkeypatch, change, snapshot, side):
+    env, declaration = _saved_status_target(side)
     if snapshot:
         declaration['lab'] = False
     path = tmp_path / 'saved-target.json'
@@ -308,17 +337,21 @@ def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, 
         assert module.snapshot_target_sha256(raw, env) == digest
         with pytest.raises(ValueError):
             module.snapshot_target_sha256(raw.decode(), env)
-    executor = module.KubernetesLogIntegrityExecutor(settings, runner=forbidden, expected_target_sha256=digest)
+    executor = module.KubernetesLogIntegrityExecutor(settings, runner=forbidden, expected_target_sha256=digest,
+        expected_target_file_sha256=digest if snapshot else None)
     monkeypatch.setattr(module, '_read_collection_status', forbidden)
     definition = gap_check()
     executor.prepared_collection_status(definition, env, GAP_VALUES, expected_target_sha256=None if snapshot else digest)
-    if change is not None:
+    if change == 'format-only':
+        path.write_bytes(raw + b'\n')
+        assert canonical_json(json.loads(path.read_bytes())) == raw
+    if change is not None and (change != 'format-only' or snapshot):
         if change == 'changed-owner':
             declaration['kubernetes']['probe']['pod_uid'] = '00000000-0000-0000-0000-000000000003'
             path.write_bytes(canonical_json(declaration))
         elif change == 'duplicate-field':
             path.write_bytes(b'{"lab":true,' + raw[1:])
-        else:
+        elif change == 'oversize':
             path.write_bytes(raw + b' ' * 65536)
         if change != 'changed-owner':
             assert canonical_json(json.loads(path.read_bytes())) == raw
@@ -347,6 +380,10 @@ def test_obs11_run_rechecks_the_prepared_target_before_reading_status(tmp_path, 
     summary = json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
     assert summary['file_sha256'] == sha256_hex(record_bytes)
     assert summary['capture_receipt'] == _status_capture(record_bytes)
+    if snapshot:
+        assert summary['target_file_sha256'] == digest
+    else:
+        assert 'target_file_sha256' not in summary
     assert summary['record_sha256'] == sha256_hex(canonical_json(document))
     assert summary['selected_record_timeline'] == [row] and not summary['producer_authenticated']
 
@@ -395,14 +432,20 @@ def test_obs11_snapshot_rejects_unbound_or_out_of_scope_inputs_before_transport(
             executor.run(definition, env, GAP_VALUES, VllmAdapter(), tmp_path / 'work')
 
 
-def test_obs11_record_from_the_probe_pod_reuses_the_original_evaluation(tmp_path, monkeypatch):
+@pytest.mark.parametrize("uncertain", [False, True], ids=["confirmed-late", "uncertain-arrival"])
+def test_obs11_record_from_the_probe_pod_reuses_the_original_evaluation(tmp_path, monkeypatch, uncertain):
     env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE}, model={'id': 'fixture-model'})
     late = {'record': 'request', 'event_at_ms': 0, 'arrived_at_ms': None, 'gap_marked_at_ms': 5000, 'alert_at_ms': None,
             'dependent_result': 'PASS', 'clock_uncertainty_ms': 10}
+    if uncertain:
+        late['arrived_at_ms'] = GAP_VALUES['collection_deadline_ms']['request'] + 1
     unrelated = {**late, 'record': 'private-unselected-record-name'}
     draft, observer, _ = run(tmp_path, monkeypatch, definition=gap_check(), values=GAP_VALUES, status=status(env, [late, unrelated]))
     reasons = {v['reason'] for v in draft.observations['collection_gap_violations'].value}
-    assert reasons == {'gap_not_marked_in_time', 'alert_not_raised_in_time', 'dependent_test_passed_without_record'}
+    assert reasons == (set() if uncertain else {
+        'gap_not_marked_in_time', 'alert_not_raised_in_time', 'dependent_test_passed_without_record'
+    })
+    assert draft.observations['collection_records_unverified'].value == (['request'] if uncertain else [])
     assert draft.status.value=='COMPLETED' and not observer.validated and observer.attached==0
     assert draft.artifacts[0].collector.endswith('+k8s.2')
     summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
@@ -498,13 +541,111 @@ def test_obs11_bound_reader_retains_only_stable_scope_validated_receipts(tmp_pat
         assert not observations['collection_normal_arrivals']['collected']
     else:
         assert not summary['diagnostic_codes']
-        assert summary['capture_receipt'] == _status_capture(raw)
+        stat = receipt.stat()
+        file_identity = {'device': stat.st_dev, 'inode': stat.st_ino, 'size': stat.st_size,
+                         'mtime_ns': stat.st_mtime_ns, 'ctime_ns': stat.st_ctime_ns}
+        assert summary['capture_receipt'] == {
+            **_status_capture(raw),
+            'file_identity_sha256': sha256_hex(canonical_json(file_identity)),
+            'owner_sha256': sha256_hex(canonical_json(probe)),
+        }
         assert summary['file_sha256'] == sha256_hex(raw)
         assert summary['record_sha256'] == sha256_hex(canonical_json(document))
         assert summary['selected_record_timeline'] == [normal]
         assert observations['collection_normal_arrivals'] == {'value': ['request'], 'collected': True}
     assert len(calls) == 1 and len(ownership) == 2 and not ctx._collection_status_cleanup
     assert transport.deadline - transport.clock() > 5
+
+
+@pytest.mark.parametrize(('side', 'case', 'reads'), [
+    ('baseline', 'engine-unready', 1),
+    ('candidate', 'engine-unready', 1),
+    ('candidate', 'legacy-engine-unready', 0),
+    ('candidate', 'parked-engine', 0),
+    ('candidate', 'stale-engine', 0),
+    ('candidate', 'stale-engine-after', 1),
+    ('candidate', 'probe-pod-unready', 0),
+    ('candidate', 'probe-container-unready', 0),
+])
+def test_obs11_snapshot_read_requires_ready_probe_but_only_running_engine(tmp_path, side, case, reads):
+    from tests.test_kubernetes_sampling import World as PodWorld
+
+    env, declaration = _saved_status_target(side)
+    declaration['lab'] = False
+    raw = canonical_json(declaration)
+    target_path = tmp_path / 'saved-target.json'
+    target_path.write_bytes(raw)
+    world = PodWorld(declaration)
+    file_reads = []
+    row = {'record': 'request', 'event_at_ms': 50, 'arrived_at_ms': 60, 'gap_marked_at_ms': None,
+           'alert_at_ms': None, 'dependent_result': None, 'clock_uncertainty_ms': 1}
+    record = canonical_json(status(env, [row])) + b'\n'
+    identity = {'device': 1, 'inode': 2, 'size': len(record), 'mtime_ns': 3, 'ctime_ns': 4}
+
+    def runner(argv, **kwargs):
+        assert 'input_bytes' not in kwargs
+        if 'exec' in argv:
+            probe = declaration['kubernetes']['probe']
+            assert argv[3:8] == [f"--namespace={probe['namespace']}", 'exec', probe['pod'],
+                                 f"--container={probe['container']}", '--']
+            assert argv[8:14] == ['python3', '-I', '-S', '-B', '-c', supervised_source(module._FILE_READER)]
+            assert argv[15:] == [f"/guard-collection/data/{GAP_VALUES['collection_session']}/collection-status.json",
+                                 str(module._STATUS_CAP)]
+            file_reads.append(True)
+            packet = {'schema': 'guard-container-file/2', 'source_complete': True, 'file_identity_stable': True,
+                      'truncated': False, 'nofollow_components': True, 'regular_file': True,
+                      'raw_base64': base64.b64encode(record).decode(), 'raw_retained_bytes': len(record),
+                      'raw_retained_sha256': sha256_hex(record), 'file_before': identity,
+                      'file_after': identity, 'path_after': identity}
+            return {'returncode': 0, 'stdout_bytes': canonical_json(packet), 'stderr_bytes': b'',
+                    'capture': {'complete': True, 'bounded_at_source': True, 'truncated': False, 'timed_out': False}}
+        assert 'get' in argv
+        result = world.runner(argv, **kwargs)
+        packet = json.loads(result['stdout_bytes'])
+        if packet.get('kind') == 'List':
+            for item in packet['items']:
+                item['kind'] = 'Namespace'
+        else:
+            packet['kind'] = 'Pod'
+            pod_status = packet['status']
+            state, = pod_status['containerStatuses']
+            condition, = pod_status['conditions']
+            if packet['metadata']['name'] == declaration['kubernetes']['engine']['pod']:
+                state['ready'], condition['status'] = False, 'False'
+                if case == 'parked-engine':
+                    pod_status['phase'] = 'Succeeded'
+                if case == 'stale-engine' or case == 'stale-engine-after' and file_reads:
+                    state['restartCount'] += 1
+            elif case == 'probe-pod-unready':
+                condition['status'] = 'False'
+            elif case == 'probe-container-unready':
+                state['ready'] = False
+        return {**result, 'stdout_bytes': canonical_json(packet)}
+
+    settings = {'target': str(target_path)}
+    if case != 'legacy-engine-unready':
+        settings[COLLECTION_STATUS_SNAPSHOT_OPTION] = True
+    executor = module.KubernetesLogIntegrityExecutor(settings, runner=runner,
+        expected_target_sha256=sha256_hex(raw), expected_target_file_sha256=sha256_hex(raw))
+    definition = gap_check()
+    executor.prepared_collection_status(definition, env, GAP_VALUES)
+    assert not file_reads and not world.calls
+    draft = executor.run(definition, env, GAP_VALUES, VllmAdapter(), tmp_path / 'work')
+    assert len(file_reads) == reads
+    assert draft.data_origin.value == 'EXAMPLE'
+    summary = json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+    assert summary['producer_authenticated'] is summary['independent_event_verified'] is False
+    observed = draft.observations['collection_normal_arrivals']
+    if case == 'engine-unready':
+        assert draft.status.value == 'COMPLETED'
+        assert observed.collected and observed.value == ['request']
+        assert summary['selected_record_timeline'] == [row]
+        assert summary['capture_receipt']['file_sha256'] == sha256_hex(record)
+        assert summary['capture_receipt']['file_identity_sha256'] == sha256_hex(canonical_json(identity))
+    else:
+        assert draft.status.value == 'ABORTED'
+        assert not observed.collected
+        assert summary['capture_receipt'] is None
 
 
 def test_transport_accepts_only_the_seven_fixed_body_ids():

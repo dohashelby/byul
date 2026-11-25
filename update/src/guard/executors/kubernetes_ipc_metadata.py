@@ -25,7 +25,8 @@ def validate_policy(check, values):
 
 
 def collect(ctx):
-    record = read_kubernetes_process_observations(ctx, ctx.policy_values['protected_unix_paths'])
+    selected_paths = ctx.policy_values['protected_unix_paths']
+    record = read_kubernetes_process_observations(ctx, selected_paths)
     packet = record.get('packet') or {}
     subject = packet.get('capture_subject') or {}
     rows = []
@@ -44,14 +45,18 @@ def collect(ctx):
                          'owner_gid': metadata['gid'] if metadata else None,
                          'permission_mode': stat.S_IMODE(metadata['mode']) if metadata else None,
                          'path_chain_sha256': source['path_chain_sha256'], 'access_tested': False})
+    missing_paths = sorted(
+        {sha256_hex(path.encode('utf-8')) for path in selected_paths} - {row['path_sha256'] for row in rows}
+    )
     cleanup = list(record['cleanup_errors'])
     ctx._ipc_metadata_cleanup = cleanup
-    ctx._ipc_metadata_gap = not rows or bool(cleanup)
+    ctx._ipc_metadata_gap = bool(missing_paths or cleanup)
     diagnostics = list(record['diagnostic_codes'])
-    if len(rows) < len(ctx.policy_values['protected_unix_paths']):
+    if missing_paths:
         diagnostics.append('IPC_PATH_METADATA_UNAVAILABLE')
     snapshot = {'profile': PROFILE, 'target_sha256': record['target_sha256'],
-                'binding_verified': verified, 'path_metadata': rows, 'diagnostic_codes': diagnostics,
+                'binding_verified': verified, 'path_metadata': rows, 'uncollected_path_sha256': missing_paths,
+                'diagnostic_codes': diagnostics,
                 'capture_status': capture_status(record),
                 'mount_namespace_sha256': sha256_hex(canonical_json(subject['mount_namespace_inode'])) if verified else None,
                 'fixture': {'profile': PROFILE, 'reader_source_sha256': record['program_sha256']}}

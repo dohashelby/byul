@@ -32,9 +32,9 @@ describe("관측 연결 경고", () => {
     });
     renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <><Layout /><StatusReady /></>);
     await screen.findByText("상태 조회 완료");
-    expect(screen.getByText("일부 예시 포함")).toBeTruthy();
-    expect(screen.getByText("예시 자료 · evidence · 해당 자료는 공식 판정 근거 제외")).toBeTruthy();
-    expect(screen.queryByText(/^예시 데이터 ·/)).toBeNull();
+    expect(screen.getByText("일부 예시 자료 포함")).toBeTruthy();
+    expect(screen.getByText(/예시 자료는 검증 결과에 포함되지 않습니다/)).toBeTruthy();
+    expect(screen.queryByText("예시 화면")).toBeNull();
   });
   it("영역별 메뉴를 표시하고 Update·입력 화면에서는 출처 안내를 숨긴다", async () => {
     const status = structuredClone(STATUS);
@@ -67,7 +67,7 @@ describe("관측 연결 경고", () => {
     renderLayout(status);
 
     await screen.findByText("상태 조회 완료");
-    expect(screen.getByText(/예시 데이터 ·/)).toBeTruthy();
+    expect(screen.getByText("예시 화면")).toBeTruthy();
     expect(screen.queryByText(/^관측 불가:/)).toBeNull();
   });
 
@@ -77,7 +77,7 @@ describe("관측 연결 경고", () => {
     renderLayout(status);
 
     expect((await screen.findByText(/^관측 불가:/)).textContent).toContain("(Tetragon)");
-    expect(screen.getByText(/예시 데이터 ·/)).toBeTruthy();
+    expect(screen.getByText("예시 화면")).toBeTruthy();
   });
 
   it("수집기 상태 문구를 한국어로 표시한다", () => {

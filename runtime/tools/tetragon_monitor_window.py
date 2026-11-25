@@ -20,6 +20,7 @@ import time
 
 from serving_runtime.enforcement.attribution import timestamp
 from serving_runtime.operations.safety import recent, SHA
+from serving_runtime.common.enforce_rules import ENFORCE_METHODS
 
 SCHEMA = "runtime-tetragon-monitor-windows/1.0"
 TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
@@ -108,6 +109,82 @@ def human_reviews(path, *, trusted_owner_uids=()):
         return {}, None
 
 
+def valid_journal_record(event):
+    if not isinstance(event, dict) or timestamp(event.get("observed_at")) is None:
+        return False
+    if event.get("schema") == "runtime-observation/1.0":
+        return True
+    # Gateway writes this separate, typed operational record to the same journal.
+    return (
+        event.get("schema_version") == "runtime-engine-health-event/1.0"
+        and event.get("source") == "engine_health"
+        and event.get("kind") in {"engine_healthy", "engine_unavailable", "engine_recovered"}
+    )
+
+
+def scope_execution_review(snapshot, source, catalog, intent, reviews, reviewer):
+    """Derive a policy-specific view; retain the original continuous collection proof."""
+    from serving_runtime.enforcement.exec_policy_render import execution_policy
+
+    expected = digest(execution_policy(intent)["spec"])
+    context = snapshot["context"]
+    if source.get("context") != context or catalog.get("context", context) != context:
+        raise ValueError("review context mismatch")
+    output, selected = [], []
+    keys = ("policy", "namespace", "node", "policy_id", "method", "spec_sha256", "kernel", "since", "until")
+    for window in source["windows"]:
+        if window["policy"] != "runtime-tg-exec-01":
+            continue
+        policies = [
+            p
+            for p in snapshot["policies"]
+            if p.get("name") == window["policy"]
+            and p.get("namespace") == intent.namespace
+            and p.get("node") == window["node"]
+        ]
+        if len(policies) != 1 or window["namespace"] != intent.namespace or window["spec_sha256"] != expected:
+            raise ValueError("intent does not match review policy")
+        policy = policies[0]
+        if (
+            policy.get("spec_sha256") != expected
+            or policy.get("id") != window["policy_id"]
+            or policy.get("mode") != "monitor"
+        ):
+            raise ValueError("live policy differs from review")
+        matches = [w for w in catalog["windows"] if all(w.get(k) == window.get(k) for k in keys)]
+        if len(matches) != 1:
+            raise ValueError("catalog does not match continuous window")
+        entries = matches[0]["events"]
+        if len(entries) != window["event_count"] or digest([r["event"] for r in entries]) != window["events_sha256"]:
+            raise ValueError("incomplete review catalog")
+        binding = {k: window[k] for k in keys if k not in {"since", "until"}}
+        binding["mode"] = "monitor"
+        for row in entries:
+            if row["event_sha256"] != digest([context, binding, window["since"], row["event"]]):
+                raise ValueError("event digest mismatch")
+        included = [r for r in entries if r["event"].get("binary") in intent.exec_deny_binaries]
+        verdicts = [reviews.get(r["event_sha256"]) for r in included]
+        output.append(
+            {
+                **window,
+                "event_count": len(included),
+                "events_sha256": digest([r["event"] for r in included]),
+                "reviewed_event_count": sum(v is not None for v in verdicts),
+                "false_positive_count": verdicts.count("false_positive"),
+                "reviewer_token_id": reviewer,
+            }
+        )
+        selected.extend(included)
+    if not output:
+        raise ValueError("matching execution window missing")
+    return {
+        **source,
+        "windows": output,
+        "source_windows_sha256": digest(source),
+        "source_catalog_sha256": digest(catalog),
+    }, selected
+
+
 class MonitorWindowGenerator:
     def __init__(
         self,
@@ -168,12 +245,7 @@ class MonitorWindowGenerator:
             if raw and not raw.endswith(b"\n"):
                 raise ValueError("incomplete observation record")
             events = [json.loads(line) for line in raw.splitlines() if line.strip()]
-            if any(
-                not isinstance(event, dict)
-                or event.get("schema") != "runtime-observation/1.0"
-                or timestamp(event.get("observed_at")) is None
-                for event in events
-            ):
+            if any(not valid_journal_record(event) for event in events):
                 raise ValueError("invalid observation record")
             reviews, reviewer = human_reviews(self.reviews, trusted_owner_uids=self.trusted_owner_uids)
             active = {}
@@ -195,8 +267,7 @@ class MonitorWindowGenerator:
                     or len(caps) != 1
                     or not caps[0].get("kernel")
                     or not SHA.fullmatch(policy.get("spec_sha256", ""))
-                    or policy.get("method")
-                    not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}
+                    or policy.get("method") not in ENFORCE_METHODS
                 ):
                     continue
                 binding = {
@@ -233,7 +304,14 @@ class MonitorWindowGenerator:
                     if (
                         event.get("source") != "tetragon"
                         or event.get("data_origin") != "real"
-                        or event.get("policy_name") != policy["name"]
+                        or (
+                            event.get("policy_name") != policy["name"]
+                            and not (
+                                policy["name"] == "runtime-tg-exec-01"
+                                and event.get("kind") == "process_exec"
+                                and event.get("rule_id") == "TG-EXEC-01"
+                            )
+                        )
                         or identity.get("state") != "confirmed"
                         or identity.get("node") != node
                         or identity.get("context") != self.context

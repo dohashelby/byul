@@ -45,8 +45,8 @@ def persist(workdir, summary, collected, collector):
     name = 'supply_boot_summary.json'
     try:
         path = workdir / name
-        with path.open('x', encoding='utf-8', newline='\n') as stream:
-            json.dump({**summary, 'artifact_errors': list(errors)}, stream, ensure_ascii=False, sort_keys=True)
+        raw = json.dumps({**summary, 'artifact_errors': list(errors)}, ensure_ascii=False, sort_keys=True).encode('utf-8')
+        _publish_complete_bytes(path, raw, staging_prefix='.supply-boot-summary-')
         artifacts.append(DraftArtifact(name=name, path=path, collector=collector))
     except OSError:
         errors.append('SUPPLY_BOOT_SUMMARY_ARTIFACT_UNAVAILABLE')

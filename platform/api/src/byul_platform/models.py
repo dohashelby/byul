@@ -204,6 +204,40 @@ class VerificationList(BaseModel):
     source: SourceInfo
 
 
+class ReportFinding(BaseModel):
+    code: Literal[
+        "forbidden_code_revision_imported",
+        "forbidden_ipc_connection",
+        "forbidden_egress_succeeded",
+        "forbidden_plaintext_succeeded",
+        "forbidden_template_reference",
+        "unapproved_running_image",
+        "untrusted_input_changed_log",
+        "normal_probes_passed",
+        "normal_probe_failed",
+    ]
+    field: str | None = None
+    revision: str | None = None
+
+
+class ReportDecisionObservation(BaseModel):
+    key: str
+    kind: Literal["boolean", "count", "number", "recorded"]
+    value: bool | int | float | None = None
+    operators: list[str] = Field(default_factory=list)
+
+
+class ReportDecision(BaseModel):
+    axis: Literal["security", "functional", "performance"]
+    verdict: Literal["PASS", "FAIL", "UNKNOWN"]
+    criterion: str | None = None
+    observations: list[ReportDecisionObservation]
+    missing: list[str]
+    unmet: list[str]
+    policy_missing: list[str]
+    limits: list[str]
+
+
 class ReportSide(BaseModel):
     result_id: str | None
     result_revision: int | None
@@ -212,6 +246,14 @@ class ReportSide(BaseModel):
     performance: str | None
     verification_level: str | None
     reasons: list[str]
+    result_sha256: str | None = None
+    execution_status: Literal["PENDING", "RUNNING", "COMPLETED", "ABORTED", "NOT_RUN"] | None = None
+    data_origin: Literal["MEASURED", "DECLARED", "EXAMPLE"] | None = None
+    evidence_ref: ManifestRef | None = None
+    missing_observations: list[str] = Field(default_factory=list)
+    unverified_observations: list[str] = Field(default_factory=list)
+    finding: ReportFinding | None = None
+    decisions: list[ReportDecision] = Field(default_factory=list)
 
 
 class ReportMark(BaseModel):
@@ -285,6 +327,11 @@ class ManifestRef(BaseModel):
     sha256: str | None
 
 
+class ReportTarget(BaseModel):
+    name: str
+    version: str
+
+
 class ReportView(BaseModel):
     """update 보고서 화면(삭제된 update HTML 보고서의 내용). 값은 계약 verification-result(0.2)에서 꺼낸다."""
 
@@ -310,7 +357,11 @@ class ReportView(BaseModel):
     not_selected: list[NotSelectedRow]
     approval: JsonValue = None
     inputs_manifest: list[ManifestRef]
+    targets: dict[str, ReportTarget] = Field(default_factory=dict)
     checks: list[ReportCheck]
+    execution_attempt_id: str | None = None
+    as_of: str | None = None
+    byul_policy_ref: Annotated[dict[str, Any] | None, WithJsonSchema({"x-contract": "Common_nullable_policy_ref"})] = None
 
 
 class VerificationDetail(BaseModel):

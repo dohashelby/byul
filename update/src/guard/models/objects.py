@@ -200,6 +200,21 @@ class PolicyException(Strict):
     approved_at: datetime | None = None
     expires_at: datetime | None = None
 
+    def unavailable_reason(self, as_of: datetime) -> str | None:
+        if not self.approved_by or self.approved_at is None:
+            return "unapproved"
+        if self.expires_at is None:
+            return "no expiry"
+        if any(value.utcoffset() is None for value in (self.approved_at, self.expires_at, as_of)):
+            return "unverified timezone"
+        if self.expires_at <= self.approved_at:
+            return "invalid approval interval"
+        if as_of < self.approved_at:
+            return "approval not yet effective"
+        if as_of >= self.expires_at:
+            return "expired"
+        return None
+
 
 class Policy(GuardObject):
     kind: Literal[Kind.POL] = Kind.POL
@@ -540,6 +555,12 @@ class Result(GuardObject):
     missing_observations: list[str] = Field(default_factory=list)
     exception: ExceptionMark | None = None
     verification_level: DataOrigin | None = None
+    as_of: datetime | None = None
+    evaluation_mode: Literal["carryover"] | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("as_of", "evaluation_mode"))
 
 
 # --- 4.7 RPT -----------------------------------------------------------------
@@ -553,10 +574,13 @@ class SideResult(Strict):
     verification_level: DataOrigin | None = None
     # FAIL·UNKNOWN 축이 있을 때 RES.reasons 원문(PASS·NOT_APPLICABLE 축의 이유는 뺀다). 없으면 직렬화에서 뺀다.
     reasons: list[str] | None = None
+    evidence_ref: Ref | None = None
+    execution_status: ExecStatus | None = None
+    data_origin: DataOrigin | None = None
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("reasons",))
+        return _drop_none(handler(self), ("reasons", "evidence_ref", "execution_status", "data_origin"))
 
 
 class ExceptionDisplay(Strict):
@@ -655,10 +679,14 @@ class Report(GuardObject):
 
     change_summary: dict[str, Any] | None = None
     carry_counts: dict[str, int] | None = None
+    execution_attempt_id: str | None = None
+    as_of: datetime | None = None
+    diagnostic_artifacts: list[Artifact] | None = None
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("evidence_counts", "change_summary", "carry_counts"))
+        return _drop_none(handler(self), ("evidence_counts", "change_summary", "carry_counts",
+                                          "execution_attempt_id", "as_of", "diagnostic_artifacts"))
 
 
 OBJECT_CLASSES: dict[str, type[GuardObject]] = {

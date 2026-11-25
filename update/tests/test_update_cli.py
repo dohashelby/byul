@@ -120,6 +120,8 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
     inputs()
     Path("guard.toml").write_text(
         '[adapter]\nname="vllm"\n[executors]\ndirect_route="real"\n[update]\nmode="managed"\n', encoding="utf-8")
+    managed_key = "EXAMPLE-managed-update-key"
+    monkeypatch.setenv("GUARD_UPDATE_GENERAL", managed_key)
     exited, calls = [], []
     class Docker:
         def __init__(self, ident): self.ident = ident
@@ -130,6 +132,7 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
                 raise DockerError("cleanup incomplete")
 
     def up(docker, topology, folder, allowed_key, **kwargs):
+        assert allowed_key == managed_key
         calls.append(kwargs["vllm"]["image"])
         if fail_baseline and folder.name == "baseline":
             raise DockerError("private engine error")
@@ -140,6 +143,7 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
 
     seen = []
     def executor(c):
+        assert c["_runtime_environ"]["GUARD_UPDATE_GENERAL"] == managed_key
         seen.append(c["direct_route"]["target"])
         return ComparableFake("direct_200" if cleanup_failure and "baseline" in seen[-1] else "pass")
     monkeypatch.setattr(orchestration, "Docker", Docker)
@@ -148,6 +152,7 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
     monkeypatch.setitem(registry.EXECUTORS, "direct_route:real", executor)
     result = invoke()
     assert result.exit_code == (1 if fail_baseline or cleanup_failure else 0), result.output + repr(result.exception)
+    assert managed_key not in result.output and managed_key not in str(report())
     if cleanup_failure:
         assert len(exited) == len(set(exited)) == len(set(calls)) == 1
         assert len(seen) == 1 and 'baseline' in seen[0]
@@ -158,14 +163,18 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
         assert candidate.execution.abort_reason == 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
         assert any('cleanup' in note for note in report()['limitations'])
         return
-    assert len(exited) == 2 and len(set(exited)) == 2
-    assert len(set(calls)) == 2
     row = next(r for r in report()["by_check"] if r["check_id"] == "REQ-01")
     if fail_baseline:
+        assert len(exited) == len(calls) == 1
         assert row["baseline"]["security"] == "UNKNOWN"
-        assert row["comparison"] != "FIXED"
-        assert len(seen) == 1 and "candidate" in seen[0]
+        assert row["candidate"]["execution_status"] == "ABORTED"
+        assert row["comparison"] == "NOT_COMPARABLE"
+        assert not seen
+        candidate, = [e for e in Store(Path('.guard')).iter_kind('EVD') if e.side.value == 'candidate']
+        assert candidate.execution.abort_reason == 'BASELINE_EXECUTION_FAILED'
     else:
+        assert len(exited) == 2 and len(set(exited)) == 2
+        assert len(set(calls)) == 2
         assert row["baseline"]["security"] == "PASS"
         assert len(set(seen)) == 2
         assert "baseline" in seen[0] and "candidate" in seen[1]

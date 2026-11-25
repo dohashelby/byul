@@ -50,8 +50,9 @@ class TetragonTransition(BaseModel):
     rollback_ok: bool | None = None
 
 class TetragonEffects(BaseModel):
-    expected_effect: Literal["file_read_denial", "process_termination"]
+    expected_effect: Literal["file_read_denial", "process_termination", "exec_denial"]
     file_read_denial: Effect
+    exec_denial: Effect | None = None
     file_denial_basis: Literal["userspace_errno", "kernel_permission_return"] | None = None
     process_termination: Effect
     service_recovery: Effect

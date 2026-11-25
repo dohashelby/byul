@@ -42,6 +42,32 @@ def owned_declarations():
     return pack, base, environments, source
 
 
+@pytest.mark.parametrize('role', ['policy', 'selection', 'candidate-environment'])
+def test_copy_preparation_rejects_saved_input_replacement_before_publication(tmp_path, monkeypatch, role):
+    _, base, environments, source = owned_declarations()
+    documents = {'policy': base.to_dict(), 'selection': source,
+                 **{f'{side}-environment': env.to_dict() for side, env in environments.items()}}
+    paths = {name: tmp_path / f'{name}.json' for name in documents}
+    for name, document in documents.items():
+        paths[name].write_bytes(canonical_json(document))
+    digest = sha256_hex(paths['selection'].read_bytes())
+    materialize = inputs.materialize
+
+    def replace_after_materialization(*args):
+        prepared = materialize(*args)
+        replacement = tmp_path / 'replacement.json'
+        replacement.write_bytes(paths[role].read_bytes())
+        replacement.replace(paths[role])
+        return prepared
+
+    monkeypatch.setattr(inputs, 'materialize', replace_after_materialization)
+    output, store = tmp_path / 'out', tmp_path / 'store'
+    with pytest.raises(ValueError, match='^COPY_SELECTION_SOURCE_CHANGED$'):
+        inputs.prepare(paths['policy'], {side: paths[f'{side}-environment'] for side in environments},
+                       paths['selection'], digest, output, store=store)
+    assert not output.exists() and not store.exists()
+
+
 def test_materialized_files_pass_the_product_binding(tmp_path, monkeypatch):
     pack, base, environments, source = owned_declarations()
     policy_path = tmp_path / 'base.json'

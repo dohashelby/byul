@@ -167,9 +167,10 @@ def test_archived_gateway_final_without_selected_run_cannot_be_adopted():
 
 @pytest.mark.parametrize("ordinary_gateway_record,line_ending", [(False, b"\n"), (True, b"\n"), (True, b"\r\n")],
                          indirect=["ordinary_gateway_record"], ids=["ascii", "unicode", "unicode-crlf"])
-@pytest.mark.parametrize("include_denied_actor", [True, False], ids=["both-actors", "allowed-only"])
+@pytest.mark.parametrize("include_denied_actor,parent_cleanup", [(True, False), (False, False), (False, True)],
+                         ids=["both-actors", "allowed-only", "parent-cleanup"])
 def test_canonical_snapshot_reads_one_owned_file_without_http(
-        tmp_path, monkeypatch, ordinary_gateway_record, line_ending, include_denied_actor):
+        tmp_path, monkeypatch, ordinary_gateway_record, line_ending, include_denied_actor, parent_cleanup):
     from datetime import timedelta
     from guard.core.run import _normalize
     from guard.executors.kubernetes_observation import KubernetesRequiredEventExecutor
@@ -211,12 +212,15 @@ def test_canonical_snapshot_reads_one_owned_file_without_http(
     def read_file(self, client, target, *, container, image, path):
         calls.append(path)
         assert self.binding["engine"] == selected["kubernetes_gateway"] and target == selected
+        self.rows.append({"program": "file", "owner_before_after_verified": True,
+                          "transport_complete": True, "diagnostic_codes": []})
+        self._parent_cleanup_failures = int(parent_cleanup)
         return raw, {"capture_sha256": sha256_hex(raw), "bytes": len(raw), "owner_binding_verified": True}
 
     def unexpected(*args, **kwargs):
         raise AssertionError("audit snapshot cannot run requests or activate the target")
 
-    monkeypatch.setattr(module.GatewayRecordReader, "read_file", read_file)
+    monkeypatch.setattr(module._GatewayRecordSnapshotReader, "read_file", read_file)
     monkeypatch.setattr(KubernetesHTTP, "__call__", unexpected)
     executor = module.KubernetesGatewayRecordSnapshotExecutor(
         {"target": str(target_file), module.SNAPSHOT_OPTION: True, module.SNAPSHOT_SOURCE: source},
@@ -231,7 +235,8 @@ def test_canonical_snapshot_reads_one_owned_file_without_http(
             executor.validate_policy(check, {**values, "observation_denied_actor_sha256": values["observation_allowed_actor_sha256"]})
     draft = executor.run(check, environment, values, object(), tmp_path / "evidence")
     assert calls == ["verify-engine-and-probe", module.RECORD_PATH, "verify-engine-and-probe"]
-    assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
+    assert draft.status == (ExecStatus.ABORTED if parent_cleanup else ExecStatus.COMPLETED)
+    assert draft.data_origin == DataOrigin.EXAMPLE
     observed = _normalize(check, draft)["observations"]
     capture, = observed["required_event_collection"]["value"]
     assert capture["file_bytes_sha256"] == sha256_hex(raw) and capture["record_sha256"] == sha256_hex(canonical_json(row))
@@ -250,4 +255,19 @@ def test_canonical_snapshot_reads_one_owned_file_without_http(
     assert not observed["required_event_independent_trigger_verified"]["value"]
     assert not observed["required_event_scope_complete"]["value"]
     assert not draft.normal_control.attempted and all(not step.attempted for step in draft.challenges)
+    artifact = json.loads(draft.artifacts[0].path.read_bytes())
     assert "EXAMPLE-PRIVATE" not in draft.artifacts[0].path.read_text()
+    if parent_cleanup:
+        assert draft.cleanup_errors == ["GATEWAY_AUDIT_PARENT_CLEANUP_UNVERIFIED"]
+        assert "record_transport" not in artifact
+    else:
+        transport = artifact["record_transport"]
+        assert not transport["collection_gap"] and transport["injected_runner"] is True
+        read, = transport["reads"]
+        assert read == {"program": "file", "owner_before_after_verified": True, "transport_complete": True,
+                        "diagnostic_codes": [], "file_path_sha256": sha256_hex(module.RECORD_PATH.encode("utf-8")),
+                        "file_bytes_sha256": sha256_hex(raw)}
+        assert set(transport["programs"]) == {"file"}
+        report_bytes = canonical_json(transport)
+        assert module.RECORD_PATH.encode("utf-8") not in report_bytes
+        assert selected["kubernetes_gateway"]["container_id"].encode("utf-8") not in report_bytes

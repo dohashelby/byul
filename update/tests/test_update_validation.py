@@ -193,12 +193,14 @@ def test_help_and_analysis_reject_execution_inputs_without_launch(tmp_path, monk
     assert harness.main(["--analyze-existing", str(tmp_path), "--pack", str(PACK_DIR), "--output", str(tmp_path / "out")]) == 1
 
 
-def fake_execution(tmp_path, monkeypatch, *, update_code=0, timeout=False, replay_accepted=True):
+def fake_execution(tmp_path, monkeypatch, *, update_code=0, timeout=False, replay_accepted=True,
+                   fresh_readiness=None, report_fields=None):
     output = tmp_path / "run"
     output.mkdir()
     inputs = {key: tmp_path / key for key in ("pack", "baseline", "candidate", "policy", "config")}
     calls = []
-    report = {"inputs_manifest": [{"kind": "PLAN", "id": "PLAN-EXAMPLE", "revision": 1}]}
+    report = {"inputs_manifest": [{"kind": "PLAN", "id": "PLAN-EXAMPLE", "revision": 1, "sha256": "a" * 64}],
+              **(report_fields or {})}
     def command(args, label, seconds):
         calls.append((label, args))
         if label == "update" and not timeout:
@@ -214,10 +216,12 @@ def fake_execution(tmp_path, monkeypatch, *, update_code=0, timeout=False, repla
         if label == "report-restored":
             (output / "replay-report.json").write_text(json.dumps(report), encoding="utf-8")
         return {"command": label, "returncode": update_code if label == "update" else 0,
-                "timed_out": label == "update" and timeout}, json.dumps(readiness()) if label == "prepare-update" else ""
+                "timed_out": label == "update" and timeout}, json.dumps(
+                    readiness() if fresh_readiness is None else fresh_readiness) if label == "prepare-update" else ""
     monkeypatch.setattr(harness, "_command", command)
     monkeypatch.setattr(harness, "_assess_store", lambda store, path, **kw: {
-        "accepted": replay_accepted if store.name == "replay-store" else True})
+        "accepted": replay_accepted if store.name == "replay-store" else True,
+        "checks": {row["check_id"]: {} for row in (fresh_readiness or readiness())["check_support"]}})
     monkeypatch.setattr(harness, "_target_proof", lambda *a: {"synthetic": True})
     monkeypatch.setattr(harness, "_report_pair", lambda *a: report)
     monkeypatch.setattr(harness, "_preserved_graph", lambda *a: {"synthetic": True})
@@ -238,6 +242,22 @@ def test_execute_delegates_product_sequence_and_preserves_fresh_restore(tmp_path
     assert updated[updated.index("--as-of") + 1] == judged[judged.index("--as-of") + 1]
     assert str(output / "replay-store") in judged and str(output / "restored") not in judged
     assert "guard.cli" in updated
+
+
+def test_execute_uses_actual_scope_and_original_decision_for_replay(tmp_path, monkeypatch):
+    scope = ["REQ-03"]
+    first = readiness()
+    first["check_support"] = [row for row in first["check_support"] if row["check_id"] in scope]
+    original = {"as_of": "2026-11-24T10:00:00Z", "execution_attempt_id": "a" * 32}
+    output, inputs, calls = fake_execution(tmp_path, monkeypatch, fresh_readiness=first, report_fields=original)
+    summary = harness.execute_run(inputs, output, first, {"selected_checks": scope}, timeout=30)
+    assert summary["accepted"]
+    for name in ("judge-restored", "report-restored"):
+        argv = dict(calls)[name]
+        assert argv[argv.index("--attempt") + 1] == original["execution_attempt_id"]
+        assert argv[argv.index("--as-of") + 1] == original["as_of"]
+        assert argv[argv.index("--from-report") + 1] == str(output / "updates/UPDATE-EXAMPLE/report.json")
+        assert "--config" not in argv
 
 
 @pytest.mark.parametrize("update_code,replay_accepted", [(1, True), (0, False)])

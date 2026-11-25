@@ -10,8 +10,7 @@ import os
 from pathlib import Path
 import stat
 
-from guard.collectors import gpu_common_inputs as common
-from guard.collectors import worker_shard_producer
+from guard.collectors import check_observations, gpu_common_inputs as common, worker_shard_producer
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 
@@ -45,6 +44,13 @@ def load_input(config, *, environment_ref, target_sha256, prepared_sha256=None):
         before = os.fstat(stream.fileno())
         if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= MAX_INPUT_BYTES:
             raise ValueError("B_COMMON_INPUT_NOT_REGULAR")
+        source = check_observations.recipe_record(path)
+        if source is not None:
+            if source.sha256 is None or source.sha256 != config["sha256"]:
+                raise ValueError("B_COMMON_INPUT_BYTES_MISMATCH")
+            verified = check_observations.load_verified(path, before, source, decode=strict_json)
+            if verified is not None:
+                return verified[0], scope
         raw = stream.read(MAX_INPUT_BYTES + 1)
         after = os.fstat(stream.fileno())
     identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns)
@@ -63,10 +69,18 @@ def runner(record, scope, *, check_id, requests, required_cases):
     gaps = list(result["gaps"])
     if not required_cases or not set(required_cases) <= set(requests):
         gaps.append("B_RUNNER_CASE_COVERAGE_UNAVAILABLE")
+    selected_requests = {requests.get(case) for case in required_cases}
+    events_by_request = {request: [] for request in selected_requests}
+    bindings = []
+    for event in record["events"]:
+        events = events_by_request.get(event["request_sha256"])
+        if events is not None:
+            events.append(event)
+            bindings.append(record["bindings"][event["binding"]])
     selected, consumed_rejections = {}, []
     for case in required_cases:
         request = requests.get(case)
-        events = [row for row in record["events"] if row["request_sha256"] == request]
+        events = events_by_request[request]
         api = [row for row in events if row["event"] in {"api_validated", "api_rejected"}]
         received = [row for row in events if row["event"] == "runner_received"]
         applied = [row for row in events if row["event"] == "sampler_applied"]
@@ -87,9 +101,6 @@ def runner(record, scope, *, check_id, requests, required_cases):
         elif any(row["seq"] <= api[0]["seq"] for row in received) or any(
                 row["seq"] <= min(r["seq"] for r in received) for row in applied):
             gaps.append("B_RUNNER_CAUSAL_ORDER_UNAVAILABLE:" + case)
-    selected_requests = {requests.get(case) for case in required_cases}
-    bindings = [record["bindings"][row["binding"]] for row in record["events"]
-                if row["request_sha256"] in selected_requests]
     if len({(b["pod_uid"], b["container_id"], b["restart_count"]) for b in bindings}) > 1:
         gaps.append("B_RUNNER_PROCESS_GENERATION_MISMATCH")
     identities = {}
@@ -100,8 +111,7 @@ def runner(record, scope, *, check_id, requests, required_cases):
         gaps.append("B_RUNNER_PROCESS_ID_REUSED")
     reused = {key for key, starts in identities.items() if len(starts) > 1}
     for case, details in selected.items():
-        case_bindings = [record["bindings"][row["binding"]] for row in record["events"]
-                         if row["request_sha256"] == details["request_sha256"]]
+        case_bindings = [record["bindings"][row["binding"]] for row in events_by_request[details["request_sha256"]]]
         generations = {(b["pod_uid"], b["container_id"], b["restart_count"]) for b in case_bindings}
         details["identity_binding_verified"] = bool(case_bindings) and len(generations) == 1 and not any(
             tuple(b[k] for k in ("pod_uid", "container_id", "restart_count", "worker_pid")) in reused

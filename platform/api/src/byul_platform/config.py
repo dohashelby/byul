@@ -33,6 +33,7 @@ class Settings:
     update_dir: Path = REPO_ROOT / "update"
     update_python: Path | None = None
     update_config_file: Path | None = None
+    update_required_checks: tuple[str, ...] = ()
     mvp_policy_file: Path | None = None
     platform_data_dir: Path | None = None
     evidence_index_paths: tuple[Path, ...] = ()
@@ -74,6 +75,8 @@ class Settings:
             update_dir=_path("BYUL_UPDATE_DIR") or REPO_ROOT / "update",
             update_python=_path("BYUL_UPDATE_PYTHON"),
             update_config_file=_path("BYUL_UPDATE_CONFIG"),
+            update_required_checks=tuple(dict.fromkeys(check.strip() for check in
+                os.environ.get("BYUL_UPDATE_REQUIRED_CHECKS", "").split(",") if check.strip())),
             mvp_policy_file=_path("BYUL_MVP_POLICY_FILE"),
             platform_data_dir=_path("PLATFORM_DATA_DIR"),
             evidence_index_paths=tuple(_paths("EVIDENCE_INDEX_PATHS")),

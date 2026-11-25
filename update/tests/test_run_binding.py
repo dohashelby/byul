@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 
 import pytest
+
+from tests.builders import run_under_plan_lock
 import yaml
 
 from guard import application
@@ -322,11 +324,11 @@ def test_paired_req02_preserves_owned_record_for_recipe_bound_missing_native_pre
     run_settings = application.run_config(cfg)
     if change.endswith('-before-run'):
         with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
-            run_plan(store, PACK, plan, run_settings, only_side=Side.candidate)
+            run_under_plan_lock(store, PACK, plan, run_settings, only_side=Side.candidate)
         assert not list(store.iter_kind('EVD')) and world.reads == 0
         return
 
-    evd, = run_plan(store, PACK, plan, run_settings, only_side=Side.candidate)
+    evd, = run_under_plan_lock(store, PACK, plan, run_settings, only_side=Side.candidate)
     if change == 'delete-after-recipe':
         assert evd.execution.status == ExecStatus.NOT_RUN
         assert evd.execution.abort_reason == 'RUN_BINDING_UNAVAILABLE'
@@ -384,6 +386,81 @@ def test_req02_record_only_binding_requires_the_declared_preparation_itself_to_b
         run_binding.compute(PACK.checks['REQ-02'], settings, selected_env, side='candidate', attempt_id='attempt',
                             issued_at=utcnow(), run_cfg={'record_session': 'ab' * 16},
                             native_route_prepared_absent=absent)
+
+
+@pytest.mark.parametrize('defect', [None, 'undeclared', 'corrupt-manifest', 'changed-manifest', 'wrong-record-target'])
+def test_prepare_update_checks_only_the_declared_req02_record_pair(
+        tmp_path, monkeypatch, ordinary_gateway_record, defect):
+    import socket
+
+    from typer.testing import CliRunner
+    from guard.cli import app
+    from guard.executors.kubernetes_native_route import KubernetesNativeRouteExecutor
+    from tests.test_a1_kubernetes_route_product import SESSION, World, stored_gateway_route
+    from tests.test_kubernetes_request_binding import env
+    from tools.j02_run_config import write_config
+    from tools.mvp_versions import versions
+
+    parsed_candidate = env()
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {'route_record': 'kubernetes'},
+           'update': {'mode': 'external', 'kubernetes_candidate_binding': 'prebound',
+                      'allowed_checks': ['REQ-02']}, 'sides': {}}
+    worlds, environments = {}, {}
+    gateway_raw, _, _ = ordinary_gateway_record
+    for side, version in versions().items():
+        selected = environment(id='ENV-ROUTE-' + side.upper(), model=parsed_candidate.model,
+            engine={'name': version['engine'], 'version': version['version'], 'image_digest': version['image']})
+        world = worlds[side] = World(selected, 'normal')
+        world.target['observed_version'] = selected.engine.version
+        world.target['engine']['image_digest'] = selected.engine.image_digest
+        world.target['kubernetes']['engine'].update(image=selected.engine.image_digest,
+                                                    image_id=selected.engine.image_digest)
+        stored_gateway_route(world, selected, gateway_raw)
+        environment_file = environments[side] = tmp_path / (side + '-env.json')
+        environment_file.write_bytes(canonical_json(selected.to_dict()))
+        target = tmp_path / (side + '-target.json')
+        target.write_bytes(canonical_json(world.target))
+        cfg['sides'][side] = {'route_record': {'target': str(target),
+            'native_route': {'target': str(target), 'prepared': str(tmp_path / (side + '-native.json'))}},
+            'run_binding': {'REQ-02': {'record_session': SESSION}}}
+
+    candidate = cfg['sides']['candidate']['route_record']
+    manifest = Path(candidate['native_route']['prepared'])
+    if defect == 'undeclared':
+        candidate.pop('native_route')
+    elif defect == 'corrupt-manifest':
+        manifest.write_bytes(b'{')
+    elif defect == 'changed-manifest':
+        effective_values = run_binding.effective_values
+
+        def change_after_binding(*args, **kwargs):
+            result = effective_values(*args, **kwargs)
+            if kwargs.get('side') == 'candidate':
+                manifest.write_bytes(b'{')
+            return result
+
+        monkeypatch.setattr(run_binding, 'effective_values', change_after_binding)
+    elif defect == 'wrong-record-target':
+        candidate['target'] = cfg['sides']['baseline']['route_record']['target']
+    policy_path, config_path = tmp_path / 'policy.json', tmp_path / 'guard.toml'
+    pol = policy(PACK.ref(), scope={'include': ['REQ-02']}, values={})
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    write_config(cfg, config_path)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Static REQ-02 preparation must not dispatch or construct a native collector')
+
+    monkeypatch.setattr(KubernetesNativeRouteExecutor, '__init__', forbidden)
+    monkeypatch.setattr(application, 'Docker', forbidden)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    result = CliRunner().invoke(app, ['prepare-update', '--pack', str(PACK.path),
+        '--baseline', str(environments['baseline']), '--candidate', str(environments['candidate']),
+        '--policy', str(policy_path), '--config', str(config_path)])
+    ready = json.loads(result.stdout)
+    assert result.exit_code == (0 if defect is None else 1), result.output
+    assert ready['execution_scope']['static_preparation_ready'] is (defect is None)
+    assert all(world.reads == 0 for world in worlds.values())
 
 
 def _supply_pair(external, check_id):
@@ -532,7 +609,7 @@ def test_paired_recipe_binds_raw_supply_role_files_until_consumed(
     if phase == 'before-recipe':
         rewrite()
         with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
-            run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+            run_under_plan_lock(store, PACK, plan, run_cfg, only_side=Side.candidate)
         assert seen == []
         return
     if phase == 'before-binding':
@@ -552,7 +629,7 @@ def test_paired_recipe_binds_raw_supply_role_files_until_consumed(
             return result
 
         monkeypatch.setattr(run_binding, 'effective_values', rewrite_after_binding)
-    evd, = run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+    evd, = run_under_plan_lock(store, PACK, plan, run_cfg, only_side=Side.candidate)
     if phase == 'before-binding':
         assert seen == []
         assert evd.execution.status == ExecStatus.NOT_RUN and evd.execution.abort_reason == reason

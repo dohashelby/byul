@@ -16,7 +16,7 @@ from guard.models import canonical_json, sha256_hex, utcnow
 from guard.runtime import kubernetes_worker_readiness as public
 from tools import b_lif07_readiness as tool
 from tools import b_lif07_native_capture as helper
-from tests.test_b_lif07_readiness import case, PRIVATE
+from tests.test_b_lif07_readiness import PRIVATE, UNVERIFIED_VERDICTS, case
 from tests.test_a1_worker_readiness_http import World as AWorld, PRIVATE as A_PRIVATE
 
 COMMON = 'f277fecd6df1e59505c0ad731032593f6fb22885'
@@ -178,7 +178,8 @@ def test_public_HTTP_to_actual_CLI_manual_Store_exact_ref_restore(case, monkeypa
     tool.main(argv); stdout = capsys.readouterr().out; summary = json.loads(stdout)
     output = case['args']['output']; record = json.loads((output / 'worker-readiness.json').read_text())
     assert len(created) == 1 and len(world.execs) == summary['requests'] == summary['http_requests_attempted'] == 2
-    assert summary['exact_refs_restored'] and summary['verdicts'] == {key: 'UNKNOWN' for key in ('security', 'functional', 'performance')}
+    assert summary['exact_refs_restored'] and summary['verdicts'] == UNVERIFIED_VERDICTS
+    assert 'INSUFFICIENT_EVIDENCE' in summary['security_failure_tags']
     assert summary['capture_origin'] == 'EXAMPLE' and summary['actual_target_executed'] is False
     assert record['http_observation']['snapshot']['cleanup_errors'] and record['http_observation']['snapshot']['requests'][1]['outcome'] == 200
     entry, = yaml.safe_load((output / 'manual-evidence.yaml').read_text())['checks']

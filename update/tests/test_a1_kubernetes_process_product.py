@@ -95,7 +95,8 @@ def test_registered_process_cli_preserves_origin_facts_failures_and_exact_refs(
     assert evd.execution.status.value==('ABORTED' if attachment_failure else 'COMPLETED')
     assert bool(evd.execution.cleanup_errors) is (normal_mode=='cleanup')
     assert evd.normal_control.attempted and evd.normal_control.succeeded is (normal_mode is None)
-    assert res.verdicts.security.value==('FAIL' if check_id=='PLT-01' and kind!='normal' else 'UNKNOWN')
+    assert res.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in res.security_failure_tags) == (check_id == 'PLT-01' and kind != 'normal')
     assert res.verdicts.functional.value==('FAIL' if normal_mode=='denied' else 'UNKNOWN')
     assert res.verdicts.performance.value=='UNKNOWN'
     assert evd.observations['process_scan_complete'].value is False

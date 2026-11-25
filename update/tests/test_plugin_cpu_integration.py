@@ -147,14 +147,14 @@ def test_environment_hash_and_source_profile_are_checked_before_capture(tmp_path
         pipeline.proposal_pack(tmp_path / 'unsupported', 'unsupported')
 
 
-@pytest.mark.parametrize('scenario,security,execution', [
-    ('normal', 'UNKNOWN', 'COMPLETED'), ('violation', 'FAIL', 'COMPLETED'),
-    ('uncollected', 'UNKNOWN', 'ABORTED'), ('unsupported', 'UNKNOWN', 'ABORTED'),
-    ('violation_after_failure', 'FAIL', 'ABORTED'), ('artifact_failure', 'FAIL', 'ABORTED'),
-    ('auxiliary_write_failure', 'FAIL', 'ABORTED'), ('known_child_mismatch', 'UNKNOWN', 'ABORTED'),
-    ('mixed_attribution', 'FAIL', 'ABORTED'),
+@pytest.mark.parametrize('scenario,confirmed,execution', [
+    ('normal', False, 'COMPLETED'), ('violation', True, 'COMPLETED'),
+    ('uncollected', False, 'ABORTED'), ('unsupported', False, 'ABORTED'),
+    ('violation_after_failure', True, 'ABORTED'), ('artifact_failure', True, 'ABORTED'),
+    ('auxiliary_write_failure', True, 'ABORTED'), ('known_child_mismatch', False, 'ABORTED'),
+    ('mixed_attribution', True, 'ABORTED'),
 ])
-def test_example_capture_core_refs_privacy_and_registry_restoration(tmp_path, monkeypatch, scenario, security, execution):
+def test_example_capture_core_refs_privacy_and_registry_restoration(tmp_path, monkeypatch, scenario, confirmed, execution):
     record = example_record('target031')
     if scenario in ('violation', 'violation_after_failure', 'artifact_failure',
                     'auxiliary_write_failure', 'known_child_mismatch', 'mixed_attribution'):
@@ -194,7 +194,10 @@ def test_example_capture_core_refs_privacy_and_registry_restoration(tmp_path, mo
     summary = pipeline.run_pipeline(tmp_path / 'source', output, source_profile='target031', origin=DataOrigin.EXAMPLE)
     assert registry.EXECUTORS == before
     assert summary['execution_status'] == execution and summary['data_origin'] == 'EXAMPLE'
-    assert summary['verdicts']['security'] == security
+    assert summary['verdicts']['security'] == 'FAIL'
+    tags = json.loads((output / 'RES.json').read_text())['security_failure_tags']
+    assert tags and ('CONFIRMED_VIOLATION' in tags) is confirmed
+    assert ('ABORTED' in tags) is (execution == 'ABORTED')
     assert summary['runner_hook_verified'] is False and summary['installed_target'] is None
     assert summary['permanent_registration_verified'] is False and summary['exact_ref_rejudgment_unchanged']
     assert summary['store_verify_errors'] == []

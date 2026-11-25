@@ -13,7 +13,7 @@ from guard.executors import registry
 from guard.executors.kubernetes_request_binding import KubernetesRequestBindingExecutor
 from guard.models import canonical_json
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, T0
+from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.test_kubernetes_sampling import World as PodWorld, inputs, PRIVATE
 from tests.test_request_binding import World as RequestWorld, IMAGE, SHA, TEMPLATE_PATH, VALUES, target as docker_target, judge
 
@@ -215,7 +215,11 @@ def test_existing_cli_evd_res_rpt_refs_export_restore_and_rejudge(tmp_path,monke
     cli(["report","--plan",plan,"--pack",str(pack.path),"--json",str(tmp_path/"report.json"),"--as-of",T0.isoformat(),*common])
     cli(["verify",*common]);store=Store(store_path)
     evd,=store.find_latest("EVD",lambda e:True);res,=store.find_latest("RES",lambda e:True);rpt,=store.find_latest("RPT",lambda e:True)
-    assert res.verdicts.security.value==expected and evd.data_origin.value=="EXAMPLE" and not rpt.official
+    assert evd.data_origin.value == "EXAMPLE" and not rpt.official
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(res)
+    else:
+        assert res.verdicts.security.value == expected
     assert store.resolve(evd.environment).model.id=="EXAMPLE-repository-id"
     if mode=="attachment":assert evd.execution.status.value=="ABORTED" and len(evd.artifacts)==1
     assert PRIVATE not in canonical_json(evd.to_dict()).decode()

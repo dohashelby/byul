@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import re
 
-from guard.core.compare import compare_results, comparison_differences
-from guard.core.judge import pass_gate
+from guard.core.compare import compare_results, comparison_differences, security_comparison_verdict
+from guard.core.judge import judge_evidence, pass_gate
 from guard.core.select import check_policy_value
 from guard.judges.rule_table import RuleTableJudge
-from guard.models import canonical_json, sha256_hex, weakest_origin
+from guard.models import Verdict, canonical_json, sha256_hex, weakest_origin
 from guard.models.artifacts import model_closure_sha256
 from guard.models.objects import object_from_dict
 from guard.store.integrity import ref_key as _key
@@ -258,6 +258,7 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                 if param.key in values:
                     check_policy_value(cid, param.key, param.type, values[param.key])
             checks[cid] = {}
+            comparable_security: dict[str, Verdict] = {}
             for side, env in zip(SIDES, environments):
                 evd = evd_by_pair[cid, side]
                 if evd.plan != plan.ref() or evd.environment != env.ref():
@@ -315,8 +316,19 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                     raise ValueError(f"{cid}/{side}: duplicate or unrecognized challenge records")
                 expected = {axis: str(raw.verdicts.get(axis, "UNKNOWN")) for axis in AXES}
                 expected = {axis: "UNKNOWN" if value == "PASS" and blocks else value for axis, value in expected.items()}
+                expected_tags = []
+                if saved.security_verdict_version is not None:
+                    current = judge_evidence(
+                        check, evd, policy, saved.as_of or result.as_of or saved.created_at,
+                        plan=plan, binary_security=True,
+                    )
+                    expected["security"] = current.verdicts.security.value
+                    expected_tags = current.security_failure_tags
                 actual = result.verdicts.model_dump(mode="json")
                 shown = getattr(row, side)
+                comparable_security[side] = security_comparison_verdict(
+                    result.verdicts.security, result.security_failure_tags,
+                )
                 checks[cid][side] = {"evidence": evd.ref().model_dump(mode="json"),
                                      "result": result.ref().model_dump(mode="json"),
                                      "actual": actual, "raw_rule_verdicts": {axis: str(value) for axis, value in raw.verdicts.items()},
@@ -324,10 +336,14 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                                      "collection_blocks": coverage_blocks,
                                      "required_observations": [obs.key for obs in check.required_observations],
                                      "challenge_steps": list(check.challenge_steps)}
-                if actual != expected:
+                if result.security_failure_tags:
+                    checks[cid][side]["security_failure_tags"] = [tag.value for tag in result.security_failure_tags]
+                if (actual != expected or result.security_verdict_version != saved.security_verdict_version
+                        or result.security_failure_tags != expected_tags):
                     contract_problems.append(f"{cid}/{side}: saved RES differs from the fixed rules and PASS gate")
                 if (shown is None or shown.result != result.ref()
                         or any(str(getattr(shown, axis)) != actual[axis] for axis in AXES)
+                        or shown.security_failure_tags != result.security_failure_tags
                         or shown.verification_level != result.verification_level):
                     contract_problems.append(f"{cid}/{side}: report differs from the original RES/ref")
                 expected_level = weakest_origin([evd.data_origin, *[condition.origin for condition in item.conditions]])
@@ -339,14 +355,17 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                     incomplete.append(f"{cid}/{side}: incomplete normal control/challenges/observations: {blocks}")
                 if coverage_blocks:
                     incomplete.append(f"{cid}/{side}: incomplete collection coverage: {coverage_blocks}")
-                if any(actual[axis] not in {"PASS", "FAIL"} for axis in ("security", "functional")):
+                if (comparable_security[side] not in {Verdict.PASS, Verdict.FAIL}
+                        or actual["functional"] not in {"PASS", "FAIL"}):
                     incomplete.append(f"{cid}/{side}: concrete security and functional PASS/FAIL are required")
             base, cand = (evd_by_pair[cid, side] for side in SIDES)
             differences = comparison_differences(base.comparability, cand.comparability)
             for axis, field in (("security", "comparison"), ("functional", "functional_comparison")):
+                verdicts = (comparable_security if axis == "security"
+                            else {side: checks[cid][side]["actual"][axis] for side in SIDES})
                 expected_comparison = str(compare_results(
-                    checks[cid]["baseline"]["actual"][axis], base.comparability,
-                    checks[cid]["candidate"]["actual"][axis], cand.comparability))
+                    verdicts["baseline"], base.comparability, verdicts["candidate"], cand.comparability,
+                ))
                 if str(getattr(row, field)) != expected_comparison:
                     contract_problems.append(f"{cid}: report {field} differs from the original comparison rules")
             if row.comparison_reasons != differences:

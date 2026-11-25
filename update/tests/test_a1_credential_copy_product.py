@@ -13,7 +13,7 @@ from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
 from tests.run_binding_support import for_pack, run_table_toml
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
 from tests.test_a1_credential_copy_contract import example
 from tests.test_a1_required_event_product import World as OriginalWorld,PRIVATE
 from tests.test_kubernetes_request_binding import env
@@ -122,7 +122,8 @@ def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');evd,=store.iter_kind('EVD');result,=store.iter_kind('RES')
     assert evd.data_origin.value=='EXAMPLE' and evd.normal_control.attempted is False and evd.normal_control.succeeded is None
-    assert result.verdicts.model_dump(mode='json')=={key:'UNKNOWN' for key in ('security','functional','performance')}
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == result.verdicts.performance == "UNKNOWN"
     assert all(evd.observations[key].value is False for key in ('copy_producer_authenticated','copy_membership_verified','copy_treatment_verified','copy_reuse_enforcer_verified','copy_issuer_verified','copy_scope_complete'))
     assert world.sent==[] and receipt['unchanged_definition_bytes']==76 and not receipt['full_PLT12_complete']
     rows=evd.observations['copy_event_declarations'].value

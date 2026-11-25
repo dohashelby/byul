@@ -17,7 +17,7 @@ from guard.judges.declared import DeclaredJudge
 from guard.manual_audit import BUDGETS, CASES, CLAIMS, CONTRACT, OBSERVATION, POLICY_TYPES, normalize, timestamp
 from guard.models.objects import Observation
 from guard.store import Store
-from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
+from tests.builders import PACK_DIR, T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import entry, fill, snapshot, write
@@ -311,12 +311,13 @@ def test_v2_still_imports_existing_sup_lif_item_evidence(tmp_path,pack):
 
 
 @pytest.mark.parametrize('version',['guard-manual-evidence/1','guard-manual-evidence/2'])
-def test_legacy_payload_without_audit_under_new_definition_is_unknown(tmp_path,pack,version):
+def test_legacy_payload_without_audit_under_new_definition_is_unconfirmed_failure(tmp_path,pack,version):
     st,plan,doc=setup(tmp_path,pack);doc['template']=version;entry(doc,'OBS-11').pop('audit_evidence')
     if version.endswith('/1'):doc.pop('policy');doc.pop('pack')
     import_evidence(st,pack,write(tmp_path,doc),now=T0)
     results={r.check_id:r for r in judge_plan(st,pack,plan,T0)}
-    assert results['OBS-11'].verdicts.security=='UNKNOWN' and results['SUP-05'].verdicts.security=='PASS'
+    assert_unconfirmed_security_failure(results['OBS-11'])
+    assert results['SUP-05'].verdicts.security == 'PASS'
 
 
 @pytest.mark.parametrize("issue",["foreign_check","foreign_null","unfilled_foreign_null","foreign_side","foreign_item","duplicate","foreign_attachment","wrong_enum","wrong_attempt","wrong_time_error","wrong_dependent","reserved_observation"])
@@ -393,4 +394,8 @@ def test_obs_uses_existing_core_pass_gate_and_keeps_fail(tmp_path,pack,normal,fa
     if fail:next(r for r in e['audit_evidence']['records'] if r['case']=='collection_fault')['observations']['missing_handling']='treated_normal'
     import_evidence(st,pack,write(tmp_path,doc),now=T0)
     res=next(r for r in judge_plan(st,pack,plan,T0) if r.check_id=='OBS-11')
-    assert res.verdicts.security==('FAIL' if fail else 'UNKNOWN')
+    if fail:
+        assert res.verdicts.security == 'FAIL'
+        assert 'CONFIRMED_VIOLATION' in res.security_failure_tags
+    else:
+        assert_unconfirmed_security_failure(res)

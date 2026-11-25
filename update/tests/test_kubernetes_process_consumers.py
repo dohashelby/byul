@@ -270,7 +270,8 @@ def test_proposed_registry_cli_keeps_metadata_scope_unknown_and_original_refs(tm
     assert world.process_reads == 1 and len(world.packets) == (1 if mode is None else 0)
     assert evd.data_origin.value == "EXAMPLE"
     assert evd.execution.status == (ExecStatus.ABORTED if attachment_failure else ExecStatus.COMPLETED)
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert res.verdicts.security == Verdict.FAIL
+    assert "CONFIRMED_VIOLATION" not in res.security_failure_tags
     assert evd.normal_control.succeeded is (mode is None)
     assert evd.observations["functional_probe_results"].value == {
         "POST /v1/completions": "pass" if mode is None else "no_response"}

@@ -12,7 +12,7 @@ from guard.core.select import select
 from guard.models import DataOrigin, Mode
 from guard.store import Store
 from guard.store.packs import put_pack
-from tests.builders import baseline_pack, environment, policy, T0, PACK_DIR
+from tests.builders import PACK_DIR, T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 
 PRIVATE = 'EXAMPLE-PRIVATE-LOG-USERNAME-GROUP-EXCEPTION-DO-NOT-PERSIST'
 
@@ -131,8 +131,13 @@ def test_uncertain_access_never_submits_pass(case, change):
         case['capture']['normal_control'] = {'attempted': False, 'succeeded': None}
         case['capture']['unauthorized_read_verified'] = None
     result = bridge.run(**case['args'], execute=True)
-    assert result['security'] == 'UNKNOWN' and result['storage_encryption'] == 'UNKNOWN'
-    assert 'PASS' not in latest_evidence(case).observations['declared_verdicts'].value.values()
+    assert result['security'] == 'FAIL' and result['storage_encryption'] == 'UNKNOWN'
+    stored = Store.read_only(case['args']['output'] / 'store')
+    saved = next(stored.iter_kind('RES'))
+    assert_unconfirmed_security_failure(saved)
+    assert 'INSUFFICIENT_EVIDENCE' in saved.security_failure_tags
+    declared = latest_evidence(case).observations['declared_verdicts'].value
+    assert declared['security'] == 'UNKNOWN' and 'PASS' not in declared.values()
 
 
 @pytest.mark.parametrize('late', ['after', 'cleanup', 'artifact', 'export'])

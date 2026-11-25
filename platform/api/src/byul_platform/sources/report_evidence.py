@@ -87,13 +87,18 @@ def _observed(evd, key):
     return obs.get("value") if obs.get("collected") is True else None
 
 
+def _supports_violation_display(view):
+    tags = view.get("security_failure_tags")
+    return not tags or "CONFIRMED_VIOLATION" in tags
+
+
 def _finding(check_id, view, result, evd):
     execution = evd.get("execution", {})
     if (evd.get("data_origin") != "MEASURED" or execution.get("status") != "COMPLETED"
             or execution.get("operator") is not None):
         return None
     verdicts = result.get("verdicts", {})
-    if view["security"] == verdicts.get("security") == "FAIL":
+    if view["security"] == verdicts.get("security") == "FAIL" and _supports_violation_display(view):
         if check_id == "SUP-08":
             return _import_violation(evd)
         if rule := _SECURITY_FINDINGS.get(check_id):
@@ -146,6 +151,8 @@ def _decisions(view, result, evd, traces=None):
         trace = traces.get(axis)
         verdict = view.get(axis)
         if not isinstance(trace, dict) or verdict not in {"PASS", "FAIL", "UNKNOWN"} or verdict != verdicts.get(axis):
+            continue
+        if axis == "security" and verdict == "FAIL" and not _supports_violation_display(view):
             continue
 
         def keys(name):

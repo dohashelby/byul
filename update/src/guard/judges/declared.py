@@ -18,7 +18,7 @@ PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관�
 
 from __future__ import annotations
 
-from guard.models import CheckDef, Evidence, Verdict
+from guard.models import CheckDef, Evidence, SecurityFailureTag, Verdict
 from guard.log_policy_profiles import policy_supported as log_policy_supported
 from guard.input_policy import policy_context
 from guard.automation_policy import (string_list, validate_template_policy,
@@ -84,15 +84,15 @@ def _automation_policy_valid(executor: str, values: dict, *, log_contract="legac
         return False
 
 
-def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
+def _branch_context(check: CheckDef, values: dict) -> tuple[SecurityFailureTag | None, list[str]]:
     """A declared policy opens a review branch; it does not prove actual state."""
     branch = {"OBS-04": ("usage_allowed", False), "OBS-05": ("usage_allowed", True),
               "OBS-07": ("replay_allowed", True), "OBS-08": ("replay_allowed", True)}.get(check.id)
     if branch is None:
-        return False, []
+        return None, []
     key, expected = branch
     if not any(p.key == key and p.type == "bool" and p.required for p in check.policy_params):
-        return False, []
+        return None, []
     value = values.get(key)
     valid = type(value) is bool
     blocked = not valid or value is not expected
@@ -100,7 +100,10 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
     code = "POLICY_FLAG_UNRESOLVED" if not valid else ("POLICY_BRANCH_INACTIVE" if blocked else "POLICY_BRANCH_ACTIVE")
     limit = ("USAGE_FIELDS_DESTINATIONS_PERIOD_AND_ACTUAL_STATE_NOT_AUTOMATICALLY_VERIFIED"
              if key == "usage_allowed" else "REPLAY_CONSUMER_PERMISSIONS_PARSER_AND_ACTUAL_STATE_NOT_AUTOMATICALLY_VERIFIED")
-    return blocked, [f"POLICY_CONTEXT: {check.id}.{key}={shown}; {code}; declared policy only, not proof of actual state",
+    failure = None
+    if blocked:
+        failure = SecurityFailureTag.CONDITIONS_UNMET if valid else SecurityFailureTag.INSUFFICIENT_EVIDENCE
+    return failure, [f"POLICY_CONTEXT: {check.id}.{key}={shown}; {code}; declared policy only, not proof of actual state",
                      f"POLICY_CONTEXT: {limit}; per-check scope only, shared-policy consistency not automatically verified"]
 
 
@@ -113,7 +116,8 @@ class DeclaredJudge:
         obs = evidence.observations.get("declared_verdicts")
         if obs is None or not obs.collected or not isinstance(obs.value, dict):
             return JudgeOutput(verdicts={a: Verdict.UNKNOWN for a in AXES}, reasons=["no declared verdicts"],
-                               missing_observations=["declared_verdicts"])
+                               missing_observations=["declared_verdicts"],
+                               security_failure_tags=[SecurityFailureTag.INSUFFICIENT_EVIDENCE])
         input_rules = None
         input_rule_issue = "unavailable"
         if input_context is not None and not input_context.blocked:
@@ -165,7 +169,7 @@ class DeclaredJudge:
             context_missing = not isinstance(value, str) or not value.strip()
             code = "APPROVAL_RECORD_SYSTEM_UNRESOLVED" if context_missing else "APPROVAL_RECORD_SYSTEM_DECLARED"
             reasons.append(f"POLICY_CONTEXT: {code}; context only, approval permissions not automatically verified")
-        branch_blocked, branch_reasons = _branch_context(check, policy_values)
+        branch_failure, branch_reasons = _branch_context(check, policy_values)
         reasons.extend(branch_reasons)
         if input_context is not None:
             reasons.extend(input_context.reasons)
@@ -213,7 +217,7 @@ class DeclaredJudge:
             if v == "PASS" and context_missing:
                 reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: approval_record_system is blank")
                 v = "UNKNOWN"
-            if v == "PASS" and branch_blocked:
+            if v == "PASS" and branch_failure is not None:
                 reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: policy flag does not establish this review branch")
                 v = "UNKNOWN"
             if v == "PASS" and input_context is not None and input_context.blocked:
@@ -260,7 +264,26 @@ class DeclaredJudge:
                 v = "UNKNOWN"
             verdicts[axis] = Verdict(v)
             reasons.append(f"{axis}: declared {obs.value.get(axis) or 'UNKNOWN'} → {v}")
-        return JudgeOutput(verdicts=verdicts, reasons=reasons,
+        security_tags: set[SecurityFailureTag] = set()
+        confirmed_violation = bool(item_result and item_result[0]["security"] == "FAIL")
+        if verdicts["security"] == Verdict.FAIL and not confirmed_violation:
+            security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+        if verdicts["security"] == Verdict.UNKNOWN:
+            if branch_failure is not None:
+                security_tags.add(branch_failure)
+            for rules in (input_rules, automation_rules, cache_result, group_result):
+                if rules is not None:
+                    security_tags.update(rules.security_failure_tags)
+                    if rules.verdicts.get("security") == Verdict.FAIL:
+                        security_tags.add(SecurityFailureTag.CONDITIONS_UNMET)
+            if (obs.value.get("security") != "PASS" or missing_policy or context_missing
+                    or not evidence.artifacts or unanswered or executor_ceiling.get("security", "PASS") != "PASS"
+                    or (input_context is not None and (input_context.blocked or input_rules is None))
+                    or (automation_ceiling and (not automation_policy_valid or automation_rules is None))
+                    or (item_result and item_result[0]["security"] == "UNKNOWN") or not security_tags):
+                security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+        return JudgeOutput(verdicts=verdicts, reasons=reasons, security_failure_tags=sorted(security_tags),
+                           security_violation_confirmed=confirmed_violation,
                            missing_observations=sorted(set(item_result[2] if item_result else [])
                                | set(input_context.missing if input_context is not None else ())
                                | set(input_rules.missing_observations if input_rules is not None else ())

@@ -14,7 +14,7 @@ from guard.executors.container_config import ContainerConfigExecutor
 from guard.executors.running_image_approval import PROFILE, validate_image_approval_policy
 from guard.models import ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import PACK_DIR, baseline_pack, completion_response, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, PACK_DIR, baseline_pack, completion_response, environment, policy
 
 
 PIN = "example.invalid/vllm-cpu@sha256:" + "a" * 64
@@ -119,7 +119,7 @@ def test_approved_running_image_is_partial_unknown_not_full_supply_pass(tmp_path
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.data_origin.value == "EXAMPLE"
     assert evd.execution.executor.name == "container_config" and evd.execution.executor.version == "0.6.3"
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is True
     assert evd.observations["running_image_repo_digest"].value == PIN
     assert evd.observations["running_image_approved"].value is True
@@ -167,7 +167,7 @@ def test_identity_change_during_digest_collection_is_unknown(tmp_path, monkeypat
         after[field] = {"Id": "f" * 64, "Image": "sha256:" + "e" * 64, "Name": "/other-engine"}[field]
     _, _, _, evd, result, _, probes = _run(tmp_path, monkeypatch,
         docker=FakeDocker(before=before, after=after), values={"approved_image_digests": [OTHER]})
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is False
     assert evd.observations["running_image_unapproved"].collected is False
     assert not any(request.get("method") == "POST" for request in probes)
@@ -176,14 +176,14 @@ def test_identity_change_during_digest_collection_is_unknown(tmp_path, monkeypat
 @pytest.mark.parametrize("digests", [[], [OTHER], [IMAGE_ID], [None]])
 def test_missing_or_unlinked_repo_digest_does_not_prove_approval_or_violation(tmp_path, monkeypatch, digests):
     _, _, _, evd, result, _, _ = _run(tmp_path, monkeypatch, docker=FakeDocker(digests=digests))
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_repo_digest"].collected is False
 
 
 @pytest.mark.parametrize("pin", ["example.invalid/vllm-cpu:latest", IMAGE_ID, None])
 def test_tag_or_local_image_id_is_not_a_repo_digest(tmp_path, monkeypatch, pin):
     _, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch, pin=pin)
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is False
     assert not any(call[0] == "image_info" for call in docker.calls)
     assert not any(request.get("method") == "POST" for request in probes)
@@ -193,7 +193,7 @@ def test_tag_or_local_image_id_is_not_a_repo_digest(tmp_path, monkeypatch, pin):
 def test_collection_error_is_unknown_and_exception_text_is_not_persisted(tmp_path, monkeypatch, fault):
     store, _, _, evd, result, _, _ = _run(tmp_path, monkeypatch,
         docker=FakeDocker(inspect_error=fault == "inspect", image_error=fault == "image"))
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     summary, raw = _summary(store, evd)
     assert "RUNNING_IMAGE_COLLECTION_UNAVAILABLE" in summary["collection_errors"]
     assert "NEVER_PERSIST_DAEMON_ERROR" not in raw and "NEVER_PERSIST_IMAGE_ERROR" not in raw
@@ -201,7 +201,7 @@ def test_collection_error_is_unknown_and_exception_text_is_not_persisted(tmp_pat
 
 def test_explicit_container_must_match_target_engine(tmp_path, monkeypatch):
     _, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch, cfg_container="other-engine")
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is False
     assert not docker.calls and not any(request.get("method") == "POST" for request in probes)
 
@@ -216,7 +216,7 @@ def test_byul_bare_manifest_digest_is_bound_to_explicit_verified_target(tmp_path
 @pytest.mark.parametrize("declared", [IMAGE_ID, "sha256:" + "c" * 64, None])
 def test_unlinked_environment_digest_cannot_borrow_target_identity(tmp_path, monkeypatch, declared):
     _, _, _, evd, result, docker, _ = _run(tmp_path, monkeypatch, environment_image=declared)
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is False
     assert not docker.calls
 
@@ -228,13 +228,13 @@ def test_stable_but_malformed_identity_is_not_verified(tmp_path, monkeypatch, fi
     (before["State"] if field == "StartedAt" else before)[field] = value
     _, _, _, evd, result, _, _ = _run(tmp_path, monkeypatch,
         docker=FakeDocker(before=before), values={"approved_image_digests": [OTHER]})
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is False
 
 
 def test_unowned_target_is_not_queried_as_a_verified_running_engine(tmp_path, monkeypatch):
     _, _, _, evd, result, _, probes = _run(tmp_path, monkeypatch, target_extra={"run_id": None})
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is False
     assert not any(request.get("method") == "POST" for request in probes)
 
@@ -242,7 +242,7 @@ def test_unowned_target_is_not_queried_as_a_verified_running_engine(tmp_path, mo
 def test_missing_approval_policy_is_not_run_and_never_filled_from_observation(tmp_path, monkeypatch):
     _, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch, values={})
     assert evd.execution.status == ExecStatus.NOT_RUN
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert not docker.calls and not probes
 
 
@@ -284,7 +284,7 @@ def test_aborted_supply_collection_records_same_static_executor_version(tmp_path
     assert evd.execution.status == ExecStatus.ABORTED
     assert evd.execution.executor.name == "container_config"
     assert evd.execution.executor.version == ContainerConfigExecutor.version == "0.6.3"
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
 
 
 def test_manual_pass_cannot_bypass_partial_supply_security_ceiling(tmp_path, monkeypatch):
@@ -327,7 +327,7 @@ def test_static_guidance_names_partial_scope_without_claiming_runtime_identity()
 def test_missing_or_foreign_environment_ref_cannot_supply_image_observations(tmp_path, monkeypatch, target_ref):
     store, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch, target_ref=target_ref,
         values={"approved_image_digests": [OTHER]})
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["running_image_identity_verified"].value is False
     assert evd.observations["running_image_unapproved"].collected is False
     assert not docker.calls and not any(p.get("method") == "POST" for p in probes)
@@ -344,7 +344,8 @@ def test_environment_ref_comparison_uses_the_complete_exact_ref(tmp_path, monkey
     _, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch, target_ref=bad_ref)
     assert evd.environment == env.ref()
     assert evd.observations["running_image_identity_verified"].value is False
-    assert result.verdicts.security == Verdict.UNKNOWN and not docker.calls
+    assert_unconfirmed_security_failure(result)
+    assert not docker.calls
     assert not any(p.get("method") == "POST" for p in probes)
 
 
@@ -361,10 +362,10 @@ def test_unsealed_environment_cannot_supply_a_running_image_identity():
     assert _target(SimpleNamespace(env=invalid, target=target), None) is None
 
 
-@pytest.mark.parametrize("mode,expected", [("approved", "UNKNOWN"), ("unapproved", "FAIL"),
-    ("missing-ref", "UNKNOWN"), ("foreign-ref", "UNKNOWN"), ("bare-digest", "FAIL"),
-    ("later-functional-error", "FAIL")])
-def test_environment_binding_product_cli_report_restore_and_exact_refs(tmp_path, monkeypatch, mode, expected):
+@pytest.mark.parametrize("mode,confirmed", [("approved", False), ("unapproved", True),
+    ("missing-ref", False), ("foreign-ref", False), ("bare-digest", True),
+    ("later-functional-error", True)])
+def test_environment_binding_product_cli_report_restore_and_exact_refs(tmp_path, monkeypatch, mode, confirmed):
     import socket
     import subprocess
     from typer.testing import CliRunner
@@ -419,7 +420,8 @@ def test_environment_binding_product_cli_report_restore_and_exact_refs(tmp_path,
     evd, = store.find_latest("EVD", lambda r: True); res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
     assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.3"
-    assert evd.execution.status == ExecStatus.COMPLETED and res.verdicts.security.value == expected
+    assert evd.execution.status == ExecStatus.COMPLETED and res.verdicts.security == Verdict.FAIL
+    assert ("CONFIRMED_VIOLATION" in res.security_failure_tags) is confirmed
     assert evd.environment == env.ref() and rpt.official is False
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     if mode in {"missing-ref", "foreign-ref"}:

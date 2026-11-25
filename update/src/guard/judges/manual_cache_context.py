@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from guard.models import Verdict
+from guard.models import SecurityFailureTag, Verdict
 from .base import AXES, JudgeOutput
 
 POLICY = "required_cache_contexts"
@@ -106,6 +106,7 @@ def evaluate(check, evidence, values) -> JudgeOutput | None:
     ]
     missing = []
     ceilings = dict.fromkeys(AXES, Verdict.UNKNOWN)
+    security_tags = set()
     try:
         _require(state == "complete", "CONTRACT_INCOMPLETE")
         _require(POLICY in values, "NO_POLICY_VALUE")
@@ -129,11 +130,18 @@ def evaluate(check, evidence, values) -> JudgeOutput | None:
                 is_same = row["case"] == "same_context"
                 expected_effect = {"same_context": "before_context_hit", "changed_context": "isolated_after_change",
                                    "post_control": "after_context_hit"}[row["case"]]
-                controls = (row["object_change"] == ("unchanged" if is_same else "observed")
-                            and row["other_conditions"] == "same"
-                            and row["key_relation"] == ("same" if is_same else "different"))
-                secure &= controls and row["cache_effect"] == expected_effect
-                functional &= controls and row["cache_effect"] == expected_effect and row["inference"] == "succeeded"
+                conditions = ((row["object_change"], "unchanged" if is_same else "observed"),
+                              (row["other_conditions"], "same"),
+                              (row["key_relation"], "same" if is_same else "different"),
+                              (row["cache_effect"], expected_effect))
+                matches = all(actual == expected for actual, expected in conditions)
+                secure &= matches
+                functional &= matches and row["inference"] == "succeeded"
+                for actual, expected in conditions:
+                    if actual == "unknown":
+                        security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+                    elif actual != expected:
+                        security_tags.add(SecurityFailureTag.CONDITIONS_UNMET)
                 if row["inference"] != "succeeded":
                     reasons.append("POLICY_CONTEXT: CACHE_CONTEXT_INFERENCE_UNRESOLVED; functional PASS withheld")
                 if row["cache_effect"] == "old_context_reused":
@@ -153,4 +161,7 @@ def evaluate(check, evidence, values) -> JudgeOutput | None:
     except (TypeError, KeyError):
         reasons.append("POLICY_CONTEXT: CACHE_CONTEXT_EVIDENCE_INVALID; DECLARED PASS withheld")
         missing.append(OBSERVATION)
-    return JudgeOutput(verdicts=ceilings, reasons=reasons, missing_observations=missing)
+    if missing:
+        security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+    return JudgeOutput(verdicts=ceilings, reasons=reasons, missing_observations=missing,
+                       security_failure_tags=sorted(security_tags))

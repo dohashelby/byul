@@ -49,9 +49,10 @@ def test_real_factory_original_independent_fail_and_exact_refs(tmp_path,monkeypa
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     fail=mode not in {'denied','timeout','receiver-restart','receipt-peer','prefix'}
-    if res.verdicts.security.value!=('FAIL' if fail else 'UNKNOWN'):
+    if res.verdicts.security.value != 'FAIL' or ('CONFIRMED_VIOLATION' in res.security_failure_tags) is not fail:
         print('OWNED_EGRESS_FAILURE_EVIDENCE\n'+canonical_json(e.to_dict()).decode())
-    assert e.data_origin.value=='EXAMPLE' and res.verdicts.security.value==('FAIL' if fail else 'UNKNOWN')
+    assert e.data_origin.value == 'EXAMPLE' and res.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in res.security_failure_tags) is fail
     assert res.verdicts.functional.value==res.verdicts.performance.value=='UNKNOWN'
     assert e.normal_control.attempted is False and e.normal_control.succeeded is None
     assert e.observations['egress_scope_complete'].value is False

@@ -19,7 +19,7 @@ from guard.models.checkdef import JudgeSpec, ObsSpec, PolicyParam
 from guard.store import Store
 from guard.store.packs import put_pack, get_pack
 from guard.store.bundle import export_bundle, restore_bundle
-from tests.builders import baseline_pack
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack
 from tests.test_kubernetes_lifecycle import group, target as native_target
 from tests.test_lifecycle_capture import case, external, revised
 from tests.test_lifecycle_sensor import writer_factory
@@ -81,7 +81,10 @@ def test_lif03_real_registered_factory_through_saved_pack_rejudgment(tmp_path, g
         {'target': str(target), 'prepared': str(group.manifest_path)})
     assert evd.execution.executor.name == 'stream_buffer'
     assert evd.data_origin.value == 'EXAMPLE'
-    assert result.verdicts.security.value == expected
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security.value == expected
     assert evd.observations['buffer_scope_complete'].value is False
     if mode == 'cleanup':
         assert evd.execution.status.value == 'ABORTED'
@@ -134,7 +137,8 @@ def test_obs02_separate_producers_registered_factory_and_stored_pack(tmp_path, g
     sessions = evd.observations['state_collection_sessions'].value
     assert len({row['session_sha256'] for row in sessions}) == 2
     assert len({row['target_sha256'] for row in sessions}) == 2
-    assert evd.data_origin.value == 'EXAMPLE' and result.verdicts.security.value == 'UNKNOWN'
+    assert evd.data_origin.value == 'EXAMPLE'
+    assert_unconfirmed_security_failure(result)
     assert evd.observations['identity_native_models'].collected
     assert len(evd.artifacts) == 2
 
@@ -163,7 +167,7 @@ def test_transition_registered_factory_with_select_supported_policy_and_stored_p
     assert evd.execution.executor.name == 'lifecycle_transition'
     assert evd.execution.status.value == 'ABORTED'
     assert evd.observations['transition_request_configuration_conflicts'].value
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
     assert evd.observations['transition_actual_consumption_verified'].value is False
 
 
@@ -196,7 +200,7 @@ def test_profiler_control_registered_factory_and_exact_saved_pack(tmp_path, exte
     assert evd.observations['profiler_next_start_api_linked'].value is True
     assert evd.observations['profiler_scope_complete'].value is False
     assert evd.observations['profiler_backend_collection_stopped_verified'].value is False
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
     if mode == 'followup-error':
         assert evd.execution.status.value == 'ABORTED'
         assert evd.observations['profiler_control_flag_adapter_conflicts'].value

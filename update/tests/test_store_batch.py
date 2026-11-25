@@ -9,7 +9,7 @@ import pytest
 from guard.core.judge import judge_evidence
 from guard.core.report import build_report
 from guard.core.select import select
-from guard.models import DataOrigin, ExecStatus, Side
+from guard.models import DataOrigin, ExecStatus, SecurityFailureTag, Side
 from guard.store import AppendOnlyError, IntegrityError, Store
 from tests.builders import T0, baseline_pack, environment, evidence, policy
 
@@ -141,3 +141,17 @@ def test_report_cannot_change_the_recorded_result_judgment_time(selected_evidenc
     report = build_report(store, pack, plan, T0, evidence=[evd], judged=[result])
     with pytest.raises(IntegrityError, match="judgment times differ"):
         store.validate_object(report.model_copy(update={"as_of": T0 + timedelta(seconds=1)}).seal())
+
+
+def test_binary_report_cannot_invent_confirmed_violation_without_result(selected_evidence):
+    store, pack, _, plan, evd = selected_evidence
+    report = build_report(store, pack, plan, T0, evidence=[], judged=[])
+    index = next(index for index, row in enumerate(report.by_check) if row.check_id == evd.check_id)
+    row = report.by_check[index]
+    assert row.single.security_failure_tags == ["INSUFFICIENT_EVIDENCE"]
+    rows = report.by_check.copy()
+    rows[index] = row.model_copy(update={
+        "single": row.single.model_copy(update={"security_failure_tags": [SecurityFailureTag.CONFIRMED_VIOLATION]}),
+    })
+    with pytest.raises(IntegrityError, match="unsupported verdict or tag"):
+        store.validate_object(report.model_copy(update={"by_check": rows}).seal())

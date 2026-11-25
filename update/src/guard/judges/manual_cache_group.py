@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from guard.models import Verdict
+from guard.models import SecurityFailureTag, Verdict
 from .base import AXES, JudgeOutput
 
 POLICIES = {"public_prefix_sharing_allowed": "bool", "isolated_cache_groups": "list[str]",
@@ -156,6 +156,7 @@ def evaluate(check, evidence, values) -> JudgeOutput | None:
     ]
     ceilings = dict.fromkeys(AXES, Verdict.UNKNOWN)
     missing = []
+    security_tags = set()
     try:
         _require(state == "complete", "CONTRACT_INCOMPLETE")
         _require(all(k in values for k in POLICIES), "NO_POLICY_VALUE")
@@ -182,16 +183,22 @@ def evaluate(check, evidence, values) -> JudgeOutput | None:
                     expected_effect = ("warmed" if case == "source_warmup" else "self_group_hit"
                                        if case in ("same_group_reuse", "post_control") else "cross_group_isolated")
                     expected_entry = row["source_entry_ref"] if source_case else target_entry
-                    consistent = (row["actor_principal_ref"] == principals[actor]
-                        and row["derived_group_id"] == actor and row["consumed_group_id"] == actor
-                        and row["consumed_entry_ref"] == expected_entry
-                        and (source_case or target_entry != row["source_entry_ref"])
-                        and row["client_group_claim"] == ("source_group" if case == "forged_salt" else "absent")
-                        and row["salt_action"] == ("trusted_overwritten" if case == "forged_salt" else "trusted_injected")
-                        and row["key_relation"] == ("same" if source_case else "different")
-                        and row["cache_effect"] == expected_effect and row["request_outcome"] == "accepted")
+                    conditions = ((row["actor_principal_ref"], principals[actor]),
+                                  (row["derived_group_id"], actor), (row["consumed_group_id"], actor),
+                                  (row["consumed_entry_ref"], expected_entry),
+                                  (source_case or target_entry != row["source_entry_ref"], True),
+                                  (row["client_group_claim"], "source_group" if case == "forged_salt" else "absent"),
+                                  (row["salt_action"], "trusted_overwritten" if case == "forged_salt" else "trusted_injected"),
+                                  (row["key_relation"], "same" if source_case else "different"),
+                                  (row["cache_effect"], expected_effect), (row["request_outcome"], "accepted"))
+                    consistent = all(actual == expected for actual, expected in conditions)
                     secure &= consistent
                     functional &= consistent and row["inference"] == "succeeded"
+                    for actual, expected in conditions:
+                        if actual == "unknown":
+                            security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+                        elif actual != expected:
+                            security_tags.add(SecurityFailureTag.CONDITIONS_UNMET)
                     if row["inference"] != "succeeded":
                         reasons.append("POLICY_CONTEXT: CACHE_GROUP_INFERENCE_UNRESOLVED; functional PASS withheld")
                     if row["cache_effect"] == "forbidden_cross_group_reuse":
@@ -211,4 +218,7 @@ def evaluate(check, evidence, values) -> JudgeOutput | None:
     except (TypeError, KeyError):
         reasons.append("POLICY_CONTEXT: CACHE_GROUP_EVIDENCE_INVALID; DECLARED PASS withheld")
         missing.append(OBSERVATION)
-    return JudgeOutput(verdicts=ceilings, reasons=list(dict.fromkeys(reasons)), missing_observations=missing)
+    if missing:
+        security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+    return JudgeOutput(verdicts=ceilings, reasons=list(dict.fromkeys(reasons)), missing_observations=missing,
+                       security_failure_tags=sorted(security_tags))

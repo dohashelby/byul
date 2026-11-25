@@ -12,6 +12,7 @@ from guard.executors import registry
 from guard.executors.response_error_contract import observe_error_response
 from guard.models import DataOrigin, Policy
 from guard.store import Store
+from tests.builders import assert_unconfirmed_security_failure
 from tests.test_kubernetes_request_binding import env, target
 from tools import b2_response_kubernetes as producer
 
@@ -82,7 +83,8 @@ def test_allowed_error_remains_partial_unknown_and_exact_ref_restore(tmp_path, i
     assert len(calls) == 1 and calls[0][2]['allowed_error_fields'] == FIELDS
     assert calls[0][2]['forbidden_contexts'] is None and calls[0][2]['binary'] == 'kubectl'
     assert summary['collector_status'] == 'completed' and summary['execution_status'] == 'ABORTED'
-    assert result.verdicts.security.value == 'UNKNOWN' and result.verdicts.functional.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional.value == 'UNKNOWN'
     assert evidence.data_origin == DataOrigin.EXAMPLE and evidence.normal_control.succeeded
     assert evidence.observations['response_coverage_complete'].value is False
     for key in ('error_fields_seen', 'response_fields_seen', 'response_options_returned',
@@ -134,7 +136,9 @@ def test_unset_policy_preserves_not_run_selection_and_does_not_capture(tmp_path,
     args[1] = args[1].model_copy(update={'values': raw}).seal()
     summary, calls, _, evidence, result = run(tmp_path, args, error_record(args))
     assert not calls and summary['capture_calls'] == 0
-    assert evidence.execution.status.value == 'NOT_RUN' and result.verdicts.security.value == 'UNKNOWN'
+    assert evidence.execution.status.value == 'NOT_RUN'
+    assert_unconfirmed_security_failure(result)
+    assert 'NOT_RUN' in result.security_failure_tags
     assert not evidence.artifacts
 
 
@@ -173,7 +177,7 @@ def test_wrong_binding_or_policy_projection_is_not_promoted(tmp_path, inputs, ch
     elif change == 'policy': record['allowed_error_fields_sha256'] = '0' * 64
     else: record['error_observation']['violations'] = []
     _, _, _, evidence, result = run(tmp_path, inputs, record)
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
     assert not evidence.observations['response_violations'].collected
 
 
@@ -182,14 +186,15 @@ def test_non_error_response_never_uses_error_field_policy(tmp_path, inputs, stat
     record = error_record(inputs, violation=True)
     record['error_observation']['outcome'] = status
     _, _, _, evidence, result = run(tmp_path, inputs, record)
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
     assert evidence.observations['response_violations'].value is None
 
 
 def test_capture_exception_is_fixed_diagnostic_and_unknown(tmp_path, inputs):
     summary, _, _, evidence, result = run(tmp_path, inputs, fail=True)
     assert summary['diagnostics'] == ['REQ13_CAPTURE_OR_COMPONENT_UNAVAILABLE']
-    assert not evidence.artifacts and result.verdicts.security.value == 'UNKNOWN'
+    assert not evidence.artifacts
+    assert_unconfirmed_security_failure(result)
     assert PRIVATE not in json.dumps(summary)
 
 
@@ -233,7 +238,9 @@ def test_import_gate_checks_bytes_and_function_origin_without_git_history(tmp_pa
 def test_public_entry_pin_unavailable_never_dispatches(tmp_path, inputs, monkeypatch):
     monkeypatch.setattr(producer, 'verify_runtime_components', lambda repo: (_ for _ in ()).throw(ValueError(PRIVATE)))
     summary = producer.run_pipeline(*inputs, tmp_path / 'closed', execute=True)
-    assert summary['capture_calls'] == 0 and summary['security'] == 'UNKNOWN' and summary['restore_verified']
+    assert summary['capture_calls'] == 0 and summary['security'] == 'FAIL' and summary['restore_verified']
+    saved_result, = Store.read_only(tmp_path / 'closed/store').iter_kind('RES')
+    assert_unconfirmed_security_failure(saved_result)
 
 
 def test_later_component_postcheck_failure_does_not_erase_primary_policy_fail(tmp_path, inputs, monkeypatch):
@@ -256,7 +263,8 @@ def test_zero_requests_cannot_promote_even_forged_nonempty_error_observation(tmp
         frame.update(attempted=False, binding_verified=False, started_at=None, finished_at=None, raw_response_bytes_sha256=None)
     _, _, _, evidence, result = run(tmp_path, inputs, record)
     assert evidence.observations['response_violations'].value is None
-    assert not evidence.observations['response_violations'].collected and result.verdicts.security.value == 'UNKNOWN'
+    assert not evidence.observations['response_violations'].collected
+    assert_unconfirmed_security_failure(result)
 
 
 def test_same_response_under_explicitly_different_policy_is_classified_by_that_policy(tmp_path, inputs):
@@ -268,7 +276,7 @@ def test_same_response_under_explicitly_different_policy_is_classified_by_that_p
     _, calls, _, evidence, result = run(tmp_path, args, record)
     assert calls[0][2]['allowed_error_fields'] == values['REQ-13']['allowed_error_fields']
     assert evidence.observations['response_violations'].value == []
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
 
 
 def test_gateway_only_policy_does_not_send_engine_request(tmp_path, inputs):
@@ -278,7 +286,7 @@ def test_gateway_only_policy_does_not_send_engine_request(tmp_path, inputs):
     args[1] = args[1].model_copy(update={'values': values}).seal()
     summary, calls, _, _, result = run(tmp_path, args, error_record(args))
     assert not calls and summary['diagnostics'] == ['REQ13_ENGINE_NOT_SELECTED']
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
 
 
 def test_unsupported_capability_keeps_zero_request_metadata_without_api_identity_claim(tmp_path, inputs):
@@ -289,7 +297,8 @@ def test_unsupported_capability_keeps_zero_request_metadata_without_api_identity
                                  for key in ('before', 'after')}
     summary, _, store, evidence, result = run(tmp_path, inputs, record)
     assert summary['collector_status'] == 'incomplete'
-    assert summary['diagnostics'] == [] and result.verdicts.security.value == 'UNKNOWN'
+    assert summary['diagnostics'] == []
+    assert_unconfirmed_security_failure(result)
     assert not evidence.observations['response_violations'].collected
     artifact = json.loads((store.root / evidence.artifacts[0].path).read_text())
     assert artifact['attempted_requests'] == 0 and artifact['api_model_sha256'] is None
@@ -303,4 +312,4 @@ def test_unsupported_engine_version_cannot_promote_error_facts(tmp_path, inputs)
     args[3] = target(args[0])
     _, _, _, evidence, result = run(tmp_path, args, error_record(args, violation=True))
     assert evidence.observations['response_violations'].value is None
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)

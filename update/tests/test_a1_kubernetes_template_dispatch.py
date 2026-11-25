@@ -12,7 +12,7 @@ from guard.executors.registry import resolve_executor
 from guard.models import canonical_json
 from guard.runtime import kubernetes_http as kube
 from guard.store import Store
-from tests.builders import baseline_pack, policy, T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, policy, T0
 from tests.test_kubernetes_template_supply import inputs, PRIVATE
 
 
@@ -60,7 +60,8 @@ def test_shipped_registry_cli_and_saved_pack_without_factory_override(tmp_path, 
     evd, = store.iter_kind('EVD')
     res, = store.iter_kind('RES')
     assert evd.data_origin.value == 'EXAMPLE'
-    assert all(axis.value == 'UNKNOWN' for axis in res.verdicts.model_dump().values())
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert PRIVATE not in canonical_json(evd.to_dict()).decode()
     if mode == 'missing-policy':
         assert evd.execution.status.value == 'NOT_RUN' and evd.execution.executor is None

@@ -2,14 +2,15 @@
 from datetime import timedelta
 import json
 
+import pytest
 from typer.testing import CliRunner
 
 from guard.cli import app
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.models import canonical_json, new_id
+from guard.models import Comparison, canonical_json, new_id
 from guard.models.objects import PolicyException, Report
-from guard.store import Store
+from guard.store import IntegrityError, Store
 from tests.builders import T0
 from tests.update_builders import build_update_case
 
@@ -60,6 +61,47 @@ def test_cli_uses_original_exact_evidence_and_decision_time(tmp_path):
     assert replayed.as_of == original.as_of
     assert newer.ref() not in replayed.inputs_manifest
     assert replayed.by_check == original.by_check
+
+
+def test_legacy_replay_preserves_unknown_after_current_judgment(tmp_path):
+    def omit_observations(cid, side, evidence):
+        if cid == "REQ-01" and side == "candidate":
+            evidence["observations"] = {}
+
+    data, _, pack = build_update_case(tmp_path, mutate_evidence=omit_observations)
+    current = Report.model_validate(data)
+    store = Store(tmp_path / "store")
+    plan = store.resolve(next(ref for ref in current.inputs_manifest if ref.kind == "PLAN"))
+    legacy_results = judge_plan(store, pack, plan, T0, binary_security=False)
+    legacy = build_report(store, pack, plan, T0, judged=legacy_results, binary_security=False)
+    store.put(legacy)
+    legacy_row = next(row for row in legacy.by_check if row.check_id == "REQ-01")
+    current_row = next(row for row in current.by_check if row.check_id == "REQ-01")
+    assert legacy.security_verdict_version is None and legacy_row.candidate.security == "UNKNOWN"
+    assert current.security_verdict_version == "binary-v1" and current_row.candidate.security == "FAIL"
+    assert "INSUFFICIENT_EVIDENCE" in current_row.candidate.security_failure_tags
+    assert current_row.comparison == legacy_row.comparison == "UNKNOWN"
+    assert store.resolve(current_row.candidate.result).security_verdict_version == "binary-v1"
+    for comparison in (Comparison.REGRESSED, Comparison.FIXED, Comparison.STILL_FAILING, Comparison.NO_CHANGE):
+        forged = [row.model_copy(update={"comparison": comparison})
+                  if row.check_id == "REQ-01" else row for row in current.by_check]
+        with pytest.raises(IntegrityError, match="comparison contradicts"):
+            store.validate_object(current.model_copy(update={"by_check": forged}).seal())
+
+    source = tmp_path / "original.json"
+    source.write_bytes(canonical_json(legacy.to_dict()))
+    output = tmp_path / "replayed.json"
+    common = ["--store", str(store.root), "--plan", plan.id, "--from-report", str(source)]
+    runner = CliRunner()
+    before = store.revisions(legacy_row.candidate.result.id)
+    judged = runner.invoke(app, ["judge", *common])
+    assert judged.exit_code == 0, judged.output + repr(judged.exception)
+    assert store.revisions(legacy_row.candidate.result.id) == before
+    rendered = runner.invoke(app, ["report", *common, "--json", str(output)])
+    assert rendered.exit_code == 0, rendered.output + repr(rendered.exception)
+    replayed = Report.model_validate_json(output.read_bytes())
+    assert replayed.security_verdict_version is None
+    assert replayed.by_check == legacy.by_check
 
 
 def test_pending_recovery_is_idempotent_and_does_not_dispatch(tmp_path):

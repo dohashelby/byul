@@ -7,7 +7,8 @@ import hashlib
 from pathlib import Path
 import re
 
-from guard.models import GuardObject, Ref
+from guard.core.compare import compare, security_comparison_verdict
+from guard.models import Comparison, ExecStatus, GuardObject, Ref, SecurityFailureTag, Verdict
 from guard.models.objects import Evidence, Plan, Policy, Report, Result
 
 
@@ -151,6 +152,13 @@ def validate_relationships(obj: GuardObject, resolve: Resolver) -> None:
         if (getattr(obj, "as_of", None) is not None and getattr(obj, "evaluation_mode", None) is None
                 and policy != plan.inputs.policy):
             raise IntegrityError("RES policy does not match the EVD's PLAN")
+        if obj.security_verdict_version == "binary-v1":
+            status = evidence.execution.status
+            tags = obj.security_failure_tags
+            if (obj.verdicts.security == Verdict.PASS and status != ExecStatus.COMPLETED
+                    or (SecurityFailureTag.NOT_RUN in tags) != (status == ExecStatus.NOT_RUN)
+                    or (SecurityFailureTag.ABORTED in tags) != (status == ExecStatus.ABORTED)):
+                raise IntegrityError("RES security verdict or tags differ from the execution state")
     elif isinstance(obj, Report):
         _validate_report(obj, resolve)
 
@@ -172,17 +180,33 @@ def _validate_report(report: Report, resolve: Resolver) -> None:
     previous_items = {item.check_id: item for item in previous_plan.items} if previous_plan is not None else {}
     if len({row.check_id for row in report.by_check}) != len(report.by_check):
         raise IntegrityError("RPT repeats a check ID")
+    binary = report.security_verdict_version == "binary-v1"
+    sides = ("baseline", "candidate") if plan.mode == "update" else ("single",)
+    if binary and not {item.check_id for item in plan.items if item.selected} <= {row.check_id for row in report.by_check}:
+        raise IntegrityError("RPT omits a selected check")
     for row in report.by_check:
         item = items.get(row.check_id)
         if item is None or row.selected != item.selected or row.carried_over != item.carried_over:
             raise IntegrityError("RPT row does not match the current PLAN")
         if row.carried_over is not None:
             _carryover(row.check_id, row.carried_over, resolve)
+        if binary and item.selected and any(getattr(row, name) is None for name in sides):
+            raise IntegrityError("RPT omits a selected side")
+        if (binary and item.selected and plan.mode == "update"
+                and row.comparison in {Comparison.NO_CHANGE, Comparison.REGRESSED,
+                                       Comparison.FIXED, Comparison.STILL_FAILING}):
+            baseline = security_comparison_verdict(row.baseline.security, row.baseline.security_failure_tags)
+            candidate = security_comparison_verdict(row.candidate.security, row.candidate.security_failure_tags)
+            if row.comparison != compare(baseline, candidate, comparable=True):
+                raise IntegrityError("RPT security comparison contradicts the recorded security verdicts or tags")
         for name in ("single", "baseline", "candidate", "previous_result"):
             side = getattr(row, name)
             if side is None:
                 continue
-            evidence, result = _report_side(row.check_id, side, manifest, resolve)
+            current = item.selected and name in sides
+            evidence, result = _report_side(row.check_id, side, manifest, resolve, binary=binary and current)
+            if current and result is not None and result.security_verdict_version != report.security_verdict_version:
+                raise IntegrityError("RPT and RES use different security verdict versions")
             if evidence is None:
                 continue
             if name == "previous_result":
@@ -219,7 +243,7 @@ def _validate_report(report: Report, resolve: Resolver) -> None:
                     raise IntegrityError("RPT and RES judgment times differ")
 
 
-def _report_side(check_id, side, manifest, resolve):
+def _report_side(check_id, side, manifest, resolve, *, binary=False):
     result = resolve(side.result) if side.result is not None else None
     if result is not None and (ref_key(side.result) not in manifest or result.check_id != check_id):
         raise IntegrityError("RPT result is outside its check or input manifest")
@@ -228,12 +252,15 @@ def _report_side(check_id, side, manifest, resolve):
         or side.functional not in (None, result.verdicts.functional)
         or side.performance not in (None, result.verdicts.performance)
         or side.verification_level not in (None, result.verification_level)
+        or side.security_failure_tags != result.security_failure_tags
     ):
-        raise IntegrityError("RPT verdict or verification level differs from the stored RES")
+        raise IntegrityError("RPT verdict, security failure tags or verification level differs from the stored RES")
     if side.evidence_ref is None and (side.execution_status is not None or side.data_origin is not None):
         raise IntegrityError("RPT evidence status and origin need an exact EVD reference")
     ref = side.evidence_ref if side.evidence_ref is not None else (result.evidence if result is not None else None)
     if ref is None:
+        if binary:
+            _validate_unjudged_side(side, None)
         return None, result
     evidence = resolve(ref)
     if (not isinstance(evidence, Evidence) or ref_key(ref) not in manifest or evidence.check_id != check_id
@@ -243,8 +270,20 @@ def _report_side(check_id, side, manifest, resolve):
         side.execution_status != evidence.execution.status or side.data_origin != evidence.data_origin
     ):
         raise IntegrityError("RPT evidence status or origin differs from the stored EVD")
-    if side.evidence_ref is not None and result is None and (
-        side.security != "UNKNOWN" or side.functional is not None or side.performance is not None
-    ):
-        raise IntegrityError("RPT reports a verdict without a RES")
+    if side.evidence_ref is not None and result is None:
+        if binary:
+            _validate_unjudged_side(side, evidence.execution.status)
+        elif side.security != Verdict.UNKNOWN or side.functional is not None or side.performance is not None:
+            raise IntegrityError("RPT reports a verdict without a RES")
     return evidence, result
+
+
+def _validate_unjudged_side(side, status):
+    expected = {SecurityFailureTag.INSUFFICIENT_EVIDENCE}
+    if status == ExecStatus.NOT_RUN:
+        expected.add(SecurityFailureTag.NOT_RUN)
+    elif status == ExecStatus.ABORTED:
+        expected.add(SecurityFailureTag.ABORTED)
+    if (side.security != Verdict.FAIL or set(side.security_failure_tags or ()) != expected
+            or side.functional is not None or side.performance is not None or side.verification_level is not None):
+        raise IntegrityError("RPT reports an unsupported verdict or tag without a RES")

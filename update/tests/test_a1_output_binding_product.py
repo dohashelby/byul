@@ -15,7 +15,7 @@ from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.executors.session_seal import SESSION_SEALER
 from guard.store import Store
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
 from tests.test_lifecycle_capture import case,external,revised
 from tests.test_lifecycle_sensor import writer_factory
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -117,7 +117,9 @@ def test_product11_output_binding_and_exact_ref_roundtrip(tmp_path,group,native_
     cli(['run','--plan',plan.id,'--pack',pack.path,*common],1 if mode=='http-cleanup' else 0)
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
-    assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,a).value=='UNKNOWN' for a in ('security','functional','performance'))
+    assert e.data_origin.value=='EXAMPLE'
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     for key in ('late_delivery_verified','automatic_retry_verified','request_attempt_scope_complete'):assert e.observations[key].value is False
     output_events=e.observations['request_attempt_output_events'].value
     if mode=='normal':

@@ -312,7 +312,9 @@ def test_example_core_refs_registry_privacy_and_single_capture(tmp_path, monkeyp
     assert summary['exact_ref_rejudgment_unchanged'] and summary['store_verify_errors'] == []
     for cid in pipeline.CHECKS:
         assert summary['checks'][cid]['data_origin'] == 'EXAMPLE'
-        assert summary['checks'][cid]['verdicts']['security'] == ('FAIL' if scenario in ('violations', 'artifact_failure') else 'UNKNOWN')
+        assert summary['checks'][cid]['verdicts']['security'] == 'FAIL'
+        tags = json.loads((output / ('RES-' + cid + '.json')).read_text())['security_failure_tags']
+        assert ('CONFIRMED_VIOLATION' in tags) == (scenario in ('violations', 'artifact_failure'))
         assert summary['checks'][cid]['verdicts']['functional'] == 'UNKNOWN'
     report = json.loads((output / 'RPT.json').read_text())
     assert report['official'] is False and all(ref in report['refs'] for ref in summary['evidence'] + summary['results'])
@@ -445,7 +447,9 @@ def test_oov_core_verdict_shared_capture_window_and_failure_preservation(tmp_pat
     output = tmp_path / 'EXAMPLE-oov'
     summary = pipeline.run_pipeline(tmp_path / 'source', output, source_profile='target031', origin=DataOrigin.EXAMPLE)
     assert calls == [{'source_profile': 'target031'}] and summary['capture_invocations'] == 1
-    assert summary['checks']['REQ-08']['verdicts']['security'] == ('UNKNOWN' if fault in ('missing_domain', 'added_token') else 'FAIL')
+    assert summary['checks']['REQ-08']['verdicts']['security'] == 'FAIL'
+    tags = json.loads((output / 'RES-REQ-08.json').read_text())['security_failure_tags']
+    assert ('CONFIRMED_VIOLATION' in tags) == (fault not in ('missing_domain', 'added_token'))
     assert summary['exact_ref_rejudgment_unchanged'] and summary['store_verify_errors'] == []
     evidence = [json.loads((output / ('EVD-' + cid + '.json')).read_text()) for cid in pipeline.CHECKS]
     assert len({item['execution']['started_at'] for item in evidence}) == 1

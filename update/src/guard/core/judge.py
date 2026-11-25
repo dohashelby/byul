@@ -1,10 +1,11 @@
 """judge: EVD → RES. 엔진에 접속하지 않는다. 저장된 증거만으로 언제든 다시 판정한다(재판정).
 
 코어가 플러그인과 별개로 강제하는 것:
-- INV-11 PASS 관문: 실행 완료, 정상 대조 성공, 모든 챌린지 시도, 필수 관측 전부 수집. 하나라도 빠지면 PASS → UNKNOWN.
+- INV-11 PASS 관문: 실행 완료, 정상 대조 성공, 모든 챌린지 시도, 필수 관측 전부 수집.
 - INV-04 확인된 FAIL은 관문과 무관하게 유지.
-- INV-15 플러그인 실패·이상 출력은 UNKNOWN.
+- INV-15 플러그인 실패·이상 출력은 증거 부족으로 남긴다.
 - INV-08 예외는 판정을 바꾸지 않고 표시만. 만료·미승인은 표시하지 않고 사유를 남긴다.
+- 계획에 따른 보안 판정은 PASS/FAIL과 구조화된 실패 사유를 쓴다. 과거 판정 재생에는 기존 의미를 유지한다.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from guard.models import (
     Plan,
     Policy,
     Result,
+    SecurityFailureTag,
     Verdict,
     canonical_json,
     new_id,
@@ -34,28 +36,48 @@ from guard.models.objects import ExceptionMark, JudgeInfo, Verdicts
 from guard.store import Store
 
 _ALLOWED = {Verdict.PASS, Verdict.FAIL, Verdict.UNKNOWN}
+_PLUGIN_FAILURE_TAGS = {
+    SecurityFailureTag.CONDITIONS_UNMET,
+    SecurityFailureTag.INSUFFICIENT_EVIDENCE,
+    SecurityFailureTag.NO_PASS_RULE,
+}
+_INCOMPLETE_EXECUTION_TAGS = {
+    ExecStatus.NOT_RUN: SecurityFailureTag.NOT_RUN,
+    ExecStatus.ABORTED: SecurityFailureTag.ABORTED,
+}
 
 
 def pass_gate(check: CheckDef, evd: Evidence) -> list[str]:
     """INV-11: PASS를 막는 사유 목록. 비어 있으면 관문 통과."""
-    blocks = []
+    return _pass_gate(check, evd)[0]
+
+
+def _pass_gate(check: CheckDef, evd: Evidence) -> tuple[list[str], set[SecurityFailureTag]]:
+    blocks: list[str] = []
+    tags: set[SecurityFailureTag] = set()
     if evd.execution.status != ExecStatus.COMPLETED:
         blocks.append(f"execution {evd.execution.status.value}: {evd.execution.abort_reason or ''}".rstrip(": "))
+        tags.add(_INCOMPLETE_EXECUTION_TAGS.get(evd.execution.status, SecurityFailureTag.INSUFFICIENT_EVIDENCE))
     nc = evd.normal_control
     if not nc.attempted:
         blocks.append("normal control not attempted")
+        tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
     elif nc.succeeded is not True:
         blocks.append("normal control did not succeed (over-blocking or unknown)")
+        tags.add(SecurityFailureTag.CONDITIONS_UNMET if nc.succeeded is False
+                 else SecurityFailureTag.INSUFFICIENT_EVIDENCE)
     steps = {c.step: c for c in evd.challenges}
     not_attempted = [s for s in check.challenge_steps if s not in steps or not steps[s].attempted]
     if not_attempted:
         blocks.append(f"challenges not attempted: {not_attempted}")
+        tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
     if not evd.challenges and check.challenge_steps:
         blocks.append("no challenge records")
     missing = [o.key for o in check.required_observations if not (o.key in evd.observations and evd.observations[o.key].collected)]
     if missing:
         blocks.append(f"required observations not collected: {missing}")
-    return blocks
+        tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+    return blocks, tags
 
 
 def _policy_exception_statuses(check_id: str, policy: Policy, as_of: datetime):
@@ -84,18 +106,22 @@ def judge_evidence(
     plan: Plan | None = None,
     *,
     carryover: bool = False,
+    binary_security: bool | None = None,
 ) -> Result:
     if evd.check_id != check.id:
         raise ValueError(f"evidence is for {evd.check_id}, not {check.id}")
     if as_of.utcoffset() is None:
         raise ValueError("JUDGMENT_TIMEZONE_REQUIRED")
     as_of = as_of.astimezone(timezone.utc)
+    if binary_security is None:
+        binary_security = plan is not None
 
     reasons: list[str] = []
     missing = sorted(
         o.key for o in check.required_observations if not (o.key in evd.observations and evd.observations[o.key].collected)
     )
     verdicts = {axis: Verdict.UNKNOWN for axis in AXES}
+    blocks, security_tags = _pass_gate(check, evd)
     judge_info = JudgeInfo(name="none", version="0", params_sha256=sha256_hex(canonical_json({})))
 
     # 판정기: 증거에 기록된 실행기의 기본 판정기가 있으면 그것, 없으면 CheckDef.judge
@@ -108,6 +134,7 @@ def judge_evidence(
         plugin_name, params = None, {}
 
     if plugin_name is None:
+        security_tags.add(SecurityFailureTag.NO_PASS_RULE)
         reasons.append("no judge defined: manual judgment required")
         if evd.execution.status != ExecStatus.COMPLETED:
             reasons.append(f"execution {evd.execution.status.value}: {evd.execution.abort_reason}")
@@ -117,6 +144,7 @@ def judge_evidence(
         )
         plugin = registry.JUDGES.get(plugin_name)
         if plugin is None:
+            security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
             reasons.append(f"judge plugin {plugin_name!r} not available")
         else:
             judge_info = judge_info.model_copy(update={"name": plugin.name, "version": plugin.version})
@@ -128,24 +156,39 @@ def judge_evidence(
                         reasons.append(f"{axis}: plugin returned {v.value}; treated as UNKNOWN")
                         v = Verdict.UNKNOWN
                     verdicts[axis] = v
+                    if binary_security and axis == "security":
+                        if v == Verdict.FAIL:
+                            confirmed = getattr(out, "security_violation_confirmed", None)
+                            security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE if confirmed is False
+                                              else SecurityFailureTag.CONFIRMED_VIOLATION)
+                        security_tags.update(tag for tag in getattr(out, "security_failure_tags", ())
+                                             if tag in _PLUGIN_FAILURE_TAGS)
                 reasons.extend(out.reasons)
                 missing = sorted(set(missing) | set(out.missing_observations))
             except Exception:  # noqa: BLE001 - INV-15
                 # Never serialize arbitrary plugin exceptions into evidence reports.
                 reasons.append("JUDGE_PLUGIN_FAILURE")
+                security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
                 # A later invalid field must not leave an earlier PASS in place.
                 # Already obtained FAIL remains independent of that collection gap.
                 for axis in AXES:
                     if verdicts[axis] == Verdict.PASS:
                         verdicts[axis] = Verdict.UNKNOWN
 
-        blocks = pass_gate(check, evd)
         for axis in AXES:
             if verdicts[axis] == Verdict.PASS and blocks:
                 verdicts[axis] = Verdict.UNKNOWN
                 reasons.append(f"{axis}: PASS withheld: {'; '.join(blocks)}")
             elif verdicts[axis] == Verdict.FAIL and blocks:
                 reasons.append(f"{axis}: FAIL kept despite: {'; '.join(blocks)}")
+
+    if binary_security and (verdicts["security"] != Verdict.PASS or security_tags):
+        if verdicts["security"] != Verdict.FAIL:
+            detail = f" ({', '.join(blocks)})" if blocks else ""
+            reasons.append(f"security: FAIL because PASS requirements were not established{detail}")
+        verdicts["security"] = Verdict.FAIL
+        if not security_tags:
+            security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
 
     if evd.comparability.cpu is not None:
         verdicts["performance"] = Verdict.UNKNOWN
@@ -175,6 +218,8 @@ def judge_evidence(
         verification_level=level,
         as_of=as_of,
         evaluation_mode="carryover" if carryover else None,
+        security_verdict_version="binary-v1" if binary_security else None,
+        security_failure_tags=sorted(security_tags) if binary_security else [],
     ).seal()
 
 
@@ -218,15 +263,18 @@ def result_for_policy(result, policy_ref) -> bool:
 
 
 def judge_plan(store: Store, pack: Pack, plan: Plan, as_of: datetime, *,
-               attempt_id: str | None = None, evidence: Iterable[Evidence] | None = None) -> list[Result]:
+               attempt_id: str | None = None, evidence: Iterable[Evidence] | None = None,
+               binary_security: bool = True) -> list[Result]:
     """Judge one coherent evidence snapshot while protecting its result revisions."""
     from guard.core.execution_recipe import execution_lock
     with execution_lock(store.root, plan.id):
-        return judge_plan_locked(store, pack, plan, as_of, attempt_id=attempt_id, evidence=evidence)
+        return judge_plan_locked(store, pack, plan, as_of, attempt_id=attempt_id, evidence=evidence,
+                                 binary_security=binary_security)
 
 
 def judge_plan_locked(store: Store, pack: Pack, plan: Plan, as_of: datetime, *,
-                      attempt_id: str | None = None, evidence: Iterable[Evidence] | None = None) -> list[Result]:
+                      attempt_id: str | None = None, evidence: Iterable[Evidence] | None = None,
+                      binary_security: bool = True) -> list[Result]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     policy = store.resolve(plan.inputs.policy)
@@ -241,13 +289,15 @@ def judge_plan_locked(store: Store, pack: Pack, plan: Plan, as_of: datetime, *,
     evd_refs = {evd.id: evd.ref() for evd in evds}
     prior: dict[str, Result] = {}
     same_time: dict[str, Result] = {}
+    security_version = "binary-v1" if binary_security else None
     for result in store.iter_kind("RES") if evd_refs else ():
         eid = result.evidence.id
         if eid not in evd_refs or not result_for_policy(result, plan.inputs.policy):
             continue
         if eid not in prior or result.revision > prior[eid].revision:
             prior[eid] = result
-        if result.evidence == evd_refs[eid] and result.as_of == as_of:
+        if (result.evidence == evd_refs[eid] and result.as_of == as_of
+                and result.security_verdict_version == security_version):
             if eid not in same_time or result.revision > same_time[eid].revision:
                 same_time[eid] = result
     out = []
@@ -255,7 +305,8 @@ def judge_plan_locked(store: Store, pack: Pack, plan: Plan, as_of: datetime, *,
         check = pack.checks[evd.check_id]
         item = plan.item(evd.check_id)
         res = judge_evidence(
-            check, evd, policy, as_of, condition_origins=[c.origin for c in item.conditions], plan=plan
+            check, evd, policy, as_of, condition_origins=[c.origin for c in item.conditions], plan=plan,
+            binary_security=binary_security,
         )
         recorded = same_time.get(evd.id)
         if recorded is not None and _same_content(recorded, res):

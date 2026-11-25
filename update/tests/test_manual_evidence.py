@@ -16,7 +16,7 @@ from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.store import Store
 from guard.models import load_pack
 from tools.pack_seed import SEED_DIR, SEED_REF
-from tests.builders import T0, baseline_pack, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, T0, baseline_pack, environment, policy
 from tests.prepared_fixtures import copy_workdir, dump_fixture_yaml, manual_setup_seed
 
 D = {"origin": "DECLARED", "source": "env.yaml"}
@@ -118,7 +118,7 @@ def test_declared_pass_is_downgraded_without_basis(tmp_path, kw, reason):
     _fill(_entry(doc, "SUP-01"), **kw)
     import_evidence(store, pack, _write(tmp_path, doc), now=T0)
     (res,) = [r for r in judge_plan(store, pack, plan, as_of=T0) if r.check_id == "SUP-01"]
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
     assert any(reason in r for r in res.reasons), res.reasons
 
 

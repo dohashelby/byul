@@ -146,7 +146,8 @@ def test_registered_cli_auth_samples_absolute_constraint_and_exact_refs(tmp_path
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     fail=mode in {'accepted','seal-failure','native-one-missing','attachment','after-timeout','http-cleanup','late-protocol'}
     assert e.data_origin.value=='EXAMPLE' and res.verdicts.functional.value==('FAIL' if fail else 'UNKNOWN')
-    assert res.verdicts.security.value==res.verdicts.performance.value=='UNKNOWN' and e.normal_control.succeeded is None
+    assert res.verdicts.security.value == 'FAIL' and 'CONFIRMED_VIOLATION' not in res.security_failure_tags
+    assert res.verdicts.performance.value == 'UNKNOWN' and e.normal_control.succeeded is None
     if mode in {'actual-lab-false','version032','missing-credential','same-credential'}:
         assert not world.sent and e.observations['revocation_absolute_denial_constraint_violated'].value is None
     else:

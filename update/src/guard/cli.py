@@ -307,16 +307,19 @@ def judge(
     cfg = _config(config)
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
-    attempt, judgment_time, evds, _ = _replay_inputs(st, pl, from_report, attempt, as_of)
-    results = judge_plan(st, pk, pl, judgment_time or utcnow(), attempt_id=attempt, evidence=evds)
+    attempt, judgment_time, evds, original = _replay_inputs(st, pl, from_report, attempt, as_of)
+    binary_security = original is None or original.security_verdict_version == "binary-v1"
+    results = judge_plan(st, pk, pl, judgment_time or utcnow(), attempt_id=attempt, evidence=evds,
+                         binary_security=binary_security)
     counts: dict[str, int] = {}
     for r in results:
         counts[r.verdicts.security.value] = counts.get(r.verdicts.security.value, 0) + 1
     typer.echo(f"{len(results)} results (security): " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
     for r in results:
-        if r.judge.name != "none":
+        if r.judge.name != "none" or r.security_failure_tags:
+            tags = f" security_failure_tags={','.join(r.security_failure_tags)}" if r.security_failure_tags else ""
             typer.echo(f"  {r.check_id} {r.id}@{r.revision} security={r.verdicts.security.value} "
-                       f"functional={r.verdicts.functional.value} level={r.verification_level}")
+                       f"functional={r.verdicts.functional.value} level={r.verification_level}{tags}")
 
 
 @app.command()
@@ -342,7 +345,9 @@ def report(
             for side in (row.single, row.baseline, row.candidate)
             if side is not None and side.result is not None
         ]
-        rpt = build_report(st, pk, pl, judgment_time, attempt_id=attempt, evidence=evds, judged=judged)
+        binary_security = original is None or original.security_verdict_version == "binary-v1"
+        rpt = build_report(st, pk, pl, judgment_time, attempt_id=attempt, evidence=evds, judged=judged,
+                           binary_security=binary_security, original_report=original)
         st.put(rpt)
     _publish_report(json_out, rpt)
     typer.echo(f"{rpt.id}@{rpt.revision} official={rpt.official} → {json_out}")

@@ -224,7 +224,8 @@ def test_one_native_json_write_failure_keeps_other_successful_exact_refs(scenari
     assert case.evd.observations == baseline.evd.observations
     assert {a.name for a in case.evd.artifacts} == {"probe_log.jsonl", "log_integrity_display.html",
         "log_integrity_samples.json", "log_integrity_events.json"} - {filename}
-    assert case.res.verdicts.security == (Verdict.FAIL if violation else Verdict.UNKNOWN)
+    assert case.res.verdicts.security == Verdict.FAIL
+    assert ("CONFIRMED_VIOLATION" in case.res.security_failure_tags) is violation
     assert case.store.verify() == [] and CANARY not in canonical_json(case.evd.to_dict()).decode()
 
 

@@ -17,7 +17,7 @@ from guard.executors.kubernetes_rank_failure import KubernetesRankFailureExecuto
 from guard.executors.lifecycle_common_input_consumption import attach_inputs
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
-from tests.builders import environment, policy
+from tests.builders import assert_unconfirmed_security_failure, environment, policy
 from tests.test_rank_rpc_fault_producer import capture_example
 from tests.test_rank_rpc_product_binding import example
 from tools.mvp_versions import versions
@@ -91,7 +91,8 @@ def test_common_record_reaches_exact_product_refs_and_restores_as_unknown(tmp_pa
     store = Store.read_only(tmp_path / 'store'); evidence, = store.iter_kind('EVD'); result, = store.iter_kind('RES')
     assert evidence.data_origin.value == 'EXAMPLE' and evidence.execution.status.value == 'ABORTED'
     assert not evidence.normal_control.attempted and evidence.normal_control.succeeded is None
-    assert all(getattr(result.verdicts, key).value == 'UNKNOWN' for key in ('security', 'functional', 'performance'))
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == result.verdicts.performance == "UNKNOWN"
     assert evidence.observations['activation_scope_complete'].value is False
     assert set(evidence.observations) == {o.key for o in pack.checks['LIF-08'].required_observations}
     assert not evidence.observations['activation_violations'].value
@@ -145,7 +146,9 @@ def test_update_compares_two_exact_partial_inputs_without_starting_an_engine(tmp
         assert evd.execution.abort_reason == 'RANK_RECORD_INPUT_QUESTION_SCOPE_INCOMPLETE' and not evd.execution.cleanup_errors
         row, = evd.observations['activation_steps'].value[-1]['records']
         assert row['record']['environment_ref'] == store.resolve(evd.environment).ref().model_dump(mode='json')
-    assert all(getattr(r.verdicts, axis).value == 'UNKNOWN' for r in results for axis in ('security', 'functional', 'performance'))
+    for result in results:
+        assert_unconfirmed_security_failure(result)
+        assert result.verdicts.functional == result.verdicts.performance == "UNKNOWN"
 
 
 @pytest.mark.parametrize('damage', ['target', 'prepared', 'session', 'kind', 'origin', 'file', 'extra'])

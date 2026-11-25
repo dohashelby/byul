@@ -210,13 +210,16 @@ def test_original_manual_store_restore_and_privacy(case):
     def example(*args, **kwargs):
         calls.append(1); return capture(case)
     result = tool.run(**case['args'], execute=True, _example_capture=example)
-    assert calls == [1] and result['security'] == 'UNKNOWN' and result['candidate_count'] == 1
+    assert calls == [1] and result['security'] == 'FAIL' and result['candidate_count'] == 1
     assert result['source_unchanged'] and result['exact_refs_restored'] and not result['real_gpu_execution_verified']
     store = Store.read_only(case['args']['output'] / 'store'); evidence, = store.iter_kind('EVD'); res, = store.iter_kind('RES')
     assert evidence.plan == case['plan'].ref() and evidence.environment == case['env'].ref()
     assert evidence.data_origin.value == 'DECLARED' and len(evidence.artifacts) == 1
     assert all(not c.attempted for c in evidence.challenges) and not evidence.normal_control.attempted
-    assert res.verdicts.model_dump(mode='json') == {'security': 'UNKNOWN', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
+    assert res.verdicts.model_dump(mode='json') == {'security': 'FAIL', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
+    assert result['security_failure_tags'] == res.to_dict()['security_failure_tags']
+    assert 'INSUFFICIENT_EVIDENCE' in res.security_failure_tags
+    assert 'CONFIRMED_VIOLATION' not in res.security_failure_tags
     assert tool._inventory(case['source'].root) == before
     doc = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text()); entry, = doc['checks']
     check = case['pack'].checks['REQ-20']; assert entry['question'] == check.question

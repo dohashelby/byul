@@ -23,7 +23,7 @@ from guard.executors.base import EvidenceDraft
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
-from tests.builders import environment, policy
+from tests.builders import assert_unconfirmed_security_failure, environment, policy
 from tests.run_binding_support import fixed_file_hashes, run_table, split
 from tests.test_native_model_file_reads import fixture as read_fixture
 
@@ -131,7 +131,7 @@ def test_change_not_applied_is_never_a_pass(tmp_path, monkeypatch):
     _, result = run_boot(tmp_path, monkeypatch, "SUP-05", None,
         lambda v: part("normal", "SUP-05", v, nat=native([read_row()])),
         lambda v: part("challenge", "SUP-05", v, nat=native([read_row()]), chg=change(applied=False)))
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 def test_instrumentation_started_after_consumption_is_missing_not_clean(tmp_path, monkeypatch):
@@ -139,7 +139,7 @@ def test_instrumentation_started_after_consumption_is_missing_not_clean(tmp_path
         lambda v: part("normal", "SUP-05", v, nat=native([read_row()])),
         lambda v: part("challenge", "SUP-05", v, nat=native([read_row()]), chg=change(started_first=False)))
     assert "challenge:instrumentation_started_after_consumption" in evd.observations["supply_boot_missing"].value
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 def test_normal_session_failure_keeps_confirmed_challenge_violation(tmp_path, monkeypatch):
@@ -151,7 +151,8 @@ def test_normal_session_failure_keeps_confirmed_challenge_violation(tmp_path, mo
 
 def test_both_sessions_unavailable_is_unknown_not_a_filled_wrapper(tmp_path, monkeypatch):
     evd, result = run_boot(tmp_path, monkeypatch, "SUP-16", None, RuntimeError("x"), RuntimeError("y"))
-    assert evd.observations["supply_boot_violations"].collected is False and result.verdicts.security.value == "UNKNOWN"
+    assert evd.observations["supply_boot_violations"].collected is False
+    assert_unconfirmed_security_failure(result)
 
 
 def test_sessions_are_collected_separately_in_order(tmp_path, monkeypatch):
@@ -248,7 +249,7 @@ def test_record_profile_keeps_fail_but_never_passes(tmp_path, monkeypatch):
     bad = [{"object_sha256": "b", "identity_sha256": "i", "outcome": "allowed"}]
     extra = {"supply_allowed_objects": ["a"]}
     _, result = run_boot(tmp_path, monkeypatch, "PLT-03", extra, lambda v: part("normal", "PLT-03", v, good), lambda v: part("challenge", "PLT-03", v, good))
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
     (tmp_path / "bad").mkdir()
     _, result = run_boot(tmp_path / "bad", monkeypatch, "PLT-03", extra, lambda v: part("normal", "PLT-03", v, good), lambda v: part("challenge", "PLT-03", v, bad))
     assert result.verdicts.security.value == "FAIL"
@@ -372,14 +373,15 @@ def test_obs06_unauthorized_read_fails_even_when_inventory_is_missing(tmp_path, 
 
 def test_obs06_log_reads_only_is_a_partial_observation(tmp_path, monkeypatch):
     evd, result = access_run(tmp_path, monkeypatch, access_capture(None), None)
-    assert evd.observations["record_access_partial"].value is True and result.verdicts.security.value == "UNKNOWN"
+    assert evd.observations["record_access_partial"].value is True
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["record_scope_complete"].value is False
 
 
 def test_obs06_denied_read_and_clean_inventory_do_not_become_pass(tmp_path, monkeypatch):
     evd, result = access_run(tmp_path, monkeypatch, access_capture(None), FULL)
     assert evd.observations["record_scope_complete"].value is True and evd.observations["record_denial_verified"].value is False
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 def test_obs06_inventory_violation_survives_log_collection_failure(tmp_path, monkeypatch):

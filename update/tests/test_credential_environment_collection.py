@@ -256,7 +256,8 @@ def test_registered_consumer_cli_preserves_original_refs_and_partial_fact_verdic
     res, = original_store.iter_kind("RES")
     assert evd.data_origin.value == "EXAMPLE"
     assert evd.execution.status == (ExecStatus.ABORTED if attachment_failure else ExecStatus.COMPLETED)
-    assert res.verdicts.security == (Verdict.FAIL if known_violation else Verdict.UNKNOWN)
+    assert res.verdicts.security == Verdict.FAIL
+    assert ("CONFIRMED_VIOLATION" in res.security_failure_tags) is known_violation
     assert res.verdicts.functional == Verdict.UNKNOWN
     assert PRIVATE not in canonical_json(evd.to_dict()).decode()
     assert evd.observations["process_scan_complete"].value is False

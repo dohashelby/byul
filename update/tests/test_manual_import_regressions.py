@@ -51,7 +51,9 @@ def test_real_false_withholds_pass(tmp_path):
     entry["required_observations"][0]["collected"] = False
     import_evidence(store, pack, _write(tmp_path, doc))
     result, = judge_plan(store, pack, plan, T0)
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert result.verdicts.security == Verdict.FAIL
+    assert "INSUFFICIENT_EVIDENCE" in result.security_failure_tags
+    assert "CONFIRMED_VIOLATION" not in result.security_failure_tags
 
 
 @pytest.mark.parametrize("has_previous", [False, True])

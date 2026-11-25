@@ -140,6 +140,12 @@ Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 
 
 ## 변경 이력
 
+### 2026-11-25 · 쪽별 보안 미충족 사유
+
+`verification-result` 0.2의 `sides.<side>.security_failure_tags`는 선택 필드다. 각 쪽의 원본 RPT에 기록된 위반 확인(`CONFIRMED_VIOLATION`), 조건 미충족(`CONDITIONS_UNMET`), 증거 부족(`INSUFFICIENT_EVIDENCE`), 미실행(`NOT_RUN`), 실행 중단(`ABORTED`), PASS 규칙 미정의(`NO_PASS_RULE`) 코드를 옮긴다. 한 결과에 여러 사유가 있을 수 있다. 비교 상태와 이전 보고서의 `UNKNOWN`은 원본 값을 사용한다.
+
+원본 RPT의 보안 판정 방식이 `binary-v1`이면 선택 필드 `security_verdict_version`으로 전달한다.
+
 ### 사용자 요청(2026-11-16) · 쪽별 판정 이유 `sides.<side>.reasons`
 
 보고서에서 FAIL·UNKNOWN의 이유를 보이기 위해 `verification-result` 0.2의 `sides.<side>`에 선택 필드 `reasons`(문자열 배열)를 더했다. 판본과 DRAFT 상태는 유지하고 기존 문서는 그대로 유효하다.

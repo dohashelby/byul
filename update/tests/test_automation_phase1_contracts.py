@@ -24,7 +24,7 @@ from tests import test_direct_route as direct
 from tests import test_role_route as role
 from tests.test_container_config import FakeDocker, LAB_POLICY, _probe, IMAGE as PERMISSION_IMAGE, RUN as PERMISSION_RUN
 from tests.test_credential_mount_semantics import FakeDocker as CredentialFixture, IMAGE as CREDENTIAL_IMAGE, RUN as CREDENTIAL_RUN
-from tests.builders import PACK_DIR, baseline_pack, environment, policy
+from tests.builders import PACK_DIR, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.response_semantics_support import materialize_pack21
 from guard.store.packs import put_pack
@@ -136,7 +136,10 @@ def test_five_executor_cases_survive_export_restore_and_rejudge(tmp_path, monkey
     st, pack, env, plan, evd, res = _run(tmp_path, monkeypatch, cid, expected)
     assert evd.execution.status.value == 'COMPLETED'
     assert evd.data_origin.value == 'EXAMPLE'
-    assert res.verdicts.security.value == expected
+    if expected == 'UNKNOWN':
+        assert_unconfirmed_security_failure(res)
+    else:
+        assert res.verdicts.security.value == expected
     assert evd.normal_control.succeeded is True
     assert evd.artifacts
     original_bytes = canonical_json(evd.to_dict())

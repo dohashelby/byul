@@ -16,7 +16,7 @@ from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests import test_b12_runner_consumers as old
-from tests.builders import completion_response, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, completion_response, environment, policy
 from tests.test_gpu_input_producers import api_rows, POD, R1, SCOPE
 from tests.test_runner_consumption import worker_rows
 from tests.test_scoped_consumption import native, EXAMPLE_SCOPE
@@ -77,7 +77,8 @@ def test_null_start_ticks_is_original_A_contract_rejection_not_a_new_B_field_gat
         gpu_common_inputs.validate(record, kind='runner-consumption', **SCOPE)
     inject_record(monkeypatch, 'identity', contradiction=False)
     draft, evd, result = old.input_finish(tmp_path)
-    assert draft.status.value == 'ABORTED' and result.verdicts.security.value == 'UNKNOWN'
+    assert draft.status.value == 'ABORTED'
+    assert_unconfirmed_security_failure(result)
     assert evd.observations['reused_input_violations'].value == []
     raw = json.loads(next(a.path for a in draft.artifacts if a.name == 'b_common_consumption.json').read_bytes())
     assert raw['projection']['input_error']['message'] == 'GPU_INPUT_BINDING_INVALID'
@@ -89,7 +90,8 @@ def test_missing_unregistered_or_unbound_fact_cannot_create_native_FAIL_or_PASS(
     inject_record(monkeypatch, damage)
     draft, evd, result = old.input_finish(tmp_path, unsupported=damage == 'unsupported')
     assert evd.observations['reused_input_violations'].value == []
-    assert draft.status.value == 'ABORTED' and result.verdicts.security.value == 'UNKNOWN'
+    assert draft.status.value == 'ABORTED'
+    assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize('damage', ['missing', 'generation', 'unsupported'])

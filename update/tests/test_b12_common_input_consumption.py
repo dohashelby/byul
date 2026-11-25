@@ -20,7 +20,7 @@ from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, loa
 from guard.store import Store
 from guard.store.packs import put_pack, get_pack
 from guard.store.bundle import export_bundle, restore_bundle
-from tests.builders import environment, policy
+from tests.builders import assert_unconfirmed_security_failure, environment, policy
 from tests.test_gpu_input_producers import POD, R1, lifecycle, row, trow, sched, hrow, prow
 from tests.test_ipc_ownership import observed
 from tests.test_group_resources import before, restarted, trigger_for
@@ -444,7 +444,8 @@ def test_plt02_actual_producer_summary_to_original_factory_judge_report_and_rest
     assert facts['records'][0]['facts']['connections']['engine_core->worker'] == 2
     assert 'GPU_INPUT_PRODUCER_UNSUPPORTED' in facts['records'][0]['gaps']
     assert evd.observations['ipc_scope_complete'].value is False
-    assert result.verdicts.security.value == ('UNKNOWN' if mode=='normal' else 'FAIL')
+    assert result.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in result.security_failure_tags) == (mode != 'normal')
     if mode=='cleanup':assert evd.execution.cleanup_errors
 
 
@@ -468,7 +469,8 @@ def test_lif10_actual_producer_to_current_pack_normalized_evidence_and_rejudge(t
     report = evd.observations['activation_steps'].value[-1]
     assert report['records'][0]['kind']=='request-attempt' and report['records'][0]['validation']['supported']
     assert report['native_observations']['termination_attempts']['collected']
-    assert result.verdicts.security.value=='UNKNOWN' and not evd.observations['activation_scope_complete'].value
+    assert_unconfirmed_security_failure(result)
+    assert not evd.observations['activation_scope_complete'].value
 
 
 @pytest.mark.parametrize('primary_stage', ['write','mkdir'])
@@ -524,7 +526,7 @@ def test_lif11_lineage_keeps_original_selected_fd_deadline_fail_and_axis(tmp_pat
     store, evd, result = pipeline(tmp_path/'product',pack,group.env,'LIF-11',values,
         {'target':str(target),'prepared':str(group.manifest_path),'selection':str(selection),'common_inputs':descriptor})
     assert result.verdicts.functional.value == ('UNKNOWN' if mode=='released-descriptors' else 'FAIL')
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
     assert evd.observations['recovery_absolute_deadline_violated'].value is (mode!='released-descriptors')
     assert not evd.observations['recovery_global_resources_released'].value
     artifact = next(a for a in evd.artifacts if a.name=='b-common-inputs.json')
@@ -546,7 +548,8 @@ def test_current_plt02_profile_mismatch_is_not_hidden_by_optional_input(tmp_path
     monkeypatch.setattr(http,'capture_pipes',forbidden)
     _, evd, result = pipeline(tmp_path/'product',load_pack(ROOT/'packs/PACK-BASELINE'),env,'PLT-02',deepcopy(VALUES),cfg)
     assert evd.execution.status == ExecStatus.ABORTED and evd.execution.abort_reason == 'EXECUTOR_FAILURE'
-    assert not evd.artifacts and result.verdicts.security.value=='UNKNOWN'
+    assert not evd.artifacts
+    assert_unconfirmed_security_failure(result)
 
 
 def test_profiler_original_dispatch_consumes_own_session_record(tmp_path, external, monkeypatch):

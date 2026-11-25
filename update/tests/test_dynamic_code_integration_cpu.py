@@ -201,13 +201,13 @@ def test_shared_capture_cannot_cross_environment_plan_or_source_boundaries(priva
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize('scenario,security,execution', [
-    ('normal', ('UNKNOWN', 'UNKNOWN'), 'COMPLETED'), ('violation', ('FAIL', 'FAIL'), 'COMPLETED'),
-    ('sup09_only', ('FAIL', 'UNKNOWN'), 'COMPLETED'), ('missing', ('UNKNOWN', 'UNKNOWN'), 'ABORTED'),
-    ('unsupported', ('UNKNOWN', 'UNKNOWN'), 'ABORTED'), ('auxiliary', ('FAIL', 'FAIL'), 'ABORTED'),
-    ('attachment', ('FAIL', 'FAIL'), 'ABORTED'),
+@pytest.mark.parametrize('scenario,confirmed,execution', [
+    ('normal', set(), 'COMPLETED'), ('violation', {'SUP-09', 'SUP-11'}, 'COMPLETED'),
+    ('sup09_only', {'SUP-09'}, 'COMPLETED'), ('missing', set(), 'ABORTED'),
+    ('unsupported', set(), 'ABORTED'), ('auxiliary', {'SUP-09', 'SUP-11'}, 'ABORTED'),
+    ('attachment', {'SUP-09', 'SUP-11'}, 'ABORTED'),
 ])
-def test_example_pipeline_core_consumes_once_and_preserves_refs_privacy_and_rules(tmp_path, monkeypatch, scenario, security, execution):
+def test_example_pipeline_core_consumes_once_and_preserves_refs_privacy_and_rules(tmp_path, monkeypatch, scenario, confirmed, execution):
     raw = example_record('target031')
     if scenario in ('violation', 'auxiliary', 'attachment'):
         add_violation(raw)
@@ -238,10 +238,13 @@ def test_example_pipeline_core_consumes_once_and_preserves_refs_privacy_and_rule
     assert len(summary['evidence']) == len(summary['results']) == 2
     assert summary['exact_ref_rejudgment_unchanged'] and summary['store_verify_errors'] == []
     assert summary['installed_target'] is None and summary['runner_hook_verified'] is False
-    for cid, expected in zip(pipeline.CHECKS, security):
+    for cid in pipeline.CHECKS:
         result = summary['checks'][cid]
         assert result['data_origin'] == 'EXAMPLE' and result['execution_status'] == execution
-        assert result['verdicts']['security'] == expected and result['verdicts']['functional'] == 'UNKNOWN'
+        assert result['verdicts']['security'] == 'FAIL' and result['verdicts']['functional'] == 'UNKNOWN'
+        tags = json.loads((output / f'RES-{cid}.json').read_text())['security_failure_tags']
+        assert tags and ('CONFIRMED_VIOLATION' in tags) is (cid in confirmed)
+        assert ('ABORTED' in tags) is (execution == 'ABORTED')
     if scenario not in ('missing',):
         evidences = [json.loads((output / ('EVD-' + cid + '.json')).read_text()) for cid in pipeline.CHECKS]
         assert evidences[0]['execution']['started_at'] == evidences[1]['execution']['started_at']

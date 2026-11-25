@@ -9,6 +9,7 @@ from guard.executors import request_binding as binding
 from guard.executors.content_common import MAX_SAMPLE_BYTES
 from guard.models import Verdict
 from tests import test_request_binding as req
+from tests.builders import assert_unconfirmed_security_failure
 
 CANARY="EXAMPLE_PRIVATE_DUPLICATE_RESPONSE"
 EXPECTED={"tokens":[1],"text":"EXAMPLE-origin"}
@@ -197,7 +198,11 @@ def test_product_storage_report_restore_and_exact_rejudge_keep_packet_meaning(tm
             later.setattr(Store,"put_artifact",unavailable)
         evd,=run_plan(store,pack,plan,RunConfig(executors={"request_binding":"json-sim"},adapter="vllm"))
     result,=judge_plan(store,pack,plan,as_of=T0)
-    assert result.verdicts.security==expected and evd.data_origin.value=="EXAMPLE"
+    assert evd.data_origin.value == "EXAMPLE"
+    if expected == Verdict.UNKNOWN:
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security == expected
     assert evd.execution.executor.version=="0.4.0"
     assert not evd.observations["collection_complete"].value
     assert bool(evd.observations["security_violations"].value) is (expected==Verdict.FAIL)

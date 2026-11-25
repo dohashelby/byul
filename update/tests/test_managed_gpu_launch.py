@@ -22,7 +22,7 @@ from guard.models import utcnow
 from guard.runtime.docker import CmdResult, ContainerLimits, Docker, DockerError
 from guard.runtime import sandbox
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy
 
 
 def launch(**options):
@@ -206,9 +206,12 @@ def test_single_managed_validation_retains_completed_violations_on_cleanup_failu
     evd, = list(st.iter_kind("EVD"))
     res, = list(st.iter_kind("RES"))
     if stage in {"startup", "version", "startup_cleanup"}:
-        assert evd.execution.status.value == "ABORTED" and res.verdicts.security.value == "UNKNOWN"
+        assert evd.execution.status.value == "ABORTED"
+        assert_unconfirmed_security_failure(res)
+        assert "ABORTED" in res.security_failure_tags
     else:
         assert evd.execution.status.value == "COMPLETED" and res.verdicts.security.value == "FAIL"
+        assert "CONFIRMED_VIOLATION" in res.security_failure_tags
     assert failed is (stage != "success")
     assert "private credential text" not in json.dumps(rpt.to_dict())
     if stage in {"cleanup", "startup_cleanup"}:

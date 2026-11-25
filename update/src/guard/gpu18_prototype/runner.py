@@ -19,7 +19,8 @@ from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
 from guard.executors import registry
 from guard.executors.base import DraftArtifact, EvidenceDraft
-from guard.models import DataOrigin, Environment, ExecStatus, Policy, canonical_json, load_pack, new_id, sha256_hex
+from guard.models import (DataOrigin, Environment, ExecStatus, Policy, SecurityFailureTag, canonical_json,
+                          load_pack, new_id, sha256_hex)
 from guard.models.base import utcnow
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle, verify_complete
@@ -176,6 +177,8 @@ def _execute(store, pack, env, owners, scenario, as_of, reports_dir, label):
     return {"scenario": scenario, "plan_id": plan.id, "plan_ref": plan.ref().model_dump(mode="json"),
             "report_id": report.id, "report_ref": report.ref().model_dump(mode="json"),
             "verdicts": {r.check_id: r.verdicts.security.value for r in results},
+            "security_failure_tags": {r.check_id: [tag.value for tag in r.security_failure_tags]
+                                      for r in results if r.security_failure_tags},
             "result_refs": [r.ref().model_dump(mode="json") for r in results]}
 
 
@@ -203,9 +206,13 @@ def run_demo(output: Path) -> dict:
     for scenario in SCENARIOS:
         runs.append(_execute(store, pack, env, owners, scenario, as_of, reports, "prototype"))
         baseline_runs.append(_execute(store, source, env, owners, scenario, as_of, reports, "source-pack-example"))
-    expected = {"normal": "PASS", "violation": "FAIL", "missing": "UNKNOWN"}
     for run in runs:
-        if set(run["verdicts"]) != set(CHECK_IDS) or set(run["verdicts"].values()) != {expected[run["scenario"]]}:
+        failed = run["scenario"] != "normal"
+        confirmed = run["scenario"] == "violation"
+        tags = run["security_failure_tags"]
+        if (run["verdicts"] != dict.fromkeys(CHECK_IDS, "FAIL" if failed else "PASS")
+                or set(tags) != (set(CHECK_IDS) if failed else set())
+                or any((SecurityFailureTag.CONFIRMED_VIOLATION in reason) != confirmed for reason in tags.values())):
             raise ValueError(f"prototype contract mismatch: {run['scenario']}: {run['verdicts']}")
     verify_complete(store)
     manifest = export_bundle(store.root, output / "evidence.zip")

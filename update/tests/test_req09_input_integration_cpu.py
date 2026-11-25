@@ -126,7 +126,9 @@ def test_original_req09_definition_scope_and_public_cli_roundtrip(case):
     result = pipeline.run_req09_pipeline(**case['args'])
     assert result['pack'] == pipeline.REQ09_PACK_REF and result['capture_invocations'] == 1
     assert result['confirmed_input_violations'] == [] and result['checks']['REQ-09']['verdicts'] == {
-        'security': 'UNKNOWN', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
+        'security': 'FAIL', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
+    saved_result, = Store.read_only(case['args']['output_root'] / 'store').iter_kind('RES')
+    assert 'CONFIRMED_VIOLATION' not in saved_result.security_failure_tags
     assert len(case['captures']) == 1 and len(case['gates']) == 2
     assert pipeline._req09_inventory(case['source'].root) == before
     evidence = evd(case)
@@ -180,7 +182,9 @@ def test_unknown_without_exact_supported_violation(case, change):
     elif change == 'input_hash': target['input_metadata']['canonical_sha256'] = '0' * 64
     else: target['events'] = []
     result = pipeline.run_req09_pipeline(**case['args'])
-    assert result['checks']['REQ-09']['verdicts']['security'] == 'UNKNOWN'
+    assert result['checks']['REQ-09']['verdicts']['security'] == 'FAIL'
+    saved_result, = Store.read_only(case['args']['output_root'] / 'store').iter_kind('RES')
+    assert 'CONFIRMED_VIOLATION' not in saved_result.security_failure_tags
     assert not result['confirmed_input_violations']
 
 

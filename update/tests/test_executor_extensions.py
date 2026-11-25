@@ -23,7 +23,7 @@ from guard.runtime.docker import CmdResult
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
 from tests.run_binding_support import run_table, split
-from tests.builders import completion_response, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, completion_response, environment, policy
 
 ROOT = Path(__file__).resolve().parents[1]
 from tests.published_pack38 import original as published_pack38
@@ -116,8 +116,10 @@ def test_req08_reused_tokens_are_decided_by_consumed_ids(tmp_path, challenge, al
                            {**REQ08, "reused_token_allowed": allowed}, extra_cfg=CFG08)
     assert evd.observations["reused_input_state"].value == state
     assert evd.execution.executor.version == request_field_probe.VERSION
-    assert result.verdicts.security.value == security
-    if security != "UNKNOWN":
+    if security == "UNKNOWN":
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security.value == security
         assert result.verdicts.functional.value == "PASS"
 
 
@@ -129,7 +131,8 @@ def test_req08_failed_control_sends_no_challenge_and_stays_unknown(tmp_path):
     evd, result = pipeline(tmp_path, "REQ-08", lambda c: InputValidationExecutor(c, container_probe=probe),
                            {**REQ08, "reused_token_allowed": False}, extra_cfg=CFG08)
     assert len(calls) == 1 and evd.observations["reused_input_state"].collected is False
-    assert result.verdicts.security.value == "UNKNOWN" and result.verdicts.functional.value == "FAIL"
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional.value == "FAIL"
 
 
 def test_req08_requires_fixture_inside_vocabulary_before_any_request(tmp_path):
@@ -154,7 +157,10 @@ def test_sup08_rejection_before_import_is_the_only_automatic_pass(tmp_path, stat
     evd, result = pipeline(tmp_path, "SUP-08", lambda c: InputValidationExecutor(c, container_probe=selection_probe(status)),
                            {"code_selection_fields": ["code_revision"], "code_selection_allowed": allowed, "rejection_codes": ["400"]},
                            pack=load_pack(ROOT / 'reference/pack-seeds/PACK-BASELINE-33'))
-    assert result.verdicts.security.value == security
+    if security == "UNKNOWN":
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security.value == security
     assert evd.observations["code_selection_final_code_verified"].value is False
 
 
@@ -205,15 +211,18 @@ def receipt(fields, sink="sink"):
 START = {"schema": usage_report.START_SCHEMA}
 
 
-@pytest.mark.parametrize("after,sink,security", [
-    (usage_snapshot(), [[START], [START]], "PASS"),
-    (usage_snapshot(sha="b" * 64), [[START], [START]], "FAIL"),
-    (usage_snapshot(), [[START], [START, receipt(["event"])]], "FAIL"),
-    (usage_snapshot(), None, "UNKNOWN"),
+@pytest.mark.parametrize("after,sink,security,confirmed", [
+    (usage_snapshot(), [[START], [START]], "PASS", False),
+    (usage_snapshot(sha="b" * 64), [[START], [START]], "FAIL", True),
+    (usage_snapshot(), [[START], [START, receipt(["event"])]], "FAIL", True),
+    (usage_snapshot(), None, "FAIL", False),
 ])
-def test_obs04_silence_needs_a_send_sensor(tmp_path, monkeypatch, after, sink, security):
+def test_obs04_silence_needs_a_send_sensor(tmp_path, monkeypatch, after, sink, security, confirmed):
     _, result = usage_run(tmp_path, "OBS-04", HelperDocker([usage_snapshot(), after]), USAGE, monkeypatch, deepcopy(sink))
     assert result.verdicts.security.value == security
+    assert ('CONFIRMED_VIOLATION' in result.security_failure_tags) is confirmed
+    if sink is None:
+        assert_unconfirmed_security_failure(result)
 
 
 def test_obs04_existing_old_file_is_not_a_new_report(tmp_path, monkeypatch):
@@ -225,7 +234,8 @@ def test_obs04_existing_old_file_is_not_a_new_report(tmp_path, monkeypatch):
 def test_obs04_process_replacement_keeps_facts_but_never_passes(tmp_path, monkeypatch):
     evd, result = usage_run(tmp_path, "OBS-04", HelperDocker([usage_snapshot(), usage_snapshot(start=8)]),
                             USAGE, monkeypatch, [[START], [START]])
-    assert evd.execution.status.value == "ABORTED" and result.verdicts.security.value == "UNKNOWN"
+    assert evd.execution.status.value == "ABORTED"
+    assert_unconfirmed_security_failure(result)
 
 
 def test_obs04_later_read_error_keeps_earlier_sink_fact(tmp_path, monkeypatch):
@@ -238,7 +248,8 @@ def test_obs04_unreadable_path_is_a_gap(tmp_path, monkeypatch):
     after = usage_snapshot()
     after["files"][0] = {"path": "/root/usage.jsonl", "exists": None, "readable": False}
     evd, result = usage_run(tmp_path, "OBS-04", HelperDocker([usage_snapshot(), after]), USAGE, monkeypatch, [[START], [START]])
-    assert evd.observations["usage_new_local_reports"].collected is False and result.verdicts.security.value == "UNKNOWN"
+    assert evd.observations["usage_new_local_reports"].collected is False
+    assert_unconfirmed_security_failure(result)
 
 
 ALLOWED = {**USAGE, "usage_allowed": True, "allowed_usage_fields": ["event"], "allowed_usage_sinks": ["sink"]}
@@ -253,7 +264,7 @@ def test_obs05_fields_and_sinks_are_compared_to_the_approved_lists(tmp_path, mon
 
 def test_obs05_no_report_observed_never_passes(tmp_path, monkeypatch):
     _, result = usage_run(tmp_path, "OBS-05", HelperDocker([usage_snapshot(), usage_snapshot()]), ALLOWED, monkeypatch, [[START], [START]])
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 def test_usage_sink_rejects_open_records():
@@ -315,14 +326,17 @@ PLAIN = {"tcp": True, "tls": False, "reason": "no_tls"}
 GONE = {"tcp": False, "tls": False, "reason": "unreachable"}
 
 
-@pytest.mark.parametrize("reply,security", [
-    (handshake(OK, REFUSED_PEER), "UNKNOWN"), (handshake(PLAIN, PLAIN), "FAIL"),
-    (handshake(OK, OK), "FAIL"), (handshake(GONE, GONE), "UNKNOWN"),
+@pytest.mark.parametrize("reply,confirmed", [
+    (handshake(OK, REFUSED_PEER), False), (handshake(PLAIN, PLAIN), True),
+    (handshake(OK, OK), True), (handshake(GONE, GONE), False),
 ])
-def test_plt09_handshake_results(tmp_path, reply, security):
+def test_plt09_handshake_results(tmp_path, reply, confirmed):
     evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=HelperDocker([reply])), TRANSPORT,
                            extra_cfg={"record_segments": [SEGMENT]})
-    assert result.verdicts.security.value == security
+    assert result.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in result.security_failure_tags) is confirmed
+    if not confirmed:
+        assert_unconfirmed_security_failure(result)
     assert evd.observations["record_transport_sender_verified"].value is False
 
 
@@ -394,12 +408,13 @@ def test_obs11_declared_late_detection_fails_and_clean_record_stays_unknown(tmp_
     assert result.verdicts.security.value == "FAIL"
     (tmp_path / "clean").mkdir()
     _, result = gap_run(tmp_path / "clean", monkeypatch, packet(gap_row()))
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 def test_obs11_unavailable_status_record_is_unknown(tmp_path, monkeypatch):
     evd, result = gap_run(tmp_path, monkeypatch, None)
-    assert evd.observations["collection_gap_violations"].collected is False and result.verdicts.security.value == "UNKNOWN"
+    assert evd.observations["collection_gap_violations"].collected is False
+    assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize("check_id,impl", [("REQ-08", "real"), ("SUP-08", "real"), ("OBS-04", "real"), ("OBS-05", "real"),

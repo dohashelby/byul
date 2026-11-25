@@ -8,6 +8,10 @@
   "required": ["schema_version", "report_ref", "mode", "created_at", "data_origin", "official", "policy_status", "plan_ref", "environment_refs", "policy_ref", "pack", "change_ref", "inputs_manifest", "summary", "checks", "manual_required", "not_selected", "limitations", "approval"],
   "properties": {
     "schema_version": { "const": "byul-verification-result/0.2" },
+    "security_verdict_version": {
+      "description": "선택. 원본 RPT의 보안 판정 방식.",
+      "const": "binary-v1"
+    },
     "report_ref": { "$ref": "common.schema.json#/$defs/object_ref" },
     "mode": { "enum": ["audit", "update"] },
     "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
@@ -124,6 +128,12 @@
                   "description": "선택. 이 쪽의 보안·기능·성능 중 FAIL·UNKNOWN 축이 있을 때 판정(RES)이 남긴 이유 원문. PASS·NOT_APPLICABLE 축의 이유는 뺀다. 없으면 생략한다.",
                   "type": "array",
                   "items": { "type": "string" }
+                },
+                "security_failure_tags": {
+                  "description": "선택. 원본 RPT가 기록한 이 쪽의 보안 미충족 사유 코드.",
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": { "enum": ["CONFIRMED_VIOLATION", "CONDITIONS_UNMET", "INSUFFICIENT_EVIDENCE", "NOT_RUN", "ABORTED", "NO_PASS_RULE"] }
                 }
               }
             }

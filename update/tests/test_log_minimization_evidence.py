@@ -16,7 +16,7 @@ from guard.core.select import select
 from guard.models import DataOrigin
 from guard.store import Store
 from guard.store.packs import put_pack
-from tests.builders import baseline_pack, policy, PACK_DIR
+from tests.builders import PACK_DIR, assert_unconfirmed_security_failure, baseline_pack, policy
 from tests.test_kubernetes_request_binding import env as example_env, target as example_target
 
 PRIVATE = 'OBS03_EXAMPLE_PRIVATE_LOG_CANARY_RID_CREDENTIAL_DO_NOT_PERSIST'
@@ -138,7 +138,7 @@ def test_only_actual_qualified_predicate_becomes_fail(case, kind):
 
 
 @pytest.mark.parametrize('missing', ['analysis', 'generation', 'linked_event', 'count', 'code', 'profile_unavailable', 'untransmitted_context'])
-def test_incomplete_or_unqualified_predicate_remains_unknown(case, missing):
+def test_incomplete_or_unqualified_predicate_remains_unconfirmed(case, missing):
     if missing == 'analysis': case['capture']['analysis_binding_verified'] = False
     elif missing == 'generation': case['capture']['source_generation_verified'] = False
     elif missing == 'linked_event': case['capture']['source_reads'][0]['trial_linked_event_count'] = 0
@@ -154,8 +154,13 @@ def test_incomplete_or_unqualified_predicate_remains_unknown(case, missing):
             gaps=['OBS03_A_PROFILE_UNAVAILABLE'], normal_control={'attempted': False, 'succeeded': None})
         for row in case['capture']['request_summaries']: row.update(attempted=False, binding_verified=False, outcome=None)
     result = bridge.run(**case['args'], execute=True)
-    assert result['security'] == 'UNKNOWN'
-    assert 'PASS' not in latest_evidence(case).observations['declared_verdicts'].value.values()
+    assert result['security'] == 'FAIL'
+    stored = Store.read_only(case['args']['output'] / 'store')
+    saved = next(stored.iter_kind('RES'))
+    assert_unconfirmed_security_failure(saved)
+    assert 'INSUFFICIENT_EVIDENCE' in saved.security_failure_tags
+    declared = latest_evidence(case).observations['declared_verdicts'].value
+    assert declared['security'] == 'UNKNOWN' and 'PASS' not in declared.values()
 
 
 @pytest.mark.parametrize('late', ['after', 'cleanup', 'artifact', 'form', 'export'])

@@ -9,7 +9,7 @@ from guard.collectors import native_input as native,reused_input_qualification a
 from guard.executors import kubernetes_reused_input_matrix as executor
 from guard.input_policy import policy_context
 from guard.models import CheckDef,Observation,load_pack
-from tests.builders import baseline_pack
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack
 from tests.test_native_input_capture import captured  # noqa: F401
 from tests.test_native_input_rejection import current,facts as original_facts  # noqa: F401
 
@@ -301,7 +301,10 @@ def test_both_fields_flow_through_registry_cli_evd_judge_report_and_restore(tmp_
     store=Store.read_only(tmp_path/'store');evd,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert calls==p['reused_token_fields']and evd.data_origin==DataOrigin.EXAMPLE
     assert evd.execution.status==ExecStatus.COMPLETED and evd.observations['reused_matrix_complete'].value is registered
-    assert res.verdicts.security.value==('PASS'if registered else'UNKNOWN')
+    if registered:
+        assert res.verdicts.security.value == 'PASS'
+    else:
+        assert_unconfirmed_security_failure(res)
     cli(['evidence','export','--store',tmp_path/'store','--output',tmp_path/'bundle.zip'])
     cli(['evidence','restore','--bundle',tmp_path/'bundle.zip','--destination',tmp_path/'restored'])
     restored=Store.read_only(tmp_path/'restored')

@@ -43,12 +43,15 @@ def _evidence(store, plan, env, *, check_id="REQ-01", origin=DataOrigin.MEASURED
     return evd
 
 
-def _result(store, evd, *, revision=1, security=Verdict.PASS, created_at=T0):
+def _result(store, evd, *, revision=1, security=Verdict.PASS, created_at=T0, binary_security=False):
+    security_tags = ["CONDITIONS_UNMET"] if binary_security and security == Verdict.FAIL else []
     result = Result(id="RES-CURRENT", revision=revision, created_at=created_at,
                     data_origin=evd.data_origin, refs=[evd.ref()], evidence=evd.ref(),
                     check_id=evd.check_id, side=evd.side,
                     judge={"name": "rule_table", "version": "1", "params_sha256": "a" * 64},
                     verdicts={"security": security, "functional": "PASS", "performance": "UNKNOWN"},
+                    security_verdict_version="binary-v1" if binary_security else None,
+                    security_failure_tags=security_tags,
                     verification_level=evd.data_origin).seal()
     store.put(result)
     return result
@@ -133,6 +136,30 @@ def test_readjudged_carried_result_keeps_original_execution_time(tmp_path):
     assert any("이번 실행·실측으로 세지 않음" in note for note in report.limitations)
 
 
+def test_replay_preserves_the_exact_previous_result_after_rejudgment(tmp_path):
+    store, pack, env, _, previous = _setup(tmp_path)
+    evd = _evidence(store, previous, env)
+    original_result = _result(store, evd, security=Verdict.UNKNOWN)
+    plan = previous.model_copy(update={
+        "id": "PLAN-NEXT",
+        "inputs": previous.inputs.model_copy(update={"previous_plan": previous.ref()}),
+        "refs": [*previous.refs, previous.ref()],
+    }).seal()
+    store.put(plan)
+    original = build_report(store, pack, plan, T0, binary_security=False)
+    store.put(original)
+    newer = _result(store, evd, revision=2, security=Verdict.FAIL, binary_security=True,
+                    created_at=T0 + timedelta(seconds=1))
+    current = build_report(store, pack, plan, T0)
+    replay = build_report(store, pack, plan, T0, binary_security=False, original_report=original)
+    current_row = next(row for row in current.by_check if row.check_id == evd.check_id)
+    replay_row = next(row for row in replay.by_check if row.check_id == evd.check_id)
+    assert current_row.previous_result.result == newer.ref()
+    assert replay_row.previous_result.result == original_result.ref()
+    assert replay_row.previous_result.security == Verdict.UNKNOWN
+    assert replay.inputs_manifest == original.inputs_manifest
+
+
 @pytest.mark.parametrize("mode", ["tcp", "http", "handler", "missing_scope", "example", "no_evidence", "no_trace", "partial_roles"])
 def test_five_stages_keep_evidence_scopes_and_do_not_change_verdicts(tmp_path, mode):
     store, pack, env, pol, initial = _setup(tmp_path)
@@ -146,7 +173,7 @@ def test_five_stages_keep_evidence_scopes_and_do_not_change_verdicts(tmp_path, m
         evd = _evidence(store, plan, env, logs=None if mode == "no_trace" else [] if mode == "missing_scope" else logs,
                         registered=() if mode == "missing_scope" else ("POST /new",),
                         origin=DataOrigin.EXAMPLE if mode == "example" else DataOrigin.MEASURED)
-        res = _result(store, evd, security=Verdict.FAIL)
+        res = _result(store, evd, security=Verdict.FAIL, binary_security=True)
     report = build_report(store, pack, plan, T0)
     stage = report.change_summary["entrypoints"][0]["stages"][0]
     assert stage["selected"] is True
@@ -210,6 +237,7 @@ def test_corrupt_trace_cannot_confirm_dynamic_reach(tmp_path):
 
 def test_old_report_optional_fields_are_not_serialized(tmp_path):
     store, pack, env, pol, plan = _setup(tmp_path)
-    report = build_report(store, pack, plan, T0).to_dict()
+    report = build_report(store, pack, plan, T0, binary_security=False).to_dict()
     assert "change_summary" not in report and "carry_counts" not in report
+    assert "security_verdict_version" not in report
     assert all(not {"carried_over", "previous_result", "triggers"} & row.keys() for row in report["by_check"])

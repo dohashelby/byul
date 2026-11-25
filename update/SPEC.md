@@ -125,6 +125,8 @@ Applicability: APPLICABLE | NOT_APPLICABLE | UNDETERMINED | CONFLICT
 Verdict:       PASS | FAIL | UNKNOWN | NOT_APPLICABLE      # 문서상 충족/미충족/미확인/해당 없음
 ExecStatus:    PENDING | RUNNING | COMPLETED | ABORTED | NOT_RUN
 Comparison:    NO_CHANGE | REGRESSED | FIXED | STILL_FAILING | UNKNOWN | NOT_COMPARABLE
+SecurityFailureTag:
+  CONFIRMED_VIOLATION | CONDITIONS_UNMET | INSUFFICIENT_EVIDENCE | NOT_RUN | ABORTED | NO_PASS_RULE
 Gap:           NO_EXECUTOR | NO_POLICY_VALUE | NO_FIXTURE | NO_ENV_FACT | ADAPTER_UNSUPPORTED
 ```
 
@@ -375,28 +377,33 @@ check_id: REQ-01
 side: baseline | candidate | single
 judge: { plugin: str, version: str, params_sha256: hex }
 verdicts:                                      # 세 축은 따로 판정 (프레임워크 05 규칙)
-  security:    Verdict
+  security:    PASS | FAIL
   functional:  Verdict
   performance: Verdict
+security_verdict_version: binary-v1
+security_failure_tags: [SecurityFailureTag]     # 보안 FAIL일 때 하나 이상
 reasons: [str]                                 # 판정 규칙의 어떤 조건이 맞았는가
-missing_observations: [str]                    # UNKNOWN의 원인
+missing_observations: [str]
 exception: { check_id: str, expires_at: RFC3339 } | null   # 정책 예외 표시만. 판정에 영향 없음
 verification_level: MEASURED | DECLARED | EXAMPLE | null   # 근거 중 가장 약한 것. 하나라도 null이면 null
 ```
+
+새 보안 판정은 정의된 PASS 규칙과 실행·증거 요건을 모두 충족한 경우에 PASS다. 나머지는 FAIL이고 확인 가능한 사유를 하나 이상 저장한다. 태그는 각각 위반 확인, 조건 미충족, 증거 부족, 미실행, 실행 중단, PASS 규칙 미정의를 나타낸다. 확인된 위반과 실행·수집 공백은 한 결과에 함께 나타날 수 있다. 이전에 봉인한 결과는 원래 판정과 참조로 읽고, 원본 보고서를 지정한 재생은 그 보안 판정 방식을 적용한다.
 
 ### 4.7 RPT — Report (집계·비교·보고)
 
 ```yaml
 kind: RPT
 mode: audit | update
+security_verdict_version: binary-v1
 inputs_manifest: [Ref]                         # 이 보고서가 쓴 모든 객체 (해시 포함)
 pack_review_status: DRAFT | REVIEWED
 by_check:
   - check_id: REQ-01
     applicability: APPLICABLE
     selected: true
-    baseline:  { result: Ref|null, security: Verdict }
-    candidate: { result: Ref|null, security: Verdict }
+    baseline:  { result: Ref|null, security: PASS|FAIL, security_failure_tags: [SecurityFailureTag] }
+    candidate: { result: Ref|null, security: PASS|FAIL, security_failure_tags: [SecurityFailureTag] }
     comparison: Comparison                     # update 모드만
     functional_comparison: Comparison          # update 모드, 값이 있을 때만
     comparison_reasons: [str]                  # 불일치/미확인 필드, 값이 있을 때만
@@ -416,7 +423,7 @@ evidence_counts: { <영역>: { manual: int, automated: int, not_run: int } }   #
 - JSON이 원본이다. 화면은 byul platform이 이 JSON만 읽어 보여주고, JSON에 없는 내용을 넣지 않는다(2026-10-25 HTML 보고서 `report/html.py` 삭제, 같은 내용은 platform 검증 결과 화면).
 - `approval`은 보고서를 받아들인 기록이다. 자동 권고가 아니다(INV-07).
 
-**버전 비교 규칙** (`security` 축 기준, 다른 축도 같은 표)
+**버전 비교 규칙** (다른 축에도 같은 표 적용)
 
 | 기준 \ 후보 | PASS | FAIL | UNKNOWN |
 | --- | --- | --- | --- |
@@ -426,10 +433,12 @@ evidence_counts: { <영역>: { manual: int, automated: int, not_run: int } }   #
 
 비교 조건(INV-09)이 맞지 않으면 표와 관계없이 `NOT_COMPARABLE`.
 
+새 보안 판정은 `CONFIRMED_VIOLATION`이 있는 FAIL을 표의 FAIL로 비교한다. 다른 새 FAIL은 표에서 UNKNOWN으로 처리하며 개별 판정과 사유 태그는 각 점검에 표시한다. 이전에 봉인된 보안 판정은 그 판정 방식으로 비교한다.
+
 **집계 규칙** (점검 → 보호 목적 → 영역)
 
 1. 적용 점검 중 `FAIL`이 하나라도 있으면 → `FAIL`
-2. 아니고 `UNKNOWN`이 있거나 `inventory_complete: false`면 → `UNKNOWN`
+2. 아니고 이전 판정 중 `UNKNOWN`이 있거나 `inventory_complete: false`면 → `UNKNOWN`
 3. 아니고 `PASS`가 하나 이상이면 → `PASS`
 4. 전부 `NOT_APPLICABLE`이면 → `NOT_APPLICABLE`
 
@@ -461,14 +470,14 @@ CHG* ──────────┘                                          
 | **INV-01** | `UNKNOWN`을 `PASS`로 올리지 않는다. 확인 부족과 위반 확인을 구별한다. | A1-1 |
 | **INV-02** | `EXAMPLE` 자료, 기대값, 실행하지 않은 시험을 `MEASURED`로 표시하지 않는다. | A1-2 |
 | **INV-03** | 시도가 없으면 차단 성공이 아니다. `challenges[].attempted: false`인데 "거부됨"으로 `PASS`를 낼 수 없다. 응답 미수신만으로 `PASS`가 되지 않는다. (주: `refused`·`timeout`·`unreachable`은 **같은 시각 신뢰 출발점에서 대상에 도달함(양성 대조)이 관측된 경우에만** 차단 근거가 된다. `dns_error`·`error`는 차단 근거가 아니다. TCP 연결 실패에서 경로별 결과를 추론한 경우(`basis: tcp_connect`)도 연결 시도는 실제로 했으므로 "시도함"이며, 같은 양성 대조 조건을 따른다. 연결이 된 뒤의 응답 없음은 `error`다.) | A1-3,4 |
-| **INV-04** | 위반 증거가 없는 것과 준수 증거가 있는 것은 다르다. 센서 장애·수집 실패는 `UNKNOWN`이다. 이미 확인된 `FAIL`은 다른 누락 때문에 지우지 않는다. | A1-10 |
+| **INV-04** | 센서 장애·수집 실패는 보안 증거 부족이다. 확인된 위반은 다른 누락과 별도로 보존하고 태그를 남긴다. 위반 확인 없는 새 보안 FAIL은 버전 비교에서 미확인으로 처리한다. | A1-10 + 2026-11-25 사용자 결정 |
 | **INV-05** | (2026-10-25 U1 개정) 엔진 정식 릴리스(major·minor 변경, 롤백, rc·dev, 버전 확인 불가 포함)는 변경 분석으로 시험을 줄이지 않는다(적용 점검 전체). 시험을 줄이는 것은 엔진 패치 릴리스와 증분 감사에서, 변경 트리거(패치의 항상 시험 20개·diff 변경 종류, 모델 변경 종류, 입력 변경)가 없고 이월 조건(INV-19)을 모두 만족하는 점검의 이월로만 가능하다. 이전 결과가 없거나, 이미지와 diff 버전이 맞지 않거나, 미분류 엔진 파일·연결되지 않은 환경 사실·규칙에 없는 모델 파일 변경이 있으면 해당 범위를 넓게 고른다. (개정 전: 기본 점검은 변경 분석이 "영향 없음"이어도 빼지 않는다) | A(planner) + U1 사용자 결정 |
 | **INV-06** | 환경 사실을 `false`로 쓰려면 비사용·비노출 근거가 필요하다. 근거 없는 `false`는 `null`로 취급한다. 빈 조건 목록은 "항상 참"이 아니다. | F(selector) |
 | **INV-07** | 자동 판정·권고는 승인이 아니다. 보고서의 `approval`은 사람만 쓴다. 코드가 `approval`을 채우지 않는다. | A1-7 |
 | **INV-08** | 정책 예외는 판정을 바꾸지 않는다. 예외가 승인된 `FAIL`도 `FAIL`이다. 만료·미승인 예외는 표시하지 않고 사유를 남긴다. | A1-5,11 |
 | **INV-09** | 버전 비교의 단위는 엔진 이미지다. 모델 inventory·시험 자료·의미 있는 실행 설정이 같고 확인돼야 한다. GPU는 GPU·driver, 명시적 CPU(gpu_count=0)는 architecture/model/system/kernel/threads가 같아야 한다. CPU 프로파일 없이 GPU·driver가 null인 경우는 여전히 비교 불가다. CPU는 보안·기능만 비교하고 성능은 UNKNOWN이다(2026-10-19 사용자 결정). | A1-9 + CPU 결정 |
-| **INV-10** | 선정되지 않은 점검은 EVD·RES를 만들지 않는다. 선정됐지만 실행하지 못한 점검은 EVD(`status: NOT_RUN` 또는 `ABORTED`)와 RES(`UNKNOWN`)를 만든다. 둘을 같은 상태로 합치지 않는다. | A1-12 |
-| **INV-11** | `PASS`는 다음이 **모두** 관측될 때만 낸다: ① 정상 대조 성공 ② 모든 챌린지가 시도되고 기대대로 거부·무효 ③ `required_observations` 전부 `collected: true`. 하나라도 빠지면 `UNKNOWN`. 과차단(정상 대조 실패)은 `PASS`가 아니다. | F(05, L3) |
+| **INV-10** | 선정되지 않은 점검은 EVD·RES를 만들지 않는다. 선정된 점검이 실행되지 않았거나 중단되면 EVD의 `NOT_RUN` 또는 `ABORTED`와 보안 RES의 FAIL 및 해당 태그를 남긴다. | A1-12 + 2026-11-25 사용자 결정 |
+| **INV-11** | 보안 PASS에는 정의된 PASS 조건의 충족, 실행 완료, 정상 대조 성공, 모든 챌린지 시도와 요구된 효과, 필수 관측 전부 수집이 필요하다. 하나라도 충족되지 않으면 보안 FAIL과 사유 태그를 남긴다. | F(05, L3) + 2026-11-25 사용자 결정 |
 | **INV-12** | 여러 근거를 집계한 `verification_level`·`data_origin`은 필수 근거 중 하나라도 null이면 null이다. null을 빼고 나머지로 대표값을 정하지 않는다. | A1-14 |
 | **INV-13** | 보호 목적의 `inventory_complete`는 **그 목적에 속한 모든 CheckDef가 PLAN에서 적용 여부를 판단받았고(UNDETERMINED 제외), 팩이 REVIEWED일 때만** `true`다. `false`면 집계는 `PASS`가 될 수 없다. | N(L3 해소) |
 | **INV-14** | `run`은 판정하지 않고 `judge`는 엔진에 접속하지 않는다. 판정 플러그인은 순수 함수다(같은 입력 → 같은 출력, 네트워크·파일 쓰기·시계 접근 금지). | A3, A17 X4 |

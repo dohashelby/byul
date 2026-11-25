@@ -238,6 +238,12 @@ class ReportDecision(BaseModel):
     limits: list[str]
 
 
+SecurityFailureTag = Literal[
+    "CONFIRMED_VIOLATION", "CONDITIONS_UNMET", "INSUFFICIENT_EVIDENCE",
+    "NOT_RUN", "ABORTED", "NO_PASS_RULE",
+]
+
+
 class ReportSide(BaseModel):
     result_id: str | None
     result_revision: int | None
@@ -246,6 +252,7 @@ class ReportSide(BaseModel):
     performance: str | None
     verification_level: str | None
     reasons: list[str]
+    security_failure_tags: list[SecurityFailureTag] = Field(default_factory=list)
     result_sha256: str | None = None
     execution_status: Literal["PENDING", "RUNNING", "COMPLETED", "ABORTED", "NOT_RUN"] | None = None
     data_origin: Literal["MEASURED", "DECLARED", "EXAMPLE"] | None = None
@@ -362,6 +369,7 @@ class ReportView(BaseModel):
     execution_attempt_id: str | None = None
     as_of: str | None = None
     byul_policy_ref: Annotated[dict[str, Any] | None, WithJsonSchema({"x-contract": "Common_nullable_policy_ref"})] = None
+    security_verdict_version: Literal["binary-v1"] | None = None
 
 
 class VerificationDetail(BaseModel):

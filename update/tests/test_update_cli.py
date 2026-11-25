@@ -157,7 +157,10 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
         assert len(exited) == len(set(exited)) == len(set(calls)) == 1
         assert len(seen) == 1 and 'baseline' in seen[0]
         row = next(r for r in report()['by_check'] if r['check_id'] == 'REQ-01')
-        assert row['baseline']['security'] == 'FAIL' and row['candidate']['security'] == 'UNKNOWN'
+        assert row['baseline']['security'] == row['candidate']['security'] == 'FAIL'
+        assert 'CONFIRMED_VIOLATION' in row['baseline']['security_failure_tags']
+        assert 'ABORTED' in row['candidate']['security_failure_tags']
+        assert 'CONFIRMED_VIOLATION' not in row['candidate']['security_failure_tags']
         candidate, = [e for e in Store(Path('.guard')).iter_kind('EVD') if e.side.value == 'candidate']
         assert candidate.execution.status.value == 'ABORTED'
         assert candidate.execution.abort_reason == 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
@@ -166,7 +169,8 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
     row = next(r for r in report()["by_check"] if r["check_id"] == "REQ-01")
     if fail_baseline:
         assert len(exited) == len(calls) == 1
-        assert row["baseline"]["security"] == "UNKNOWN"
+        assert row["baseline"]["security"] == "FAIL"
+        assert "CONFIRMED_VIOLATION" not in row["baseline"]["security_failure_tags"]
         assert row["candidate"]["execution_status"] == "ABORTED"
         assert row["comparison"] == "NOT_COMPARABLE"
         assert not seen

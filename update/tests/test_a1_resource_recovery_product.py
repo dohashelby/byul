@@ -132,7 +132,8 @@ def test_both_registered_cli_branches_independent_fail_unknown_and_exact_refs(tm
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     fail=mode in {'retained','seal-failure','native-one-missing','native-partial','attachment','http-cleanup','retained-http-failure'}
     assert e.data_origin.value=='EXAMPLE' and res.verdicts.functional.value==('FAIL' if fail else 'UNKNOWN')
-    assert res.verdicts.security.value==res.verdicts.performance.value=='UNKNOWN' and e.normal_control.succeeded is None
+    assert res.verdicts.security.value == 'FAIL' and 'CONFIRMED_VIOLATION' not in res.security_failure_tags
+    assert res.verdicts.performance.value == 'UNKNOWN' and e.normal_control.succeeded is None
     if mode in {'actual-lab-false','version032'}:
         assert not world.sent and not world.census_count
         assert e.observations['recovery_absolute_deadline_violated'].value is None

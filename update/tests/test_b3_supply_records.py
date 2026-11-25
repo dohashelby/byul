@@ -159,7 +159,8 @@ def test_cpu_record_replay_factory_contract_refs_and_saved_pack(tmp_path,monkeyp
     assert again.ref()==res.ref() and restored.verify()==[]
     assert calls==['normal','challenge']
     assert evd.execution.executor.name=='supply_boot' and evd.data_origin.value=='EXAMPLE'
-    assert res.verdicts.security.value=='UNKNOWN' and rpt.official is False
+    assert res.verdicts.security.value == 'FAIL' and rpt.official is False
+    assert 'CONFIRMED_VIOLATION' not in res.security_failure_tags
     assert not evd.observations['supply_boot_complete'].value
     challenge=evd.observations['supply_boot_sessions'].value[1]['reported_boot_record']
     assert challenge==parts['challenge']['packet']

@@ -62,7 +62,8 @@ def test_req12_common_input_keeps_unknown_or_independent_fail_through_restore(
     assert consumed['whole_question_complete'] is consumed['producer_authenticated'] is False
     assert report['gaps'] and not report['whole_question_complete']
     assert evd.observations['activation_scope_complete'].value is False
-    assert result.verdicts.security.value == ('FAIL' if independent_fail else 'UNKNOWN')
+    assert result.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in result.security_failure_tags) is independent_fail
     if independent_fail:
         assert {'code': 'EXAMPLE_CONFIRMED_INDEPENDENT_FAIL'} in evd.observations['activation_violations'].value
     if not registered:

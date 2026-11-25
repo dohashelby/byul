@@ -21,6 +21,7 @@ from guard.models import (
     Ref,
     Result,
     ReviewStatus,
+    SecurityFailureTag,
     Side,
     Verdict,
     new_id,
@@ -43,7 +44,7 @@ from guard.store import Store
 from guard.report.change import summarize_change
 
 from .aggregate import aggregate
-from .compare import compare_results, comparison_differences
+from .compare import compare_results, comparison_differences, security_comparison_verdict
 from .judge import _policy_exception_statuses, plan_evidence, result_for_policy
 
 _IMPACT_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, None: 3}
@@ -82,15 +83,26 @@ def _verdict_reasons(res: Result) -> list[str] | None:
     return kept or None
 
 
-def _side(res: Result | None, evidence: Evidence | None = None) -> SideResult:
+def _side(res: Result | None, evidence: Evidence | None = None, *, binary_security: bool = True) -> SideResult:
     source = {} if evidence is None else {
         "evidence_ref": evidence.ref(), "execution_status": evidence.execution.status, "data_origin": evidence.data_origin,
     }
     if res is None:
-        return SideResult(result=None, security=Verdict.UNKNOWN, **source)
+        if not binary_security:
+            return SideResult(result=None, security=Verdict.UNKNOWN, **source)
+        tags = []
+        if evidence is not None and evidence.execution.status == ExecStatus.NOT_RUN:
+            tags.append(SecurityFailureTag.NOT_RUN)
+        if evidence is not None and evidence.execution.status == ExecStatus.ABORTED:
+            tags.append(SecurityFailureTag.ABORTED)
+        tags.append(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+        reason = ("security: no evidence or result for the selected check" if evidence is None
+                  else "security: no result for the selected evidence")
+        return SideResult(result=None, security=Verdict.FAIL, security_failure_tags=tags, reasons=[reason], **source)
     return SideResult(
         result=res.ref(),
         security=res.verdicts.security,
+        security_failure_tags=res.security_failure_tags,
         functional=res.verdicts.functional,
         performance=res.verdicts.performance,
         verification_level=res.verification_level,
@@ -172,9 +184,30 @@ def _previous_results(store: Store, plan: Plan) -> tuple[dict[str, Result], list
     return results, list(evidence.values())
 
 
+def _previous_report_inputs(store: Store, plan: Plan, original: Report | None) -> tuple[
+    dict[str, SideResult], list[Result], list[Evidence],
+]:
+    if original is None:
+        results, evidence = _previous_results(store, plan)
+        return {cid: _side(result) for cid, result in results.items()}, list(results.values()), evidence
+    if plan.mode != Mode.audit or plan.inputs.previous_plan is None:
+        return {}, [], []
+    # The original input manifest can also contain an older carried-over trial.
+    # Reuse its exact predecessor evidence and results instead of reading the
+    # latest revisions from a store that may since have been rejudged.
+    evidence = [store.resolve(ref) for ref in original.inputs_manifest if ref.kind == "EVD"]
+    previous = [evd for evd in evidence if evd.plan != plan.ref()]
+    previous_refs = {(evd.id, evd.revision, evd.content_sha256) for evd in previous}
+    results = [store.resolve(ref) for ref in original.inputs_manifest if ref.kind == "RES"]
+    sides = {row.check_id: row.previous_result for row in original.by_check if row.previous_result is not None}
+    return sides, [res for res in results if (res.evidence.id, res.evidence.revision, res.evidence.sha256)
+                   in previous_refs], previous
+
+
 def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *,
                  attempt_id: str | None = None, evidence: list[Evidence] | None = None,
-                 judged: list[Result] | None = None) -> Report:
+                 judged: list[Result] | None = None, binary_security: bool = True,
+                 original_report: Report | None = None) -> Report:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     policy: Policy = store.resolve(plan.inputs.policy)
@@ -195,6 +228,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
     def matches(r):
         return ((r.evidence.id, r.evidence.revision, r.evidence.sha256) in evd_refs
                 and result_for_policy(r, plan.inputs.policy)
+                and (r.security_verdict_version is not None) == binary_security
                 and (as_of is None or r.as_of is None or r.as_of == as_of))
 
     for r in judged if judged is not None else store.find_latest("RES", matches):
@@ -213,7 +247,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
     as_of = as_of.astimezone(timezone.utc)
 
     sides = [Side.single] if plan.mode == Mode.audit else [Side.baseline, Side.candidate]
-    previous_results, previous_evidence = _previous_results(store, plan)
+    previous_rows, previous_results, previous_evidence = _previous_report_inputs(store, plan, original_report)
     carried_results: list[Result] = []
     carried_evidence: list[Evidence] = []
     carried_times: list[dict] = []
@@ -237,8 +271,8 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
         )
         if getattr(item, "triggers", None):
             row["triggers"] = item.triggers
-        if check.id in previous_results:
-            row["previous_result"] = _side(previous_results[check.id])
+        if check.id in previous_rows:
+            row["previous_result"] = previous_rows[check.id]
         carried = getattr(item, "carried_over", None)
         if not item.selected:
             not_selected.append(NotSelected(check_id=check.id, reason=item.not_selected_reason.value))
@@ -274,7 +308,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
             row["tested_while_undetermined"] = item.applicability in (Applicability.UNDETERMINED, Applicability.CONFLICT)
             side_results = {s: results.get((check.id, s)) for s in sides}
             for s, res in side_results.items():
-                row[s.value] = _side(res, evds.get((check.id, s)))
+                row[s.value] = _side(res, evds.get((check.id, s)), binary_security=binary_security)
                 if res and res.judge.name == "declared":
                     limitations.extend(f"{check.id}/{s.value}: {reason}" for reason in res.reasons
                                        if reason.startswith(("POLICY_ITEMS:", "POLICY_CONTEXT:", "AUDIT_COLLECTION:")))
@@ -286,13 +320,17 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
                 rb, rc = row["baseline"], row["candidate"]
                 if b and c and b.execution.attempt_id == c.execution.attempt_id and (
                         attempt_id is None or b.execution.attempt_id == attempt_id):
-                    row["comparison"] = compare_results(rb.security, b.comparability, rc.security, c.comparability)
+                    row["comparison"] = compare_results(
+                        security_comparison_verdict(rb.security, rb.security_failure_tags), b.comparability,
+                        security_comparison_verdict(rc.security, rc.security_failure_tags), c.comparability,
+                    )
                     row["functional_comparison"] = compare_results(rb.functional or Verdict.UNKNOWN, b.comparability,
                                                                    rc.functional or Verdict.UNKNOWN, c.comparability)
                     row["comparison_reasons"] = comparison_differences(b.comparability, c.comparability)
-                elif b or c:
+                elif b or c or binary_security:
                     row["comparison"] = Comparison.NOT_COMPARABLE
-                    row["functional_comparison"] = Comparison.NOT_COMPARABLE
+                    if b or c:
+                        row["functional_comparison"] = Comparison.NOT_COMPARABLE
                     row["comparison_reasons"] = ["EXECUTION_ATTEMPT_INCOMPLETE_OR_DIFFERENT"]
             exc, notes = _exception_display(check.id, policy, as_of)
             row["exception"] = exc
@@ -324,12 +362,21 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
         complete = all(inv.get(p, False) for p in area_purposes[a])
         area_summary[a] = AxisSummary(security=aggregate(vs, complete), inventory_complete=complete)
 
-    # 미충족 먼저: impact → review_order → id. 나머지는 PLAN 순서
+    # 미충족 먼저: 확인된 위반 → impact → review_order → id. 나머지는 PLAN 순서.
     def is_fail(r: CheckRow) -> bool:
         return any(getattr(r, s.value) and getattr(r, s.value).security == Verdict.FAIL for s in sides)
 
+    def failure_order(row: CheckRow) -> tuple[bool, int, int, str]:
+        row_sides = (getattr(row, side.value) for side in sides)
+        confirmed = any(
+            security_comparison_verdict(side.security, side.security_failure_tags) == Verdict.FAIL
+            for side in row_sides if side is not None
+        )
+        return (not confirmed, _IMPACT_RANK.get(row.impact, 3),
+                _REVIEW_ORDER_RANK.get(row.review_order, 9), row.check_id)
+
     fails = sorted((r for r in rows if is_fail(r)),
-                   key=lambda r: (_IMPACT_RANK.get(r.impact, 3), _REVIEW_ORDER_RANK.get(r.review_order, 9), r.check_id))
+                   key=failure_order)
     rows = fails + [r for r in rows if not is_fail(r)]
 
     inputs: list[Ref] = [pack.ref(), *(e.ref() for e in envs), policy.ref(), plan_ref]
@@ -341,7 +388,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
     if previous_ref is not None:
         inputs.append(previous_ref)
     inputs += [e.ref() for e in [*carried_evidence, *previous_evidence]]
-    inputs += [r.ref() for r in [*carried_results, *previous_results.values()]]
+    inputs += [r.ref() for r in [*carried_results, *previous_results]]
     # 동일 Ref만 합친다. 같은 ID의 다른 revision은 각각 보존한다.
     if previous_ref is not None or carried_results:
         inputs = list({(ref.id, ref.revision, ref.sha256): ref for ref in inputs}.values())
@@ -349,7 +396,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
     origins = [e.data_origin for e in envs] + [policy.data_origin, plan.data_origin]
     origins += [e.data_origin for e in evds.values()] + [r.data_origin for r in results.values()]
     origins += [e.data_origin for e in [*carried_evidence, *previous_evidence]]
-    origins += [r.data_origin for r in [*carried_results, *previous_results.values()]]
+    origins += [r.data_origin for r in [*carried_results, *previous_results]]
     data_origin = weakest_origin(origins) or DataOrigin.EXAMPLE
 
     # INV-17 및 한계
@@ -445,4 +492,5 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime | None, *
         carry_counts=carry_counts,
         execution_attempt_id=attempt_id,
         as_of=as_of,
+        security_verdict_version="binary-v1" if binary_security else None,
     ).seal()

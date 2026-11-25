@@ -12,7 +12,7 @@ from guard.executors import registry
 from guard.executors.direct_route import DirectRouteExecutor, mask, outcome_rank, representative
 from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, completion_response
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy, completion_response
 
 ALLOWED, DENIED = "allowed-test-key-123", "denied-test-key-456"
 ENGINE_ROUTES = {"/health": "get", "/v1/models": "get", "/v1/completions": "post", "/invocations": "post"}
@@ -143,22 +143,24 @@ def test_isolated_timeout_with_positive_control_is_pass(tmp_path):
 
 def test_isolated_without_positive_control_is_unknown(tmp_path):
     _, evd, res = _run(tmp_path, World(exposed=False, trusted_reachable=False))
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
     # 신뢰 출발점도 닿지 않으면 openapi도 못 읽는다 → 등록 경로 미수집
     assert evd.observations["routes_registered"].collected is False
 
 
 @pytest.mark.parametrize("blocked, expected", [("refused", Verdict.PASS), ("unreachable", Verdict.PASS),
-                                               ("dns_error", Verdict.UNKNOWN), ("error", Verdict.UNKNOWN)])
+                                               ("dns_error", Verdict.FAIL), ("error", Verdict.FAIL)])
 def test_blocked_outcome_kinds(tmp_path, blocked, expected):
     _, _, res = _run(tmp_path, World(exposed=False, blocked=blocked))
     assert res.verdicts.security == expected
+    if expected == Verdict.FAIL:
+        assert_unconfirmed_security_failure(res)
 
 
 def test_openapi_failure_is_unknown(tmp_path):
     _, evd, res = _run(tmp_path, World(exposed=False, openapi_ok=False))
     assert evd.observations["routes_registered"].collected is False
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
 
 
 def test_extra_registered_route_is_tested(tmp_path):
@@ -242,7 +244,7 @@ def test_allowed_key_direct_result_is_evidence_only(tmp_path):
 def test_missing_allowed_key_is_aborted_unknown(tmp_path):
     _, evd, res = _run(tmp_path, World(exposed=True), environ={})
     assert evd.execution.status == ExecStatus.ABORTED
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
 
 
 def test_injected_probe_is_example_even_without_lab_permission(tmp_path):
@@ -327,7 +329,7 @@ def _run_with_policy(tmp_path, world, allowed_callers):
 
 
 def test_roles_must_match_policy_allowed_callers(tmp_path):
-    """정책 값을 바꾸면 결과가 달라진다: 역할이 허용 주체 목록에 없으면 시험을 시작하지 않는다(ABORTED → UNKNOWN)."""
+    """허용 주체 목록에 없는 역할은 실행 중단과 확인되지 않은 위반으로 기록한다."""
     world = World(exposed=True)
     (tmp_path / "a").mkdir()
     evd, res = _run_with_policy(tmp_path / "a", world, ["allowed"])
@@ -335,7 +337,8 @@ def test_roles_must_match_policy_allowed_callers(tmp_path):
     hits_before = len(world.engine_hits)
     (tmp_path / "b").mkdir()
     evd, res = _run_with_policy(tmp_path / "b", world, ["gateway-sa"])
-    assert evd.execution.status == ExecStatus.ABORTED and res.verdicts.security == Verdict.UNKNOWN
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert_unconfirmed_security_failure(res)
     assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
     assert len(world.engine_hits) == hits_before  # 시험 시작 전에 거부(요청 0건)
 

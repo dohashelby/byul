@@ -16,7 +16,7 @@ from guard.models import Evidence
 from guard.models.checkdef import JudgeSpec, ObsSpec, PolicyParam
 from guard.store import Store
 from guard.store.packs import put_pack
-from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
+from tests.builders import PACK_DIR, ROOT, T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import fill, snapshot, write
 
@@ -191,9 +191,10 @@ def test_manual_versions_report_side_history_and_idempotence(tmp_path, pack, ver
     assert snapshot(st) == before
     results = list(st.iter_kind("RES"))
     for result in results:
-        expected = "PASS" if result.check_id in ("OBS-04", "OBS-07") else "UNKNOWN"
-        if result.check_id == "OBS-08" and result.side == "candidate": expected = "FAIL"
-        assert result.verdicts.security == expected
+        if result.check_id in ("OBS-04", "OBS-07"):
+            assert result.verdicts.security == "PASS"
+        else:
+            assert_unconfirmed_security_failure(result)
         assert result.judge.version == "0.14.0" and result.data_origin == "EXAMPLE"
     report = build_report(st, pack, plan, T0).to_dict()
     text = json.dumps(report, ensure_ascii=False)
@@ -205,6 +206,8 @@ def test_manual_versions_report_side_history_and_idempotence(tmp_path, pack, ver
     assert "<script>operator</script>" not in text
     if mode == "update":
         row = next(r for r in report["by_check"] if r["check_id"] == "OBS-08")
-        assert row["baseline"]["security"] == "UNKNOWN" and row["candidate"]["security"] == "FAIL"
+        assert row["baseline"]["security"] == row["candidate"]["security"] == "FAIL"
+        assert "CONDITIONS_UNMET" in row["baseline"]["security_failure_tags"]
+        assert "INSUFFICIENT_EVIDENCE" in row["candidate"]["security_failure_tags"]
         assert any("OBS-08/candidate:" in s and "POLICY_CONTEXT:" in s for s in report["limitations"])
     assert not st.verify()

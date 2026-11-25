@@ -18,7 +18,7 @@ from guard.executors import boundary_egress as module
 from guard.executors.boundary_egress import BoundaryEgressExecutor, normalize_policy
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, new_id, sha256_hex
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy
 
 
 SOURCE_PIN = "example.invalid/engine@sha256:" + "a" * 64
@@ -295,7 +295,8 @@ def test_denial_or_unavailable_evidence_never_claims_egress_pass(tmp_path, monke
     _, _, _, evd, result, _ = run(tmp_path, monkeypatch, World(outcome=outcome))
     assert evd.observations["forbidden_egress_successes"].value == []
     assert evd.observations["egress_scope_complete"].value is False
-    assert result.verdicts.security == result.verdicts.functional == result.verdicts.performance == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == result.verdicts.performance == Verdict.UNKNOWN
 
 
 @pytest.mark.parametrize("change", ["receiver-command", "entrypoint", "host-network", "host-cgroup", "proc-mount",
@@ -304,7 +305,8 @@ def test_denial_or_unavailable_evidence_never_claims_egress_pass(tmp_path, monke
 def test_unverified_receiver_or_ownership_blocks_the_active_attempt(tmp_path, monkeypatch, change):
     _, _, _, evd, result, world = run(tmp_path, monkeypatch, World(change))
     assert ("sender", UID) not in world.calls
-    assert evd.observations["forbidden_egress_successes"].value == [] and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.observations["forbidden_egress_successes"].value == []
+    assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize("change", ["source-restart", "receiver-restart", "source-uid", "source-netns", "source-pid",
@@ -312,7 +314,8 @@ def test_unverified_receiver_or_ownership_blocks_the_active_attempt(tmp_path, mo
     "transport", "raw-error", "duplicate-sender", "connection-guard-missing", "marker-clock-missing", "reversed-event-clock"])
 def test_mismatched_or_partial_two_sided_evidence_is_unknown_without_raw_payload(tmp_path, monkeypatch, change):
     store, _, plan, evd, result, _ = run(tmp_path, monkeypatch, World(change))
-    assert evd.observations["forbidden_egress_successes"].value == [] and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.observations["forbidden_egress_successes"].value == []
+    assert_unconfirmed_security_failure(result)
     trial, = evd.observations["egress_trials"].value
     assert trial["verified"] is False and trial["diagnostic_codes"]
     assert "PRIVATE_" not in json.dumps(evd.observations["egress_trials"].model_dump())
@@ -432,7 +435,8 @@ def test_policy_window_excludes_the_attempt_without_sending(tmp_path, monkeypatc
     declared["validity_end"] = (now + timedelta(days=2) if future else now - timedelta(days=1)).isoformat()
     _, _, _, evd, result, world = run(tmp_path, monkeypatch, policy_values=declared)
     assert ("sender", UID) not in world.calls
-    assert not evd.observations["forbidden_egress_successes"].value and result.verdicts.security == Verdict.UNKNOWN
+    assert not evd.observations["forbidden_egress_successes"].value
+    assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize("change", [None, "receiver-ack-error", "final-clock-missing"])

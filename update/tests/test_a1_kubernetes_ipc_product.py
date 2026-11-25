@@ -71,7 +71,8 @@ def test_real_registered_factory_canonical_cli_independent_fail_and_exact_refs(t
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     fail=mode in {'violation','partial','later-metadata','cleanup','child-reap','normal-wrong-id','normal-wrong-model','normal-cleanup','normal-exception','attachment','report-error'}
-    assert res.verdicts.security.value==('FAIL' if fail else 'UNKNOWN')
+    assert res.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in res.security_failure_tags) is fail
     assert res.verdicts.functional.value==res.verdicts.performance.value=='UNKNOWN'
     assert e.data_origin.value=='EXAMPLE' and (VALUES,ACTORS)==before
     if mode in {'lab-false','version032'}:

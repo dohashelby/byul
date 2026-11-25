@@ -12,7 +12,7 @@ from guard.runtime.kubernetes_http import KubernetesBindingError
 from guard.runtime.kubernetes_input_matrix import KubernetesInputMatrixHTTP
 from guard.executors import kubernetes_input_matrix as executor
 from guard.executors.registry import resolve_executor
-from tests.builders import baseline_pack
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack
 from tests.test_kubernetes_input_validation import transport,TOKENS,request
 
 
@@ -209,7 +209,10 @@ def test_all_explicit_pairs_flow_through_registered_class_and_real_evd_report_ex
     assert evd.observations['input_formats_tested'].value==values()['allowed_input_formats']
     complete = registered and str(chat_rejection) in values()['rejection_codes']
     assert evd.observations['input_matrix_complete'].value is complete
-    assert res.verdicts.security.value == ('PASS' if complete else 'UNKNOWN')
+    if complete:
+        assert res.verdicts.security.value == 'PASS'
+    else:
+        assert_unconfirmed_security_failure(res)
     outcomes = evd.observations['challenge_outcomes'].value
     assert outcomes['POST /v1/completions|token_ids|length'] == '400'
     assert outcomes['POST /v1/completions|text|length'] == '400'

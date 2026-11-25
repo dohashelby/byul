@@ -37,6 +37,8 @@ def _side(side: dict[str, Any]) -> dict[str, Any]:
     # FAIL·UNKNOWN 축의 판정 이유(RPT 원문). RPT에 없으면 계약에서도 생략한다.
     if side.get("reasons"):
         out["reasons"] = list(side["reasons"])
+    if "security_failure_tags" in side:
+        out["security_failure_tags"] = side["security_failure_tags"]
     return out
 
 
@@ -84,7 +86,7 @@ def rpt_to_verification_result(rpt: dict[str, Any]) -> dict[str, Any]:
     not_selected_rows = [i for i in rpt.get("not_selected", []) if isinstance(i, dict)]
     not_selected = {str(i.get("check_id")): str(i.get("reason")) for i in not_selected_rows}
     approval = rpt.get("approval")
-    return {
+    result: dict[str, Any] = {
         "schema_version": VR_SCHEMA,
         "report_ref": {
             "kind": "RPT",
@@ -127,6 +129,9 @@ def rpt_to_verification_result(rpt: dict[str, Any]) -> dict[str, Any]:
             "note": approval.get("note", ""),
         },
     }
+    if "security_verdict_version" in rpt:
+        result["security_verdict_version"] = rpt["security_verdict_version"]
+    return result
 
 
 @dataclass(frozen=True)
@@ -271,6 +276,7 @@ def _side_view(side: dict[str, Any] | None, raw: Any) -> dict[str, Any] | None:
         "performance": side.get("performance"),
         "verification_level": side.get("verification_level"),
         "reasons": list(side.get("reasons") or []),
+        "security_failure_tags": list(side.get("security_failure_tags") or []),
         "execution_status": status if status in ("PENDING", "RUNNING", "COMPLETED", "ABORTED", "NOT_RUN") else None,
         "data_origin": origin if origin in ("MEASURED", "DECLARED", "EXAMPLE") else None,
         "evidence_ref": evidence if (isinstance(evidence, dict) and evidence.get("kind") == "EVD"
@@ -313,6 +319,7 @@ def report_view(vr: dict[str, Any], entry: ReportEntry | None = None) -> dict[st
         "as_of": entry.as_of if entry else None,
         "execution_attempt_id": entry.execution_attempt_id if entry else None,
         "byul_policy_ref": vr.get("byul_policy_ref"),
+        "security_verdict_version": vr.get("security_verdict_version"),
         "mode": vr["mode"],
         "data_origin": vr["data_origin"],
         "official": vr["official"],

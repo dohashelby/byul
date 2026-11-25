@@ -16,7 +16,7 @@ from guard.models import canonical_json, DataOrigin
 from guard.runtime import kubernetes_http as kube
 from guard.runtime.kubernetes_routes import KubernetesRoutesHTTP, EXTERNAL
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, T0
+from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.test_kubernetes_request_binding import env as binding_env, target as binding_target
 from tests.test_direct_route import World as DirectWorld, ALLOWED, DENIED, KNOWN
 from tests.test_role_route import RoleWorld, GENERAL, ADMIN, WRONG
@@ -143,7 +143,17 @@ def test_real_registry_cli_safe_existing_collectors_and_exact_refs(tmp_path,monk
     assert e.data_origin.value=='EXAMPLE'
     assert e.execution.status.value==('NOT_RUN' if mode=='missing-policy' else 'ABORTED' if mode=='attachment' else 'COMPLETED')
     if mode=='late-cleanup':assert e.execution.cleanup_errors==['KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED']
-    assert r.verdicts.security.value==('PASS' if mode is None else 'FAIL' if mode in {'violation','late-cleanup','late-restart'} else 'UNKNOWN')
+    if mode is None:
+        assert r.verdicts.security.value == 'PASS'
+    elif mode in {'violation', 'late-cleanup', 'late-restart'}:
+        assert r.verdicts.security.value == 'FAIL'
+        assert 'CONFIRMED_VIOLATION' in r.security_failure_tags
+    else:
+        assert_unconfirmed_security_failure(r)
+        if mode == 'missing-policy':
+            assert 'NOT_RUN' in r.security_failure_tags
+        elif mode == 'attachment':
+            assert 'ABORTED' in r.security_failure_tags
     if mode=='missing-policy':assert not world.calls
     else:
         assert e.execution.executor.name==name

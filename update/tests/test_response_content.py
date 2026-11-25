@@ -11,7 +11,7 @@ from guard.executors.content_common import leaves, redact_value, control_state, 
 from guard.executors.response_content import ResponseContentExecutor
 from guard.models import DataOrigin
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy
 
 VALUES = {"allowed_response_fields": ["id", "model", "choices[].text", "choices[].message.role", "choices[].message.content",
           "choices[].finish_reason", "usage.prompt_tokens", "usage.completion_tokens", "usage.total_tokens"], "allowed_error_fields": ["error.message"],
@@ -138,7 +138,7 @@ def test_quoting_callers_own_input_is_not_private_leak(tmp_path, monkeypatch):
 
 def test_completions_only_cannot_claim_private_system_pass(tmp_path, monkeypatch):
     _, evd, res = run_content(tmp_path, monkeypatch, response_probe(), endpoint="/v1/completions")
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert any("private system" in x for x in evd.observations["response_coverage_gaps"].value)
 
 
@@ -151,13 +151,13 @@ def test_observed_leak_or_field_violation_keeps_fail(tmp_path, monkeypatch, kwar
 @pytest.mark.parametrize("kwargs", [{"option_outcome": 200}, {"error_outcome": 500}, {"truncated": True}])
 def test_ignored_options_server_error_or_truncated_body_is_unknown(tmp_path, monkeypatch, kwargs):
     _, _, res = run_content(tmp_path, monkeypatch, response_probe(**kwargs))
-    assert res.verdicts.security.value == "UNKNOWN", res.reasons
+    assert_unconfirmed_security_failure(res)
 
 
 def test_missing_gateway_is_unknown_not_silently_omitted(tmp_path, monkeypatch):
     _, evd, res = run_content(tmp_path, monkeypatch, response_probe(),
                               values={**VALUES, "required_targets": ["engine", "gateway"]})
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert evd.observations["response_targets_tested"].value == ["engine"]
 
 
@@ -167,7 +167,7 @@ def test_unsupported_policy_option_aborts_before_requests(tmp_path, monkeypatch)
     _, evd, res = run_content(tmp_path, monkeypatch, never,
                               values={**VALUES, "forbidden_return_options": ["invented_flag"]})
     assert evd.execution.status.value == "ABORTED"
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
 
 
 def test_raw_private_leak_survives_unparsed_capture_limit(tmp_path, monkeypatch):
@@ -190,7 +190,7 @@ def test_truncated_initial_control_does_not_send_private_challenges(tmp_path, mo
         sent.extend(request["id"] for request in requests)
         return base(network, requests, timeout)
     _, evd, res = run_content(tmp_path, monkeypatch, transport)
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert evd.normal_control.succeeded is False
     assert sent == ["normal"]
 
@@ -198,7 +198,7 @@ def test_truncated_initial_control_does_not_send_private_challenges(tmp_path, mo
 def test_echo_flag_does_not_turn_unchanged_generated_self_quote_into_a_leak(tmp_path, monkeypatch):
     _, evd, res = run_content(tmp_path, monkeypatch, response_probe(own_quote=True),
                               values={**VALUES, "forbidden_return_options": ["echo"]})
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert evd.observations["response_options_returned"].value == []
 
 
@@ -206,7 +206,7 @@ def test_echo_flag_does_not_turn_unchanged_generated_self_quote_into_a_leak(tmp_
 def test_invalid_finish_reason_cannot_pass_normal_control(tmp_path, monkeypatch, finish_reason):
     _, evd, res = run_content(tmp_path, monkeypatch, response_probe(finish_reason=finish_reason))
     assert evd.normal_control.succeeded is False
-    assert res.verdicts.security.value == "UNKNOWN", res.reasons
+    assert_unconfirmed_security_failure(res)
 
 
 def test_nonstring_finish_reason_is_not_a_successful_control():

@@ -13,7 +13,7 @@ from guard.executors.fake import SCENARIOS_BY_CHECK
 from guard.executors.role_route import RoleRouteExecutor
 from guard.models import ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, completion_response
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy, completion_response
 
 GENERAL, ADMIN, WRONG = "general-key-111", "admin-key-222", "wrong-key-333"
 ENGINE_ROUTES = {"/health": "get", "/metrics": "get", "/load": "get", "/v1/models": "get", "/v1/completions": "post",
@@ -127,7 +127,7 @@ def test_safe_probe_never_executes_scaling(tmp_path):
 def test_unverified_engine_version_leaves_mutating_route_untested(tmp_path):
     world = RoleWorld(enforced=True)
     store, evd, res = _run(tmp_path, world, version="0.30.0")
-    assert res.verdicts.security == Verdict.UNKNOWN  # 미시험 경로가 있으면 PASS 아님
+    assert_unconfirmed_security_failure(res)  # 미시험 경로가 있으면 PASS 불가
     assert "POST /scale_elastic_ep" not in evd.observations["routes_tested"].value
     assert not any(c[1] == "/scale_elastic_ep" for c in world.engine_calls)
     assert "POST /scale_elastic_ep" in _summary(store, evd)["skipped_routes"]
@@ -151,7 +151,7 @@ def test_keys_never_stored(tmp_path):
 
 
 @pytest.mark.parametrize("scenario, expected", [("pass", Verdict.PASS), ("role_open", Verdict.FAIL),
-                                                ("scale_handler_reached", Verdict.FAIL), ("mutating_untested", Verdict.UNKNOWN)])
+                                                ("scale_handler_reached", Verdict.FAIL), ("mutating_untested", Verdict.FAIL)])
 def test_fake_scenarios(tmp_path, scenario, expected):
     assert set(SCENARIOS_BY_CHECK["REQ-03"]) == {"pass", "role_open", "scale_handler_reached", "mutating_untested"}
     store = Store(tmp_path / ".guard")
@@ -163,6 +163,8 @@ def test_fake_scenarios(tmp_path, scenario, expected):
     run_plan(store, pack, plan, RunConfig(executors={"role_route": "fake"}, raw={"fake": {"scenarios": {"REQ-03": scenario}}}))
     (res,) = judge_plan(store, pack, plan, as_of=env.created_at)
     assert res.verdicts.security == expected
+    if scenario == "mutating_untested":
+        assert_unconfirmed_security_failure(res)
     assert res.verification_level == "EXAMPLE"
 
 

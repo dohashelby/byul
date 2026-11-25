@@ -16,7 +16,7 @@ from guard.judges.declared import DeclaredJudge
 from guard.judges import manual_cache_context as cache
 from guard.models.objects import CpuProfile, ExecutorInfo, Observation
 from guard.store import Store
-from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
+from tests.builders import PACK_DIR, ROOT, T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import fill, snapshot, write
@@ -241,7 +241,11 @@ def test_actual_import_rejudge_history_hash_sides_and_report(tmp_path,pack,versi
     assert latest.execution.executor.config_sha256==previous.execution.executor.config_sha256
     results=judge_plan(st,pack,plan,T0)
     for r in results:
-        assert r.verdicts.security==("UNKNOWN" if r.side==side else "PASS")
+        if r.side == side:
+            assert_unconfirmed_security_failure(r)
+            assert "CONDITIONS_UNMET" in r.security_failure_tags
+        else:
+            assert r.verdicts.security == "PASS"
     rpt=build_report(st,pack,plan,T0); text=json.dumps(rpt.to_dict(),ensure_ascii=False)
     assert not rpt.official and "CACHE_CONTEXT_CONTRADICTION" in text
     assert next(r for r in rpt.by_check if r.check_id=="REQ-16").evidence_source=="manual"

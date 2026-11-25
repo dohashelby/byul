@@ -12,7 +12,7 @@ from guard.executors.kubernetes_profiler_observation import normalize_policy
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, policy
 from tests.test_a1_observation_state_product import World as StateWorld
 from tests.test_a1_profiler_sensor import make_world,invoke,PRIVATE
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -91,7 +91,9 @@ def test_registered_cli_profiler_facts_and_source_failures_exact_refs(tmp_path,g
     cli(['run','--plan',plan.id,'--pack',pack.path,*common],1 if mode=='http-cleanup' else 0)
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
-    assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,key).value=='UNKNOWN' for key in ('security','functional','performance'))
+    assert e.data_origin.value == "EXAMPLE"
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert e.normal_control.succeeded is None
     preflight=mode in {'profile8','version032','actual-lab-false','prepared-mismatch'}
     if preflight:assert not world.sent and e.observations['profiler_native_samples'].value is None

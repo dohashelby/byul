@@ -42,19 +42,25 @@ def owned_declarations():
     return pack, base, environments, source
 
 
-@pytest.mark.parametrize('role', ['policy', 'selection', 'candidate-environment'])
+@pytest.mark.parametrize('role', ['policy', 'selection', 'candidate-environment', 'example-source'])
 def test_copy_preparation_rejects_saved_input_replacement_before_publication(tmp_path, monkeypatch, role):
-    _, base, environments, source = owned_declarations()
+    declaration = None
+    if role == 'example-source':
+        _, base, environments, source, declaration = example_declarations()
+    else:
+        _, base, environments, source = owned_declarations()
     documents = {'policy': base.to_dict(), 'selection': source,
                  **{f'{side}-environment': env.to_dict() for side, env in environments.items()}}
+    if declaration is not None:
+        documents['example-source'] = declaration
     paths = {name: tmp_path / f'{name}.json' for name in documents}
     for name, document in documents.items():
         paths[name].write_bytes(canonical_json(document))
     digest = sha256_hex(paths['selection'].read_bytes())
     materialize = inputs.materialize
 
-    def replace_after_materialization(*args):
-        prepared = materialize(*args)
+    def replace_after_materialization(*args, **kwargs):
+        prepared = materialize(*args, **kwargs)
         replacement = tmp_path / 'replacement.json'
         replacement.write_bytes(paths[role].read_bytes())
         replacement.replace(paths[role])
@@ -64,7 +70,7 @@ def test_copy_preparation_rejects_saved_input_replacement_before_publication(tmp
     output, store = tmp_path / 'out', tmp_path / 'store'
     with pytest.raises(ValueError, match='^COPY_SELECTION_SOURCE_CHANGED$'):
         inputs.prepare(paths['policy'], {side: paths[f'{side}-environment'] for side in environments},
-                       paths['selection'], digest, output, store=store)
+                       paths['selection'], digest, output, store=store, example_source_path=paths.get('example-source'))
     assert not output.exists() and not store.exists()
 
 
@@ -268,3 +274,107 @@ def test_cannot_replace_policy_or_accept_unbound_inventory(case, diagnostic):
         source['copies'][0]['credential_value'] = 'should never be included'
     with pytest.raises(ValueError, match=diagnostic):
         inputs.materialize(base, pack, environments, source)
+
+
+def example_declarations():
+    pack, _, environments, selection = owned_declarations()
+    selection['copies'] = [
+        {'copy_id': str(index) * 32, 'generation': 0, 'location_id': str(index + 3) * 32,
+         'location_kind': location, 'recipient_id': '9' * 32}
+        for index, location in enumerate(('SECRET_OBJECT', 'ENV', 'FILE'), 1)
+    ]
+    declaration = {'schema': 'byul-enterprise-mock-inputs/1', 'data_origin': 'EXAMPLE',
+                   'policy_status': 'DRAFT', 'official': False, 'pack_ref': pack.ref().model_dump(mode='json'),
+                   'checks': {'PLT-12': {
+                       'copy_rule': {'rule': 'delete_all_owned_canary_credential_copies',
+                                     'deadline_from_start_ms': 30000, 'retention_exception': None,
+                                     'require_bounded_owned_inventory': True},
+                       'policy_values': {'copy_max_record_delay_ms': 5000, 'copy_treatments': '<runtime value>'},
+                       'mock_enterprise_facts': {'copy_selection': {
+                           **deepcopy(selection), 'base_policy_ref': '<POL>', 'started_at': '<actual start>',
+                           'environments': {'baseline': '<ENV>', 'candidate': '<ENV>'}}},
+                   }}}
+    base = policy(pack.ref(), status='DRAFT', data_origin=DataOrigin.EXAMPLE,
+                  source_document_sha256=sha256_hex(canonical_json(declaration)),
+                  scope={'include': ['PLT-12']}, values={'PLT-12': {'copy_max_record_delay_ms': 5000}})
+    selection['base_policy_ref'] = base.ref().model_dump(mode='json')
+    return pack, base, environments, selection, declaration
+
+
+def test_example_copy_materialization_enters_both_unchanged_snapshot_readers(tmp_path, monkeypatch):
+    pack, base, environments, selection, declaration = example_declarations()
+    selection['copies'].reverse()
+    files = {'base': base.to_dict(), 'selection': selection, 'mock': declaration,
+             **{side: env.to_dict() for side, env in environments.items()}}
+    paths = {name: tmp_path / f'{name}.json' for name in files}
+    for name, value in files.items():
+        paths[name].write_bytes(canonical_json(value))
+    out, store_path = tmp_path / 'out', tmp_path / 'store'
+    monkeypatch.setattr(sys, 'argv', ['mvp_credential_copy_inputs', '--policy', str(paths['base']),
+        '--baseline-environment', str(paths['baseline']), '--candidate-environment', str(paths['candidate']),
+        '--selection', str(paths['selection']), '--selection-sha256', sha256_hex(paths['selection'].read_bytes()),
+        '--example-source', str(paths['mock']), '--output', str(out), '--store', str(store_path)])
+    inputs.main()
+    manifest = json.loads((out / 'manifest.json').read_bytes())
+    assert manifest['data_origin'] == 'EXAMPLE' and manifest['official'] is False
+    assert manifest['source_document_sha256'] == base.source_document_sha256
+    assert not manifest['actual_membership_verified'] and not manifest['treatment_observed']
+    assert all(sha256_hex((out / name).read_bytes()) == digest for name, digest in manifest['files'].items())
+    revised = load_policy(out / 'policy.json', pack)
+    assert revised.status == 'DRAFT' and revised.data_origin == DataOrigin.EXAMPLE
+    assert revised.refs[-1] == base.ref() and revised.scope == base.scope
+    store = Store.read_only(store_path)
+    assert store.resolve(base.ref()) == base and store.resolve(revised.ref()) == revised
+    ordered = [environments[side] for side in ('baseline', 'candidate')]
+    assert Gap.NO_POLICY_VALUE not in select(pack, ordered, revised, mode='update').item('PLT-12').gaps
+
+    producer = tmp_path / 'producer.py'
+    producer.write_bytes(b'# inert fixture bytes, no collection\n')
+    target = tmp_path / 'target.json'
+    cfg = {'copy_record_snapshot_only': True, 'target': str(target), 'copy_inventory': str(out / 'copy-inventory.json')}
+    for index, (side, env) in enumerate(environments.items(), 1):
+        target.write_bytes(canonical_json({'environment_ref': env.ref().model_dump(mode='json')}))
+        _, effective = run_binding.effective_values(pack.checks['PLT-12'], cfg, env, revised.values['PLT-12'],
+            side=side, attempt_id='test-example-plt12', issued_at=contract.stamp(selection['started_at']),
+            run_cfg={'record_session': f'{index:032x}', 'record_producer': str(producer)})
+        inventory = KubernetesCredentialCopyRecordExecutor(cfg).validate_policy(pack.checks['PLT-12'], effective)
+        assert contract.treatments(inventory) == revised.values['PLT-12']['copy_treatments']
+        assert {row['location_kind'] for row in inventory['copies']} == {'SECRET_OBJECT', 'ENV', 'FILE'}
+        for row in inventory['copies']:
+            assert row['required_action'] == 'delete' and row['retention_exception'] is None
+            assert contract.stamp(row['deadline_at']) - contract.stamp(selection['started_at']) == timedelta(seconds=30)
+
+
+@pytest.mark.parametrize('case,diagnostic', [
+    ('no-example-flag', 'MVP_APPROVED_POLICY_REQUIRED'),
+    ('approved-policy-on-example-path', 'COPY_EXAMPLE_POLICY_REQUIRED'),
+    ('source-bytes-changed', 'COPY_EXAMPLE_SOURCE_SHA256_MISMATCH'),
+    ('official-source', 'COPY_EXAMPLE_SOURCE_INVALID'),
+    ('wrong-rule', 'COPY_MATERIALIZATION_RULE_UNSUPPORTED'),
+    ('wrong-fixed-value', 'COPY_EXAMPLE_POLICY_VALUES_MISMATCH'),
+    ('wrong-copy-location', 'COPY_EXAMPLE_SELECTION_MISMATCH'),
+    ('time-without-zone', 'COPY_TIME_INVALID'),
+])
+def test_example_copy_materialization_rejects_unbound_inputs(case, diagnostic):
+    pack, base, environments, selection, declaration = example_declarations()
+    if case == 'official-source':
+        declaration['official'] = True
+    elif case == 'wrong-rule':
+        declaration['checks']['PLT-12']['copy_rule']['deadline_from_start_ms'] = 31000
+    raw = canonical_json(declaration)
+    if case in {'official-source', 'wrong-rule'}:
+        base = base.model_copy(update={'source_document_sha256': sha256_hex(raw)}).seal()
+    elif case == 'approved-policy-on-example-path':
+        _, base, _, _ = owned_declarations()
+    elif case == 'source-bytes-changed':
+        raw += b'\n'
+    elif case == 'wrong-fixed-value':
+        base = base.model_copy(update={'values': {'PLT-12': {'copy_max_record_delay_ms': 1}}}).seal()
+    elif case == 'wrong-copy-location':
+        selection['copies'][0]['location_id'] = '0' * 32
+    elif case == 'time-without-zone':
+        selection['started_at'] = '2026-11-19T03:00:00'
+    selection['base_policy_ref'] = base.ref().model_dump(mode='json')
+    with pytest.raises(ValueError, match=f'^{diagnostic}$'):
+        inputs.materialize(base, pack, environments, selection,
+                           example_source=None if case == 'no-example-flag' else raw)

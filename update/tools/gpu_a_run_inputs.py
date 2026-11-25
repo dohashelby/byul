@@ -12,6 +12,7 @@ import argparse
 from copy import deepcopy
 import json
 from pathlib import Path
+import re
 
 import yaml
 
@@ -20,7 +21,7 @@ from guard.collectors import engine_callbacks
 from guard.collectors.file import load_environment
 from guard.executors import engine_callback_projection as projection
 from guard.models import DataOrigin, Environment, canonical_json, load_pack, new_id, sha256_hex
-from guard.runtime.kubernetes_binding import validate_container_binding
+from guard.runtime.kubernetes_binding import validate_container_binding, verify_owned_pod
 from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesHTTP
 
 SCHEMA = 'byul-gpu-a-run-inputs/1'
@@ -75,8 +76,43 @@ def cases(preset, *, media_text_after=None):
     raise ValueError('RUN_INPUTS_CASE_PRESET_UNKNOWN')
 
 
+def _external_platform(render, launch, platform):
+    from guard.adapters.engine_provider import VllmProvider
+
+    if (type(platform) is not str or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ._+/-]{0,127}', platform)
+            or platform != platform.strip()):
+        raise ValueError('RUN_INPUTS_EXTERNAL_PLATFORM_INVALID')
+    release = VllmProvider().release_profile(render.get('engine_version'))
+    hashes = render.get('outputs_sha256')
+    engine_hash = hashes.get('engine.yaml') if type(hashes) is dict else None
+    if (render.get('schema') != 'byul-gpu-a-aws-render/2' or type(launch) is not dict
+            or launch.get('engine') != 'V1' or release is None or render.get('engine_image') not in release['images']
+            or release['launch']['engine'] != launch['engine'] or launch.get('env') != release['launch']['env']
+            or type(engine_hash) is not str or not re.fullmatch(r'[0-9a-f]{64}', engine_hash)
+            or type(render.get('run_id')) is not str or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', render['run_id'])):
+        raise ValueError('RUN_INPUTS_EXTERNAL_ENV_REVIEWED_V1_REQUIRED')
+    return f'{platform}, external Kubernetes'
+
+
+def _platform(render, launch, *, observed_engine_version, external_platform):
+    fields = [('generation', render['generation'])]
+    if external_platform is None:
+        platform = 'GPU, amd64, AWS g6 kubeadm serving-lab'
+        fields.append(('run', render['run_id']))
+    else:
+        platform = _external_platform(render, launch, external_platform)
+    fields.extend((('profile', render['profile']), ('engine_requested', launch.get('engine')),
+                   ('runner', launch['runner']), ('async_requested', launch['async_requested']),
+                   ('engine_version_observed', observed_engine_version is not None),
+                   ('eager', render['enforce_eager'])))
+    if external_platform is None:
+        fields.append(('render_engine_sha256', render['outputs_sha256']['engine.yaml']))
+    return platform + '; ' + '; '.join(f'{key}={value}' for key, value in fields)
+
+
 def environment(render, *, model_id=None, inventory=None, gpu_model, driver, observed_engine_version=None,
-                data_origin='DECLARED'):
+                data_origin='DECLARED', external_platform=None, engine_pod=None, namespace=None,
+                observed_gpu_count=None):
     generation = render['generation']
     legacy = render.get('schema') == 'byul-gpu-a-aws-render/1'
     if not legacy and render.get('schema') != 'byul-gpu-a-aws-render/2':
@@ -94,17 +130,24 @@ def environment(render, *, model_id=None, inventory=None, gpu_model, driver, obs
                                       'async_requested': generation != 'v1-callback-sync',
                                       'prefix_cache': generation != 'v2-default'}
     # facts는 등록된 키만 받는다. 세대 구분은 서술 필드에 남기고 결과를 세대끼리 섞지 않는다.
-    platform = ('GPU, amd64, AWS g6 kubeadm serving-lab; ' + '; '.join(f'{k}={v}' for k, v in (
-        ('generation', generation), ('run', render['run_id']), ('profile', render['profile']),
-        ('engine_requested', launch.get('engine')),
-        ('runner', launch['runner']), ('async_requested', launch['async_requested']),
-        ('engine_version_observed', observed_engine_version is not None),
-        ('eager', render['enforce_eager']), ('render_engine_sha256', render['outputs_sha256']['engine.yaml']))))
+    platform = _platform(render, launch, observed_engine_version=observed_engine_version,
+                         external_platform=external_platform)
+    runtime = {'nodes': 1, 'tp_groups': 1, 'gpu_count': 1, 'gpu_model': gpu_model, 'driver': driver, 'platform': platform}
+    if 'normal_tp2' in render:
+        topology = _normal_tp2_topology(render, namespace, engine_pod)
+        if (external_platform is None or observed_engine_version is None
+                or type(observed_gpu_count) is not int or observed_gpu_count != topology['gpu_count']):
+            raise ValueError('RUN_INPUTS_NORMAL_TP2_OBSERVATION_REQUIRED')
+        if type(inventory) is not str or not re.fullmatch(r'[0-9a-f]{64}', inventory):
+            raise ValueError('RUN_INPUTS_NORMAL_TP2_MODEL_INVENTORY_REQUIRED')
+        runtime.update(topology)
+    elif any(value is not None for value in (engine_pod, namespace, observed_gpu_count)):
+        raise ValueError('RUN_INPUTS_NORMAL_TP2_RENDER_REQUIRED')
     origin = DataOrigin(data_origin)
     env = Environment(id=new_id('ENV'), data_origin=origin,
         engine={'name': 'vllm', 'version': version, 'image_digest': render['engine_image']},
         adapter={'name': 'vllm', 'version': VllmAdapter().version},
-        runtime={'nodes': 1, 'tp_groups': 1, 'gpu_count': 1, 'gpu_model': gpu_model, 'driver': driver, 'platform': platform},
+        runtime=runtime,
         model={'id': model_id, 'revision': render['model_revision'], 'inventory_sha256': inventory},
         facts={'prefix_cache': {'value': launch['prefix_cache'], 'origin': origin, 'source': 'render.json#launch.prefix_cache'}}).seal()
     return env
@@ -124,7 +167,60 @@ def _binding(pod, namespace, container, role_label=None):
     return item
 
 
-def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model='test-model'):
+def _normal_tp2_topology(render, namespace, pod):
+    from tools.gpu_a_aws_lab import GPU_RESOURCE, NORMAL_TP2, NORMAL_TP2_ARGS, NORMAL_TP2_GENERATIONS, normal_tp2_release
+
+    try:
+        layout = render['normal_tp2']
+        binding = _binding(pod, namespace, 'engine', 'serving-engine')
+        labels = pod['metadata']['labels']
+        engine, = (row for row in pod['spec']['containers'] if row['name'] == 'engine')
+        launch = render['launch']
+        argv = engine['args']
+        selectors = [arg.partition('=')[0].replace('_', '-') for arg in argv]
+        max_model_len = render['max_model_len']
+        model_lengths = [value for option, value in zip(argv, argv[1:]) if option == '--max-model-len']
+        quantities = [engine['resources'][key][GPU_RESOURCE] for key in ('requests', 'limits')]
+        if (type(layout) is not dict or layout != NORMAL_TP2 or any(type(value) is not int for value in layout.values())
+                or render['schema'] != 'byul-gpu-a-aws-render/2' or render['generation'] not in NORMAL_TP2_GENERATIONS
+                or render['lab_namespace_owner_label_required'] is not False
+                or not normal_tp2_release(render['engine_version'], render['engine_image'])
+                or launch['engine'] != 'V1' or namespace['kind'] != 'Namespace'
+                or namespace['metadata']['name'] != binding['namespace'] or pod['kind'] != 'Pod'
+                or labels.get('byul.a/generation') != render['generation'] or binding['image'] != render['engine_image']
+                or engine['command'] != launch['command'] or engine['args'] != launch['argv']
+                or engine['args'][-len(NORMAL_TP2_ARGS):] != list(NORMAL_TP2_ARGS)
+                or any(selectors.count(key) != 1 for key in (*NORMAL_TP2_ARGS[::2], '--max-model-len'))
+                or type(max_model_len) is not int or not 256 <= max_model_len <= 131072
+                or model_lengths != [str(max_model_len)]
+                or any(type(quantity) not in (int, str) or str(quantity) != '2' for quantity in quantities)):
+            raise ValueError
+        if render['generation'] == 'v2-template':
+            template = render['chat_template']
+            host_file = Path(template['host_file'])
+            template_args = [value for option, value in zip(argv, argv[1:]) if option == '--chat-template']
+            mount, = (item for item in engine['volumeMounts'] if item['name'] == 'guard-chat-template')
+            volume, = (item for item in pod['spec']['volumes'] if item['name'] == 'guard-chat-template')
+            if (set(template) != {'host_file', 'container_path', 'sha256'}
+                    or template['sha256'] != CHAT_TEMPLATE_SHA256 or template['container_path'] != CHAT_TEMPLATE_CONTAINER_PATH
+                    or not host_file.is_absolute() or host_file.parent.name != render['run_id']
+                    or host_file.name != Path(CHAT_TEMPLATE_CONTAINER_PATH).name
+                    or selectors.count('--chat-template') != 1 or template_args != [CHAT_TEMPLATE_CONTAINER_PATH]
+                    or mount.get('mountPath') != CHAT_TEMPLATE_CONTAINER_PATH or mount.get('readOnly') is not True
+                    or mount.get('subPath') or mount.get('subPathExpr')
+                    or mount.get('mountPropagation') not in (None, 'None')
+                    or volume.get('hostPath') != {'path': str(host_file), 'type': 'File'}):
+                raise ValueError
+        elif 'chat_template' in render or '--chat-template' in selectors:
+            raise ValueError
+        verify_owned_pod(pod, namespace['metadata'], binding, render['run_id'], require_ready=False)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        raise ValueError('RUN_INPUTS_NORMAL_TP2_POD_MISMATCH') from None
+    return dict(NORMAL_TP2)
+
+
+def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model='test-model',
+           observed_engine_version=None):
     run_id = render['run_id']
     for pod in (engine_pod, probe_pod):
         labels = pod['metadata']['labels']
@@ -138,6 +234,19 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         raise ValueError('RUN_INPUTS_PROBE_IMAGE_MISMATCH')
     if env.engine.version != render.get('engine_version', '0.31.0'):
         raise ValueError('RUN_INPUTS_ENGINE_VERSION_MISMATCH')
+    if 'normal_tp2' in render:
+        topology = _normal_tp2_topology(render, namespace, engine_pod)
+        if observed_engine_version is None or any(getattr(env.runtime, key) != value for key, value in topology.items()):
+            raise ValueError('RUN_INPUTS_NORMAL_TP2_OBSERVATION_REQUIRED')
+        argv = render['launch']['argv']
+        aliases = [value for option, value in zip(argv, argv[1:]) if option == '--served-model-name']
+        if ((env.model.id, env.model.revision) != (render['model_id'], render['model_revision'])
+                or not re.fullmatch(r'[0-9a-f]{64}', env.model.inventory_sha256 or '') or aliases != [api_model]):
+            raise ValueError('RUN_INPUTS_NORMAL_TP2_MODEL_MISMATCH')
+    if observed_engine_version is not None and (
+            observed_engine_version != env.engine.version or not env.hash_ok()
+            or 'engine_version_observed=True' not in (env.runtime.platform or '').split('; ')):
+        raise ValueError('RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH')
     if render.get('schema') == 'byul-gpu-a-aws-render/2':
         spec, = (c for c in engine_pod['spec']['containers'] if c['name'] == 'engine')
         model_volume, = (v for v in engine_pod['spec']['volumes'] if v['name'] == 'model')
@@ -192,6 +301,12 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         value['observed_version'] = env.engine.version
         value['comparison_config'] = {'launch': {'argv': list(container['args']), 'chat_template': identity,
             'max_model_len': int(container['args'][container['args'].index('--max-model-len') + 1])}}
+    if 'normal_tp2' in render:
+        value['engine']['command'] = list(render['launch']['command'])
+        value.setdefault('comparison_config', {}).setdefault('launch', {}).update(
+            argv=list(argv), max_model_len=render['max_model_len'])
+    if observed_engine_version is not None:
+        value['observed_version'] = observed_engine_version
     if (render.get('launch') or {}).get('engine') is not None:
         # Compare the requested engine semantics, not version-specific env names.
         # This is a declaration checked against the Pod spec, not runtime proof.
@@ -351,9 +466,11 @@ def http_inputs(check_id, target_value, draft, *, root, prepared=None, prepared_
     return policy, '\n'.join([*lines, ''])
 
 
-def _write(path, data):
+def _write(path, data, *, exclusive=False):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(data if type(data) is str else json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + '\n', encoding='utf-8')
+    contents = data if type(data) is str else json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + '\n'
+    with path.open('x' if exclusive else 'w', encoding='utf-8') as stream:
+        stream.write(contents)
 
 
 def main(argv=None):
@@ -363,10 +480,15 @@ def main(argv=None):
     e.add_argument('--driver', required=True); e.add_argument('--model-inventory'); e.add_argument('--out', type=Path, required=True)
     e.add_argument('--model-id', help='렌더 기록의 모델 ID와 일치해야 한다')
     e.add_argument('--observed-engine-version', help='Pod 안에서 조회한 실제 vLLM 판본(코드 선택 세대 필수)')
+    e.add_argument('--external-platform', help='비교에 쓸 서버 OS·아키텍처 선언(예: Linux x86_64)')
+    e.add_argument('--engine-pod', type=Path, help='정상 TP2 실행의 실제 엔진 Pod 관측')
+    e.add_argument('--namespace', type=Path, help='정상 TP2 실행의 실제 namespace 관측')
+    e.add_argument('--observed-gpu-count', type=int, help='같은 TP2 엔진 컨테이너에서 확인한 GPU 수')
     t = sub.add_parser('target'); t.add_argument('--env', type=Path, required=True); t.add_argument('--render', type=Path, required=True)
     for name in ('namespace', 'engine-pod', 'probe-pod'):
         t.add_argument('--' + name, type=Path, required=True)
     t.add_argument('--context', default='kubernetes-admin@kubernetes'); t.add_argument('--api-model', default='test-model')
+    t.add_argument('--observed-engine-version', help='같은 엔진 컨테이너에서 확인한 실제 vLLM 판본')
     t.add_argument('--out', type=Path, required=True)
     c = sub.add_parser('check'); c.add_argument('--check', required=True); c.add_argument('--env', type=Path, required=True)
     c.add_argument('--target', type=Path, required=True); c.add_argument('--prepared', type=Path, required=True)
@@ -385,16 +507,39 @@ def main(argv=None):
         parser.error('--media-text-after requires --check REQ-16 --cases req16-full')
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'env':
-        env = environment(load(args.render), model_id=args.model_id, gpu_model=args.gpu_model, driver=args.driver,
-            observed_engine_version=args.observed_engine_version,
-            inventory=args.model_inventory)
-        _write(args.out, env.model_dump(mode='json'))
+        render_ref = {}
+        topology_inputs = {}
+        if args.external_platform is None and any(
+                value is not None for value in (args.engine_pod, args.namespace, args.observed_gpu_count)):
+            parser.error('TP2 Pod evidence requires --external-platform')
+        if args.external_platform is None:
+            render = load(args.render)
+        else:
+            from guard.runtime.bounded import strict_json
+            from tools.mvp_a_input_preflight import _read
+
+            render_path = args.render.absolute()
+            raw, _ = _read(render_path, max_bytes=262144)
+            render = strict_json(raw, limit=262144)
+            render_ref['render'] = {'path': str(render_path), 'sha256': sha256_hex(raw)}
+            for key in ('engine_pod', 'namespace'):
+                path = getattr(args, key)
+                if path is not None:
+                    path = path.absolute()
+                    raw, _ = _read(path, max_bytes=262144)
+                    topology_inputs[key] = strict_json(raw, limit=262144)
+                    render_ref[key] = {'path': str(path), 'sha256': sha256_hex(raw)}
+        env = environment(render, model_id=args.model_id, gpu_model=args.gpu_model, driver=args.driver,
+            observed_engine_version=args.observed_engine_version, external_platform=args.external_platform,
+            inventory=args.model_inventory, observed_gpu_count=args.observed_gpu_count, **topology_inputs)
+        _write(args.out, env.model_dump(mode='json'), exclusive=args.external_platform is not None)
         if load_environment(args.out).ref() != env.ref():
             raise ValueError('RUN_INPUTS_ENV_ROUNDTRIP_MISMATCH')
-        print(json.dumps({'env': str(args.out), 'sha256': env.ref().sha256}))
+        print(json.dumps({'env': str(args.out), 'sha256': env.ref().sha256, **render_ref}))
     elif args.kind == 'target':
         value = target(load_environment(args.env), load(args.render), load(args.namespace), load(args.engine_pod),
-            load(args.probe_pod), context=args.context, api_model=args.api_model)
+            load(args.probe_pod), context=args.context, api_model=args.api_model,
+            observed_engine_version=args.observed_engine_version)
         _write(args.out, value)
         print(json.dumps({'target': str(args.out), 'sha256': sha256_hex(canonical_json(value))}))
     elif args.kind == 'http-check':

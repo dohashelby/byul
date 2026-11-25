@@ -135,10 +135,11 @@ def project_owned_snapshot(pod, namespace, expected, run_id, *, require_ready=Tr
                 ("name", "uid", "deletionTimestamp"))}}
 
 
-def validate_capture_target(target, env):
+def validate_capture_target(target, env, *, require_lab=True):
     try:
         if (type(target) is not dict or set(target) != {"schema","run_id","environment_ref","lab","kubernetes"}
-                or target["schema"] != "guard-kubernetes-lifecycle-target/1" or target["lab"] is not True
+                or target["schema"] != "guard-kubernetes-lifecycle-target/1"
+                or type(target["lab"]) is not bool or (require_lab and not target["lab"])
                 or not env.hash_ok() or target["environment_ref"] != env.ref().model_dump(mode="json")
                 or type(target["run_id"]) is not str or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}",target["run_id"])):
             raise ValueError

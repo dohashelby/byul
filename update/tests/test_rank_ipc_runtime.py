@@ -13,7 +13,7 @@ import pytest
 from guard.adapters import vllm_rank_ipc_runtime as runtime
 from guard.adapters import vllm_rank_ipc_sources as sources
 from tools import rank_ipc_candidates as tool
-from tools.mvp_versions import versions
+from tests.test_ma6_release_profiles import historical_versions
 
 RAW = b'''calls = []
 class Worker:
@@ -25,7 +25,7 @@ class Worker:
 
 def _prepared(tmp_path):
     root = tmp_path / 'prepared'
-    manifest = tool.prepare(root, image=versions()['candidate']['image'])
+    manifest = tool.prepare(root, image=historical_versions()['candidate']['image'])
     settings = json.loads((root / 'settings.json').read_bytes())
     assert settings['key'] not in json.dumps(manifest)
     assert (root / 'settings.json').stat().st_mode & 0o777 == 0o600
@@ -180,7 +180,7 @@ def test_settings_permissions_and_duplicate_keys_are_rejected(tmp_path, monkeypa
 
 def test_bootstrap_keeps_existing_sitecustomize_first(tmp_path):
     root = tmp_path / 'prepared'
-    tool.prepare(root, image=versions()['candidate']['image'])
+    tool.prepare(root, image=historical_versions()['candidate']['image'])
     original = tmp_path / 'original'
     original.mkdir()
     (original / 'guard').mkdir()
@@ -197,8 +197,8 @@ def test_bootstrap_keeps_existing_sitecustomize_first(tmp_path):
 
 def test_prepare_refuses_existing_directory_and_unknown_image(tmp_path):
     root = tmp_path / 'prepared'
-    tool.prepare(root, image=versions()['candidate']['image'])
+    tool.prepare(root, image=historical_versions()['candidate']['image'])
     with pytest.raises(ValueError, match='RANK_IPC_OUTPUT_EXISTS'):
-        tool.prepare(root, image=versions()['candidate']['image'])
+        tool.prepare(root, image=historical_versions()['candidate']['image'])
     with pytest.raises(ValueError, match='RANK_IPC_IMAGE_UNSUPPORTED'):
         tool.prepare(tmp_path / 'other', image='fixture-image')

@@ -12,6 +12,7 @@ import re
 import time
 
 from guard.models import canonical_json, sha256_hex
+from guard.runtime.comparison import model_request_conditions
 from .content_common import content_request, control_state, json_body, sample_artifact
 from .engine_identity import owned_template_snapshot
 from .http_common import mask
@@ -159,7 +160,7 @@ def _tokens(value, maximum):
             and all(type(token) is int and 0 <= token < 2**31 for token in value))
 
 
-def collect(executor, ctx, *, kubernetes=False):
+def collect(executor, ctx, *, kubernetes=False, normal_input_limit=None):
     """최대 세 번의 무해 요청. 원문 challenge와 독립 소비는 미수집이다."""
     ctx._native_artifact_written = False
     validate_policy(ctx.check, ctx.policy_values, executor.cfg)
@@ -202,6 +203,8 @@ def collect(executor, ctx, *, kubernetes=False):
 
     if before is None:
         errors.append("TEMPLATE_SUPPLY_IDENTITY_UNVERIFIED")
+    elif normal_input_limit is not None and before["sha256"] not in ctx.policy_values[POLICY_KEY]:
+        errors.append("TEMPLATE_NORMAL_APPROVAL_UNVERIFIED")
     else:
         messages = deepcopy(ctx.check.functional_probes[0].body["messages"])
         token_response = send("tokenize-A" if kubernetes else "supply-tokenize", "/tokenize", {"model": api_model, "messages": messages,
@@ -215,7 +218,12 @@ def collect(executor, ctx, *, kubernetes=False):
                               and len(rendered["tokens"]) + 1 <= rendered["max_model_len"])
         if rendered_valid:
             tokenize_response_tokens = len(rendered["tokens"])
-        if rendered_valid and tokenize_response_tokens > limits["max_total_probe_tokens"] - accepted_tokens:
+        if rendered_valid and normal_input_limit is not None and tokenize_response_tokens > normal_input_limit:
+            errors.append("TEMPLATE_NORMAL_INPUT_BUDGET_EXCEEDED")
+        elif rendered_valid and normal_input_limit is not None and _snapshot(
+                executor, ctx, target, deadline, kubernetes=kubernetes) != before:
+            errors.append("TEMPLATE_NORMAL_IDENTITY_CHANGED_BEFORE_INFERENCE")
+        elif rendered_valid and tokenize_response_tokens > limits["max_total_probe_tokens"] - accepted_tokens:
             # The bounded response was received, but its tokens are not admitted as proof.
             errors.append("TEMPLATE_SUPPLY_BUDGET_EXHAUSTED")
         elif rendered_valid:
@@ -261,13 +269,15 @@ def collect(executor, ctx, *, kubernetes=False):
     }
     fixture = {"profile": PROFILE, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
                "settings": limits, "endpoints": ["/tokenize", "/v1/chat/completions"]}
+    if normal_input_limit is not None:
+        fixture.update(profile="fixed-template-normal-input-v1", declared_normal_input_limit=normal_input_limit)
     if kubernetes:
         report = ctx.cprobe.report()
         fixture.update(transport_profile=report["profile"], probe_source_sha256=report["probe_source_sha256"],
-                       model_mapping_sha256=sha256_hex(canonical_json(ctx.cprobe.model_mapping)))
+                       model_mapping_sha256=sha256_hex(canonical_json(model_request_conditions(ctx.cprobe.model_mapping))))
     ctx._template_fixture_sha256 = sha256_hex(canonical_json(mask(fixture, ctx.secrets)))
     summary = {
-        "profile": PROFILE, "artifact_profile": "template-response-projection/1",
+        "profile": fixture["profile"], "artifact_profile": "template-response-projection/1",
         "requests_sent": requests, "accepted_tokens": accepted_tokens,
         "tokenize_response_token_count": tokenize_response_tokens,
         "identity_before": before, "identity_after": after,
@@ -283,12 +293,15 @@ def collect(executor, ctx, *, kubernetes=False):
             "Only the reviewed fixed template, full pinned ENV image, matching model and bounded normal chat are supported.",
             "Manual PASS is outside the existing REQ-07 bounded manual policy contract; declared FAIL and UNKNOWN are preserved.",
         ],
-        "fixture": {"profile": PROFILE, "normal_sha256": sha256_hex(canonical_json(fixture["normal"])),
+        "fixture": {"profile": fixture["profile"], "normal_sha256": sha256_hex(canonical_json(fixture["normal"])),
                     "settings": limits, "endpoints": fixture["endpoints"]},
     }
+    if normal_input_limit is not None:
+        summary["fixture"]["declared_normal_input_limit"] = normal_input_limit
+        summary["not_exercised"] = ["independent_worker_consumption", "input_limit_enforcement", "request_template_override"]
     if kubernetes:
         summary["kubernetes"] = report
-        summary["model_mapping_sha256"] = fixture["model_mapping_sha256"]
+        summary["model_mapping_sha256"] = sha256_hex(canonical_json(ctx.cprobe.model_mapping))
         summary["fixture"].update({key: fixture[key] for key in
             ("transport_profile", "probe_source_sha256", "model_mapping_sha256")})
         summary["limitations"].extend([

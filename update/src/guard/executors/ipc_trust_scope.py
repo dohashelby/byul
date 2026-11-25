@@ -52,6 +52,10 @@ def validate_policy(values):
         raise ValueError("worker_trust_group_markers requires 1..8 distinct process markers")
 
 
+def matching_markers(name, markers):
+    return [marker for marker in markers if marker in name]
+
+
 def project(snapshot, values):
     """표식별 그룹과 경계 위반을 계산한다. 읽지 못한 프로세스는 범위 미완결로 남긴다."""
     groups, unreadable, overlapping, ambiguous = defaultdict(list), 0, [], {}
@@ -60,7 +64,7 @@ def project(snapshot, values):
         if not row["fd_complete"]:
             unreadable += 1
             continue
-        matches = [marker for marker in values["worker_trust_group_markers"] if marker in row["comm"]]
+        matches = matching_markers(row["comm"], values["worker_trust_group_markers"])
         if len(matches) > 1 or pid_counts[row["pid"]] > 1:
             entry = ambiguous.setdefault(row["pid"], {"pid": row["pid"], "matching_markers": set(),
                 "reported_uids": set(), "resources_sha256": set(), "reasons": set()})

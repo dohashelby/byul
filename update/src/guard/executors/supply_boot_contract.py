@@ -89,16 +89,41 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
     fields = _ROWS.get(check_id)
     if fields is not None and any(type(row) is not dict or set(row) != fields for row in packet["rows"]):
         raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
-    if check_id == 'SUP-15' and any(
-            any(type(row[key]) is not bool for key in ('relevant_change', 'reused', 'compatibility_verified'))
-            or type(row['path_sha256']) is not str or _SHA.fullmatch(row['path_sha256']) is None
-            for row in packet['rows']):
-        raise ValueError('SUPPLY_BOOT_RECORD_INVALID')
+    if check_id == "LIF-01":
+        stages = set()
+        for row in packet["rows"]:
+            stage = row["stage"]
+            if (type(stage) is not str or not stage or stage in stages
+                    or any(type(row[key]) is not int or row[key] < 0 for key in ("elapsed_ms", "peak_bytes"))
+                    or any(type(row[key]) is not bool for key in ("stopped", "temporary_cleaned"))):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+            stages.add(stage)
+    if check_id == "LIF-02":
+        prior_attempt, prior_time = -1, 0
+        for row in packet["rows"]:
+            if (any(type(row[key]) is not int or row[key] < 0 for key in ("attempt", "at_ms", "bytes"))
+                    or row["attempt"] <= prior_attempt or row["at_ms"] < prior_time
+                    or type(row["outcome"]) is not str or not row["outcome"].strip()
+                    or type(row["temporary_left"]) is not bool):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+            prior_attempt, prior_time = row["attempt"], row["at_ms"]
+    if check_id in {"SUP-07", "SUP-15"}:
+        flags = _ROWS[check_id] - {"path_sha256"}
+        for row in packet["rows"]:
+            if (type(row["path_sha256"]) is not str or _SHA.fullmatch(row["path_sha256"]) is None
+                    or any(type(row[key]) is not bool for key in flags)):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+    if check_id == "SUP-12":
+        for row in packet["rows"]:
+            events = row["side_effects"]
+            if type(events) is not list or any(type(event) is not str for event in events):
+                raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
     return packet
 
 
 def _stage_budget(rows, values):
     violations, missing, total = [], [], 0
+    selected_stage_stopped = False
     budget_ms, budget_bytes = values["supply_stage_budget_ms"], values["supply_stage_budget_bytes"]
     seen = {row["stage"]: row for row in rows}
     for stage in budget_ms:
@@ -107,11 +132,12 @@ def _stage_budget(rows, values):
             missing.append("stage_cost_unavailable:" + stage)
             continue
         total += row["elapsed_ms"]
+        selected_stage_stopped = selected_stage_stopped or row["stopped"]
         if (row["elapsed_ms"] > budget_ms[stage] or row["peak_bytes"] > budget_bytes.get(stage, row["peak_bytes"])) and not row["stopped"]:
             violations.append({"reason": "stage_budget_exceeded_without_stop", "stage": stage})
         if not row["temporary_cleaned"]:
             violations.append({"reason": "temporary_resources_left", "stage": stage})
-    if total > values["supply_total_budget_ms"] and not any(row["stopped"] for row in rows):
+    if total > values["supply_total_budget_ms"] and not selected_stage_stopped:
         violations.append({"reason": "total_budget_exceeded_without_stop"})
     return violations, missing
 

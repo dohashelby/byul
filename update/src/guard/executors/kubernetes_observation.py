@@ -3,15 +3,25 @@ import re
 import time
 import uuid
 from guard.collectors.file import load_bounded_json
-from guard.models import canonical_json,sha256_hex,utcnow
+from guard.configuration import GATEWAY_RECORD_SNAPSHOT_OPTION
+from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import capture_pipes,strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP,REQUIRED_EVENT_PROFILE
+from guard.runtime.kubernetes_http import KubernetesBindingError,KubernetesHTTP,REQUEST_BINDING_PROFILE,REQUIRED_EVENT_PROFILE
 from .base import record_origin_ceiling
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_fixed_record import FixedRecordProfile, FixedRecordReader
 from .kubernetes_lifecycle_capture import KubernetesCaptureError
 from .owned_capture import MAX_BYTES
 from .observation_contract import PROFILE,POLICY_TYPES,OBSERVATIONS,normalize_policy,validate_record,correlate
+
+
+def _read_snapshot_target(path):
+    from guard.adapters.vllm_file_read_sensor import dependency
+
+    target = strict_json(dependency(path, None), limit=65536)
+    if type(target) is not dict:
+        raise ValueError
+    return target
 
 
 _RECORD_PROFILE = FixedRecordProfile(
@@ -21,23 +31,70 @@ _RECORD_PROFILE = FixedRecordProfile(
 
 
 class RequiredEventReader(FixedRecordReader):
-    def __init__(self,transport,target,session,*,binary,duration,runner=None):
-        if target.get('lab') is not True:raise KubernetesCaptureError()
+    def __init__(self,transport,target,session,*,binary,duration,runner=None,snapshot_only=False):
+        if target.get('lab') is not (not snapshot_only):raise KubernetesCaptureError()
         super().__init__(transport.binding, target, session, profile=_RECORD_PROFILE,
                          binary=binary, duration=duration, runner=runner)
 
 
 def finish_required_event(draft, ctx, *, injected_runner):
     ceiling = record_origin_ceiling(ctx.env.data_origin, local_example=injected_runner or ctx.target["lab"])
-    return draft.finish_collection(ceiling, bool(ctx._obs_gap or ctx._obs_cleanup), ctx._obs_cleanup)
+    snapshot_only = getattr(ctx, '_obs_snapshot_only', False)
+    incomplete = bool(ctx._obs_gap or ctx._obs_cleanup)
+    if snapshot_only and draft.status == ExecStatus.COMPLETED and not incomplete:
+        ceiling = DataOrigin(ctx.cprobe.process_observation_origin)
+    if snapshot_only and incomplete:
+        draft.abort_reason = draft.abort_reason or 'OBSERVATION_RECORD_SNAPSHOT_INCOMPLETE'
+    return draft.finish_collection(ceiling, incomplete, ctx._obs_cleanup)
 
 
 class KubernetesRequiredEventExecutor(HttpCheckExecutor):
     name='required_event_record';version='0.2.0';requires_roles=True;requires_route_scope=False;functional_via='engine'
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
+        if self.cfg.get('record_snapshot_only') is True:
+            self.requires_roles=False
+            self.version='0.2.0+record-snapshot'
+        if self.cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True:
+            from .kubernetes_gateway_observation import KubernetesGatewayRecordSnapshotExecutor
+            self.requires_roles=False
+            self.version=KubernetesGatewayRecordSnapshotExecutor.version
+        if self.cfg.get('copy_record_snapshot_only') is True:
+            from .kubernetes_credential_copy import SNAPSHOT_VERSION
+            self.requires_roles=False
+            self.version=SNAPSHOT_VERSION
+
+    def keys(self):
+        if (self.cfg.get('record_snapshot_only') is True or self.cfg.get('copy_record_snapshot_only') is True
+                or self.cfg.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True):
+            return {}
+        return super().keys()
+
+    def _gateway_snapshot(self):
+        from .kubernetes_gateway_observation import KubernetesGatewayRecordSnapshotExecutor
+        if self.cfg.get('record_snapshot_only') is not True:
+            raise ValueError('GATEWAY_AUDIT_CONFIGURATION_INVALID')
+        settings = {key: value for key, value in self.cfg.items() if key != 'record_snapshot_only'}
+        return KubernetesGatewayRecordSnapshotExecutor(settings, runner=self.runner,
+            expected_target_sha256=self.expected_target)
+
+    def prepared_copy_record_snapshot(self, check, env, values, *, expected_target_sha256=None):
+        from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
+        executor = KubernetesCredentialCopyRecordExecutor(self.cfg, runner=self.runner, environ=self._environ,
+                                                          expected_target_sha256=self.expected_target)
+        executor.prepared_copy_record_snapshot(check, env, values, expected_target_sha256=expected_target_sha256)
 
     def validate_policy(self,check,values):
+        if GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg:
+            return self._gateway_snapshot().validate_policy(check,values)
+        if 'copy_record_snapshot_only' in self.cfg:
+            from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
+            return KubernetesCredentialCopyRecordExecutor(self.cfg).validate_policy(check,values)
+        if 'record_snapshot_only' in self.cfg and (
+                self.cfg['record_snapshot_only'] is not True or check.id!='OBS-01'
+                or getattr(check,'collection_profile',None)!=PROFILE
+                or set(self.cfg)-{'target','record_snapshot_only','kubectl_binary','max_duration_seconds'}):
+            raise ValueError('OBSERVATION_RECORD_SNAPSHOT_CONFIGURATION_INVALID')
         if check.id=='PLT-12':
             from . import credential_copy_contract as copy_contract
             if getattr(check,'collection_profile',None)!=copy_contract.PROFILE:raise ValueError('COPY_PROFILE_UNSUPPORTED')
@@ -48,7 +105,43 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         if check.id!='OBS-01' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('OBSERVATION_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
+    def _validate_target(self, target, env, values, snapshot_only, *, expected_target_sha256=None):
+        digest = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self.expected_target, expected_target_sha256) if pin is not None]
+        if (target.get('lab') is not (not snapshot_only) or digest != values['observation_target_sha256']
+                or snapshot_only and not pins or any(pin != digest for pin in pins)
+                or env.ref().sha256 != values['observation_environment_sha256']
+                or any(type(value) is not str or not value for value in (env.model.id, env.model.revision))):
+            raise ValueError
+
+    def _transport(self, target, env, profile):
+        return KubernetesHTTP(target, env, duration=self.cfg.get('max_duration_seconds', 120),
+                              binary=self.cfg.get('kubectl_binary', 'kubectl'), runner=self.runner, profile=profile)
+
+    def prepared_record_snapshot(self, check, env, values, *, expected_target_sha256=None):
+        """Validate only the saved engine-owned OBS-01 target, without collecting its record."""
+        from .run_binding import stages_for
+
+        if (check.id != 'OBS-01' or check.executor != self.name or stages_for(check) != (1, 2, 3, 4)
+                or self.cfg.get('record_snapshot_only') is not True
+                or GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg or 'copy_record_snapshot_only' in self.cfg):
+            raise ValueError('OBSERVATION_RECORD_SNAPSHOT_CONFIGURATION_INVALID')
+        self.validate_policy(check, values)
+        try:
+            target = _read_snapshot_target(self.cfg['target'])
+            self._validate_target(target, env, values, True, expected_target_sha256=expected_target_sha256)
+        except (KeyError, ValueError, TypeError, OSError, RuntimeError):
+            raise ValueError('OBSERVATION_CONFIGURATION_INVALID') from None
+        try:
+            self._transport(target, env, REQUEST_BINDING_PROFILE)
+        except KubernetesBindingError as error:
+            raise ValueError(str(error)) from None
+        except OverflowError:
+            raise ValueError('OBSERVATION_CONFIGURATION_INVALID') from None
+
     def run(self,check,env,policy_values,adapter,workdir):
+        if GATEWAY_RECORD_SNAPSHOT_OPTION in self.cfg:
+            return self._gateway_snapshot().run(check,env,policy_values,adapter,workdir)
         self.validate_policy(check,policy_values)
         from . import kubernetes_gateway_observation as gateway
         if getattr(check,'collection_profile',None)==gateway.PROFILE:
@@ -56,31 +149,99 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             return gateway.KubernetesGatewayRequiredEventExecutor(self.cfg,runner=self.runner,environ=self._environ,
                 expected_target_sha256=self.expected_target).run(check,env,policy_values,adapter,workdir)
         if check.id=='PLT-12':
-            from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
-            if set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds'}:
+            from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor,SNAPSHOT_OPTION
+            if set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds',SNAPSHOT_OPTION}:
                 raise ValueError('COPY_CONFIGURATION_INVALID')
             selected={key:value for key,value in self.cfg.items() if key!='roles'}
             return KubernetesCredentialCopyRecordExecutor(selected,runner=self.runner,environ=self._environ,
                 expected_target_sha256=self.expected_target).run(check,env,policy_values,adapter,workdir)
+        snapshot_only=self.cfg.get('record_snapshot_only') is True
         try:
-            if (set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds'} or adapter is None
+            if adapter is None or any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
+            if not snapshot_only and (set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds'}
                     or 'copy_inventory' in self.cfg and (type(self.cfg['copy_inventory']) is not str or not self.cfg['copy_inventory'])
-                    or set(self.roles())!={'allowed','denied'}
-                    or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
-            keys=self.keys()
-            target = load_bounded_json(self.cfg['target'])
-            digest=sha256_hex(canonical_json(target));start,end=normalize_policy(policy_values)
-            if (target.get('lab') is not True or digest!=policy_values['observation_target_sha256']
-                    or env.ref().sha256!=policy_values['observation_environment_sha256']
-                    or self.expected_target is not None and self.expected_target!=digest or not start<=utcnow()<=end):raise ValueError
+                    or set(self.roles())!={'allowed','denied'}):raise ValueError
+            keys={} if snapshot_only else self.keys()
+            if snapshot_only:
+                target = _read_snapshot_target(self.cfg['target'])
+            else:
+                target = load_bounded_json(self.cfg['target'])
+            start,end=normalize_policy(policy_values)
+            self._validate_target(target,env,policy_values,snapshot_only)
+            if not start<=utcnow()<=end:raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('OBSERVATION_CONFIGURATION_INVALID') from None
-        transport=KubernetesHTTP(target,env,duration=self.cfg.get('max_duration_seconds',120),
-            binary=self.cfg.get('kubectl_binary','kubectl'),runner=self.runner,profile=REQUIRED_EVENT_PROFILE)
+        profile=REQUEST_BINDING_PROFILE if snapshot_only else REQUIRED_EVENT_PROFILE
+        transport=self._transport(target,env,profile)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,
             allow_mutating=False,keys=keys,secrets=[v for v in keys.values() if v],cprobe=transport,workdir=workdir,started=utcnow())
+        ctx._obs_snapshot_only=snapshot_only
+        if snapshot_only:ctx.http_probe_profile=profile
         return self._finish(ctx)
 
+    def _read_bound_packet(self,ctx,reader,start,end):
+        values=ctx.policy_values
+        if not start<=utcnow()<=end:raise ValueError('OBSERVATION_POLICY_WINDOW_UNVERIFIED')
+        raw,provenance=reader.read_record(ctx.target)
+        packet=validate_record(strict_json(raw,limit=MAX_BYTES),environment_ref=ctx.env.ref().model_dump(mode='json'),
+            target_sha256=values['observation_target_sha256'],session=values['observation_session'],
+            expected_source_sha256=values['observation_expected_source_sha256'],forbidden_values=ctx.secrets)
+        if provenance.get('owner_binding_verified') is not True or not start<=utcnow()<=end:
+            raise ValueError('OBSERVATION_RECORD_OR_WINDOW_UNVERIFIED')
+        return packet,provenance
+
+    def _collect_snapshot(self,ctx):
+        values=ctx.policy_values
+        reader=RequiredEventReader(ctx.cprobe,ctx.target,values['observation_session'],
+            binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120),
+            runner=self.runner or capture_pipes,snapshot_only=True)
+        packet=None; provenance=None; records=[]; diagnostics=[]; unmatched_actor_count=0; unmatched_policy_count=0
+        try:
+            packet,provenance=self._read_bound_packet(ctx,reader,*normalize_policy(values))
+            run_hash=sha256_hex(reader.binding['run_id'].encode())
+            expected_actors={'ACCESS_ALLOWED':values['observation_allowed_actor_sha256'],
+                             'ACCESS_DENIED':values['observation_denied_actor_sha256']}
+            scoped=[row for row in packet['events'] if row['event'] in expected_actors
+                    and row['event'] in values['observation_required_events']
+                    and row['run_sha256']==run_hash and row['target_sha256']==values['observation_target_sha256']]
+            actor_matched=[row for row in scoped if row['actor_sha256']==expected_actors[row['event']]]
+            records=[row for row in actor_matched if row['policy_sha256']==values['observation_event_policy_sha256']]
+            unmatched_actor_count=len(scoped)-len(actor_matched)
+            unmatched_policy_count=len(actor_matched)-len(records)
+            if not records:diagnostics.append('OBSERVATION_RECORD_SCOPE_EMPTY')
+            if unmatched_actor_count:diagnostics.append('OBSERVATION_RECORD_ACTOR_UNVERIFIED')
+            if unmatched_policy_count:diagnostics.append('OBSERVATION_RECORD_POLICY_UNVERIFIED')
+        except (KeyError,ValueError,TypeError,OSError,KubernetesCaptureError):
+            diagnostics.append('OBSERVATION_RECORD_UNAVAILABLE')
+        reader_report=reader.report()
+        ctx._obs_cleanup=['OBSERVATION_RECORD_PARENT_CLEANUP_UNVERIFIED'] if reader_report.get('parent_cleanup_unverified') else []
+        ctx._obs_gap=bool(not records or reader.gap or ctx._obs_cleanup)
+        collected=packet is not None
+        capture={'stage':'record-snapshot','collected':collected,
+                 'owner_binding_verified':collected,'file_bytes_sha256':provenance['capture_sha256'] if collected else None,
+                 'file_bytes':provenance['bytes'] if collected else None,
+                 'packet_sha256':sha256_hex(canonical_json(packet)) if collected else None,
+                 'source_end_reported':packet['source_ended'] if collected else None,
+                 'dropped_events_reported':packet['dropped_events'] if collected else None}
+        missing=[{'case_id':None,'event':event,'reason':'independent_trigger_and_collection_time_unverified'}
+                 for event in values['observation_required_events']]
+        observations={
+            'required_event_trials':(None,False),'required_event_records':(records if collected else None,collected),
+            'required_event_matches':(None,False),'required_event_missing':(missing,True),
+            'required_event_conflict_candidates':(None,False),'required_event_collection':([capture],True),
+            'required_event_records_collected':(collected,True),'required_event_producer_authenticated':(False,True),
+            'required_event_independent_trigger_verified':(False,True),'required_event_scope_complete':(False,True),
+        }
+        summary={'profile':PROFILE,'record_snapshot_only':True,'capture':capture,
+                 'diagnostic_codes':diagnostics,'record_transport':reader_report,'unmatched_actor_count':unmatched_actor_count,
+                 'unmatched_policy_count':unmatched_policy_count,
+                 'fixture':{'profile':PROFILE,'scope':'owned-existing-audit-record-snapshot'},
+                 'independent_trigger_verified':False,'event_arrival_time_verified':False}
+        normal={'attempted':False,'succeeded':None,'detail':'Read a bounded existing audit record; no request was sent.'}
+        return ({key:{'value':value,'collected':verified} for key,(value,verified) in observations.items()},normal,
+                [{'step':step,'attempted':False} for step in ctx.check.challenge_steps],summary)
+
     def collect(self,ctx):
+        if getattr(ctx,'_obs_snapshot_only',False):return self._collect_snapshot(ctx)
         values=ctx.policy_values;start,end=normalize_policy(values)
         summary={'profile':PROFILE,'trials':[],'snapshots':[],'collection':[],'diagnostic_codes':[],
             'fixture':{'profile':PROFILE},'producer_authenticated':False,'actor_identity_verified':False,
@@ -90,12 +251,7 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             row={'stage':stage,'collected':False,'file_bytes_sha256':None,'file_bytes':None,'owner_binding_verified':False,
                 'collected_monotonic_ns':time.monotonic_ns()}
             try:
-                if not start<=utcnow()<=end:raise ValueError
-                raw,provenance=reader.read_record(ctx.target)
-                packet=validate_record(strict_json(raw,limit=MAX_BYTES),environment_ref=ctx.env.ref().model_dump(mode='json'),
-                    target_sha256=values['observation_target_sha256'],session=values['observation_session'],
-                    expected_source_sha256=values['observation_expected_source_sha256'],forbidden_values=ctx.secrets)
-                if provenance.get('owner_binding_verified') is not True or not start<=utcnow()<=end:raise ValueError
+                packet,provenance=self._read_bound_packet(ctx,reader,start,end)
                 row.update(collected=True,file_bytes_sha256=provenance['capture_sha256'],file_bytes=provenance['bytes'],
                     file_identity=provenance['file_identity'],owner_binding_verified=True,collected_monotonic_ns=time.monotonic_ns())
                 summary['snapshots'].append({'stage':stage,'packet':packet,'collected_monotonic_ns':row['collected_monotonic_ns']})

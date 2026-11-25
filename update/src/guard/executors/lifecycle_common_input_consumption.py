@@ -27,18 +27,29 @@ CHECK_IDS = frozenset({"LIF-03", "LIF-05", "LIF-06", "LIF-07", "LIF-09", "LIF-10
 MAX_BYTES = check_observations.MAX_RECORD_BYTES
 
 
-def _read(path, *, reads=None):
+def _read(path, *, reads=None, expected_file=None):
     path = Path(path)
+    if expected_file is not None and str(path.absolute()) != expected_file["path"]:
+        raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError("B_COMMON_INPUT_SYMLINK")
     before = path.stat()
     if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= MAX_BYTES:
         raise ValueError("B_COMMON_INPUT_FILE_BOUND")
+    recipe_record = check_observations.recipe_record(path)
+    if recipe_record is not None and (recipe_record.sha256 is None or expected_file is not None and (
+            recipe_record.sha256 != expected_file["sha256"]
+            or recipe_record.identity is not None and check_observations.identity(before) != recipe_record.identity)):
+        raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
     if reads is not None and path in reads:
         identity, record = reads[path]
         if check_observations.identity(before) == identity and check_observations.path_identity(path) == identity:
+            if (expected_file is not None and record[1] != expected_file["sha256"]
+                    or recipe_record is not None and record[1] != recipe_record.sha256):
+                raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
             return record
-    recipe_record = check_observations.recipe_record(path)
+        if expected_file is not None:
+            raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
     if recipe_record is not None:
         verified = check_observations.load_verified(path, before, recipe_record, decode=strict_json)
         if verified is not None:
@@ -50,7 +61,8 @@ def _read(path, *, reads=None):
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
         raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
     file_sha = sha256_hex(raw)
-    if recipe_record is not None and file_sha != recipe_record.sha256:
+    if (recipe_record is not None and file_sha != recipe_record.sha256
+            or expected_file is not None and file_sha != expected_file["sha256"]):
         raise ValueError("B_COMMON_INPUT_FILE_CHANGED")
     record = strict_json(raw, limit=MAX_BYTES), file_sha
     if reads is not None and check_observations.identity(before) == check_observations.identity(after):
@@ -133,7 +145,7 @@ def _list(draft, key):
 
 
 def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=None, owner=None, generation=None,
-                  prepared_reads=None):
+                  prepared_reads=None, expected_files=None):
     """Add domain facts to existing judge inputs and an exact, bounded evidence artifact."""
     if descriptor is None:
         return draft
@@ -148,7 +160,8 @@ def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=No
                 or descriptor.get("data_origin", "EXAMPLE") not in {"EXAMPLE", "DECLARED"}
                 or descriptor.get("generation") != generation):
             raise ValueError("B_COMMON_INPUT_CONFIGURATION_INVALID")
-        declared, _ = _read(descriptor["prepared"], reads=prepared_reads)
+        expected = expected_files["prepared"] if expected_files is not None else None
+        declared, _ = _read(descriptor["prepared"], reads=prepared_reads, expected_file=expected)
         if type(declared) is not dict:
             raise ValueError("B_COMMON_INPUT_PREPARED_INVALID")
         if prepared is not None and canonical_json(declared) != canonical_json(prepared):
@@ -164,7 +177,8 @@ def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=No
             try:
                 if kind not in KINDS:
                     raise ValueError("B_COMMON_INPUT_KIND_UNSUPPORTED")
-                record, file_sha = _read(path)
+                expected = expected_files["record"] if expected_files is not None else None
+                record, file_sha = _read(path, expected_file=expected)
                 if type(record) is not dict or record.get("kind") != kind:
                     raise ValueError("B_COMMON_INPUT_KIND_MISMATCH")
                 result = consume_record(check.id, record, **scope)

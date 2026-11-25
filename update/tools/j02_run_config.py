@@ -29,8 +29,9 @@ User decisions RB2-J1~J4 (2026-11-14):
   (`gpu_a_run_inputs.target`).  The target path is written into every selected
   executor section that takes a `target` unless the spec already sets one.
 - J3 the first-scope UNKNOWN checks stay in the J02 config.
-- J4 OBS-03 keeps no executor (Kubernetes `log_analysis` does not exist); the
-  report records that cause and `guard run` leaves it NOT_RUN -> UNKNOWN.
+- J4 excluded OBS-03 from automatic selection while Kubernetes log analysis
+  was unavailable. The bounded normal engine collector now takes an explicit
+  Kubernetes selection and reports the remaining policy coverage gaps.
 
 Spec (YAML):
 
@@ -39,7 +40,7 @@ Spec (YAML):
     store: .guard-j02                    # optional, written to guard.toml
     adapter: vllm                        # optional
     approved_supply_identity_sha256: <64 lowercase hex> # approved credential identity metadata, not secret bytes
-    executors: {supply_boot: kubernetes, ...}
+    executors: {supply_boot: kubernetes, ...}   # optional; omit to select Kubernetes automatically
     shared: {<executor>: {...}}          # sections common to both sides
     sides:
       baseline:
@@ -51,6 +52,12 @@ Spec (YAML):
         checks:
           LIF-05: {executor: {...}, run_binding: {...}}
       candidate: {...}
+
+Without `executors`, every executor used by a J02 check whose Kubernetes
+implementation is registered for both sides' engine/version is selected as
+`kubernetes` (2026-11-16 user decision: Kubernetes is the only deployment).
+A declared `executors` table is kept exactly. Selection only names an
+implementation; missing targets, settings or policy values stay reported.
 
 RB3 draft inputs require both sides' ENV model id/revision/inventory SHA to
 agree. Each declared snapshot must reproduce its declared all-scope inventory
@@ -75,9 +82,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / 'docs/dev-1/ma7-session-input-plan.json'
 SIDES = ('baseline', 'candidate')
 _BARE = re.compile(r'^[A-Za-z0-9_-]+$')
-# RB2-J4: recorded cause for checks left without an executor.
-RECORDED_UNKNOWN = {'OBS-03': 'KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT'}
-RECORDED_EXECUTORS = frozenset({'log_analysis'})
+# RB2-J4: explicit selection for the bounded normal Kubernetes collector.
+EXPLICIT_KUBERNETES_EXECUTORS = frozenset({'log_analysis'})
 # Kubernetes sections whose settings do not take a single `target` (they use
 # per-role, per-generation or identity/profiler targets).
 NO_TARGET = frozenset({'lifecycle_transition', 'observation_state', 'supply_boot'})
@@ -123,14 +129,33 @@ def dumps_toml(data, prefix=()):
     return '\n'.join(part for part in out if part is not None)
 
 
-def build_config(spec, targets=None):
+def kubernetes_executors(pack, environments, checks):
+    """{executor: 'kubernetes'} for J02 executors registered for every given side's engine/version.
+
+    Both sides must be declared: a one-sided selection would give the two
+    sides different executor sets. OBS-03 `log_analysis` is opt-in.
+    """
+    from guard.executors import registry
+    if len(environments) != len(SIDES):
+        return {}
+    names = sorted({pack.checks[cid].executor for cid in checks
+                    if cid in pack.checks and pack.checks[cid].executor
+                    and pack.checks[cid].executor not in EXPLICIT_KUBERNETES_EXECUTORS})
+    return {name: 'kubernetes' for name in names
+            if all(registry.resolve_executor(name, 'kubernetes', engine=env.engine.name,
+                                             version=env.engine.version) is not None for env in environments)}
+
+
+def build_config(spec, targets=None, executors=None):
     """guard.toml content (dict) from the spec; sides carry their own check tables.
 
     `targets` ({side: path}) from --discover fills `target` of every selected
     executor section that takes one, unless the spec already sets it.
+    `executors` (automatic selection) is used only when the spec declares none.
     """
+    chosen = spec.get('executors') if spec.get('executors') is not None else executors
     config = {'store': spec.get('store', '.guard-j02'), 'adapter': {'name': spec.get('adapter', 'vllm')},
-              'executors': dict(spec.get('executors') or {}), 'update': {'mode': 'external'}}
+              'executors': dict(chosen or {}), 'update': {'mode': 'external'}}
     for name, section in (spec.get('shared') or {}).items():
         config[name] = deepcopy(section)
     sides = {}
@@ -139,7 +164,8 @@ def build_config(spec, targets=None):
         out = deepcopy(declared.get('executors') or {})
         if (targets or {}).get(side):
             for name in sorted(config['executors']):
-                if name in NO_TARGET or name in RECORDED_EXECUTORS:
+                if (name in NO_TARGET or name in EXPLICIT_KUBERNETES_EXECUTORS
+                        and config['executors'][name] != 'kubernetes'):
                     continue
                 if 'target' not in (config.get(name) or {}) and 'target' not in (out.get(name) or {}):
                     out.setdefault(name, {})['target'] = str(targets[side])
@@ -408,8 +434,14 @@ def _row(pack, check_id, side, cfg, env, values, *, policy_ref=None):
            'policy_keys_missing': sorted(p.key for p in check.policy_params if p.required and p.key not in values)}
     gap = _version_gap(check.executor, env)
     if row['implementation'] is None:
-        if check_id in RECORDED_UNKNOWN:
-            row['status'], row['reasons'] = 'UNKNOWN_RECORDED', [RECORDED_UNKNOWN[check_id]]
+        if check.executor in EXPLICIT_KUBERNETES_EXECUTORS:
+            registered = env is not None and registry.resolve_executor(
+                check.executor, 'kubernetes', engine=env.engine.name, version=env.engine.version) is not None
+            row['kubernetes_registered'] = registered
+            if registered:
+                row['status'], row['reasons'] = 'MISSING_INPUT', ['EXECUTOR_EXPLICIT_OPT_IN_REQUIRED']
+            else:
+                row['status'], row['reasons'] = 'UNKNOWN_RECORDED', ['KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT']
         elif gap is not None:
             # The release does not admit this executor; selecting one would not run it.
             row['status'], row['reasons'], row['version_gap'] = 'UNSUPPORTED', ['EXECUTOR_NOT_REGISTERED_FOR_ENGINE_VERSION'], gap
@@ -522,8 +554,15 @@ def main(argv=None):
                                          out_dir=args.out / 'cluster' / side)
             targets[side] = path.resolve()
             discovered[side] = {'target': str(path), 'target_sha256': digest}
-    config = build_config(spec, targets)
+    auto = None
+    if spec.get('executors') is None:
+        pack = load_pack(base / spec.get('pack', ROOT / 'packs/PACK-BASELINE'))
+        environments = [load_environment(base / ((spec.get('sides') or {}).get(side) or {})['env'])
+                        for side in SIDES if ((spec.get('sides') or {}).get(side) or {}).get('env')]
+        auto = kubernetes_executors(pack, environments, j02_checks(args.plan))
+    config = build_config(spec, targets, auto)
     result = report(spec, config, plan_file=args.plan, base=base, policy_document=policy_document)
+    result['executors_selected'] = 'declared' if auto is None else 'kubernetes_auto'
     result['web_values_dropped'] = dropped
     result['decided_values'] = decided
     result['rb3_source_gaps'] = rb3_gaps

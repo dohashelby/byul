@@ -1,10 +1,13 @@
 """Verifier contracts using synthetic object graphs; no engine/network is run."""
 from copy import deepcopy
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from guard.models.objects import object_from_dict
-from guard.update_acceptance import CHECKS, assess_update
+from guard.models import load_pack
+from guard.models.objects import Observation, object_from_dict
+from guard.update_acceptance import CHECKS, _coverage_blocks, assess_update
 from tests.update_builders import build_pure_update_case as build_update_case
 
 
@@ -271,6 +274,74 @@ def test_confirmed_fail_never_hides_incomplete_subtrials(tmp_path, gap):
     assert result["checks"][cid]["candidate"]["actual"]["security"] == "FAIL"
     assert result["checks"][cid]["candidate"]["collection_blocks"]
     assert any("incomplete collection coverage" in problem for problem in result["problems"])
+
+
+@pytest.fixture
+def input_matrix_evidence():
+    check = load_pack(Path(__file__).parents[1] / "packs/PACK-BASELINE").checks["REQ-09"]
+    completion, chat = "POST /v1/completions", "POST /v1/chat/completions"
+    token_pair, text_pair, chat_pair = completion + "|token_ids", completion + "|text", chat + "|text"
+    policy_values = {
+        "allowed_endpoints": [completion, chat],
+        "allowed_input_formats": ["token_ids", "text"],
+        "allowed_input_pairs": [token_pair, text_pair, chat_pair],
+    }
+    cases = [token_pair + "|token_id", token_pair + "|length", text_pair + "|length", chat_pair + "|length"]
+    controls = [token_pair + "|before", token_pair + "|after_token_id", token_pair + "|after_length",
+                text_pair + "|before", text_pair + "|after_length", chat_pair + "|before", chat_pair + "|after_length"]
+    rows = []
+    for case_id in cases:
+        endpoint, format_name, label = case_id.rsplit("|", 2)
+        rows.append({"case_id": case_id, "endpoint": endpoint, "format": format_name, "case": label,
+                     "attempted": True, "outcome": "400", "rejection_state": "verified"})
+    values = {
+        "functional_probes_planned": controls,
+        "functional_probe_results": dict.fromkeys(controls, "pass"),
+        "challenges_planned": ["token_id", "length"],
+        "challenge_outcomes": dict.fromkeys([*cases, "token_id", "length"], "400"),
+        "input_matrix_planned": cases,
+        "input_matrix_cases": rows,
+        "input_matrix_complete": True,
+    }
+    evidence = SimpleNamespace(observations={
+        key: Observation(collected=True, value=value) for key, value in values.items()})
+    return check, evidence, policy_values
+
+
+def test_req09_matrix_covers_exact_policy_pairs_even_with_concrete_failed_boundary(input_matrix_evidence):
+    check, evidence, policy_values = input_matrix_evidence
+    assert _coverage_blocks(check, evidence, policy_values) == []
+    obs = evidence.observations
+    row = obs["input_matrix_cases"].value[-1]
+    row.update(outcome="200", rejection_state="unverified")
+    obs["challenge_outcomes"].value[row["case_id"]] = row["outcome"]
+    obs["input_matrix_complete"].value = False
+    assert _coverage_blocks(check, evidence, policy_values) == []
+
+
+@pytest.mark.parametrize("damage", ["control", "omitted-pair", "unattempted", "outcome", "summary"])
+def test_req09_matrix_coverage_rejects_missing_or_conflicting_original_subtrials(input_matrix_evidence, damage):
+    check, evidence, policy_values = input_matrix_evidence
+    obs = evidence.observations
+    row = obs["input_matrix_cases"].value[-1]
+    if damage == "control":
+        obs["functional_probe_results"].value.pop(obs["functional_probes_planned"].value[-1])
+    elif damage == "omitted-pair":
+        case_id = row["case_id"]
+        obs["input_matrix_planned"].value.remove(case_id)
+        obs["input_matrix_cases"].value.pop()
+        del obs["challenge_outcomes"].value[case_id]
+        pair = case_id.rsplit("|", 1)[0]
+        for label in ("|before", "|after_length"):
+            obs["functional_probes_planned"].value.remove(pair + label)
+            del obs["functional_probe_results"].value[pair + label]
+    elif damage == "unattempted":
+        row["attempted"] = False
+    elif damage == "outcome":
+        row["outcome"] = "422"
+    else:
+        obs["challenge_outcomes"].value["token_id"] = "422"
+    assert _coverage_blocks(check, evidence, policy_values)
 
 
 @pytest.mark.parametrize("change,expected", [

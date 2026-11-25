@@ -55,6 +55,14 @@ def file_declared(check):
     return FILE_KEY in {p.key for p in check.policy_params}
 
 
+def has_record_only_native_role(cfg):
+    """Require a configured native role even when its preparation file is absent."""
+    from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
+    allowed = KubernetesRequestTerminationExecutor.configuration_keys | {"probe_key_env"}
+    return (type(cfg) is dict and set(cfg) <= allowed
+            and all(type(cfg.get(key)) is str and cfg[key] for key in ("target", "prepared")))
+
+
 def normalize_policy(values):
     try:
         if type(values) is not dict or set(values) not in (set(POLICY_TYPES), set(POLICY_TYPES) - {FILE_KEY}):
@@ -114,11 +122,18 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
     def validate_policy(self, check, values):
         if check.id == "REQ-02" and getattr(check, "collection_profile", None) == COMPOSITE_PROFILE:
             from . import native_route_contract as native
+            from .run_binding import stages_for
             expected = set(composite_contract()[0]) - (set() if file_declared(check) else {FILE_KEY})
-            if type(values) is not dict or set(values) != expected:
+            if type(values) is not dict:
+                raise ValueError("KUBERNETES_ROUTE_POLICY_INVALID")
+            provided = set(values)
+            record_only = (provided == set(POLICY_TYPES) - {FILE_KEY}
+                           and check.executor == self.name and {1, 2}.issubset(stages_for(check)))
+            if provided != expected and not record_only:
                 raise ValueError("KUBERNETES_ROUTE_POLICY_INVALID")
             normalize_policy(select_policy(values, POLICY_TYPES))
-            native.normalize_policy(select_policy(values, native.POLICY_TYPES))
+            if not record_only:
+                native.normalize_policy(select_policy(values, native.POLICY_TYPES))
             return
         if check.id != "REQ-02" or getattr(check, "collection_profile", None) != PROFILE:
             raise ValueError("KUBERNETES_ROUTE_PROFILE_UNSUPPORTED")
@@ -134,20 +149,25 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
     def _run_composite(self, check, env, values, adapter, workdir):
         """기록 파일 수집과 native 세션 수집을 각각 끝낸 뒤 모은다."""
         from . import native_route_contract as native
-        from .kubernetes_native_route import KubernetesNativeRouteExecutor
         self.validate_policy(check, values)
         self.version = "0.2.0"
         cfg = dict(self.cfg)
         native_cfg = cfg.pop("native_route", None)
-        if type(native_cfg) is not dict:
+        record_only = set(values).isdisjoint(native.POLICY_TYPES)
+        if type(native_cfg) is not dict or (record_only and not has_record_only_native_role(native_cfg)):
             raise ValueError("KUBERNETES_ROUTE_CONFIGURATION_INVALID")
         record = type(self)(cfg, runner=self._kubectl_runner, environ=self._environ,
                             expected_target_sha256=self._expected_target_sha256)
-        session = KubernetesNativeRouteExecutor(native_cfg, runner=self._kubectl_runner, environ=self._environ,
-                                                expected_target_sha256=self._expected_target_sha256)
         drafts, failures = {}, {}
-        for name, executor, profile, keys in (("route_record", record, PROFILE, POLICY_TYPES),
-                                              ("native_route", session, native.PROFILE, native.POLICY_TYPES)):
+        parts = [("route_record", record, PROFILE, POLICY_TYPES)]
+        if record_only:
+            failures["native_route"] = "SUBCOLLECTION_UNAVAILABLE"
+        else:
+            from .kubernetes_native_route import KubernetesNativeRouteExecutor
+            session = KubernetesNativeRouteExecutor(native_cfg, runner=self._kubectl_runner, environ=self._environ,
+                                                    expected_target_sha256=self._expected_target_sha256)
+            parts.append(("native_route", session, native.PROFILE, native.POLICY_TYPES))
+        for name, executor, profile, keys in parts:
             part = Path(workdir) / name
             part.mkdir(parents=True, exist_ok=True)
             try:

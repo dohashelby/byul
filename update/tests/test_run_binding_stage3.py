@@ -124,6 +124,28 @@ def test_obs01_test_actors_move_as_they_are(tmp_path):
                                 issued_at=utcnow(), run_cfg={**good, 'test_actors': actors})
 
 
+def test_obs01_allowed_only_requires_the_canonical_gateway_snapshot(tmp_path):
+    from tests.run_binding_support import before_stage4
+    from tests.test_run_binding import target_file
+
+    target = {'target': str(target_file(tmp_path, {'schema': 'EXAMPLE-target', 'lab': False})),
+              'record_snapshot_only': True, 'gateway_record_snapshot_only': True}
+    run_cfg = {'record_session': SESSION, 'record_producer': write(tmp_path, 'gw.py', b'gateway'),
+               'test_actors': {'allowed': 'a' * 64}}
+    check = PACK.checks['OBS-01']
+    opts = dict(side='baseline', attempt_id=None, issued_at=utcnow(), run_cfg=run_cfg, policy_row={})
+    document, values = run_binding.compute(check, target, env(), **opts)
+    assert values['observation_allowed_actor_sha256'] == 'a' * 64
+    assert 'observation_denied_actor_sha256' not in values
+    assert 'observation_denied_actor_sha256' not in document['values']
+    for marker in ('record_snapshot_only', 'gateway_record_snapshot_only', 'copy_record_snapshot_only'):
+        invalid = {**target, marker: marker == 'copy_record_snapshot_only'}
+        with pytest.raises(run_binding.RunBindingUnavailable, match='^RUN_BINDING_CONFIG_INVALID$'):
+            run_binding.compute(check, invalid, env(), **opts)
+    with pytest.raises(run_binding.RunBindingUnavailable, match='^RUN_BINDING_CONFIG_INVALID$'):
+        run_binding.compute(before_stage4(check), target, env(), **opts)
+
+
 def issuer_event(tmp_path, check_id, start):
     stamp = lambda s: (start + timedelta(seconds=s)).strftime('%Y-%m-%dT%H:%M:%SZ')
     event = {'issuer_id': 'EXAMPLE-issuer', 'event_id': 'EXAMPLE-event-1', 'event_at': stamp(-10), 'deny_after': stamp(50)}

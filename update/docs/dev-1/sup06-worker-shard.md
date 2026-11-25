@@ -9,7 +9,7 @@ B 요청(`gpu-b/consolidation-20261106/DEPENDENCY_RETURNS.md` 5번): worker/rank
 |---|---|
 | 계약 종류 | `gpu_common_inputs.KINDS['worker-shard-load']` (소비 점검 SUP-06). 행: `shard_required`, `shard_assigned`, `load_completed`, `load_failed`, `rank_ready` |
 | 관측기 | `adapters/vllm_worker_shard_callback.py` — 엔진 콜백 센서의 선택 관측 `worker_shards`(기본 꺼짐, `prepare_assets(worker_shards=True)`) |
-| 생산자 | `collectors/worker_shard_producer.py` — `guard-engine-callback-worker-shard-load` 판본 1, 소스 SHA = 관측기+생산자 bytes |
+| 생산자 | `collectors/worker_shard_producer.py` — `guard-engine-callback-worker-shard-load` 판본 2, 소스 SHA = 관측기+생산자 bytes |
 | 기존 소비자 연결 | `worker_shard_producer.shard_rows(record)` → `supply_boot_contract._worker_shard`가 받는 `{rank, required_missing, ready_accepted}` 행(+적재 완료/실패) |
 | 등록 | **미등록**. TP2(rank 2개)에서 확인한 뒤 `SUPPORTED_PRODUCERS`에 더한다. 그 전 기록은 `GPU_INPUT_PRODUCER_UNSUPPORTED`로 complete가 아니다 |
 
@@ -27,7 +27,7 @@ vLLM 0.31.0 원 소스 해시로 고정한 세 지점:
 
 ## 무엇을 관측하지 않나
 
-원 경로·tensor·payload, 실제 GPU 메모리 적재(함수 완료만), 교체 모델의 내용 동일성, 복구 소비. rank를 읽지 못하면 0과 `WORKER_RANK_UNOBSERVED`.
+원 경로·tensor·payload, 실제 GPU 메모리 적재(함수 완료만), 교체 모델의 내용 동일성, 복구 소비. rank가 없거나 같은 종류의 관측 rank가 서로 다르면 해당 worker를 바인딩하지 않고 `WORKER_RANK_UNOBSERVED` 또는 `WORKER_RANK_CONFLICT`를 남긴다.
 
 ## 확인
 

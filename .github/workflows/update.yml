@@ -142,6 +142,27 @@ jobs:
       - run: uv sync --frozen
       - name: Compile update sources before the full suite
         run: uv run python -m compileall -q src/guard tools
+      - name: Record paired transition source ABI
+        run: |
+          uv run --frozen python - <<'PY'
+          import os
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          from guard.models import canonical_json
+          from tests.test_mvp_transition_dependency_abi import CONNECTION_FIXTURE, stage_source_fixtures
+          from tools.mvp_transition_dependency_abi import measure
+
+          with TemporaryDirectory(prefix="byul-transition-abi-", dir=os.environ["RUNNER_TEMP"]) as staged:
+              root = Path(staged)
+              stage_source_fixtures(root)
+              report = measure(
+                  root / "baseline", root / "candidate", include_weight_iteration=True,
+                  baseline_connection=CONNECTION_FIXTURE, candidate_connection=CONNECTION_FIXTURE,
+              )
+              line = canonical_json({"source": os.environ["GITHUB_SHA"], "report": report}).decode("utf-8")
+              print("BYUL_TRANSITION_SOURCE_ABI " + line, flush=True)
+          PY
       - name: Measure default suite parent wall clock
         run: |
           uv run --project ../platform/api --frozen --with-editable . --with-editable ../runtime --with pytest-xdist==3.8.0 python - <<'PY'

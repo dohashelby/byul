@@ -485,6 +485,60 @@
         "native_selection_point": "OpenAIServing._log_inputs"
       },
       "baseline_stream": "uvicorn-0.34-wheel-source"
+    },
+    {
+      "profile": "vllm-native-lifecycle-metadata/35",
+      "schema": "guard-native-lifecycle-events/35",
+      "engine": "vllm",
+      "version": "0.30.0",
+      "commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+        "vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
+      ],
+      "runtimes": {"cpython-3.12.3": ["posix"]},
+      "sources": {
+        "vllm.model_executor.model_loader.default_loader": {
+          "sha256": "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
+          "bytes": 18754,
+          "classes": {}
+        },
+        "vllm.model_executor.model_loader.weight_utils": {
+          "sha256": "7443e55184777dcc99f621b0d97d9149d52c2ea8b4304c6621eb4902e1c8ba5b",
+          "bytes": 60910,
+          "classes": {}
+        }
+      },
+      "void_return_argument_ids": [],
+      "engine_mode": "V1",
+      "approved_file_read": true
+    },
+    {
+      "profile": "vllm-native-lifecycle-metadata/36",
+      "schema": "guard-native-lifecycle-events/36",
+      "engine": "vllm",
+      "version": "0.31.0",
+      "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+        "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
+      ],
+      "runtimes": {"cpython-3.12.3": ["posix"]},
+      "sources": {
+        "vllm.model_executor.model_loader.default_loader": {
+          "sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+          "bytes": 21126,
+          "classes": {}
+        },
+        "vllm.model_executor.model_loader.weight_utils": {
+          "sha256": "7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
+          "bytes": 65986,
+          "classes": {}
+        }
+      },
+      "void_return_argument_ids": [],
+      "engine_mode": "V1",
+      "approved_file_read": true
     }
   ]
 }

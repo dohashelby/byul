@@ -8,6 +8,7 @@ from types import SimpleNamespace as NS
 from multiprocessing.connection import Connection
 import pytest
 from guard.adapters import vllm_lifecycle_sensor as base8,vllm_initialization_sensor as sensor,vllm_initialization_metadata as metadata
+from guard.adapters import vllm_initialization_release_sensor as init_release,vllm_lifecycle_release_sensor as release_rows
 from tests.test_lifecycle_sensor import CONTEXT
 from tests.test_a1_rank_failure_sensor import codes,QuietLogger
 
@@ -37,10 +38,13 @@ class OwnedReadyConnection(Connection):
     def _close(self):self._inner.close()
 
 
-def make_world(session='a'*32,mode='normal'):
-    raw=REFERENCE.read_bytes();assert hashlib.sha256(raw).hexdigest()==sensor.SOURCE_ADDITIONS[sensor.MP]
-    compiled=codes(compile(raw,str(REFERENCE),'exec',dont_inherit=True,optimize=0))
-    module=types.ModuleType(sensor.MP);module.__file__=str(REFERENCE)
+def make_world(session='a'*32,mode='normal',*,profile=sensor.PROFILE):
+    release = profile == init_release.PROFILE
+    reference = REFERENCE.parent.with_name('vllm-mp-030') / REFERENCE.name if release else REFERENCE
+    source = (init_release if release else sensor).SOURCE_ADDITIONS[sensor.MP]
+    raw=reference.read_bytes();assert hashlib.sha256(raw).hexdigest()==source
+    compiled=codes(compile(raw,str(reference),'exec',dont_inherit=True,optimize=0))
+    module=types.ModuleType(sensor.MP);module.__file__=str(reference)
     executor_cls=type('MultiprocExecutor',(),{'__module__':sensor.MP});worker_cls=type('WorkerProc',(),{'__module__':sensor.MP})
     class OMP:
         def __init__(self,config):pass
@@ -61,12 +65,19 @@ def make_world(session='a'*32,mode='normal'):
         rank=h.rank,proc=h.proc,worker_response_mq=mq,peer_worker_response_mqs=peer_worker_response_mqs))
     base=types.ModuleType('_initialization_private_base');base.__file__=base8.__file__
     exec(compile(Path(base8.__file__).read_bytes(),base8.__file__,'exec',dont_inherit=True,optimize=0),base.__dict__)
-    sensor.configure(base)
+    if release:
+        observer_module = types.ModuleType('_initialization_private_release_observer')
+        observer_module.__file__ = sensor.__file__
+        exec(compile(Path(sensor.__file__).read_bytes(), sensor.__file__, 'exec', dont_inherit=True, optimize=0),
+             observer_module.__dict__)
+        init_release.configure(base, release_rows, observer_module)
+    else:
+        sensor.configure(base)
     class Observer(base.Observer):
         def __init__(self):super().__init__({'session':session},'b'*64);self.recorded=[]
         def _writer(self):return NS(context={**CONTEXT,'pid':os.getpid()})
         def emit(self,event,payload):self.recorded.append({'event':event,'payload':deepcopy(payload),'monotonic_ns':time.monotonic_ns()})
-    observer=Observer();observer.instrument(module);observer.modules[sensor.MP]={'source_sha256':sensor.SOURCE_ADDITIONS[sensor.MP],'code_sha256':'c'*64}
+    observer=Observer();observer.instrument(module);observer.modules[sensor.MP]={'source_sha256':source,'code_sha256':'c'*64}
     observer.emit('MODULE',{'module':sensor.MP,'verified':True,**observer.modules[sensor.MP]})
     world=NS(observer=observer,module=module,base=base,created=[],terminated=[],mode=mode)
     def make_worker(**kw):

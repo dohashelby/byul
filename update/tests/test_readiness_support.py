@@ -90,6 +90,28 @@ def test_supply_template_support_uses_its_own_policy_and_names_observation_scope
     assert missing["status"] == "UNKNOWN" and missing["policy_valid"] is False
 
 
+@pytest.mark.parametrize("version", ("0.30.0", "0.31.0"))
+def test_kubernetes_template_guidance_uses_the_scoped_collector(pack, monkeypatch, version):
+    from guard import readiness_support
+
+    def unrelated_contract(*_args):
+        pytest.fail("Kubernetes template readiness should use the declared template collector")
+
+    monkeypatch.setattr(readiness_support, "evidence_contract", unrelated_contract)
+    env, pol, _ = declared_inputs(pack)
+    env.engine = env.engine.model_copy(update={"version": version})
+    pol.values["REQ-07"]["max_rendered_input_tokens"] = 4096
+    pol.values["SUP-03"] = {"allowed_template_sha256": [CHAT_TEMPLATE_SHA256]}
+    pol.values["SUP-13"] = {"forbidden_template_attributes": ["fixture_attribute"]}
+    cfg = {"adapter": {"name": "vllm"}, "executors": {"template_validation": "kubernetes"},
+           "check_config": {"REQ-07": {"req07_normal_only": True}}}
+    rows = assess_check_support(pack, env, pol, cfg, selected_check_ids=["REQ-07", "SUP-03", "SUP-13"], managed=False)
+    assert [row["status"] for row in rows] == ["UNKNOWN", "UNKNOWN", "UNSUPPORTED"]
+    assert [row["policy_supported"] for row in rows] == [True, True, False]
+    assert all(row["policy_valid"] and not row["runtime_qualified"] for row in rows)
+    assert "normal input projection" in rows[0]["scope"]
+
+
 @pytest.mark.parametrize("change", ["other-digest", "other-version"])
 def test_pinned_source_contracts_do_not_trust_version_alone(pack, change):
     def mutate(env, pol, cfg):
@@ -155,6 +177,46 @@ def test_external_target_launch_metadata_is_unconfirmed_without_reading_it(pack)
     rows = support(pack, managed=False)
     assert {row["status"] for row in rows} == {"UNKNOWN"}
     assert all("runtime verification" in " ".join(row["reasons"]) for row in rows)
+
+
+@pytest.mark.parametrize(("version", "image_prefix", "expected"), [
+    pytest.param("0.30.0", "vllm/", "UNSUPPORTED", id="baseline-pin"),
+    pytest.param("0.31.0", "vllm/", "UNKNOWN", id="reviewed-candidate-pin"),
+    pytest.param("0.31.0", "docker.io/vllm/", "UNSUPPORTED", id="deployed-candidate-pin"),
+])
+def test_external_kubernetes_obs09_uses_its_own_source_contract(
+        pack, monkeypatch, tmp_path, version, image_prefix, expected):
+    from guard import readiness_support
+    from guard.adapters.vllm_release_profiles import release_profile
+
+    env, pol, cfg = declared_inputs(pack)
+    image = next(pin for pin in release_profile(version)["images"] if pin.startswith(image_prefix))
+    engine = env.engine.model_copy(update={"version": version, "image_digest": image})
+    env = env.model_copy(update={"engine": engine}).seal()
+    cfg["executors"] = {"log_integrity": "kubernetes", "request_binding": "kubernetes"}
+    cfg["log_integrity"] = {"target": str(tmp_path / "unavailable-log-target.json")}
+    cfg["request_binding"] = {"target": str(tmp_path / "unavailable-binding-target.json")}
+    before = deepcopy((env.model_dump(), pol.model_dump(), cfg))
+    source_contract = readiness_support.evidence_contract
+    requested = []
+
+    def track(adapter, name, selected_image, selected_version):
+        requested.append((name, selected_image, selected_version))
+        return source_contract(adapter, name, selected_image, selected_version)
+
+    monkeypatch.setattr(readiness_support, "evidence_contract", track)
+    obs, req = assess_check_support(pack, env, pol, cfg, selected_check_ids=["OBS-09", "REQ-11"], managed=False)
+    assert requested == [("native_log_contract", image, version), ("request_binding_contract", image, version)]
+    assert (obs["status"], req["status"]) == (expected, expected)
+    assert obs["code_available"] and obs["policy_valid"] and obs["policy_supported"]
+    assert obs["profile_available"] == (expected == "UNKNOWN")
+    assert not obs["runtime_qualified"]
+    assert "external target ownership and launch metadata require runtime verification" in obs["reasons"]
+    assert "source-linked log bytes" in " ".join(obs["limitations"])
+    assert not any("REQ-11" in reason for reason in obs["reasons"])
+    assert any("OBS-09 has no inspected native logging contract" in reason for reason in obs["reasons"]) == (
+        expected == "UNSUPPORTED")
+    assert (env.model_dump(), pol.model_dump(), cfg) == before and not list(tmp_path.iterdir())
 
 
 def test_external_target_does_not_hide_known_policy_mismatch(pack):
@@ -278,6 +340,44 @@ def log_executor(cfg):
     executor = object.__new__(LogAnalysisExecutor)
     executor.cfg = cfg["log_analysis"]
     return executor
+
+
+def test_kubernetes_obs03_reports_the_partial_policy_scope(pack):
+    env, pol, _ = log_inputs(pack)
+    cfg = {"adapter": {"name": "vllm"}, "executors": {"log_analysis": "kubernetes"}}
+    row, = assess_check_support(pack, env, pol, cfg, selected_check_ids=["OBS-03"], managed=False)
+    assert row["code_available"] is True and row["policy_valid"] is True
+    assert row["policy_supported"] is False and row["runtime_qualified"] is False
+    assert row["status"] == "UNSUPPORTED"
+    assert "normal engine" in " ".join(row["reasons"])
+
+
+def test_exact_declared_policy_shapes_do_not_require_unrelated_executor_fields():
+    import json
+    from pathlib import Path
+
+    from guard.models import load_pack
+
+    root = Path(__file__).resolve().parents[1]
+    pack = load_pack(root / "packs/PACK-BASELINE")
+    docs = root / "docs/dev-1"
+    check_ids = ("OBS-11", "PLT-06", "SUP-08", "REQ-08")
+    values = {cid: {} for cid in check_ids}
+    for name in ("mvp-enterprise-policy-20261116.json", "mvp-enterprise-policy-20261118.json"):
+        document = json.loads((docs / name).read_bytes())
+        for row in document["decisions"]:
+            if row["check_id"] in values and row["decision_state"] != "USER_DELEGATED_RUNTIME_RULE":
+                values[row["check_id"]][row["key"]] = row["value"]
+    env, _, _ = declared_inputs(pack)
+    pol = policy(pack.ref(), values=values)
+    rows = assess_check_support(pack, env, pol, {}, selected_check_ids=check_ids, managed=False)
+    assert [row["check_id"] for row in rows] == list(check_ids)
+    for row in rows:
+        assert row["policy_valid"] is True and row["runtime_qualified"] is False, (row["check_id"], row["reasons"])
+    assert "a source-bound collection session input is required" in rows[0]["reasons"], rows[0]
+    pol.values["OBS-11"]["collection_deadline_ms"] = {}
+    row, = assess_check_support(pack, env, pol, {}, selected_check_ids=["OBS-11"], managed=False)
+    assert row["policy_valid"] is False
 
 
 @pytest.mark.parametrize(("key", "value"), [

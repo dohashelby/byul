@@ -38,6 +38,15 @@ def test_mode_violation_uses_the_matching_normal_baseline_and_preserves_missing_
     assert not facts['complete']
 
 
+@pytest.mark.parametrize(('observed_optimize', 'qualified'), [(1, True), (0, False), (True, False), (None, False)])
+def test_sup11_uses_actual_reported_interpreter_mode_when_present(observed_optimize, qualified):
+    normal = {**row(), 'python_optimize': 0}
+    optimized = {**row(mode='O', events=[{'phase': 'import'}], outcome='accepted'),
+                 'python_optimize': observed_optimize}
+    facts = project([normal, optimized])
+    assert facts['SUP-11']['dynamic_mode_confirmed_violations']['value'] == ([optimized['case_id']] if qualified else [])
+
+
 def test_missing_normal_or_different_entry_is_not_mode_equivalence_proof():
     optimized=row(mode='OO',events=[{'phase':'import'}],outcome='accepted')
     facts=project([row(entry='vllm-config'),optimized])

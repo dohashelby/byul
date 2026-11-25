@@ -6,6 +6,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from guard.adapters.vllm_lifecycle_catalog import approved_file_read_preparation
 from guard.cli import app
 from guard.collectors import engine_callbacks
 from guard.collectors.file import load_environment
@@ -17,6 +18,7 @@ from tests.test_req16_lab_contexts import CohortTransport
 from tools import gpu_a_aws_lab as lab
 from tools import gpu_a_req17_cohort as cohort
 from tools import gpu_a_run_inputs as inputs
+from tools.mvp_versions import versions
 
 HANDOFF = Path(__file__).parent / 'fixtures/aws-handoff-20261026'
 UPDATE = Path(__file__).resolve().parents[1]
@@ -24,9 +26,9 @@ IMAGE = 'docker.io/vllm/vllm-openai@sha256:' + 'a' * 64
 NS_UID = '11111111-2222-3333-4444-555555555555'
 
 
-def deployed(tmp_path, generation, **render_options):
+def deployed(tmp_path, generation, *, run_id='a-run-1', **render_options):
     image = render_options.pop('engine_image', IMAGE)
-    engine_yaml, probe_yaml, record = lab.render(HANDOFF, generation=generation, profile='dev', run_id='a-run-1',
+    engine_yaml, probe_yaml, record = lab.render(HANDOFF, generation=generation, profile='dev', run_id=run_id,
         engine_image=image, model_revision='7ae557604adf67be50417f59c2c2f167def9a775', host_root='/srv/byul-a',
         **render_options)
     deployment, _ = yaml.safe_load_all(engine_yaml)
@@ -77,6 +79,132 @@ def test_env_and_target_bind_the_rendered_generation(tmp_path):
     assert target['engine']['trusted_url'] == 'http://10.244.0.11:8000' and target['kubernetes']['run_id'] == 'a-run-1'
     assert target['kubernetes']['probe']['pod'] == 'engine-test-probe-a-run-1' and target['model_mapping']['served_model_name'] == 'test-model'
     assert load_environment(tmp_path / 'env.json').ref() == env.ref()
+
+
+def test_external_envs_keep_reviewed_v1_with_comparable_runtime(tmp_path, capsys):
+    environments, renders = [], []
+    for side, release in versions().items():
+        folder = tmp_path / side
+        folder.mkdir()
+        _, render = deployed(folder, 'v1-callback', run_id=f'a-{side}', engine_version=release['version'],
+                             engine_image=release['image'])
+        source = folder / 'render.json'
+        raw = source.read_bytes()
+        output = folder / 'env.json'
+        argv = ['env', '--render', str(source), '--external-platform', 'Linux x86_64',
+                '--gpu-model', 'NVIDIA L4', '--driver', 'EXAMPLE-driver', '--model-inventory', 'b' * 64,
+                '--observed-engine-version', release['version'], '--out', str(output)]
+        inputs.main(argv)
+        env = load_environment(output)
+        assert json.loads(capsys.readouterr().out) == {
+            'env': str(output), 'sha256': env.ref().sha256, 'render': {'path': str(source), 'sha256': sha256_hex(raw)}}
+        assert env.runtime.platform == ('Linux x86_64, external Kubernetes; generation=v1-callback; profile=dev; '
+                                        'engine_requested=V1; runner=v1; async_requested=None; '
+                                        'engine_version_observed=True; eager=False')
+        assert env.data_origin.value == 'DECLARED'
+        assert env.runtime.gpu_model == 'NVIDIA L4' and env.runtime.driver == 'EXAMPLE-driver'
+        assert env.model.id == render['model_id'] and env.model.revision == render['model_revision']
+        assert env.model.inventory_sha256 == 'b' * 64 and env.facts['prefix_cache'].value is True
+        saved = output.read_bytes()
+        with pytest.raises(FileExistsError):
+            inputs.main(argv)
+        assert output.read_bytes() == saved and source.read_bytes() == raw
+        environments.append(env)
+        renders.append(render)
+    assert renders[0]['run_id'] != renders[1]['run_id']
+    assert renders[0]['outputs_sha256']['engine.yaml'] != renders[1]['outputs_sha256']['engine.yaml']
+    assert environments[0].runtime == environments[1].runtime
+    assert [approved_file_read_preparation(env) for env in environments] == [
+        {'profile': 'vllm-native-lifecycle-metadata/35', 'model_root': '/models'},
+        {'profile': 'vllm-native-lifecycle-metadata/36', 'model_root': '/models'},
+    ]
+
+
+@pytest.mark.parametrize('side', ('baseline', 'candidate'))
+@pytest.mark.parametrize('generation', ('v2-default', 'v2-template'))
+def test_owned_normal_tp2_render_binds_observed_layout_and_version(tmp_path, side, generation):
+    release = versions()[side]
+    pods, render = deployed(tmp_path, generation, engine_version=release['version'], engine_image=release['image'],
+                            release_launch=True, normal_tp2=True)
+    pod = pods['engine']
+    pod['kind'] = 'Pod'
+    engine = pod['spec']['containers'][0]
+    assert engine['args'][-len(lab.NORMAL_TP2_ARGS):] == list(lab.NORMAL_TP2_ARGS)
+    assert all(engine['args'].count(key) == 1 for key in lab.NORMAL_TP2_ARGS[::2])
+    assert [engine['resources'][key][lab.GPU_RESOURCE] for key in ('requests', 'limits')] == ['2', '2']
+    engine_path = tmp_path / 'engine-pod.json'
+    engine_path.write_bytes(canonical_json(pod))
+    namespace_path = tmp_path / 'namespace.json'
+    namespace = json.loads(namespace_path.read_bytes())
+    assert render['normal_tp2'] == lab.NORMAL_TP2
+    kwargs = {'inventory': 'b' * 64, 'gpu_model': 'NVIDIA L4', 'driver': 'EXAMPLE-driver',
+              'observed_engine_version': release['version'], 'external_platform': 'Linux x86_64',
+              'namespace': namespace, 'engine_pod': pod}
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_OBSERVATION_REQUIRED$'):
+        inputs.environment(render, **kwargs)
+    env_path = tmp_path / 'env.json'
+    inputs.main(['env', '--render', str(tmp_path / 'render.json'), '--external-platform', 'Linux x86_64',
+                 '--gpu-model', 'NVIDIA L4', '--driver', 'EXAMPLE-driver', '--model-inventory', 'b' * 64,
+                 '--observed-engine-version', release['version'], '--observed-gpu-count', '2',
+                 '--engine-pod', str(engine_path), '--namespace', str(namespace_path), '--out', str(env_path)])
+    env = load_environment(env_path)
+    assert {key: getattr(env.runtime, key) for key in lab.NORMAL_TP2} == lab.NORMAL_TP2
+    assert env.data_origin.value == 'DECLARED'
+
+    target_path = tmp_path / 'target.json'
+    inputs.main(['target', '--env', str(env_path), '--render', str(tmp_path / 'render.json'),
+                 '--engine-pod', str(engine_path), '--namespace', str(namespace_path),
+                 '--probe-pod', str(tmp_path / 'probe-pod.json'), '--context', 'byul-aws-lab',
+                 '--observed-engine-version', release['version'], '--out', str(target_path)])
+    saved = json.loads(target_path.read_bytes())
+    assert saved['observed_version'] == release['version']
+    assert saved['environment_ref'] == env.ref().model_dump(mode='json')
+    assert saved['lab'] is False
+    launch = {'argv': engine['args'], 'max_model_len': render['max_model_len']}
+    if generation == 'v2-template':
+        assert engine['args'].count('--chat-template') == 1
+        launch['chat_template'] = {'profile': inputs.CHAT_TEMPLATE_PROFILE, 'version': '1',
+                                   'sha256': lab.CHAT_TEMPLATE_SHA256, 'container_path': lab.CHAT_TEMPLATE_PATH,
+                                   'content_format': 'string', 'request_overrides': False}
+        mount, = (item for item in engine['volumeMounts'] if item['name'] == 'guard-chat-template')
+        mount['readOnly'] = False
+        with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+            inputs.target(env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
+                          observed_engine_version=release['version'])
+        mount['readOnly'] = True
+    else:
+        assert 'chat_template' not in render
+    assert saved['comparison_config']['launch'] == launch
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+        inputs.target(env, {**render, 'max_model_len': 1024}, namespace, pod, pods['probe'],
+                      context='byul-aws-lab', observed_engine_version=release['version'])
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_MODEL_MISMATCH$'):
+        inputs.target(env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
+                      api_model='different-model', observed_engine_version=release['version'])
+    with pytest.raises(ValueError, match='^RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH$'):
+        inputs.target(env, render, namespace, pod, pods['probe'], context='byul-aws-lab',
+                      observed_engine_version='other-version')
+    engine['resources']['limits'][lab.GPU_RESOURCE] = '1'
+    with pytest.raises(ValueError, match='^RUN_INPUTS_NORMAL_TP2_POD_MISMATCH$'):
+        inputs.environment(render, observed_gpu_count=2, **kwargs)
+
+
+@pytest.mark.parametrize('damage', ('legacy', 'mode-missing', 'mode-v2', 'mode-env', 'image'))
+def test_external_env_requires_reviewed_v1_render(tmp_path, damage):
+    release = versions()['baseline']
+    _, render = deployed(tmp_path, 'v1-callback', engine_version=release['version'], engine_image=release['image'])
+    if damage == 'legacy':
+        render['schema'] = 'byul-gpu-a-aws-render/1'
+    elif damage == 'mode-missing':
+        del render['launch']['engine']
+    elif damage == 'mode-v2':
+        render['launch']['engine'] = 'V2'
+    elif damage == 'mode-env':
+        render['launch']['env'] = {'EXAMPLE_MODE': 'unreviewed'}
+    else:
+        render['engine_image'] = IMAGE
+    with pytest.raises(ValueError, match='^RUN_INPUTS_EXTERNAL_ENV_REVIEWED_V1_REQUIRED$'):
+        inputs.environment(render, gpu_model='NVIDIA L4', driver='EXAMPLE-driver', external_platform='Linux x86_64')
 
 
 def test_code_selection_env_requires_installed_version_and_target_checks_launch(tmp_path):

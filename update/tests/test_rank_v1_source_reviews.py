@@ -13,14 +13,14 @@ import types
 import pytest
 
 from guard.adapters import vllm_rank_ipc_sources as sources
-from tools.mvp_versions import versions
+from tests.test_ma6_release_profiles import historical_versions
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
 
 
 def reviewed(side):
-    image = versions()[side]['image']
+    image = historical_versions()[side]['image']
     rows = json.loads(sources.V1_REVIEWS.read_bytes())['profiles']
     row, = [r for r in rows if r['image'] == image and r['runtime'] == RUNTIME]
     return row
@@ -30,7 +30,7 @@ def module_body(tmp_path, side, name):
     """컴파일한 원 함수 code만 시험 namespace에 배치한다. import/장식자 실행은 없다."""
     row = reviewed(side)
     spec = row['sources'][name]
-    fixture = ROOT / 'tests/fixtures' / ('vllm-' + versions()[side]['version']) / (spec['path'] + '.txt')
+    fixture = ROOT / 'tests/fixtures' / ('vllm-' + historical_versions()[side]['version']) / (spec['path'] + '.txt')
     raw = fixture.read_bytes()
     path = tmp_path / (side + '-' + name + '.py')
     path.write_bytes(raw)
@@ -71,10 +71,10 @@ def test_installed_source_rows_keep_actual_tag_bytes_and_runtime_body_pins():
     rows = json.loads(sources.V1_REVIEWS.read_bytes())['profiles']
     assert len(rows) == 4
     assert {(r['image'], r['runtime']) for r in rows} == {
-        (v['image'], runtime) for v in versions().values()
+        (v['image'], runtime) for v in historical_versions().values()
         for runtime in ('cpython-3.12.3', 'cpython-3.12.8')}
     for side in ('baseline', 'candidate'):
-        fixture = ROOT / 'tests/fixtures' / ('vllm-' + versions()[side]['version'])
+        fixture = ROOT / 'tests/fixtures' / ('vllm-' + historical_versions()[side]['version'])
         provenance = json.loads((fixture / 'PROVENANCE.json').read_bytes())
         for spec in reviewed(side)['sources'].values():
             raw = (fixture / (spec['path'] + '.txt')).read_bytes()

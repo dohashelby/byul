@@ -14,9 +14,10 @@ import re
 
 from guard.automation_policy import (string_list, validate_log_integrity_policy,
                                      validate_request_binding_policy, validate_template_policy)
-from guard.configuration import for_check
+from guard.configuration import (GATEWAY_RECORD_SNAPSHOT_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
+                                 UPDATE_CHECK_OUTSIDE_SCOPE, for_check)
 from guard.core.select import check_policy_value
-from guard.executors import registry
+from guard.executors import ipc_trust_scope, log_collection_gap, passive_api_hop, registry, request_field_probe, run_binding
 from guard.executors.request_binding import SUPPORTED_POLICY as BINDING_POLICY
 from guard.executors.log_integrity_parser import PROFILE as LOG_PROFILE, TRUSTED_FIELDS
 from guard.executors.response_content import OPTIONS as RETURN_OPTIONS
@@ -28,6 +29,7 @@ from guard.executors.running_image_approval import PROFILE as IMAGE_APPROVAL_PRO
 from guard.executors.template_supply_approval import (PROFILE as TEMPLATE_SUPPLY_PROFILE,
                                                       validate_policy as validate_template_supply_policy)
 from guard.input_policy import policy_context
+from guard.reused_matrix_policy import PROFILE as REUSED_MATRIX, selected as reused_matrix_policy
 
 
 # Descriptions of the existing collectors, not a second plugin registry.
@@ -52,27 +54,38 @@ _COMMON_LIMIT = (
 )
 
 
-def _policy_shape(check, values):
+def _policy_shape(check, values, *, kubernetes_template=False):
     """Existing declared types and pure shape rules, without collector limits."""
     for param in check.policy_params:
         if param.required and param.key not in values:
             raise ValueError("required policy value is missing")
         if param.key in values:
             check_policy_value(check.id, param.key, param.type, values[param.key])
+    profile = getattr(check, "collection_profile", None)
     if check.executor == "template_validation":
         if getattr(check, "collection_profile", None) == TEMPLATE_SUPPLY_PROFILE:
             validate_template_supply_policy(check, values, {})
-        else:
+        elif check.id != "SUP-13" or not kubernetes_template:
             validate_template_policy(values)
     elif check.executor == "unix_ipc":
-        from guard.executors.unix_ipc import policy_shape
-        policy_shape(values)
+        if profile == ipc_trust_scope.PROFILE:
+            ipc_trust_scope.validate_policy(values)
+        else:
+            from guard.executors.unix_ipc import policy_shape
+            policy_shape(values)
     elif check.executor == "container_config" and getattr(check, "collection_profile", None) == IMAGE_APPROVAL_PROFILE:
         validate_image_approval_policy(values)
     elif check.executor == "request_binding":
         validate_request_binding_policy(values)
     elif check.executor == "log_integrity":
-        validate_log_integrity_policy(values)
+        if profile == log_collection_gap.PROFILE:
+            log_collection_gap.validate_policy_shape(values)
+        else:
+            validate_log_integrity_policy(values)
+    elif check.executor == "input_validation" and request_field_probe.supported(check):
+        request_field_probe.validate_policy(check, values)
+    elif check.executor == "input_validation" and profile == REUSED_MATRIX:
+        reused_matrix_policy(check, values)
     elif check.executor in {"input_validation", "sampling_validation", "response_content", "log_analysis"}:
         for param in check.policy_params:
             if param.type == "list[str]":
@@ -83,7 +96,7 @@ def _policy_shape(check, values):
 
 
 def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: Iterable[str],
-                         managed: bool = True,
+                         managed: bool = True, allowed_checks=None, passive_hop: bool = False,
                          config_for_check: Callable[[str, str], dict] | None = None) -> list[dict]:
     """Describe each selected check without rejecting or rewriting its policy.
 
@@ -123,19 +136,46 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("no automatic executor; manual evidence import remains a separate path")
             continue
+        profile = getattr(check, "collection_profile", None)
+        scoped_out = allowed_checks is not None and check_id not in allowed_checks
+        if scoped_out:
+            row["reasons"].append(UPDATE_CHECK_OUTSIDE_SCOPE)
+        if profile == log_collection_gap.PROFILE:
+            row["scope"] = "configured deadlines and a source-bound log collection session"
+            try:
+                session = run_binding.run_config(cfg, check_id)
+            except ValueError:
+                row["reasons"].append("RUN_BINDING_CONFIG_INVALID")
+            else:
+                if type(session) is not dict or not session.get("record_session"):
+                    row["reasons"].append("a source-bound collection session input is required")
+        implementation = cfg.get("executors", {}).get(executor)
+        kube = implementation == "kubernetes" and not managed
+        kube_template = kube and executor == "template_validation"
         values = policy.values.get(check_id, {})
         try:
-            _policy_shape(check, values)
+            _policy_shape(check, values, kubernetes_template=kube_template)
         except (ValueError, TypeError):
             row["policy_valid"] = False
             row["reasons"].append("required policy values are missing or malformed; support cannot be determined")
             continue
         row["policy_valid"] = True
-        implementation = cfg.get("executors", {}).get(executor)
-        kube = implementation == "kubernetes" and not managed
-        selected_factory = None
-        if implementation == "real" or kube:
-            selected_factory = registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
+        if scoped_out:
+            continue
+        if passive_hop and check_id == passive_api_hop.CHECK:
+            row["scope"] = "passive evidence from the same side's owned PLT-01 normal control"
+            row["limitations"].append("the deployed caller path, TLS, IPC, TP and per-hop policy remain unverified")
+            try:
+                passive_api_hop.validate_policy(check, values)
+            except passive_api_hop.PassiveApiHopUnavailable as exc:
+                row["policy_valid"] = False
+                row["reasons"].append(str(exc))
+            else:
+                row.update(code_available=True, profile_available=True, policy_supported=True)
+                row["reasons"].append("requires the exact committed PLT-01 control in this execution attempt")
+            continue
+        selected_factory = (registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
+                            if implementation == "real" or kube else None)
         if selected_factory is None:
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
@@ -147,6 +187,61 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["reasons"].append("CHECK_CONFIG_INVALID")
             continue
         executor_cfg = check_cfg.get(executor, {})
+        if kube and check_id in {'OBS-01', 'OBS-02', 'PLT-02', 'PLT-07', 'PLT-12', 'LIF-01', 'LIF-03', 'LIF-04',
+                                 'REQ-09', 'REQ-10', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12'}:
+            effective = executor_cfg
+            setting = KUBERNETES_BOUND_CHECK_OPTIONS[check_id]
+            if type(effective) is dict and effective.get(setting) is True:
+                if check_id == 'OBS-01':
+                    row["scope"] = ("one owned Runtime Gateway final row selected by the original request hash and session"
+                                    if effective.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True else
+                                    "owned audit record snapshot for the selected producer, actor hashes and session")
+                    row["limitations"].append("independent event triggering, record delivery and timing remain unverified")
+                elif check_id == 'OBS-02':
+                    row["scope"] = "owned HTTP readiness status and an ordinary completion in the same container generation"
+                    row["limitations"].append("request selection, worker state, profiler and termination require separate observations")
+                elif check_id == 'PLT-12':
+                    row["scope"] = "owned copy-inventory record snapshot bound to the selected policy and producer"
+                    row["limitations"].append("copy membership, treatment, reuse and issuer state require independent evidence")
+                elif check_id == 'PLT-02':
+                    row["scope"] = "approved IPC path presence and mode in the owned Pod mount namespace"
+                    row["limitations"].append("no IPC connections, process-to-socket attribution or whole-access verdict")
+                elif check_id == 'PLT-07':
+                    row["scope"] = "reported Cilium egress policy state for the selected owned endpoint"
+                    row["limitations"].append("packet verdicts and process-level egress require separate observations")
+                elif check_id == 'SUP-10':
+                    row["scope"] = "installed vLLM plugin entry-point metadata from the selected owned container"
+                    row["limitations"].append("plugin load, invocation and allowlist enforcement require separate observations")
+                elif check_id == 'SUP-07':
+                    row["scope"] = "source-checked startup compile record and cache file metadata in the owned container"
+                    row["limitations"].append("writer enforcement, cache reads and verification before use require separate evidence")
+                elif check_id == 'SUP-05':
+                    row["scope"] = "owned native eager-read bytes from the prepared normal model load"
+                    row["limitations"].append("worker assignment, tensor storage and file admission enforcement require independent evidence")
+                elif check_id == 'SUP-12':
+                    row["scope"] = "source-checked default Safetensors branch during the owned normal startup"
+                    row["limitations"].append("exact file reads, alternate readers and malformed-input behavior require separate evidence")
+                elif check_id == 'LIF-01':
+                    row["scope"] = "source-checked normal model load timing and device memory delta from the owned startup log"
+                    row["limitations"].append("fetch, resolve, verify, peak bytes and budget enforcement require separate evidence")
+                elif check_id == 'LIF-03':
+                    row["scope"] = "owned client timing for one ordinary completion"
+                    row["limitations"].append("server budgets, contention and fairness require separate observations")
+                elif check_id == 'LIF-04':
+                    row["scope"] = "ordinary stream framing and fixed owned container memory observations"
+                    row["limitations"].append("bounded normal stream only; backpressure, debug behavior and release stay unverified")
+                elif check_id == 'REQ-09':
+                    row["scope"] = "owned tokenization and one ordinary completion using the returned token IDs"
+                    row["limitations"].append("rejection boundaries and native processor consumption stay unverified")
+                elif check_id == 'REQ-20':
+                    row["scope"] = "source-checked ordinary CUDA graph capture completion in the owned startup log"
+                    row["limitations"].append("capture inputs, replay, output use and buffer lifetime require separate observations")
+                else:
+                    row["scope"] = "one ordinary completion with the approved sampling options"
+                    row["limitations"].append("sampling limits, rejections, structured output and runner consumption stay unverified")
+                row["profile_available"] = True
+                row["reasons"].append("the exact target and policy inputs must pass static preparation")
+                continue
         if executor == 'engine_sensor':
             selected_executor = selected_factory(check_cfg)
             describe = getattr(selected_executor, 'support', None)
@@ -175,7 +270,36 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 row["policy_supported"] = False
             row["reasons"].append(reason)
 
+        if kube_template:
+            try:
+                selected_factory(check_cfg).validate_policy(check, values)
+            except (TypeError, ValueError):
+                unsupported("the check or policy is outside the configured Kubernetes template collector's scope",
+                            policy_scope=True)
+            else:
+                row["status"] = "UNKNOWN"
+                row["reasons"].append("owned Pod identity and selected readonly template bytes require runtime verification")
+                if check_id == "REQ-07":
+                    row["scope"] = "owned fixed-template normal input projection within the declared token limit"
+                    row["limitations"].append("limit enforcement, request template overrides and worker consumption require separate evidence")
+            continue
+
+        if profile == log_collection_gap.PROFILE:
+            row["status"] = "UNKNOWN"
+            row["limitations"].append("session identity, producer records and collection timing require runtime verification")
+            continue
+
         if executor == "unix_ipc":
+            if profile == ipc_trust_scope.PROFILE:
+                row["scope"] = "owned process trust-group and identity metadata"
+                row["status"] = "UNKNOWN"
+                row["limitations"].append("worker group attribution, isolation and shared-resource scope require separate evidence")
+                if kube:
+                    try:
+                        selected_factory(check_cfg).validate_policy(check, values)
+                    except (ValueError, TypeError):
+                        unsupported("the configured Kubernetes collector does not admit this worker trust profile")
+                continue
             from guard.executors.unix_ipc import UnixIPCExecutor
             try:
                 UnixIPCExecutor(executor_cfg, docker=object()).validate_policy(check, values)
@@ -202,19 +326,23 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                         or set(values.get("required_trusted_fields", [])) - set(TRUSTED_FIELDS)):
                     unsupported("valid collector/trust/field policy exceeds the fixed native INFO reference collector", policy_scope=True)
                 row["limitations"].append("source identity and exact trial events need runtime verification; enterprise collector/SIEM coverage is unverified")
+            image, version = env.engine.image_digest, env.engine.version
             if not managed:
                 if row["status"] != "UNSUPPORTED":
                     row["status"] = "UNKNOWN"
                 row["reasons"].append("external target ownership and launch metadata require runtime verification")
-                if kube:
-                    if evidence_contract(adapter, "request_binding_contract", env.engine.image_digest,env.engine.version) is None:
+                if kube and executor == "request_binding":
+                    if evidence_contract(adapter, "request_binding_contract", image, version) is None:
                         unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")
                     row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
+                elif kube and executor == "log_integrity":
+                    if evidence_contract(adapter, "native_log_contract", image, version) is None:
+                        unsupported("OBS-09 has no inspected native logging contract for the exact image/version")
+                    row["limitations"].append("Kubernetes native INFO collection requires a verified owned Pod, logging launch and source-linked log bytes")
                 continue
             launch = cfg.get(env.engine.name, {})
             if not provider.bounded_launch_evidence(launch, env):
                 unsupported("this inspected collection profile requires an explicit bounded GPU launch (gpu-bounded with assigned GPUs)")
-            image, version = env.engine.image_digest, env.engine.version
             if not image or not version:
                 if row["status"] != "UNSUPPORTED":
                     row["status"] = "UNKNOWN"
@@ -247,6 +375,11 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 if launch.get("logging_profile") != "request-info-v1":
                     unsupported("the fixed native INFO logging launch profile is absent or unsupported")
         elif executor == "input_validation":
+            if request_field_probe.supported(check) or profile == REUSED_MATRIX:
+                row["scope"] = "declared request fields and exact engine-bound observation inputs"
+                row["status"] = "UNKNOWN"
+                row["limitations"].append("approved runtime assets and field consumption require separate verification")
+                continue
             context = policy_context(check, values)
             if context is not None and context.blocked:
                 unsupported("valid endpoint/input-format policy exceeds the single submitted token-array profile", policy_scope=True)
@@ -281,6 +414,14 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             row["limitations"].append("actual response fields and private-context behavior remain unobserved; model instruction quality is outside this check")
         elif executor == "log_analysis":
             branches = set(values.get("required_branches", []))
+            if kube:
+                row["scope"] = "owned engine Pod normal inference and correlated structured stdout fields"
+                row["status"] = "UNKNOWN"
+                row["reasons"].append("owned Pod identity, structured log format and request correlation require runtime collection")
+                row["limitations"].append("one normal engine control; gateway logs, error and exception-dump branches require separate evidence")
+                if set(values.get("required_sources", [])) - {"engine"} or branches - {"normal"}:
+                    unsupported("required source or branch coverage exceeds the normal engine log collector", policy_scope=True)
+                continue
             if not LOG_REQUIRED_BRANCHES <= branches or branches - LOG_SUPPORTED_BRANCHES:
                 unsupported("valid branch policy exceeds the required normal/error/exception-dump and supported debug/trace profile", policy_scope=True)
             if set(values.get("forbidden_marker_contexts", [])) - LOG_MARKER_CONTEXTS:

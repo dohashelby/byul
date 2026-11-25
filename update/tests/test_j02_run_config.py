@@ -133,14 +133,18 @@ def test_discover_reads_the_run_pods_and_builds_the_side_target(tmp_path):
     assert config['sides']['baseline'] == {'direct_route': {'target': str(path)}}
 
 
-def test_obs03_keeps_no_executor_and_records_the_cause(tmp_path):
+@pytest.mark.parametrize('version', ('0.30.0', '0.31.0'))
+def test_obs03_requires_explicit_selection_and_accepts_its_kubernetes_target(tmp_path, version):
     from guard.models import load_pack
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
-    env = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'm', 'revision': 'r'})
+    env = environment(engine={'name': 'vllm', 'version': version}, model={'id': 'm', 'revision': 'r'})
     row = tool._row(pack, 'OBS-03', 'baseline', {'executors': {}}, env, {})
-    assert row['status'] == 'UNKNOWN_RECORDED' and row['reasons'] == ['KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT']
-    config = tool.build_config({'executors': {'log_analysis': 'kubernetes'}}, {'baseline': tmp_path / 't.json'})
-    assert 'log_analysis' not in config['sides']['baseline']
+    assert row['status'] == 'MISSING_INPUT' and row['reasons'] == ['EXECUTOR_EXPLICIT_OPT_IN_REQUIRED']
+    assert row['kubernetes_registered'] is True
+    targets = {'baseline': tmp_path / 't.json'}
+    config = tool.build_config({'executors': {'log_analysis': 'kubernetes'}}, targets)
+    assert config['sides']['baseline']['log_analysis']['target'] == str(targets['baseline'])
+    assert tool.build_config({'executors': {'log_analysis': 'real'}}, targets)['sides']['baseline'] == {}
 
 
 def test_req05_decision_fills_only_missing_values_from_the_one_model():
@@ -251,3 +255,55 @@ def test_rb3_requires_one_model_and_explicit_supply_identity(tmp_path):
     assert 'PLT-05' not in filled and document['values']['PLT-05'] == {'supply_allowed_identities': ['web-approved-identity']}
     with pytest.raises(ValueError, match='DRAFT_POLICY_REQUIRED'):
         tool.rb3_draft_values({'status': 'CONFIRMED', 'values': {}}, environments, sources, base=tmp_path)
+
+
+def _write_envs(tmp_path, versions):
+    for side, version in zip(tool.SIDES, versions):
+        env = environment(engine={'name': 'vllm', 'version': version}, model={'id': 'm', 'revision': 'r'})
+        (tmp_path / (side + '-env.json')).write_text(json.dumps(env.to_dict()))
+
+
+@pytest.mark.parametrize('versions', [('0.31.0', '0.31.0'), ('0.30.0', '0.31.0')])
+def test_without_declared_executors_selects_common_kubernetes_registrations(tmp_path, versions):
+    from guard.executors import registry
+    from guard.models import load_pack
+    _write_envs(tmp_path, versions)
+    declared = {'sides': {side: {'env': side + '-env.json'} for side in tool.SIDES}}
+    (tmp_path / 'spec.yaml').write_text(yaml.safe_dump(declared))
+    tool.main([str(tmp_path / 'spec.yaml'), '--out', str(tmp_path / 'out')])
+    result = json.loads((tmp_path / 'out/report.json').read_text())
+    selected = tomllib.loads((tmp_path / 'out/guard.toml').read_text())['executors']
+    assert result['executors_selected'] == 'kubernetes_auto'
+    assert selected and set(selected.values()) == {'kubernetes'}
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    names = {pack.checks[check].executor for check in tool.j02_checks()}
+    supported = [
+        {name for name in names
+         if name and registry.resolve_executor(name, 'kubernetes', engine='vllm', version=version) is not None}
+        for version in versions
+    ]
+    assert set(selected) == supported[0].intersection(supported[1]) - tool.EXPLICIT_KUBERNETES_EXECUTORS
+    assert 'log_analysis' not in selected
+    rows = {(r['side'], r['check_id']): r for r in result['rows']}
+    assert rows['baseline', 'OBS-03']['reasons'] == ['EXECUTOR_EXPLICIT_OPT_IN_REQUIRED']
+    assert rows['baseline', 'OBS-03']['status'] == 'MISSING_INPUT'
+    # Selecting never fills a verdict: no row becomes READY_STATIC without its inputs.
+    assert result['counts'].get('READY_STATIC', 0) < len(result['rows'])
+
+
+def test_declared_executors_are_kept_exactly_and_auto_selection_needs_both_sides():
+    assert tool.build_config({'executors': {'direct_route': 'fake'}}, None, {'role_route': 'kubernetes'})['executors'] == {
+        'direct_route': 'fake'}
+    assert tool.build_config({'executors': {}}, None, {'role_route': 'kubernetes'})['executors'] == {}
+    assert tool.build_config({}, None, {'role_route': 'kubernetes'})['executors'] == {'role_route': 'kubernetes'}
+    from guard.models import load_pack
+    pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
+    one = [environment(engine={'name': 'vllm', 'version': '0.31.0'})]
+    assert tool.kubernetes_executors(pack, one, tool.j02_checks()) == {}
+
+
+def test_auto_selected_executors_receive_the_discovered_target(tmp_path):
+    config = tool.build_config({'sides': {}}, {'baseline': tmp_path / 't.json'},
+                               {'direct_route': 'kubernetes', 'supply_boot': 'kubernetes'})
+    assert config['sides']['baseline']['direct_route']['target'] == str(tmp_path / 't.json')
+    assert 'supply_boot' not in config['sides']['baseline']

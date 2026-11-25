@@ -77,6 +77,7 @@ def test_bound_packet_keeps_capture_uid_distinct_and_never_authenticates_workers
     env,target,world=inputs(tmp_path)
     result=collect(env,target,runner=world.runner,candidate_paths=['/run/secrets/EXAMPLE'])
     assert result['available'] and result['binding_verified_before_after']
+    assert result['capture_stage']=='complete' and result['incomplete_packet'] is None
     assert result['binding_before']==result['binding_after']==target['kubernetes']['engine']
     assert result['data_origin']=='EXAMPLE' and result['program_sha256']==process.SOURCE_SHA256
     assert result['packet']['capture_subject']['uid_effective']==10001
@@ -113,19 +114,63 @@ def test_later_owner_failure_retains_unbound_packet_without_claiming_generation(
         else:value['status']['containerStatuses'][0]['restartCount']=1
     world.mutate=mutate;r=collect(env,t,runner=world.runner)
     assert not r['available'] and not r['binding_verified_before_after']
+    assert r['capture_stage']=='binding_after' and r['incomplete_packet'] is None
     assert r['binding_before']==t['kubernetes']['engine'] and r['binding_after'] is None
     assert r['packet']['processes'][0]['uid_effective']==2000
     assert not r['worker_subject_verified'] and not r['worker_inventory_complete']
     assert r['diagnostic_codes']==['KUBERNETES_PROCESS_CAPTURE_UNAVAILABLE']
 
 
-@pytest.mark.parametrize('mode',['forged-worker','private-extra','value-in-name','cleanup','shared-pid'])
-def test_invalid_or_incomplete_capture_has_only_fixed_diagnostics(tmp_path,mode):
+@pytest.mark.parametrize('mode,stage',[
+    ('forged-worker','packet_validation'),('private-extra','packet_validation'),
+    ('value-in-name','packet_validation'),('shared-pid','scope_before'),
+])
+def test_invalid_or_disallowed_capture_has_only_fixed_diagnostics(tmp_path,mode,stage):
     env,t,world=inputs(tmp_path,mode);r=collect(env,t,runner=world.runner)
     assert not r['available'] and r['packet'] is None and PRIVATE not in json.dumps(r)
+    assert r['incomplete_packet'] is None
+    assert r['capture_stage']==stage and not r['binding_verified_before_after']
+    assert r['diagnostic_codes']==['KUBERNETES_PROCESS_CAPTURE_UNAVAILABLE']
     assert not r['worker_subject_verified']
     if mode=='shared-pid':assert world.process_calls==0
-    if mode=='cleanup':assert r['cleanup_errors']==['KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED']
+
+
+def test_initial_owner_failure_stops_before_requesting_packet(tmp_path):
+    env,target,world=inputs(tmp_path)
+
+    def replace_owner(role, document, after):
+        if role=='engine':
+            document['metadata']['uid']='replacement'
+
+    world.mutate=replace_owner
+    result=collect(env,target,runner=world.runner)
+    assert result['capture_stage']=='binding_before'
+    assert result['binding_before'] is result['binding_after'] is result['packet'] is None
+    assert result['incomplete_packet'] is None
+    assert not result['available'] and not result['binding_verified_before_after']
+    assert result['diagnostic_codes']==['KUBERNETES_PROCESS_CAPTURE_UNAVAILABLE']
+    assert world.process_calls==0
+
+
+def test_incomplete_transport_retains_typed_packet_without_after_verification(tmp_path):
+    env,target,world=inputs(tmp_path,'cleanup')
+    after_reads=[]
+
+    def record_after_read(role, document, after):
+        if after:
+            after_reads.append(role)
+
+    world.mutate=record_after_read
+    result=collect(env,target,runner=world.runner)
+    assert result['capture_stage']=='packet_transport'
+    assert result['packet'] is None and result['incomplete_packet']==packet()
+    assert result['binding_before']==target['kubernetes']['engine'] and result['binding_after'] is None
+    assert not result['available'] and not result['binding_verified_before_after']
+    assert not result['worker_subject_verified'] and not result['worker_inventory_complete']
+    assert result['data_origin']=='EXAMPLE' and result['security']=='UNKNOWN'
+    assert result['diagnostic_codes']==['KUBERNETES_PROCESS_CAPTURE_UNAVAILABLE']
+    assert result['cleanup_errors']==['KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED']
+    assert world.process_calls==1 and not after_reads and PRIVATE not in json.dumps(result)
 
 
 def test_changed_mount_declaration_is_separate_from_stable_pid_observations(tmp_path):
@@ -191,6 +236,10 @@ def test_same_cli_capture_and_exclusive_artifact_without_new_judge(tmp_path,monk
     actual=runner.invoke(app,[*args,'--execute']);assert actual.exit_code==(1 if mode in {'cleanup','private-extra'} else 0),(actual.output,repr(actual.exception))
     record=json.loads(output.read_text());assert record['security']=='UNKNOWN' and record['data_origin']=='EXAMPLE'
     assert not record['worker_subject_verified'] and PRIVATE not in output.read_text()
+    if mode=='cleanup':
+        assert record['capture_stage']=='packet_transport'
+        assert record['packet'] is None and record['incomplete_packet']==packet()
+        assert not record['available'] and not record['binding_verified_before_after']
     count=world.process_calls;unchanged=output.read_bytes();again=runner.invoke(app,[*args,'--execute'])
     assert again.exit_code==2 and output.read_bytes()==unchanged and world.process_calls==count
 

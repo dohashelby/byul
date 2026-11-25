@@ -1,6 +1,6 @@
 """태그 bytes 후보 자격·반환 형식·sampler 배치를 모의 자료로 확인한다."""
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import CodeType, FunctionType, ModuleType, SimpleNamespace
 import threading
 
 import pytest
@@ -12,6 +12,7 @@ from guard.adapters import vllm_scoped_consumption_callback as scoped
 from guard.adapters import vllm_kernel_bounds_callback as kernel
 from guard.adapters import vllm_graph_replay_callback as graph
 from guard.adapters import vllm_weights_lifetime_callback as weights
+from guard.adapters import vllm_worker_shard_callback as shards
 from guard.adapters.observer_runtime import QualifiedObserver
 from guard.adapters.vllm_observer_pin_rows import ROWS, layout
 
@@ -35,6 +36,40 @@ def test_candidate_bytes_qualify_only_exact_registered_row(observer, name, tmp_p
     path.write_bytes(raw + b'\n')
     with pytest.raises(ValueError):
         cache._codes(module, observer.targets, observer.sources)
+
+
+@pytest.mark.parametrize('name,fixture,pin', [
+    (shards.LOADER, 'vllm-0.30.0/vllm/model_executor/model_loader/default_loader.py.txt',
+     '9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8'),
+    (shards.MP, 'vllm-0.30.0/vllm/v1/executor/multiproc_executor.py.txt', ROWS[shards.MP]['sha256']),
+    (shards.LOADER, 'weight-iteration-native/default_loader.py.txt',
+     'd17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9'),
+    (shards.MP, 'vllm-mp-031/multiproc_executor.py',
+     '11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b'),
+])
+def test_worker_shard_callables_keep_exact_paired_source_pins(tmp_path, name, fixture, pin):
+    raw = (FIXTURES.parent / fixture).read_bytes()
+    path = tmp_path / 'source.py'
+    path.write_bytes(raw)
+    module = ModuleType(name)
+    module.__file__ = str(path)
+    source = compile(raw, str(path), 'exec', dont_inherit=True, optimize=0)
+    observer = shards.WorkerShardObserver('a' * 32, context_provider=lambda: {'fixture': True})
+
+    for point in observer.targets[name]:
+        owner, method = point.split('.')
+        owner_code = next(code for code in source.co_consts if type(code) is CodeType and code.co_name == owner)
+        code = next(code for code in owner_code.co_consts if type(code) is CodeType and code.co_name == method)
+        original = FunctionType(code, vars(module))
+        if not hasattr(module, owner):
+            setattr(module, owner, type(owner, (), {}))
+        setattr(getattr(module, owner), method, original)
+        assert observer.wrap(module, point).__wrapped__ is original
+        assert observer._source_pins[name] == pin
+
+    path.write_bytes(raw + b'\n')
+    with pytest.raises(ValueError):
+        observer.wrap(module, point)
 
 
 def test_qualified_observer_postcheck_uses_the_matched_pin(tmp_path):

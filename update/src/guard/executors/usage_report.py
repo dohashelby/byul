@@ -136,6 +136,7 @@ class UsageReportExecutor(HttpCheckExecutor):
     def collect(self, ctx):
         self.validate_policy(ctx.check, ctx.policy_values)
         values = ctx.policy_values
+        report_scope = ctx.check.collection_profile == SCOPE_PROFILE
         requests, probes = functional_requests(ctx, via="engine")
         if len(requests) != 1:
             raise ValueError("usage checks need one engine control")
@@ -169,16 +170,18 @@ class UsageReportExecutor(HttpCheckExecutor):
             rows = self._sink_rows(ctx)
             if rows is not None and sink_before is not None:
                 seen = len(sink_before)
-                arrived = receipts(rows[seen:])
-                sensor = rows[:seen] == sink_before
+                unchanged_prefix = rows[:seen] == sink_before
+                if report_scope and not unchanged_prefix:
+                    diagnostics.append("USAGE_SINK_PREFIX_CHANGED")
+                else:
+                    arrived = receipts(rows[seen:])
+                    sensor = unchanged_prefix
         except Exception:
             diagnostics.append("USAGE_SINK_AFTER_UNAVAILABLE")
         forbidden = not values["usage_allowed"]
         local_seen = before is not None and after is not None and not gaps and "USAGE_ENGINE_PROCESS_CHANGED" not in diagnostics
         report_rows = [{"path_sha256": sha256_hex(row["path"].encode()), "bytes": row["bytes"], "lines": row["lines"],
                         "sha256": row["sha256"], "fields": row["fields"]} for row in fresh]
-        observed_fields = sorted({field for row in fresh for field in row["fields"]}
-                                 | {field for row in arrived or [] for field in row["fields"]})
         settings = (after or before or {}).get("settings")
         obs = {"usage_policy_forbidden": {"value": forbidden, "collected": True},
                "usage_effective_settings": {"value": settings, "collected": settings is not None},
@@ -188,11 +191,13 @@ class UsageReportExecutor(HttpCheckExecutor):
                "usage_send_sensor_available": {"value": sensor, "collected": True},
                "functional_probes_planned": {"value": ["inference"], "collected": True},
                "functional_probe_results": {"value": controls, "collected": True}}
-        if ctx.check.collection_profile == SCOPE_PROFILE:
+        if report_scope:
+            local_fields = {field for row in fresh for field in row["fields"]} if local_seen else set()
+            received_fields = {field for row in arrived or [] for field in row["fields"]}
             sinks = sorted({row["sink"] for row in arrived or []})
-            obs.update({"usage_fields_seen": {"value": observed_fields, "collected": local_seen or sensor},
+            obs.update({"usage_fields_seen": {"value": sorted(local_fields | received_fields), "collected": local_seen or sensor},
                         "usage_sinks_seen": {"value": sinks, "collected": sensor},
-                        "usage_report_observed": {"value": bool(fresh or arrived), "collected": local_seen or sensor}})
+                        "usage_report_observed": {"value": bool(arrived) if sensor else None, "collected": sensor}})
         normal = {"attempted": True, "succeeded": controls["inference"] == "pass",
                   "detail": "보고 전후 사이에 정상 추론 1회"}
         summary = {"profile": ctx.check.collection_profile, "diagnostic_codes": sorted(set(diagnostics)),

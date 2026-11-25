@@ -11,15 +11,17 @@ import pytest
 from typer.testing import CliRunner
 from guard.cli import app
 from guard.adapters.vllm import VllmAdapter
-from guard.models import canonical_json,load_pack,sha256_hex,utcnow
+from guard.models import DataOrigin,ExecStatus,canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
-from guard.executors import kubernetes_observation as observation, run_binding
+from guard.executors import kubernetes_gateway_observation, kubernetes_observation as observation, run_binding
 from guard.executors.observation_contract import EVENTS,FIELDS,SCHEMA,normalize_policy,validate_record
 from guard.executors.owned_capture import _FILE_READER
+from guard.executors.registry import build_executor
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
 from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
+from tests.test_kubernetes_gateway_observation import ordinary_gateway_record
 from tests.test_kubernetes_request_binding import env,target
 from tests.test_kubernetes_sampling import World as PodWorld
 from tools.build_kubernetes_required_event_pack import derive
@@ -106,21 +108,167 @@ def inputs(tmp_path,mode='normal'):
         'observation_allowed_actor_sha256':'d'*64,'observation_denied_actor_sha256':'e'*64}
     if mode=='required-unimplemented':values['observation_required_events']=list(sorted(EVENTS));values['observation_required_fields'].append('approval_sha256')
     if mode=='deadline':values['observation_max_delay_ms']=0
+    if mode in {'deadline-boundary','deadline-nanosecond-late'}:values['observation_max_delay_ms']=1
     world.values=values;receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
     if 4 in run_binding.stages_for(pack.checks['OBS-01']):
         values['observation_event_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'OBS-01',values)))
     return environment,world,values,pack,receipt
 
 
+@pytest.mark.parametrize('mode', ['normal','wrong-record-target','wrong-actor','missing','bad-source','pod-replaced',
+                                 'wrong-policy','missing-policy','mixed-policy'])
+def test_canonical_obs01_snapshot_reads_owned_source_without_request_or_role_key(tmp_path,mode,ordinary_gateway_record):
+    environment,world,values,_,_=inputs(tmp_path,mode)
+    world.target['lab']=False
+    digest=values['observation_target_sha256']=sha256_hex(canonical_json(world.target))
+    raw,original,_=ordinary_gateway_record
+    record,=kubernetes_gateway_observation.record_events(raw.decode().splitlines(),run_id=original['run_id'])
+    # Reuse the writer's event fields inside the EXAMPLE direct-reader envelope.
+    values['observation_allowed_actor_sha256']=record['actor_sha256']
+    values['observation_event_policy_sha256']=record['policy_sha256']
+    record.update(target_sha256=digest,run_sha256=sha256_hex(world.target['kubernetes']['run_id'].encode()),
+        source_sha256=values['observation_expected_source_sha256'])
+    world.records=[record]
+    if mode=='wrong-policy':record['policy_sha256']='0'*64
+    elif mode=='missing-policy':record['policy_sha256']=None
+    elif mode=='mixed-policy':
+        world.records.append({**record,'seq':1,'event_id_sha256':'f'*64,'policy_sha256':'0'*64})
+    target_path=tmp_path/'target.json'
+    target_path.write_bytes(canonical_json(world.target))
+    pack=load_pack(Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE')
+    executor=build_executor('required_event_record','kubernetes',{'required_event_record':{
+        'target':str(target_path),'record_snapshot_only':True},'_kubernetes_target_sha256':digest},
+        engine=environment.engine.name,version=environment.engine.version)
+
+    def read_only(argv,**kwargs):
+        assert 'input_bytes' not in kwargs
+        result=world.runner(argv,**kwargs)
+        if 'exec' in argv:world.after_exec=True
+        return result
+
+    executor.runner=read_only
+    draft=executor.run(pack.checks['OBS-01'],environment,values,VllmAdapter(),tmp_path/'snapshot')
+    assert not world.sent and world.reads==1
+    assert draft.data_origin==DataOrigin.EXAMPLE
+    assert draft.status==(ExecStatus.COMPLETED if mode in {'normal','mixed-policy'} else ExecStatus.ABORTED)
+    assert not draft.normal_control.attempted and all(not step.attempted for step in draft.challenges)
+    observations=draft.observations
+    assert observations['required_event_trials'].collected is False
+    assert observations['required_event_matches'].collected is False
+    assert all(observations[key].value is False for key in ('required_event_scope_complete',
+        'required_event_producer_authenticated','required_event_independent_trigger_verified'))
+    assert all(row['reason']=='independent_trigger_and_collection_time_unverified'
+               for row in observations['required_event_missing'].value)
+    if mode in {'normal','mixed-policy'}:
+        assert observations['required_event_records'].value==[record]
+        capture,=observations['required_event_collection'].value
+        assert capture['owner_binding_verified'] and capture['file_bytes_sha256']==sha256_hex(canonical_json(world._packet()))
+    if mode=='wrong-actor':
+        assert observations['required_event_records'].value==[]
+        summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+        assert summary['unmatched_actor_count']==1 and 'OBSERVATION_RECORD_ACTOR_UNVERIFIED' in summary['diagnostic_codes']
+    if mode in {'wrong-policy','missing-policy','mixed-policy'}:
+        assert observations['required_event_records'].value==([record] if mode=='mixed-policy' else [])
+        summary=json.loads(draft.artifacts[0].path.read_text(encoding='utf-8').splitlines()[-1])
+        assert summary['unmatched_policy_count']==1 and 'OBSERVATION_RECORD_POLICY_UNVERIFIED' in summary['diagnostic_codes']
+    assert all(PRIVATE.encode() not in artifact.path.read_bytes() for artifact in draft.artifacts)
+
+
+@pytest.mark.parametrize('damage',['no-exact-target','roles','sibling','lab'])
+def test_canonical_obs01_snapshot_rejects_unsafe_configuration_before_read(tmp_path,damage):
+    environment,world,values,_,_=inputs(tmp_path)
+    world.target['lab']=damage=='lab'
+    digest=values['observation_target_sha256']=sha256_hex(canonical_json(world.target))
+    target_path=tmp_path/'target.json'
+    target_path.write_bytes(canonical_json(world.target))
+    pack=load_pack(Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE')
+    cfg={'target':str(target_path),'record_snapshot_only':True}
+    if damage=='roles':cfg['roles']={'allowed':'OBS_ALLOWED'}
+    executor=observation.KubernetesRequiredEventExecutor(cfg,runner=world.runner,
+        expected_target_sha256=None if damage=='no-exact-target' else digest)
+    check=pack.checks['PLT-12' if damage=='sibling' else 'OBS-01']
+    with pytest.raises(ValueError,match='OBSERVATION_'):
+        executor.run(check,environment,values,VllmAdapter(),tmp_path/'snapshot')
+    assert not world.calls and not world.sent and not world.reads
+
+
+@pytest.mark.parametrize(('damage', 'reason'), [
+    (None, None),
+    ('foreign-model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('schema', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('duration', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('missing-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
+    ('binding-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
+    ('executor-pin', 'OBSERVATION_CONFIGURATION_INVALID'),
+    ('gateway', 'OBSERVATION_RECORD_SNAPSHOT_CONFIGURATION_INVALID'),
+    ('same-content-symlink-after-prepare', None),
+])
+def test_canonical_obs01_prepares_only_the_bound_engine_snapshot(tmp_path, monkeypatch, damage, reason):
+    environment, world, values, _, _ = inputs(tmp_path)
+    world.target['lab'] = False
+    if damage == 'foreign-model':
+        world.target['model_mapping']['revision'] = 'EXAMPLE-other-revision'
+    elif damage == 'schema':
+        world.target['schema'] = 'EXAMPLE-other-target'
+    target_path = tmp_path / 'target.json'
+    raw = canonical_json(world.target)
+    target_path.write_bytes(raw)
+    digest = values['observation_target_sha256'] = sha256_hex(raw)
+    cfg = {'target': str(target_path), 'record_snapshot_only': True}
+    if damage == 'duration':
+        cfg['max_duration_seconds'] = 301
+    elif damage == 'gateway':
+        cfg['gateway_record_snapshot_only'] = True
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Snapshot declaration validation must not resolve role keys or open a runtime reader')
+
+    monkeypatch.setattr(observation.HttpCheckExecutor, 'keys', forbidden)
+    monkeypatch.setattr(http.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(http.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(observation.RequiredEventReader, '__init__', forbidden)
+    executor = observation.KubernetesRequiredEventExecutor(cfg, runner=forbidden,
+        expected_target_sha256={'executor-pin': 'f' * 64,
+                                'same-content-symlink-after-prepare': digest}.get(damage))
+    pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
+    check = pack.checks['OBS-01']
+    pin = 'e' * 64 if damage == 'binding-pin' else None if damage == 'missing-pin' else digest
+    if reason is None:
+        executor.prepared_record_snapshot(check, environment, values, expected_target_sha256=pin)
+        assert executor.keys() == {}
+        if damage == 'same-content-symlink-after-prepare':
+            original = target_path.with_name('original-target.json')
+            target_path.rename(original)
+            target_path.symlink_to(original.name)
+            monkeypatch.setattr(observation.KubernetesRequiredEventExecutor, '_transport', forbidden)
+            with pytest.raises(ValueError, match='^OBSERVATION_CONFIGURATION_INVALID$'):
+                executor.run(check, environment, values, VllmAdapter(), tmp_path / 'snapshot')
+    else:
+        with pytest.raises(ValueError, match=f'^{reason}$'):
+            executor.prepared_record_snapshot(check, environment, values, expected_target_sha256=pin)
+
+
 @pytest.mark.parametrize('mode',['normal','wrong-actor','wrong-record-target','missing-field','duplicate-record','empty','missing','recovered',
     'final-missing','unclosed','dropped','bad-source','producer-trust-claim','raw-field','bad-control','denied-allowed','after-error',
-    'http-cleanup','record-cleanup','restart','pod-replaced','attachment','required-unimplemented'])
+    'http-cleanup','record-cleanup','restart','pod-replaced','attachment','required-unimplemented',
+    'deadline-boundary','deadline-nanosecond-late'])
 def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts(tmp_path,monkeypatch,mode):
     environment,world,values,pack,receipt=inputs(tmp_path,mode)
     monkeypatch.setenv('OBS_ALLOWED',ALLOWED);monkeypatch.setenv('OBS_DENIED',DENIED)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr(observation,'capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected external runtime')
     monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)
+    if mode in {'deadline-boundary','deadline-nanosecond-late'}:
+        correlate = observation.correlate
+        observed_delay_ns = 1_000_000 + (mode == 'deadline-nanosecond-late')
+
+        def correlate_at_policy_boundary(snapshots, trials, values, **kwargs):
+            trial_end_ns = 100_000_000
+            return correlate(
+                [{**snapshot, 'collected_monotonic_ns': trial_end_ns + observed_delay_ns} for snapshot in snapshots],
+                [{**trial, 'finished_monotonic_ns': trial_end_ns} for trial in trials], values, **kwargs)
+
+        monkeypatch.setattr(observation, 'correlate', correlate_at_policy_boundary)
     if mode=='attachment':
         original=Path.open
         def open_file(path,*a,**kw):
@@ -145,11 +293,18 @@ def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts
     assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert e.normal_control.succeeded is None
     for key in ('required_event_producer_authenticated','required_event_independent_trigger_verified','required_event_scope_complete'):assert e.observations[key].value is False
-    assert e.execution.status.value==('COMPLETED' if mode=='normal' else 'ABORTED')
+    assert e.execution.status.value==('COMPLETED' if mode in {'normal','deadline-boundary'} else 'ABORTED')
     if mode=='normal':
         assert world.sent==['obs01-before','obs01-denied','obs01-after'] and world.reads==2
         assert all(m['declared_record_match_observed'] and not m['producer_authenticated'] for m in e.observations['required_event_matches'].value)
         assert len(e.observations['required_event_records'].value)==3 and not e.observations['required_event_missing'].value
+    if mode in {'deadline-boundary','deadline-nanosecond-late'}:
+        late = mode == 'deadline-nanosecond-late'
+        matches = e.observations['required_event_matches'].value
+        assert len(matches) == 3
+        assert all(row['collection_arrival_upper_bound_ms'] == (2 if late else 1) for row in matches)
+        assert all(row['declared_record_match_observed'] is (not late) for row in matches)
+        assert bool(e.observations['required_event_missing'].value) is late
     if mode in {'wrong-actor','wrong-record-target','duplicate-record'}:
         assert e.observations['required_event_conflict_candidates'].value
         assert all(not r['confirmed_violation'] for r in e.observations['required_event_conflict_candidates'].value)

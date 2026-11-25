@@ -1,4 +1,5 @@
 """LIF11 selected resources and explicit absolute deadlines; full recovery lineage separate."""
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import uuid
 from guard.collectors.file import load_bounded_json
@@ -11,12 +12,112 @@ from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_recovery_http import KubernetesRecoveryHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
-from guard.runtime.kubernetes_resource_recovery import KubernetesResourceRecoveryReader
+from guard.runtime.kubernetes_resource_recovery import KubernetesResourceRecoveryReader, PROBE_SOURCE_SHA256
 from .lifecycle_session import capture_session
 from .resource_recovery_contract import PROFILE,normalize_policy,stamp,validate_selected_policy,project
 
 
 from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+def _namespace_observations(censuses, selection, target_sha256, start, end):
+    from guard.runtime import resource_group_source
+
+    selection_sha256 = sha256_hex(canonical_json(selection))
+    steps = []
+    for row in censuses:
+        try:
+            if (not all(row[key] is True for key in ('collected', 'owner_binding_verified', 'clock_window_verified'))
+                    or not start <= stamp(row['started_at']) <= stamp(row['finished_at']) <= end
+                    or row['selection_sha256'] != selection_sha256
+                    or row['probe_source_sha256'] != resource_group_source.GROUP_SHA256
+                    or row['context_source_sha256'] != resource_group_source.SELECTED_SHA256):
+                continue
+            packet = group_probe.validate_result(row['packet'], selection)
+        except (KeyError, TypeError, ValueError):
+            continue
+        matched = {owner['id'] for owner in packet['owners'] if owner['status'] == 'match'}
+        if not matched:
+            continue
+        owners = {(owner['context']['pid'], owner['context']['start_ticks']): owner['id']
+                  for owner in selection['owners'] if owner['id'] in matched}
+        references = {}
+        for ref in packet['references']:
+            owner = owners.get((ref['pid'], ref['start_ticks']))
+            if owner is None:
+                continue
+            resource = sha256_hex(canonical_json([ref['kind'], ref['device'], ref['inode']]))
+            form = 'memory-mapping' if ref['fd'] is None else 'file-descriptor'
+            references.setdefault((owner, ref['kind'], resource), set()).add(form)
+        steps.append({'step': 'owned-namespace-held-resource-census', 'stage': row['stage'],
+            'target_sha256': target_sha256, 'selection_sha256': selection_sha256,
+            'probe_source_sha256': row['probe_source_sha256'], 'context_source_sha256': row['context_source_sha256'],
+            'packet_sha256': sha256_hex(canonical_json(packet)), 'started_at': row['started_at'], 'finished_at': row['finished_at'],
+            'matched_owner_ids': sorted(matched), 'namespace_scan_complete': packet['namespace_scan_complete'],
+            'held_references': [{'owner_id': owner, 'kind': kind, 'resource_sha256': digest,
+                                 'reference_forms': sorted(forms)}
+                                for (owner, kind, digest), forms in sorted(references.items())],
+            'global_release_verified': False, 'producer_authenticated': False})
+    return steps
+
+
+def _selected_census_sources(before, after, selection, target_sha256, start, end):
+    selection_sha256 = sha256_hex(canonical_json(selection))
+    sources = []
+    for stage, row in (('before', before), ('after', after)):
+        if row is None:
+            continue
+        try:
+            if (not all(row[key] is True for key in ('collected', 'owner_binding_verified', 'clock_window_verified'))
+                    or row['selection_sha256'] != selection_sha256 or row['probe_source_sha256'] != PROBE_SOURCE_SHA256
+                    or not start <= stamp(row['started_at']) <= stamp(row['finished_at']) <= end):
+                continue
+            packet = resource_probe.validate_result(row['packet'], selection)
+        except (KeyError, TypeError, ValueError):
+            continue
+        sources.append({'stage': stage, 'selection_sha256': selection_sha256, 'target_sha256': target_sha256,
+                        'probe_source_sha256': PROBE_SOURCE_SHA256, 'packet_sha256': sha256_hex(canonical_json(packet)),
+                        'started_at': row['started_at'], 'finished_at': row['finished_at']})
+    return sources
+
+
+def _owned_gpu_references(censuses, target_sha256, start, end):
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    lower, upper = ((bound - epoch) // timedelta(microseconds=1) * 1000 for bound in (start, end))
+    steps = []
+    for row in censuses:
+        if not all(row[key] is True for key in ('collected', 'owner_binding_verified', 'clock_window_verified')):
+            continue
+        packet, receipt = row['packet'], row['receipt']
+        # validate_packet recomputes completeness, including the host anchor,
+        # observer, query receipts, stable binary and wall/monotonic agreement.
+        if (packet['host_inventory_complete'] is not True
+                or not lower <= packet['started_wall_ns'] <= packet['finished_wall_ns'] <= upper
+                or packet['selection_sha256'] != receipt.get('selection_sha256')):
+            continue
+        devices = {device['uuid']: (device['major'], device['minor']) for device in packet['devices']}
+        processes = {proc['host_pid']: proc for proc in packet['processes']}
+        compute = {(sample['host_pid'], sample['uuid']) for sample in packet['compute']}
+        confirmed = {(sample['host_pid'], sample['uuid']) for sample in packet['compute_confirm']}
+        devices_by_pid = {}
+        for pid, device in compute & confirmed:
+            devices_by_pid.setdefault(pid, []).append(device)
+        references = []
+        for owner in gpu_probe.owner_matches(receipt['selection'], packet['processes']):
+            if len(owner['host_pids']) != 1:
+                continue
+            pid, = owner['host_pids']
+            held = {(handle['major'], handle['minor']) for handle in processes[pid]['handles']}
+            for device in sorted(uuid for uuid in devices_by_pid.get(pid, ()) if devices[uuid] in held):
+                references.append({'owner_id': owner['id'],
+                                   'device_sha256': sha256_hex(canonical_json([target_sha256, device]))})
+        if references:
+            steps.append({'step': 'owned-node-held-gpu-references', 'stage': row['stage'], 'target_sha256': target_sha256,
+                          'selection_sha256': receipt['selection_sha256'], 'program_sha256': receipt['program_sha256'],
+                          'packet_sha256': receipt['packet_sha256'], 'started_wall_ns': packet['started_wall_ns'],
+                          'finished_wall_ns': packet['finished_wall_ns'], 'compute_and_device_handle_references': references,
+                          'producer_authenticated': False, 'gpu_release_verified': False})
+    return steps
 
 
 class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
@@ -56,16 +157,18 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         ctx._recovery_prepared=prepared;ctx._recovery_selection=selection;return self._finish(ctx)
 
     def collect(self,ctx):
-        start,end,deadline=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[];censuses=[];groups=[];gpus=[]
+        start,end,deadline=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[];groups=[];gpus=[]
+        before_census = after_census = None
         group_selection={'schema':group_probe.SELECTION_SCHEMA,
             'owners':[{'id':row['id'],'context':row['context']}for row in ctx._recovery_selection['owners']]}
-        def collect_group():
+        def collect_group(stage):
             if self.cfg.get('namespace_resources',False):
-                row=reader.group_resource_census(group_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']);groups.append(row)
+                row=reader.group_resource_census(group_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
+                groups.append({**row, 'stage': stage})
                 if (not row.get('collected')or not row.get('owner_binding_verified')or not row.get('clock_window_verified')
                         or (row.get('packet')or{}).get('namespace_scan_complete')is not True):
                     diagnostics.append('RESOURCE_RECOVERY_NAMESPACE_CENSUS_INCOMPLETE')
-        def collect_gpu():
+        def collect_gpu(stage):
             if not self.cfg.get('node_gpu_processes',False):return
             from .node_gpu_process import collect_for_reader
             try:
@@ -84,7 +187,7 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             except Exception:
                 row={'schema':'guard-owned-node-gpu-process-read/1','collected':False,'owner_binding_verified':False,
                     'clock_window_verified':False,'packet':None,'receipt':None,'diagnostic_codes':['GPU_PROCESS_OWNED_NODE_READ_UNVERIFIED']}
-            gpus.append(row)
+            gpus.append({**row, 'stage': stage})
             if(not row.get('collected')or not row.get('owner_binding_verified')or not row.get('clock_window_verified')
                     or(row.get('packet')or{}).get('host_inventory_complete')is not True):
                 diagnostics.append('RESOURCE_RECOVERY_NODE_GPU_CENSUS_INCOMPLETE')
@@ -93,9 +196,10 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         try:
             reader=KubernetesResourceRecoveryReader(native_target,ctx.env,ctx._recovery_prepared,runner=self.runner,
                 binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120));reader.snapshot()
-            censuses.append(reader.resource_census(ctx._recovery_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']))
-            collect_group()
-            collect_gpu()
+            before_census = reader.resource_census(ctx._recovery_selection,
+                max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
+            collect_group('before')
+            collect_gpu('before')
             for slot in SLOTS:
                 row={'case_id':'lif11-'+slot,'request_id_sha256':sha256_hex(('byul-lif11-'+token+'-'+slot).encode()),
                     'attempted':False,'started_at':None,'finished_at':None,'policy_window_verified':False,
@@ -114,11 +218,13 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
         except Exception:diagnostics.append('RESOURCE_RECOVERY_PREFLIGHT_UNAVAILABLE')
         finally:
             if reader is not None:
-                try:censuses.append(reader.resource_census(ctx._recovery_selection,max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms']))
+                try:
+                    after_census = reader.resource_census(ctx._recovery_selection,
+                        max_clock_skew_ms=ctx.policy_values['recovery_max_clock_skew_ms'])
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_CENSUS_UNAVAILABLE')
-                try:collect_group()
+                try:collect_group('after')
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_FINAL_NAMESPACE_CENSUS_UNAVAILABLE')
-                collect_gpu()
+                collect_gpu('after')
                 try:sealed=reader.seal_session().get('sealed') is True
                 except Exception:pass
                 if not sealed:diagnostics.append('RESOURCE_RECOVERY_SESSION_SEAL_UNAVAILABLE')
@@ -127,7 +233,8 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
                         prepared=ctx._recovery_prepared,owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
                     if not packet.get('recorded_files_covered'):diagnostics.append('RESOURCE_RECOVERY_NATIVE_COVERAGE_UNAVAILABLE')
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_CAPTURE_UNAVAILABLE')
-        projection=project(censuses,ctx._recovery_selection,ctx.policy_values)
+        projection = project([before_census or {}, after_census or {}], ctx._recovery_selection, ctx.policy_values)
+        censuses = [row for row in (before_census, after_census) if row is not None]
         group_projection=None
         if self.cfg.get('namespace_resources',False):
             try:
@@ -173,7 +280,33 @@ class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheck
             'recovery_missing':projection['missing'],'recovery_absolute_deadline_violated':projection['absolute_deadline_violated'],
             'recovery_selected_absence_observed':projection['selected_absence_observed'],'recovery_global_resources_released':False,
             'recovery_next_normal_launch_verified':False,'recovery_scope_complete':False}
-        return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
+        observations = {key: {'value': value, 'collected': True} for key, value in observations.items()}
+        # The baseline pack consumes activation evidence. Retain the selected
+        # census without turning its independent functional deadline into a
+        # security finding about the entire failure and subsequent restart.
+        selected = [row for row in projection['rows'] if row['before_status'] == 'match'
+                    or row['after_status'] in {'match', 'absent', 'replaced'}]
+        steps = [{'step': 'selected-resource-census', 'resources': selected}] if selected else []
+        if steps:
+            sources = _selected_census_sources(before_census, after_census, ctx._recovery_selection,
+                                               ctx.policy_values['recovery_target_sha256'], start, end)
+            if sources:
+                steps[0]['source_censuses'] = sources
+        missing = list(projection['missing'])
+        if self.cfg.get('namespace_resources', False):
+            held = _namespace_observations(groups, group_selection, ctx.policy_values['recovery_target_sha256'], start, end)
+            steps.extend(held)
+            if {row['stage'] for row in held} != {'before', 'after'}:
+                missing.append('owned_namespace_held_reference_census_incomplete')
+        if self.cfg.get('node_gpu_processes', False):
+            steps.extend(_owned_gpu_references(gpus, ctx.policy_values['recovery_target_sha256'], start, end))
+        observations.update({
+            'activation_steps': {'value': steps or None, 'collected': bool(steps)},
+            'activation_missing': {'value': missing, 'collected': True},
+            'activation_violations': {'value': None, 'collected': False},
+            'activation_scope_complete': {'value': False, 'collected': True},
+        })
+        return observations,{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Explicit selected owner/PID/start and descriptor/inode census; unconditional absolute policy deadline violations separate from missing failure/restart/global release.'},[],summary
 
     def _finish(self,ctx):

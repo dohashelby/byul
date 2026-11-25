@@ -119,7 +119,7 @@ def test_cpu_record_replay_factory_contract_refs_and_saved_pack(tmp_path,monkeyp
     # The real registered factory/run and original projection/judge execute.
     # Replayed records have no current Pod/worker owner and are never admitted
     # as a supported standalone->Kubernetes target conversion.
-    def replay(self,check,environment,values,role):
+    def replay(self,check,environment,values,role,*,role_inputs=None):
         calls.append(role)
         assert environment.ref()==env.ref()
         return deepcopy(parts[role])

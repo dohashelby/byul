@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import re
+from types import SimpleNamespace
 
 import yaml
 import pytest
@@ -14,36 +15,35 @@ from guard.adapters.vllm import VllmAdapter
 from guard.adapters.vllm_release_profiles import release_profile, http_profile
 from guard.executors.registry import resolve_executor
 from tools import gpu_a_aws_lab as lab
+from tools.mvp_versions import versions
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def pair():
-    text = (ROOT / 'docs/WORK_ORDER_VLLM_MVP.md').read_text()
-    section = text.split('### 0.1 MVP 판본 표 (데이터)', 1)[1].split('### 0.2', 1)[0]
-    rows = re.findall(r'^\| (기준 판본|후보 판본) \| vLLM ([^| ]+) \| `([^`]+)`', section, re.M)
-    assert len(rows) == 2
-    return rows
+    return [(row['role'], row['version'], row['image']) for row in versions().values()]
+
+
+def historical_versions():
+    result = {}
+    for side, version in [('baseline', '0.7.0'), ('candidate', '0.30.0')]:
+        row = release_profile(version)
+        result[side] = {'role': row['role'], 'engine': 'vllm', 'version': version, 'image': row['images'][0]}
+    return result
 
 
 def test_both_launch_profiles_follow_the_work_order_without_runtime_qualification():
     provider = get_provider('vllm')
-    for role, version, image in pair():
+    for _, version, image in pair():
         row = provider.release_profile(version)
-        assert row['role'] == role and image in row['images']
+        assert image in row['images']
         assert row['pin_status'] == 'candidate_pin' and row['launch']['command']
-        assert row['launch']['model_argument'] in {'--model', 'positional'}
-        assert row['launch']['default_engine'] == ('V0' if role == '기준 판본' else 'V1')
+        assert row['launch']['model_argument'] == 'positional'
+        assert row['launch']['default_engine'] == row['launch']['engine'] == 'V1'
         support = engine_profiles.resolve('vllm', version, 'native_input')
         assert support.available and not support.runtime_qualified
-        if role == '후보 판본':
-            assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is not None
-            # 사용자 결정 M-A6-V6(2026-11-15): 0.30.0 정확 행 profile(/25)로 열린다.
-            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is not None
-        else:
-            assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is None
-            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is not None
-            assert resolve_executor('observation_state', 'kubernetes', engine='vllm', version=version) is not None
+        for name in ('engine_sensor', 'request_termination', 'observation_state'):
+            assert resolve_executor(name, 'kubernetes', engine='vllm', version=version) is not None
         row['launch']['command'].clear()
         assert provider.release_profile(version)['launch']['command']
     assert provider.release_profile('EXAMPLE-future') is None
@@ -51,7 +51,8 @@ def test_both_launch_profiles_follow_the_work_order_without_runtime_qualificatio
 
 def test_candidate_http_rows_cannot_enable_safe_mutating_probes_or_rejection_proof():
     adapter = VllmAdapter()
-    for role, version, image in pair():
+    for side, release in historical_versions().items():
+        version, image = release['version'], release['image']
         row = adapter.http_profile(version, image)
         assert row['pin_status'] == 'candidate_pin' and row['length_error_format']
         assert http_profile(version, image + '0') is None
@@ -65,13 +66,46 @@ def test_candidate_http_rows_cannot_enable_safe_mutating_probes_or_rejection_pro
         # row now. A malformed response remains unverified and has no proof.
         reason='REJECTION_CAUSE_UNVERIFIED' if version=='0.30.0' else 'INPUT_REJECTION_CANDIDATE_PIN_NOT_IMAGE_VERIFIED'
         assert proof == {'state': 'unverified', 'reason': reason, 'sources': []}
-        if role == '기준 판본':
+        if side == 'baseline':
             assert row['safe_probe_candidates'] == []
             assert not engine_profiles.supports('vllm', version, 'native_lifecycle')
+            assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is None
+            for name in ('request_termination', 'observation_state'):
+                assert resolve_executor(name, 'kubernetes', engine='vllm', version=version) is not None
         else:
             assert len(row['safe_probe_candidates']) == 2
             support = engine_profiles.resolve('vllm', version, 'native_lifecycle')
             assert support.available and not support.runtime_qualified
+
+
+def test_candidate_gpu_launch_row_does_not_add_a_reviewed_http_profile():
+    _, version, image = pair()[1]
+    assert http_profile(version, image) is None
+    assert all(http_profile(version, gpu_image) is None for gpu_image in release_profile(version)['images'])
+
+
+def test_usage_report_catalog_is_bound_to_exact_reviewed_release_images():
+    provider = get_provider('vllm')
+    expected_env_files = {
+        '0.30.0': 'fbd370b2f56ff798d373e85705c9e044ccae893ef974f2800eec4ef6f2b4fb7f',
+        '0.31.0': '1d7101800f67b803a700fbf7489292cf1f0022b570085166ad407e6b1513dc15',
+    }
+    for _, version, image in pair():
+        engine = SimpleNamespace(name='vllm', version=version, image_digest=image, source_commit=None)
+        env = SimpleNamespace(engine=engine)
+        assert provider.evidence_contract('usage_report_source', env) == {
+            'source_root': '/usr/local/lib/python3.12/dist-packages/vllm',
+            'filename': 'usage_stats.json',
+            'file_sha256': {
+                'envs.py': expected_env_files[version],
+                'usage/usage_lib.py': '26150a9e2a0fad4e51bacb6435e4e739be765db3645dc23b132d628bedc7f8f3',
+            },
+        }
+        engine.source_commit = '0' * 40
+        assert provider.evidence_contract('usage_report_source', env) is None
+        engine.source_commit = None
+        engine.image_digest = image[:-64] + 'e' * 64
+        assert provider.evidence_contract('usage_report_source', env) is None
 
 
 def test_moved_path_review_maps_exact_files_and_retains_unmapped_paths():

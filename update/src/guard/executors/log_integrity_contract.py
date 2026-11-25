@@ -10,10 +10,12 @@ from datetime import datetime
 from .log_integrity_parser import parse_native_info
 
 PLANNED_CASES = ("before", "multiline", "cr", "crlf", "reserved", "html", "after")
+DEFAULT_REQUEST_LOGGER_LINE = 65
 
 
 def analyze_integrity_capture(capture: dict, trials: list[dict], before_identity,
-                              after_identity, *, initial_gaps=(), max_events=128) -> dict:
+                              after_identity, *, initial_gaps=(), max_events=128,
+                              request_logger_line: int = DEFAULT_REQUEST_LOGGER_LINE) -> dict:
     gaps, violations, anchors, reached = list(initial_gaps), [], {}, []
     stable = bool(before_identity and before_identity == after_identity)
     if not stable:
@@ -59,7 +61,7 @@ def analyze_integrity_capture(capture: dict, trials: list[dict], before_identity
         matches = [event for event in complete_events if event["message"].startswith(expected)
                    and event["message"].endswith(", lora_request: None.")]
         source_matches = [event for event in matches if event["level"] == "INFO"
-                          and event["source"] == "request_logger.py" and event["source_line"] == 65
+                          and event["source"] == "request_logger.py" and event["source_line"] == request_logger_line
                           and event["_stream"] == "stdout"]
         if stable and len(matches) > 1:
             violations.append(f"{label}: duplicate trial-linked request events in the reference collector")

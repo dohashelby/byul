@@ -23,6 +23,11 @@ NAMESPACE = 'serving-lab'
 PROFILES = {'dev': ('2', '4', '8Gi', '16Gi'), 'reference': ('4', '8', '12Gi', '24Gi')}
 CALLBACKS, DATA = '/guard-lifecycle/engine-callbacks', '/guard-lifecycle/data'
 MP = ('--distributed-executor-backend', 'mp')
+GPU_RESOURCE = 'nvidia.com/gpu'
+NORMAL_TP2_GENERATIONS = frozenset({'v2-default', 'v2-template'})
+NORMAL_TP2 = {'gpu_count': 2, 'tp_size': 2, 'pp_size': 1, 'dp_size': 1}
+NORMAL_TP2_ARGS = ('--tensor-parallel-size', '2', '--pipeline-parallel-size', '1',
+                   '--data-parallel-size', '1', *MP)
 # guard 어댑터의 고정 SUP-03 템플릿(adapters/assets/chat). 호스트 사본은 실행 전에 같은 바이트로 둔다.
 CHAT_TEMPLATE_PATH = '/guard-assets/chat/guard-text-chat-v1.jinja'
 CHAT_TEMPLATE_SHA256 = 'e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e'
@@ -87,9 +92,16 @@ def _fill(template, values):
     return text
 
 
+def normal_tp2_release(version, image):
+    from tools.mvp_versions import versions
+
+    return any((row['version'], row['image']) == (version, image) for row in versions().values())
+
+
 def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revision, host_root, enforce_eager=False,
            engine_version=None, model_id=None, model_host_snapshot=None,
-           code_revision=None, extra_engine_args=(), max_model_len=2048, check_id=None, release_launch=False):
+           code_revision=None, extra_engine_args=(), max_model_len=2048, check_id=None, release_launch=False,
+           normal_tp2=False):
     if (generation not in GENERATIONS or profile not in PROFILES or not _RUN_ID.fullmatch(run_id or '')
             or not _IMAGE.fullmatch(engine_image or '') or not re.fullmatch(r'[0-9a-f]{40}', model_revision or '')
             or not _HOST_PATH.fullmatch(host_root or '')):
@@ -136,6 +148,12 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     release = VllmProvider().release_profile(engine_version)
     if type(release_launch) is not bool or release_launch and (release is None or engine_image not in release['images']):
         raise ValueError('AWS_RELEASE_LAUNCH_PROFILE_UNAVAILABLE')
+    if type(normal_tp2) is not bool or normal_tp2 and (
+            generation not in NORMAL_TP2_GENERATIONS or not release_launch or release['launch']['engine'] != 'V1'
+            or not normal_tp2_release(engine_version, engine_image)
+            or check_id is not None or code_revision is not None or enforce_eager
+            or tuple(extra_engine_args) not in ((), ('--safetensors-load-strategy=eager',))):
+        raise ValueError('AWS_NORMAL_TP2_LAUNCH_UNAVAILABLE')
     check_args = []
     if check_id is not None:
         if (release is None or engine_image not in release['images']
@@ -153,6 +171,19 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     engine['args'] = [*engine['args'], *spec['args'], *(['--enforce-eager'] if enforce_eager else [])]
     engine['args'] += [*(['--code-revision', code_revision] if code_revision else []), *extra_engine_args]
     engine['args'] += [arg for arg in check_args if arg not in engine['args']]
+    if normal_tp2:
+        args = engine['args']
+        original_tp = args.index('--tensor-parallel-size')
+        if args[original_tp:original_tp + 2] != ['--tensor-parallel-size', '1']:
+            raise ValueError('AWS_NORMAL_TP2_HANDOFF_MISMATCH')
+        del args[original_tp:original_tp + 2]
+        if any(arg.split('=', 1)[0] in NORMAL_TP2_ARGS[::2] for arg in args):
+            raise ValueError('AWS_NORMAL_TP2_HANDOFF_MISMATCH')
+        args.extend(NORMAL_TP2_ARGS)
+        for key in ('requests', 'limits'):
+            engine['resources'][key][GPU_RESOURCE] = str(NORMAL_TP2['gpu_count'])
+        shared_memory, = (volume for volume in pod['spec']['volumes'] if volume['name'] == 'shm')
+        shared_memory['emptyDir']['sizeLimit'] = '4Gi'
     unsupported = set(launch_profile.get('unsupported_args', []))
     if any(arg.split('=', 1)[0] in unsupported for arg in engine['args']):
         raise ValueError('AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED')
@@ -216,6 +247,7 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
             if spec['sensor'] else {}),
         **({'chat_template': {'host_file': run_root + '/guard-text-chat-v1.jinja', 'container_path': CHAT_TEMPLATE_PATH,
             'sha256': CHAT_TEMPLATE_SHA256}} if spec.get('template') else {}),
+        **({'normal_tp2': dict(NORMAL_TP2)} if normal_tp2 else {}),
         'outputs_sha256': {'engine.yaml': _sha(engine_yaml), 'probe.yaml': _sha(probe_yaml)}}
     return engine_yaml, probe_yaml, record
 
@@ -234,6 +266,7 @@ def main(argv=None):
     parser.add_argument('--max-model-len', type=int, default=2048)
     parser.add_argument('--check-id', choices=['REQ-16', 'REQ-17'], help='승인된 두 판본 캐시 비교 기동 조건')
     parser.add_argument('--release-launch', action='store_true', help='정확한 이미지 쌍의 판본 profile 기동 명령 사용')
+    parser.add_argument('--normal-tp2', action='store_true', help='검토된 V1 정상 서빙을 Pod당 GPU 두 장으로 렌더링')
     parser.add_argument('--code-revision')
     parser.add_argument('--extra-engine-args-json', default='[]', help='추가 기동 인자의 JSON 배열')
     parser.add_argument('--host-root', default='/srv/byul-a')
@@ -245,7 +278,7 @@ def main(argv=None):
         host_root=args.host_root, enforce_eager=args.enforce_eager, engine_version=args.engine_version,
         model_id=args.model_id, model_host_snapshot=args.model_host_snapshot, code_revision=args.code_revision,
         extra_engine_args=json.loads(args.extra_engine_args_json), max_model_len=args.max_model_len, check_id=args.check_id,
-        release_launch=args.release_launch)
+        release_launch=args.release_launch, normal_tp2=args.normal_tp2)
     args.out.mkdir(parents=True)
     (args.out / 'engine.yaml').write_bytes(engine_yaml); (args.out / 'probe.yaml').write_bytes(probe_yaml)
     (args.out / 'render.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8')

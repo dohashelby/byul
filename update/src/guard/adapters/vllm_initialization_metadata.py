@@ -46,22 +46,32 @@ def validate_sample(v,source_sha256=None):
     except (KeyError,TypeError,ValueError):raise ValueError('INITIALIZATION_SAMPLE_INVALID') from None
 
 
-def project(packet,limits):
+def project(packet,limits,*,source_sha256=None):
     result={'samples':[],'calls':[],'correspondence':[],'missing':[],
         'producer_authenticated':False,'whole_scope_complete':False,'failure_activation_verified':False,
         'all_preparation_stages_verified':False,'cross_phase_lineage_verified':False,'service_gate_verified':False}
+    source_recordings = {}
     for index,recording in enumerate([] if not packet else packet.get('recordings',[])):
         capture=recording.get('capture')
         if not capture:continue
+        provenance = capture.get('provenance', {})
+        summary = capture.get('summary', {})
+        if (limits.get('init_phase') in {'normal', 'recovered-normal'}
+                and type(provenance) is dict and type(summary) is dict
+                and provenance.get('owner_binding_verified') is True
+                and fingerprint(provenance.get('capture_sha256'))
+                and summary.get('recording_closed') is True and summary.get('discarded_tail_bytes') == 0):
+            source_recordings[index] = provenance['capture_sha256']
         context=capture['records'][0]['payload']['context']
         for row in capture['records']:
             if row['event']!='INITIALIZATION':continue
-            value=row['payload'];validate_sample(value)
+            value=row['payload'];validate_sample(value,source_sha256=source_sha256)
             result['samples'].append({'recording':index,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],
                 **{k:context[k] for k in ('pid','start_ticks','boot_sha256','pid_namespace','time_namespace','time_offsets_sha256')},
                 'safe_file_claim_retained':True,'process_binding_verified':bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match')),
                 'image_digest_verified':capture.get('image_digest_verified') is True,**value})
     grouped={}
+    paired_events = {}
     for row in result['samples']:grouped.setdefault((row['recording'],row['pid'],row['start_ticks'],row['call_sha256']),[]).append(row)
     for key,rows in grouped.items():
         first=[r for r in rows if r['phase']=='CALL'];last=[r for r in rows if r['phase'] in {'RETURN','RAISE'}]
@@ -69,6 +79,10 @@ def project(packet,limits):
         paired=(len(rows)==2 and len(first)==len(last)==1 and all(first[0][k]==last[0][k] for k in stable)
             and first[0]['monotonic_ns']<=last[0]['operation_started_ns']<=last[0]['operation_finished_ns']<=last[0]['monotonic_ns'])
         value=last[0] if len(last)==1 else rows[0]
+        if (paired and key[0] in source_recordings and value['phase'] == 'RETURN'
+                and type(first[0]['seq']) is type(value['seq']) is int
+                and 0 <= first[0]['seq'] < value['seq'] < sensor.MAX_ROWS):
+            paired_events[key] = [first[0]['seq'], value['seq']]
         result['calls'].append({**{k:value[k] for k in ('point','call_sha256','executor_sha256','parent_call_sha256','phase','expected_handles','returned_handles','executor_workers','world_size','exception_kind','operation_started_ns','operation_finished_ns')},
             'recording':key[0],'pid':key[1],'start_ticks':key[2],'paired':paired,
             'source_process_binding_observed':bool(paired and all(r['source_verified'] and r['process_binding_verified'] for r in rows))})
@@ -91,6 +105,17 @@ def project(packet,limits):
             'ready_failure_aggregate_success_candidate':bool(linked and child['phase']=='RAISE' and parent['phase']=='RETURN'),
             'declared_world_rank_workers_match':bool(linked and parent['world_size']==len(required) and ranks(parent['executor_workers'])==required),
             'confirmed_violation':False,'all_model_loads_verified':False,'failure_activation_verified':False,'service_gate_verified':False})
+        if linked:
+            key = (parent['recording'], parent['pid'], parent['start_ticks'])
+            aggregate_events = paired_events.get((*key, parent['call_sha256']))
+            ready_events = paired_events.get((*key, child['call_sha256']))
+            if (aggregate_events is not None and ready_events is not None
+                    and aggregate_events[0] < ready_events[0] < ready_events[1] < aggregate_events[1]):
+                result['correspondence'][-1]['source_recording'] = {
+                    'sha256': source_recordings[parent['recording']],
+                    'aggregate_call_and_return_seq': aggregate_events,
+                    'ready_call_and_return_seq': ready_events,
+                }
     result['missing'].extend(['independent_failure_activation_and_component_root_outcome_unavailable',
         'all_required_model_preparation_and_inflight_state_unavailable','normal_failure_repaired_launch_lineage_unavailable',
         'readiness_and_http_shape_are_not_independent_admission_oracle','source_record_producer_authentication_unavailable'])

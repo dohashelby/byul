@@ -297,6 +297,187 @@ def test_existing_probe_source_runs_through_real_stdin_and_owned_http_socket(tmp
         server.shutdown(); server.server_close(); thread.join(timeout=2)
 
 
+APPROVED_NORMAL = {"allowed_sampling_options": ["temperature", "top_p", "max_tokens", "min_tokens"],
+                   "rejection_codes": ["400", "422"]}
+
+
+def normal_sampling_inputs(tmp_path, version):
+    from guard.models import load_pack
+    from tests.test_kubernetes_request_binding import target as bound_target
+
+    selected = environment(engine={"name": "vllm", "version": version, "image_digest": IMAGE},
+                           model={"id": "fixture-model", "revision": "fixture-revision"})
+    value = bound_target(selected)
+    value["lab"] = False
+    value["observed_version"] = version
+    value["engine"]["image_digest"] = IMAGE
+    value["kubernetes"]["engine"].update(image=IMAGE, image_id=IMAGE)
+    definition = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE").checks["REQ-10"]
+    path = tmp_path / "normal-target.json"
+    return selected, value, definition, path
+
+
+@pytest.mark.parametrize(('version', 'damage'), [
+    ('0.30.0', None), ('0.31.0', None),
+    ('0.30.0', 'model'), ('0.31.0', 'schema'), ('0.31.0', 'duration'),
+    ('0.30.0', 'synthetic'), ('0.30.0', 'missing-pin'),
+    ('0.31.0', 'caller-pin'), ('0.31.0', 'executor-pin'),
+])
+def test_req10_prepares_only_the_saved_normal_target_without_building_requests(tmp_path, monkeypatch, version, damage):
+    from guard.executors import kubernetes_sampling as sampling
+    from guard.models import canonical_json, sha256_hex
+    from tools.mvp_versions import versions
+
+    env, target, check, path = normal_sampling_inputs(tmp_path, version)
+    image = next(item['image'] for item in versions().values() if item['version'] == version)
+    env = env.model_copy(update={'engine': env.engine.model_copy(update={'image_digest': image})}).seal()
+    target['environment_ref'] = env.ref().model_dump(mode='json')
+    target['engine']['image_digest'] = image
+    target['kubernetes']['engine'].update(image=image, image_id=image)
+    cfg = {'target': str(path), 'normal_sampling_only': True}
+    if damage == 'model':
+        target['model_mapping']['revision'] = 'EXAMPLE-other-revision'
+    elif damage == 'schema':
+        target['schema'] = 'EXAMPLE-other-target'
+    elif damage == 'duration':
+        cfg['max_duration_seconds'] = 301
+    elif damage == 'synthetic':
+        target['synthetic'] = True
+    raw = canonical_json(target)
+    path.write_bytes(raw)
+    target_sha256 = sha256_hex(raw)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('REQ-10 declaration validation must not resolve role keys or construct or dispatch requests')
+
+    monkeypatch.setattr(sampling.SamplingValidationExecutor, 'keys', forbidden)
+    monkeypatch.setattr(sampling.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(sampling.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(sampling.KubernetesHTTP, 'declare_input_contract', forbidden)
+    executor = KubernetesSamplingExecutor(cfg, runner=forbidden,
+        expected_target_sha256='e' * 64 if damage == 'executor-pin' else None)
+    expected = None if damage == 'missing-pin' else 'f' * 64 if damage == 'caller-pin' else target_sha256
+    if damage is None:
+        executor.prepared_normal_sampling(check, env, APPROVED_NORMAL, expected_target_sha256=expected)
+        assert executor.keys() == {}
+    else:
+        with pytest.raises(ValueError, match='^KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED$'):
+            executor.prepared_normal_sampling(check, env, APPROVED_NORMAL, expected_target_sha256=expected)
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("owner_changed", [False, True])
+def test_req10_normal_only_uses_existing_owned_probe_and_one_approved_combination(tmp_path, version, owner_changed):
+    from guard.core.run import _normalize
+    from guard.executors.kubernetes_sampling import NORMAL_OPTIONS, NORMAL_LABEL
+    from guard.judges.rule_table import RuleTableJudge
+    from guard.models import canonical_json, sha256_hex
+    from tests.builders import evidence
+
+    seen = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args): pass
+
+        def do_POST(self):
+            seen.append((self.path, self.headers.get("Authorization"),
+                         json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+            data = json.dumps({"model": "fixture-model", "choices": [{"text": PRIVATE, "finish_reason": "length"}],
+                               "usage": {"prompt_tokens": 4, "completion_tokens": 1, "total_tokens": 5}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+    try:
+        selected, target, definition, path = normal_sampling_inputs(tmp_path, version)
+        selected = selected.model_copy(update={
+            "model": selected.model.model_copy(update={"inventory_sha256": "a" * 64}),
+            "runtime": selected.runtime.model_copy(update={
+                "gpu_count": 1, "gpu_model": "EXAMPLE GPU", "driver": "EXAMPLE driver",
+            }),
+        }).seal()
+        target["environment_ref"] = selected.ref().model_dump(mode="json")
+        target["engine"]["trusted_url"] = f"http://127.0.0.1:{server.server_port}"
+        path.write_bytes(canonical_json(target))
+        world = World(target)
+        world.actual_probe = True
+        if owner_changed:
+            def change_owner(role, pod, after):
+                if role == "engine" and after:
+                    pod["metadata"]["uid"] = "replacement"
+            world.mutate = change_owner
+        executor = KubernetesSamplingExecutor({"target": str(path), "normal_sampling_only": True},
+                                              runner=world.runner, expected_target_sha256=sha256_hex(path.read_bytes()))
+        draft = executor.run(definition, selected, APPROVED_NORMAL, VllmAdapter(), tmp_path / "work")
+        assert seen == [("/v1/completions", None, {"model": "fixture-model", "prompt": "guard sampling control", **NORMAL_OPTIONS})]
+        assert len(world.execs) == 1 and world.execs[0]["id"] == NORMAL_LABEL and world.execs[0]["headers"] == {}
+        assert draft.status == (ExecStatus.ABORTED if owner_changed else ExecStatus.COMPLETED)
+        assert draft.data_origin == DataOrigin.EXAMPLE
+        assert draft.normal_control.attempted is True
+        assert draft.normal_control.succeeded is (None if owner_changed else True)
+        assert all(not step.attempted for step in draft.challenges)
+        observations = _normalize(definition, draft)["observations"]
+        assert observations["sampling_options_planned"]["value"] == APPROVED_NORMAL["allowed_sampling_options"]
+        assert observations["functional_probe_results"]["value"] == (None if owner_changed else {NORMAL_LABEL: "pass"})
+        assert not observations["sampling_challenge_outcomes"]["collected"]
+        assert not observations["runner_consumption_verified"]["value"]
+        sealed = evidence(check_id=definition.id, observations=observations, normal=draft.normal_control.model_dump())
+        assessed = RuleTableJudge().judge(definition, sealed, definition.judge.params, APPROVED_NORMAL)
+        assert assessed.verdicts["security"] == Verdict.UNKNOWN and assessed.verdicts["functional"] == Verdict.UNKNOWN
+        raw = draft.artifacts[0].path.read_text()
+        saved = json.loads(raw)
+        assert saved["ownership_verified_before_after"] is (not owner_changed)
+        assert saved["normal_completion_shape_verified"] is (not owner_changed)
+        assert saved["http_dispatch_observed"] is (None if owner_changed else True)
+        if owner_changed:
+            assert saved["response_capture"] is None
+            assert draft.comparability.fixture_sha256 is None and draft.comparability.config_sha256 is None
+        else:
+            assert len(saved["response_capture"]["original_body_sha256"]) == 64
+            fixture = {"profile": "kubernetes-owned-normal-sampling/1",
+                       "request_body_sha256": sha256_hex(canonical_json(seen[0][2]))}
+            assert draft.comparability.fixture_sha256 == sha256_hex(canonical_json(fixture))
+            assert len(draft.comparability.config_sha256) == 64
+            assert (draft.comparability.model_inventory_sha256, draft.comparability.gpu, draft.comparability.driver) == (
+                selected.model.inventory_sha256, selected.runtime.gpu_model, selected.runtime.driver)
+        assert PRIVATE not in raw and "guard sampling control" not in raw
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("fault", ["missing-hash", "wrong-env", "unknown-option", "missing-max-tokens", "roles", "wrong-check",
+                                 "wrong-executor", "unsupported-catalog-version"])
+def test_req10_normal_rejects_unbound_or_unsupported_input_before_remote_io(tmp_path, fault):
+    from guard.models import canonical_json, sha256_hex
+
+    version = "999.0.0" if fault == "unsupported-catalog-version" else "0.30.0"
+    selected, target, definition, path = normal_sampling_inputs(tmp_path, version)
+    if fault == "wrong-env":
+        target["environment_ref"]["sha256"] = "0" * 64
+    path.write_bytes(canonical_json(target))
+    values, config = deepcopy(APPROVED_NORMAL), {"target": str(path), "normal_sampling_only": True}
+    if fault == "unknown-option":
+        values["allowed_sampling_options"].append("unknown-option")
+    if fault == "missing-max-tokens":
+        values["allowed_sampling_options"].remove("max_tokens")
+    if fault == "roles":
+        config["roles"] = {}
+    if fault == "wrong-check":
+        definition = definition.model_copy(update={"id": "REQ-09"})
+    if fault == "wrong-executor":
+        definition = definition.model_copy(update={"executor": "input_validation"})
+    world = World(target)
+    approved = None if fault == "missing-hash" else sha256_hex(path.read_bytes())
+    executor = KubernetesSamplingExecutor(config, runner=world.runner, expected_target_sha256=approved)
+    with pytest.raises(ValueError, match="^KUBERNETES_SAMPLING_NORMAL_"):
+        executor.run(definition, selected, values, VllmAdapter(), tmp_path / "work")
+    assert not world.calls
+
+
 def test_remote_probe_terminates_itself_while_http_body_is_still_open():
     release = threading.Event()
     class Handler(BaseHTTPRequestHandler):

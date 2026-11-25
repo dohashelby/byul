@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from guard.cli import app
 from guard.executors import kubernetes_retry_records as retry_executor
+from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from guard.executors.owned_capture import _FILE_READER, MAX_BYTES
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
@@ -85,6 +86,135 @@ def inputs(tmp_path,mode='normal'):
     world.values=values;world.retry_packet=packet
     receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
     return environment,world,scope,values,pack,receipt,path
+
+
+@pytest.mark.parametrize('case,error', [
+    ('ordinary', None),
+    ('foreign-run', 'RETRY_CONFIGURATION_INVALID'),
+    ('foreign-source', 'RETRY_CONFIGURATION_INVALID'),
+    ('malformed-scope', 'RETRY_CONFIGURATION_INVALID'),
+    ('target-pin', 'RETRY_CONFIGURATION_INVALID'),
+    ('over-budget', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
+    ('legacy-stage', 'RETRY_PROFILE_UNSUPPORTED'),
+])
+def test_retry_readiness_uses_the_exact_owned_scope_without_collecting(tmp_path, monkeypatch, case, error):
+    from guard.models.checkdef import PolicyParam
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('LIF-12 readiness must not contact the target or read retry records')
+
+    monkeypatch.setattr(http.KubernetesHTTP, '_verify', forbidden)
+    monkeypatch.setattr(http.KubernetesHTTP, '__call__', forbidden)
+    monkeypatch.setattr(retry_executor.RequiredEventReader, 'read_file', forbidden)
+    environment, world, scope, values, _, _, scope_path = inputs(tmp_path)
+    decision_key = retry_executor.contract.DECISION_KEY
+    values[decision_key] = deepcopy(scope['limits'])
+    policy_row = {key: values[key] for key in (decision_key, 'retry_policy_mode', 'retry_max_record_delay_ms')}
+    scope['policy_sha256'] = values['retry_policy_sha256'] = sha256_hex(canonical_json(policy_row))
+    if case == 'foreign-run':
+        scope['run_id'] = 'another-example-run'
+    elif case == 'foreign-source':
+        scope['producer_source_sha256'] = 'f' * 64
+    raw_scope = b'{' if case == 'malformed-scope' else canonical_json(scope)
+    scope_path.write_bytes(raw_scope)
+    values['retry_scope_sha256'] = sha256_hex(raw_scope)
+
+    target_path = tmp_path / 'saved-target.json'
+    target_path.write_bytes(canonical_json(world.target))
+    digest = sha256_hex(target_path.read_bytes())
+    cfg = {'target': str(target_path), 'retry_scope': str(scope_path),
+           'prepared': str(tmp_path / 'inert-prepared-declaration.json'),
+           'max_duration_seconds': 301 if case == 'over-budget' else 30}
+    executor = KubernetesRequestTerminationExecutor(
+        cfg, runner=forbidden, expected_target_sha256='0' * 64 if case == 'target-pin' else None)
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['LIF-12']
+    if case == 'legacy-stage':
+        check = check.model_copy(update={'policy_params': [
+            *check.policy_params, PolicyParam(key='retry_session', type='str')]})
+    if error is None:
+        executor.prepared_retry_records(check, environment, values, expected_target_sha256=digest)
+    else:
+        with pytest.raises(ValueError, match=f'^{error}$'):
+            executor.prepared_retry_records(check, environment, values, expected_target_sha256=digest)
+
+
+def test_retry_snapshot_scope_keeps_sibling_executors_out_of_the_option():
+    from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION, bounded_metadata_scopes, for_check
+
+    pack = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE")
+    allowed = {"LIF-10", "LIF-12", "REQ-12"}
+    cfg = {"executors": {"request_termination": "kubernetes"},
+           "check_config": {"LIF-12": {RETRY_RECORD_SNAPSHOT_OPTION: True}}}
+    scopes = bounded_metadata_scopes([cfg, deepcopy(cfg)], pack, allowed)
+    assert all(set(scope) == {"LIF-12"} for scope in scopes)
+    assert "request_termination" not in for_check(cfg, "request_termination", "LIF-10")
+
+    for unsafe in ({"request_termination": {RETRY_RECORD_SNAPSHOT_OPTION: True}},
+                   {**cfg, "lab_activation": {"EXAMPLE": True}},
+                   {**cfg, "update": {"kubernetes_candidate_binding": "staged"}}):
+        with pytest.raises(ValueError, match="^RETRY_RECORD_SNAPSHOT_SCOPE_INVALID$"):
+            bounded_metadata_scopes([{**cfg, **unsafe}, cfg], pack, allowed)
+
+
+@pytest.mark.parametrize("pin,target_problem", [
+    ("exact", None), ("missing", None), ("different", None),
+    ("exact", "missing"), ("exact", "changed"), ("exact", "symlink"),
+    ("exact", "prepared-owner"), ("exact", "prepared-environment"),
+])
+def test_normal_retry_snapshot_reads_only_the_independently_pinned_owner(tmp_path, pin, target_problem):
+    from guard.adapters.vllm import VllmAdapter
+    from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION
+    from guard.models import DataOrigin
+
+    environment, world, scope, values, _, _, scope_path = inputs(tmp_path)
+    world.target["lab"] = False
+    values[retry_executor.contract.DECISION_KEY] = deepcopy(scope["limits"])
+    digest = sha256_hex(canonical_json(world.target))
+    values["retry_target_sha256"] = world.retry_packet["target_sha256"] = digest
+    target_path = tmp_path / "normal-target.json"
+    target_path.write_bytes(canonical_json(world.target))
+    cfg = {"target": str(target_path), "retry_scope": str(scope_path), RETRY_RECORD_SNAPSHOT_OPTION: True}
+    prepared_binding = retry_executor.contract.TARGET_BINDING_KEY
+    if target_problem in {"prepared-owner", "prepared-environment"}:
+        cfg[prepared_binding] = {"environment_ref": environment.ref().model_dump(mode="json"), "target_sha256": digest}
+    selected_pin = {"exact": digest, "missing": None, "different": "0" * 64}[pin]
+    executor = KubernetesRequestTerminationExecutor(cfg, runner=world.runner, expected_target_sha256=selected_pin)
+    check = load_pack(Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE").checks["LIF-12"]
+
+    if target_problem is not None:
+        executor.prepared_retry_records(check, environment, values)
+        if target_problem == "missing":
+            target_path.unlink()
+        elif target_problem == "changed":
+            target_path.write_bytes(canonical_json({**world.target, "observed_version": "changed"}))
+        elif target_problem == "prepared-owner":
+            cfg[prepared_binding]["target_sha256"] = "0" * 64
+        elif target_problem == "prepared-environment":
+            cfg[prepared_binding]["environment_ref"]["sha256"] = "0" * 64
+        else:
+            original = target_path.rename(tmp_path / "same-target-bytes.json")
+            target_path.symlink_to(original.name)
+
+    if pin != "exact" or target_problem is not None:
+        def forbidden(*args, **kwargs):
+            pytest.fail("An invalid retry snapshot target must be rejected before transport dispatch")
+
+        executor = KubernetesRequestTerminationExecutor(cfg, runner=forbidden, expected_target_sha256=selected_pin)
+        with pytest.raises(ValueError, match="^RETRY_CONFIGURATION_INVALID$"):
+            executor.prepared_retry_records(check, environment, values)
+        with pytest.raises(ValueError, match="^RETRY_CONFIGURATION_INVALID$"):
+            executor.run(check, environment, values, VllmAdapter(), tmp_path / "work")
+        assert world.reads == 0 and world.sent == []
+        return
+
+    executor.prepared_retry_records(check, environment, values)
+    assert world.reads == 0
+    draft = executor.run(check, environment, values, VllmAdapter(), tmp_path / "work")
+    assert world.reads == 2 and world.sent == []
+    assert draft.data_origin is DataOrigin.EXAMPLE and not draft.normal_control.attempted
+    assert draft.observations["retry_records_collected"].value is True
+    assert draft.observations["automatic_retry_verified"].value is False
+    assert draft.observations["retry_scope_complete"].value is False
 
 
 @pytest.mark.parametrize('mode',['normal','unresolved','declared-forbidden','declared-cost','manual-only','missing-event',

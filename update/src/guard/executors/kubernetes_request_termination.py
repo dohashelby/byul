@@ -58,6 +58,12 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             raise ValueError("TERMINATION_PROFILE_UNSUPPORTED")
         self.policy_normalizer(values)
 
+    def prepared_retry_records(self, check, env, values, *, expected_target_sha256=None):
+        if type(self) is not KubernetesRequestTerminationExecutor or check.id != 'LIF-12':
+            raise ValueError('RETRY_PROFILE_UNSUPPORTED')
+        consumer = self._consumer(check)
+        consumer.prepared_retry_records(check, env, values, expected_target_sha256=expected_target_sha256)
+
     def _consumer(self,check):
         # Only the public dispatcher selects consumers; subclasses never redispatch.
         if type(self) is not KubernetesRequestTerminationExecutor:return self

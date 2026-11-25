@@ -4,19 +4,25 @@ from __future__ import annotations
 from datetime import timedelta
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 import yaml
 
+from guard import application
+from guard.core.execution_recipe import bind_recipe, configuration_sha256
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
 from guard.executors import registry, run_binding
 from guard.executors.base import EvidenceDraft
-from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
+from guard.executors.kubernetes_supply_boot import KubernetesSupplyBootExecutor
+from guard.models import DataOrigin, ExecStatus, Side, canonical_json, load_pack, sha256_hex, utcnow
 from guard.models.objects import Execution
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import environment, policy
+from tests.test_kubernetes_gateway_observation import ordinary_gateway_record  # noqa: F401
+from tests.test_lifecycle_capture import external  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = load_pack(ROOT / 'packs/PACK-BASELINE')
@@ -239,3 +245,322 @@ def test_policy_migration_tool_keeps_enterprise_values_and_never_overwrites(tmp_
         main([str(path), '--out', str(tmp_path / 'new.yaml')])
     with pytest.raises(ValueError, match='SEALED_POLICY'):
         migrate({'kind': 'POL'}, PACK)
+
+
+@pytest.mark.parametrize('change', [
+    'missing', 'create-before-run', 'delete-before-run', 'create-after-recipe', 'delete-after-recipe',
+])
+def test_paired_req02_preserves_owned_record_for_recipe_bound_missing_native_preparation(
+        tmp_path, external, monkeypatch, ordinary_gateway_record, change):  # noqa: F811
+    import socket
+
+    from guard.collectors.lifecycle import prepare_assets
+    from guard.executors import kubernetes_route_record as route
+    from guard.executors.kubernetes_native_route import KubernetesNativeRouteExecutor
+    from tests.test_a1_kubernetes_route_product import SESSION, World, stored_gateway_route
+    from tests.test_kubernetes_request_binding import env
+    from tools.mvp_versions import versions
+
+    candidate = env()
+    baseline_version = versions()['baseline']
+    baseline = environment(id='ENV-ROUTE-BASELINE', model=candidate.model,
+        engine={'name': baseline_version['engine'], 'version': baseline_version['version'],
+                'image_digest': baseline_version['image']})
+    world = World(candidate, 'normal')
+    gateway_raw, _, _ = ordinary_gateway_record
+    stored_gateway_route(world, candidate, gateway_raw)
+    target = tmp_path / 'target.json'
+    target.write_bytes(canonical_json(world.target))
+    prepared = external / 'native-assets' / 'manifest.json'
+    if change.startswith('delete-'):
+        prepare_assets(prepared.parent, ROOT.parent)
+    settings = {'target': str(target),
+                'native_route': {'target': str(target), 'prepared': str(prepared)}}
+    run_cfg = {'record_session': SESSION}
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {'route_record': 'kubernetes'},
+           'update': {'allowed_checks': ['REQ-02']},
+           'sides': {'candidate': {'route_record': settings, 'run_binding': {'REQ-02': run_cfg}}}}
+    envs = [baseline, candidate]
+    pol = policy(PACK.ref(), scope={'include': ['REQ-02']}, values={})
+    store = Store(tmp_path / 'store')
+    put_pack(store, PACK.path)
+    store.put_many([*envs, pol])
+    selected = select(PACK, envs, pol, mode='update')
+    plan = bind_recipe(selected, cfg, envs)
+    store.put(plan)
+    if change == 'missing':
+        # The default offline preflight requires complete inputs.
+        with pytest.raises(run_binding.RunBindingUnavailable, match='^RUN_BINDING_UNAVAILABLE$'):
+            run_binding.effective_values(PACK.checks['REQ-02'], settings, candidate, {}, side='candidate',
+                                         attempt_id=None, issued_at=utcnow(), run_cfg=run_cfg)
+    if change == 'create-before-run':
+        prepare_assets(prepared.parent, ROOT.parent)
+    elif change == 'delete-before-run':
+        prepared.unlink()
+    elif change.endswith('-after-recipe'):
+        original = run_binding.effective_values
+
+        def change_after_recipe(*args, **kwargs):
+            assert kwargs.get('native_route_prepared_absent', False) is change.startswith('create-')
+            if change == 'create-after-recipe':
+                prepare_assets(prepared.parent, ROOT.parent)
+            else:
+                prepared.unlink()
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(run_binding, 'effective_values', change_after_recipe)
+
+    def forbid_runtime(*args, **kwargs):
+        pytest.fail('REQ-02 retained record must not dispatch an external or native request')
+
+    monkeypatch.setattr(subprocess, 'Popen', forbid_runtime)
+    monkeypatch.setattr(socket, 'socket', forbid_runtime)
+    monkeypatch.setattr(KubernetesNativeRouteExecutor, '__init__', forbid_runtime)
+    monkeypatch.setattr(route, 'capture_pipes', world.runner)
+    monkeypatch.setattr('guard.runtime.kubernetes_http.capture_pipes', world.runner)
+
+    run_settings = application.run_config(cfg)
+    if change.endswith('-before-run'):
+        with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+            run_plan(store, PACK, plan, run_settings, only_side=Side.candidate)
+        assert not list(store.iter_kind('EVD')) and world.reads == 0
+        return
+
+    evd, = run_plan(store, PACK, plan, run_settings, only_side=Side.candidate)
+    if change == 'delete-after-recipe':
+        assert evd.execution.status == ExecStatus.NOT_RUN
+        assert evd.execution.abort_reason == 'RUN_BINDING_UNAVAILABLE'
+        assert not evd.artifacts and world.reads == 0
+        return
+
+    assert world.reads == 1
+    assert evd.execution.status == ExecStatus.ABORTED and evd.data_origin == DataOrigin.EXAMPLE
+    assert evd.observations['route_record_collected'].value is True
+    assert evd.observations['route_producer_authenticated'].value is False
+    assert evd.observations['native_route_trials'].collected is False
+    assert evd.observations['composite_subcollections'].value['failed'] == {'native_route': 'SUBCOLLECTION_UNAVAILABLE'}
+    binding = evd.execution.run_binding
+    assert binding['files'] == {'route_target_sha256': sha256_hex(target.read_bytes())}
+    assert binding['values'] == {'route_session': SESSION} and run_binding.verify(binding, evd) == []
+    artifact, = evd.artifacts
+    record = json.loads((store.root / artifact.path).read_bytes().splitlines()[-1])['record']
+    assert record['file_bytes_sha256'] == sha256_hex(world.raw)
+    assert record['owner_binding_verified'] is True
+    assert store.resolve(evd.ref()).to_dict() == evd.to_dict()
+
+
+@pytest.mark.parametrize(('defect', 'absent'), [
+    ('missing-asset', False), ('malformed', False), ('dangling-symlink', False),
+    ('missing-native-target', True), ('malformed-native-target', True), ('foreign-environment', True),
+])
+def test_req02_record_only_binding_requires_the_declared_preparation_itself_to_be_absent(
+        external, defect, absent):  # noqa: F811
+    from guard.collectors.lifecycle import prepare_assets
+    from tests.test_kubernetes_request_binding import env, target
+
+    selected_env = env()
+    record_target = target_file(external, target(selected_env))
+    prepared = external / 'assets' / 'manifest.json'
+    if defect == 'missing-asset':
+        prepare_assets(prepared.parent, ROOT.parent)
+        (prepared.parent / 'sitecustomize.py').unlink()
+    elif defect == 'malformed':
+        prepared.parent.mkdir()
+        prepared.write_bytes(b'{')
+    elif defect == 'dangling-symlink':
+        prepared.parent.mkdir()
+        prepared.symlink_to('missing.json')
+    native_target = external / 'native-target.json'
+    if defect == 'malformed-native-target':
+        native_target.write_bytes(b'[]')
+    elif defect == 'foreign-environment':
+        native_target.write_bytes(canonical_json({**target(selected_env), 'environment_ref': {}}))
+    elif defect != 'missing-native-target':
+        native_target.write_bytes(record_target.read_bytes())
+    settings = {'target': str(record_target),
+                'native_route': {'target': str(native_target), 'prepared': str(prepared)}}
+    assert run_binding.native_route_preparation_missing(settings) is absent
+    with pytest.raises(run_binding.RunBindingUnavailable, match='^RUN_BINDING_UNAVAILABLE$'):
+        run_binding.compute(PACK.checks['REQ-02'], settings, selected_env, side='candidate', attempt_id='attempt',
+                            issued_at=utcnow(), run_cfg={'record_session': 'ab' * 16},
+                            native_route_prepared_absent=absent)
+
+
+def _supply_pair(external, check_id):
+    from tests.test_sup15_owned_record_admission import _prepare_roles
+    from tests.test_supply_boot_record_access import VALUES as example_policy_values
+    from tools.mvp_versions import versions
+
+    cfg = {'adapter': {'name': 'vllm'}, 'executors': {'supply_boot': 'kubernetes'},
+           'update': {'allowed_checks': [check_id]}, 'sides': {}}
+    envs = []
+    for index, (side, version) in enumerate(versions().items()):
+        root = external / side
+        root.mkdir()
+        env = environment(id=f'ENV-SUPPLY-RECIPE-{side.upper()}',
+            engine={'name': version['engine'], 'version': version['version'], 'image_digest': version['image']},
+            runtime={'gpu_count': 1, 'gpu_model': 'EXAMPLE GPU', 'driver': 'EXAMPLE driver'})
+        envs.append(env)
+        settings, _, _, _ = _prepare_roles(root, env, late_owner_change=False, first_owner=1 + 2 * index)
+        producer = root / 'exact-producer.py'
+        producer.write_bytes(b'# EXAMPLE identity only\n')
+        cfg['sides'][side] = {'check_config': {check_id: settings},
+                             'run_binding': {check_id: {'record_producer': str(producer)}}}
+    row = {param.key: example_policy_values[param.key] for param in PACK.checks[check_id].policy_params}
+    values = {check_id: row} if row else {}
+    return envs, policy(PACK.ref(), scope={'include': [check_id]}, values=values), cfg
+
+
+@pytest.mark.parametrize(('check_id', 'candidate_issue', 'reason'), [
+    *((check_id, None, None) for check_id, check in PACK.checks.items()
+      if check.executor == 'supply_boot' and not check.retired),
+    ('SUP-06', 'foreign-environment', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
+    ('SUP-09', 'foreign-environment', 'SUPPLY_BOOT_INPUT_UNAVAILABLE'),
+    ('SUP-11', 'same-record-location', 'SUPPLY_BOOT_DISTINCT_ROLE_INPUTS_REQUIRED'),
+])
+def test_offline_readiness_validates_nested_supply_roles(external, monkeypatch, check_id, candidate_issue, reason):  # noqa: F811
+    from tools import mvp_live_readiness
+    from tools.j02_run_config import write_config
+
+    def forbid_runtime_request(*args, **kwargs):
+        pytest.fail('supply file readiness must not make a runtime request')
+
+    monkeypatch.setattr(subprocess, 'Popen', forbid_runtime_request)
+    envs, pol, cfg = _supply_pair(external, check_id)
+    roles = cfg['sides']['candidate']['check_config'][check_id]
+    if candidate_issue == 'foreign-environment':
+        path = Path(roles['challenge']['target'])
+        target = json.loads(path.read_bytes())
+        target['environment_ref'] = envs[0].ref().model_dump(mode='json')
+        path.write_bytes(canonical_json(target))
+    elif candidate_issue == 'same-record-location':
+        roles['challenge'] = dict(roles['normal'])
+
+    ready = application.update_readiness(PACK, envs, pol, cfg)
+    inputs_result = next(row for row in ready['checks'] if row['check'] == 'inputs')
+    assert inputs_result['ok'] is (reason is None), ready
+    if reason:
+        assert inputs_result['detail'] == reason
+    config_path, policy_path = external / 'guard.toml', external / 'policy.json'
+    write_config(cfg, config_path)
+    policy_path.write_bytes(canonical_json(pol.to_dict()))
+    index = mvp_live_readiness.template(PACK)
+    for side, env in zip(cfg['sides'], envs):
+        env_path = external / side / 'env.json'
+        env_path.write_bytes(canonical_json(env.to_dict()))
+        inputs = {role: {'path': str(path), 'sha256': sha256_hex(path.read_bytes())}
+                  for role, path in {'configuration': config_path, 'policy': policy_path, 'environment': env_path}.items()}
+        index['inputs'].append({'check_id': check_id, 'side': side, **inputs})
+    index_path = external / 'index.json'
+    index_path.write_bytes(canonical_json(index))
+    report = mvp_live_readiness.audit(index_path, pack=PACK)
+    assert report['sides'] == 138 and report['file_binding_valid_sides'] == (1 if reason else 2)
+    for row in report['rows']:
+        if row['check_id'] == check_id:
+            if reason and row['side'] == 'candidate':
+                assert not row['file_binding_valid'], row
+                assert row['blocking_codes'] == [reason]
+            else:
+                assert row['file_binding_valid'], row
+            assert row['live_target_verified'] is False
+            assert row['engine_executed'] is row['ready_for_execution'] is False
+
+
+def test_paired_supply_readiness_does_not_reinterpret_normal_legacy_or_unpaired_settings():
+    from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS
+    from guard.models.checkdef import PolicyParam
+
+    roles = {'normal': {}, 'challenge': {}}
+    for check in PACK.checks.values():
+        if check.executor == 'supply_boot' and (option := KUBERNETES_BOUND_CHECK_OPTIONS.get(check.id)):
+            assert run_binding.is_paired_supply_role_preflight(check, roles, {})
+            for value in (True, False):
+                assert not run_binding.is_paired_supply_role_preflight(check, {**roles, option: value}, {})
+    check = PACK.checks['SUP-06']
+    old = check.model_copy(update={'policy_params': [PolicyParam(key='supply_environment_sha256', type='str')]})
+    assert not run_binding.is_paired_supply_role_preflight(old, roles, {})
+    assert not run_binding.is_paired_supply_role_preflight(check, {'target': 'unused'}, {})
+    assert not run_binding.is_paired_supply_role_preflight(check, roles, {'kubernetes_candidate_binding': 'after_baseline'})
+    assert not run_binding.is_paired_supply_role_preflight(check, roles, {'mode': 'managed'})
+
+
+@pytest.mark.parametrize('check_id', ['SUP-15', 'SUP-16'])
+@pytest.mark.parametrize(('phase', 'field', 'reason'), [
+    ('before-recipe', 'challenge', None),
+    ('before-recipe', 'record_producer', None),
+    ('before-binding', 'challenge', 'RUN_BINDING_SUPPLY_CHALLENGE_PREPARED_CHANGED'),
+    ('before-binding', 'record_producer', 'RUN_BINDING_SUPPLY_RECORD_PRODUCER_CHANGED'),
+    ('after-binding', 'challenge', None),
+])
+def test_paired_recipe_binds_raw_supply_role_files_until_consumed(
+        external, tmp_path, monkeypatch, check_id, phase, field, reason):  # noqa: F811
+    from guard.core import run as core_run
+
+    def forbid_runtime_request(*args, **kwargs):
+        pytest.fail('The supply role fixture must not make a runtime request')
+
+    envs, pol, cfg = _supply_pair(external, check_id)
+    store = Store(tmp_path / 'store')
+    put_pack(store, PACK.path)
+    store.put_many([*envs, pol])
+    plan = bind_recipe(select(PACK, envs, pol, mode='update'), cfg, envs)
+    store.put(plan)
+    digests = {}
+    assert configuration_sha256(cfg, envs, plan=plan, supply_record_digests=digests) == plan.inputs.execution_recipe_sha256
+    assert set(digests) == {f'baseline:{check_id}', f'candidate:{check_id}'}
+    candidate = cfg['sides']['candidate']
+    settings = candidate['check_config'][check_id]
+    path = Path(candidate['run_binding'][check_id]['record_producer']
+                if field == 'record_producer' else settings[field]['prepared'])
+    assert digests[f'candidate:{check_id}'][field] == sha256_hex(path.read_bytes())
+    unchanged_document = json.loads(path.read_bytes()) if field != 'record_producer' else None
+
+    def rewrite():
+        path.write_bytes(path.read_bytes() + b'\n')
+        if unchanged_document is not None:
+            assert json.loads(path.read_bytes()) == unchanged_document
+
+    monkeypatch.setattr(subprocess, 'Popen', forbid_runtime_request)
+    seen = []
+
+    def role_reader(executor, target, env, prepared):
+        seen.append(target['run_id'])
+        raise ValueError('EXAMPLE detached reader')
+
+    monkeypatch.setattr(KubernetesSupplyBootExecutor, '_role_reader', role_reader)
+    run_cfg = application.run_config(cfg)
+    if phase == 'before-recipe':
+        rewrite()
+        with pytest.raises(ValueError, match='^EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED$'):
+            run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+        assert seen == []
+        return
+    if phase == 'before-binding':
+        run_one = core_run._run_one
+
+        def rewrite_before_binding(*args, **kwargs):
+            rewrite()
+            return run_one(*args, **kwargs)
+
+        monkeypatch.setattr(core_run, '_run_one', rewrite_before_binding)
+    else:
+        binding = run_binding.effective_values
+
+        def rewrite_after_binding(*args, **kwargs):
+            result = binding(*args, **kwargs)
+            rewrite()
+            return result
+
+        monkeypatch.setattr(run_binding, 'effective_values', rewrite_after_binding)
+    evd, = run_plan(store, PACK, plan, run_cfg, only_side=Side.candidate)
+    if phase == 'before-binding':
+        assert seen == []
+        assert evd.execution.status == ExecStatus.NOT_RUN and evd.execution.abort_reason == reason
+        assert evd.execution.run_binding is None
+    else:
+        assert seen == ['guard-normal']
+        assert evd.execution.status == ExecStatus.ABORTED
+        assert evd.execution.run_binding['files']['supply_challenge_prepared_sha256'] == sha256_hex(canonical_json(unchanged_document))
+        normal, challenge = evd.observations['supply_boot_sessions'].value
+        assert normal['diagnostic_codes'] == ['SUPPLY_BOOT_PREFLIGHT_UNAVAILABLE']
+        assert challenge['diagnostic_codes'] == ['SUPPLY_BOOT_INPUT_UNAVAILABLE']

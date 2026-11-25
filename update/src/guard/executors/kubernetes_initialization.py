@@ -3,10 +3,13 @@ import uuid
 from guard.collectors.file import load_bounded_json
 from guard.adapters import vllm_initialization_sensor as sensor,vllm_initialization_metadata as metadata
 from guard.adapters import vllm_initialization_release_sensor as init_release
+from guard.adapters.vllm_lifecycle_profiles import source_hashes
 from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor,vllm_ready_endpoint_contract as endpoint_contract,vllm_ready_endpoint_metadata as endpoint_metadata
 from guard.adapters import vllm_worker_generation_sensor as generation_sensor,vllm_worker_generation_metadata as generation_metadata
 from guard.adapters import vllm_worker_initialization_sensor as joint_sensor,vllm_worker_initialization_metadata as joint_metadata
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
+from guard.runtime.bounded import strict_json
+from guard.runtime.engine_http import KubernetesBindingError
 from guard.runtime.kubernetes_initialization import KubernetesInitializationHTTP,PROFILE as HTTP_PROFILE,SLOTS
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
@@ -19,6 +22,7 @@ CHECK_PROFILES={'LIF-09':PROFILE,'LIF-07':READINESS_PROFILE}
 
 READINESS_POLICY_TYPES={**POLICY_TYPES,'required_readiness_items':'list[str]'}
 READINESS_OBSERVATIONS={'init_required_readiness_items':'list','init_unverified_readiness_items':'list'}
+ACTIVATION_OBSERVATIONS = {'activation_steps', 'activation_violations', 'activation_missing', 'activation_scope_complete'}
 
 
 def normalize_check_policy(check,values):
@@ -30,27 +34,55 @@ def normalize_check_policy(check,values):
     return normalize_policy({key:values[key] for key in POLICY_TYPES})
 
 
+def _activation_observations(projection, trials, diagnostics, *, source_sha256, declared_phase):
+    # Native executor correspondence and a direct HTTP control are separate observations.
+    # Neither proves which request the external service gate admitted or when it admitted it.
+    correspondence = [row for row in projection['correspondence']
+        if row['same_process_interval_observed'] and row['ready_phase'] == row['aggregate_phase'] == 'RETURN']
+    controls = [row for row in trials if row.get('binding_verified') is True
+        and row.get('policy_window_verified') is True and row.get('normal_shape_verified') is True]
+    steps = [{'step': 'native-initialization-correspondence', 'source_sha256': source_sha256,
+              'declared_phase': declared_phase, **row} for row in correspondence]
+    steps += [{'step': 'direct-initialization-normal-control', 'declared_phase': declared_phase, **row}
+              for row in controls]
+    missing = set(projection['missing']) | set(diagnostics)
+    if not correspondence:
+        missing.add('INITIALIZATION_NORMAL_NATIVE_CORRESPONDENCE_UNAVAILABLE')
+    if not controls:
+        missing.add('INITIALIZATION_BOUNDED_NORMAL_CONTROL_UNAVAILABLE')
+    return {'activation_steps': steps, 'activation_violations': [], 'activation_missing': sorted(missing),
+            'activation_scope_complete': False}
+
+
 from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
 
 
 class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='initialization';version='0.4.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
-    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
+    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None,expected_prepared_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
+        self.expected_prepared = expected_prepared_sha256
 
     def validate_policy(self,check,values):
         if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('INITIALIZATION_PROFILE_UNSUPPORTED')
         normalize_check_policy(check,values)
 
-    def run(self,check,env,policy_values,adapter,workdir):
-        from guard.collectors.lifecycle import load_prepared
-        self.validate_policy(check,policy_values)
+    def _local_inputs(self, check, env, policy_values):
+        from guard.adapters.vllm_file_read_sensor import dependency
+        from guard.collectors.lifecycle import load_initialization_prepared
+        from .run_binding import stages_for
+
         try:
-            if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
+            if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
-            target=load_bounded_json(self.cfg['target'])
-            target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end=normalize_check_policy(check,policy_values)
+            if stages_for(check) == (1, 2):
+                target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+            else:
+                target = load_bounded_json(self.cfg['target'])
+            target_hash = sha256_hex(canonical_json(target))
+            prepared = load_initialization_prepared(self.cfg['prepared'], env, expected_sha256=self.expected_prepared)
+            start, end = normalize_check_policy(check, policy_values)
             if prepared['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}:
                 required={item.key for item in check.required_observations}
                 if not {'init_worker_generation_events','init_worker_generation_candidates','init_ready_send_observations'}<=required:raise ValueError
@@ -61,17 +93,43 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
                     or sha256_hex(canonical_json(prepared))!=policy_values['init_prepared_sha256'] or not start<=utcnow()<=end or type(env.model.inventory_sha256) is not str or len(env.model.inventory_sha256)!=64):raise ValueError
         except (KeyError,ValueError,TypeError,RuntimeError,OSError):raise ValueError('INITIALIZATION_CONFIGURATION_INVALID') from None
         transport=KubernetesInitializationHTTP(target,env,runner=self.runner,duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))
+        return target, prepared, transport
+
+    @staticmethod
+    def _native_target(target, env, transport):
+        return {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': target['lab'],
+            'run_id': transport.binding['run_id'], 'environment_ref': env.ref().model_dump(mode='json'),
+            'kubernetes': {'context': transport.binding['context'], 'engine': transport.binding['engine']}}
+
+    def _native_reader(self, native_target, env, prepared):
+        return KubernetesLifecycleReader(native_target, env, prepared, runner=self.runner,
+            binary=self.cfg.get('kubectl_binary', 'kubectl'), duration=self.cfg.get('max_duration_seconds', 120))
+
+    def prepared_inputs(self, check, env, policy_values):
+        """Validate local inputs only, without taking ownership snapshots or dispatching."""
+        self.validate_policy(check, policy_values)
+        try:
+            target, prepared, transport = self._local_inputs(check, env, policy_values)
+            self._native_reader(self._native_target(target, env, transport), env, prepared)
+        except KubernetesBindingError as exc:
+            raise ValueError(str(exc)) from None
+        return target, prepared, transport
+
+    def run(self,check,env,policy_values,adapter,workdir):
+        self.validate_policy(check, policy_values)
+        if adapter is None:
+            raise ValueError('INITIALIZATION_CONFIGURATION_INVALID')
+        target, prepared, transport = self._local_inputs(check, env, policy_values)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,allow_mutating=False,
             keys={'none':None},secrets=[],cprobe=transport,workdir=workdir,started=utcnow(),http_probe_profile=HTTP_PROFILE)
         ctx._init_prepared=prepared;return self._finish(ctx)
 
     def collect(self,ctx):
         start,end=normalize_check_policy(ctx.check,ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[]
-        native_target={'schema':'guard-kubernetes-lifecycle-target/1','lab':ctx.target['lab'],'run_id':ctx.cprobe.binding['run_id'],
-            'environment_ref':ctx.env.ref().model_dump(mode='json'),'kubernetes':{'context':ctx.cprobe.binding['context'],'engine':ctx.cprobe.binding['engine']}}
+        native_target = self._native_target(ctx.target, ctx.env, ctx.cprobe)
         try:
-            reader=KubernetesLifecycleReader(native_target,ctx.env,ctx._init_prepared,runner=self.runner,
-                binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120));reader.snapshot()
+            reader = self._native_reader(native_target, ctx.env, ctx._init_prepared)
+            reader.snapshot()
             for slot in SLOTS:
                 row={'case_id':'lif09-'+slot,'request_id_sha256':sha256_hex(('byul-lif09-'+token+'-'+slot).encode()),
                     'attempted':False,'started_at':None,'finished_at':None,'policy_window_verified':False,
@@ -98,7 +156,9 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
                         prepared=ctx._init_prepared,owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
                     if not packet.get('recorded_files_covered'):diagnostics.append('INITIALIZATION_NATIVE_COVERAGE_UNAVAILABLE')
                 except Exception:diagnostics.append('INITIALIZATION_CAPTURE_UNAVAILABLE')
-        projection=metadata.project(packet,ctx.policy_values);http=ctx.cprobe.report();read_report=reader.report() if reader else None
+        source_sha256 = source_hashes(ctx._init_prepared['profile'])[sensor.MP]
+        projection=metadata.project(packet,ctx.policy_values,source_sha256=source_sha256)
+        http=ctx.cprobe.report();read_report=reader.report() if reader else None
         if not projection['correspondence']:
             diagnostics.append('INITIALIZATION_AGGREGATE_CORRESPONDENCE_UNAVAILABLE')
         if any(not row['source_process_binding_observed'] for row in projection['calls']):
@@ -141,6 +201,9 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
         if ctx.check.id=='LIF-07':
             observations['init_required_readiness_items']=list(ctx.policy_values['required_readiness_items'])
             observations['init_unverified_readiness_items']=list(ctx.policy_values['required_readiness_items'])
+        if ACTIVATION_OBSERVATIONS <= {item.key for item in ctx.check.required_observations}:
+            observations.update(_activation_observations(projection, trials, diagnostics, source_sha256=source_sha256,
+                declared_phase=ctx.policy_values['init_phase']))
         return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Single declared startup stage: same-process readiness/aggregate facts, bounded HTTP admission samples; independent failure, full model readiness and repaired launch lineage unverified.'},[],summary
 

@@ -2,17 +2,29 @@
 
 from guard.collectors.file import load_bounded_json
 from guard.adapters.engine_profiles import supports
+from guard.configuration import RETRY_RECORD_SNAPSHOT_OPTION
 import os
 import stat
 
 from guard.models import canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import capture_pipes, strict_json
-from guard.runtime.engine_http import KubernetesHTTP, REQUIRED_EVENT_PROFILE
+from guard.runtime.engine_http import KubernetesBindingError, KubernetesHTTP, REQUIRED_EVENT_PROFILE
 from .base import record_origin_ceiling
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_observation import RequiredEventReader
 from .owned_capture import MAX_BYTES
 from . import retry_record_contract as contract
+
+
+def snapshot_target_sha256(raw, env):
+    """Canonical target identity of the exact prebound execution-recipe bytes."""
+    if type(raw) is not bytes:
+        raise ValueError('RETRY_CONFIGURATION_INVALID')
+    target = strict_json(raw, limit=65536)
+    if (type(target) is not dict or target.get('lab') is not False
+            or target.get('environment_ref') != env.ref().model_dump(mode='json')):
+        raise ValueError('RETRY_CONFIGURATION_INVALID')
+    return sha256_hex(canonical_json(target))
 
 
 def load_scope(path, expected_hash, **binding):
@@ -48,45 +60,109 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         super().__init__(cfg, environ=environ)
         self.runner, self.expected_target = runner, expected_target_sha256
+        if self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+            self.version += '+record-snapshot'
 
     def validate_policy(self, check, values):
         if check.id != 'LIF-12' or getattr(check, 'collection_profile', None) != contract.PROFILE:
             raise ValueError('RETRY_PROFILE_UNSUPPORTED')
         contract.normalize_policy(values)
+        if RETRY_RECORD_SNAPSHOT_OPTION in self.cfg:
+            from .run_binding import stages_for
+            if (self.cfg[RETRY_RECORD_SNAPSHOT_OPTION] is not True or check.executor != self.name
+                    or stages_for(check) != (1, 2, 3, 4) or contract.DECISION_KEY not in values):
+                raise ValueError('RETRY_PROFILE_UNSUPPORTED')
+
+    def _validate_configuration(self, env):
+        if set(self.cfg) - {'target', 'retry_scope', 'prepared', 'kubectl_binary', 'max_duration_seconds',
+                            RETRY_RECORD_SNAPSHOT_OPTION, contract.TARGET_BINDING_KEY}:
+            raise ValueError
+        if contract.TARGET_BINDING_KEY in self.cfg and self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is not True:
+            raise ValueError
+        if 'prepared' in self.cfg and (type(self.cfg['prepared']) is not str or not self.cfg['prepared']):
+            raise ValueError
+        if not supports(env.engine.name, env.engine.version):
+            raise ValueError
+
+    def _bound_scope(self, target, env, values, *, expected_target_sha256=None):
+        target_hash = sha256_hex(canonical_json(target))
+        snapshot_only = self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True
+        expected_pins = (self.expected_target, expected_target_sha256)
+        if (target.get('lab') is not (not snapshot_only) or snapshot_only and all(pin is None for pin in expected_pins)
+                or target_hash != values['retry_target_sha256']
+                or any(pin is not None and pin != target_hash for pin in expected_pins)):
+            raise ValueError
+        if contract.TARGET_BINDING_KEY in self.cfg:
+            target_binding = {'environment_ref': env.ref().model_dump(mode='json'), 'target_sha256': target_hash}
+            if canonical_json(self.cfg[contract.TARGET_BINDING_KEY]) != canonical_json(target_binding):
+                raise ValueError
+        image = target['kubernetes']['engine']['image']
+        if type(image) is not str or '@sha256:' not in image:
+            raise ValueError
+        scope = load_scope(self.cfg['retry_scope'], values['retry_scope_sha256'],
+            policy_sha256=values['retry_policy_sha256'], source_sha256=values['retry_record_source_sha256'],
+            image_digest=image.rsplit('@', 1)[1], model_revision=env.model.revision,
+            model_inventory_sha256=env.model.inventory_sha256)
+        if scope['run_id'] != target['kubernetes']['run_id']:
+            raise ValueError
+        # The scope must carry the same enterprise limits as the effective policy.
+        if contract.DECISION_KEY in values and scope['limits'] != values[contract.DECISION_KEY]:
+            raise ValueError
+        return scope
+
+    def _transport(self, target, env):
+        return KubernetesHTTP(target, env, duration=self.cfg.get('max_duration_seconds', 120),
+            binary=self.cfg.get('kubectl_binary', 'kubectl'), runner=self.runner, profile=REQUIRED_EVENT_PROFILE)
+
+    def _read_stable_target(self):
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        target = strict_json(dependency(self.cfg['target'], None), limit=65536)
+        if type(target) is not dict:
+            raise ValueError('RETRY_CONFIGURATION_INVALID')
+        return target
+
+    def prepared_retry_records(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the sealed LIF-12 local declarations without reading a record or calling the target."""
+        from .run_binding import stages_for
+
+        self.validate_policy(check, values)
+        if check.executor != self.name or stages_for(check) != (1, 2, 3, 4):
+            raise ValueError('RETRY_PROFILE_UNSUPPORTED')
+        if contract.DECISION_KEY not in values:
+            raise ValueError('RETRY_POLICY_INVALID')
+        try:
+            self._validate_configuration(env)
+            if env.ref().sha256 != values['retry_environment_sha256']:
+                raise ValueError
+            target = self._read_stable_target()
+            self._bound_scope(target, env, values, expected_target_sha256=expected_target_sha256)
+        except (KeyError, TypeError, ValueError, OSError, RuntimeError):
+            raise ValueError('RETRY_CONFIGURATION_INVALID') from None
+        try:
+            self._transport(target, env)
+        except KubernetesBindingError as error:
+            raise ValueError(str(error)) from None
+        except OverflowError:
+            raise ValueError('RETRY_CONFIGURATION_INVALID') from None
 
     def run(self, check, env, policy_values, adapter, workdir):
         self.validate_policy(check, policy_values)
         try:
-            if set(self.cfg) - {'target', 'retry_scope', 'prepared', 'kubectl_binary', 'max_duration_seconds'} or adapter is None:
+            if adapter is None:
                 raise ValueError
-            if 'prepared' in self.cfg and (type(self.cfg['prepared']) is not str or not self.cfg['prepared']):
-                raise ValueError
-            if not supports(env.engine.name, env.engine.version):
-                raise ValueError
+            self._validate_configuration(env)
             start, end = contract.normalize_policy(policy_values)
             if env.ref().sha256 != policy_values['retry_environment_sha256'] or not start <= utcnow() <= end:
                 raise ValueError
-            target = load_bounded_json(self.cfg['target'])
-            target_hash = sha256_hex(canonical_json(target))
-            if (target.get('lab') is not True or target_hash != policy_values['retry_target_sha256']
-                    or self.expected_target is not None and target_hash != self.expected_target):
-                raise ValueError
-            image = target['kubernetes']['engine']['image']
-            if type(image) is not str or '@sha256:' not in image:
-                raise ValueError
-            scope = load_scope(self.cfg['retry_scope'], policy_values['retry_scope_sha256'],
-                policy_sha256=policy_values['retry_policy_sha256'], source_sha256=policy_values['retry_record_source_sha256'],
-                image_digest=image.rsplit('@', 1)[1], model_revision=env.model.revision,
-                model_inventory_sha256=env.model.inventory_sha256)
-            if scope['run_id'] != target['kubernetes']['run_id']:
-                raise ValueError
-            # @38 (RB3-Q4): the limits are decided in policy; the run's scope file must carry exactly them.
-            if contract.DECISION_KEY in policy_values and scope['limits'] != policy_values[contract.DECISION_KEY]:
-                raise ValueError
+            if self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True:
+                target = self._read_stable_target()
+            else:
+                target = load_bounded_json(self.cfg['target'])
+            scope = self._bound_scope(target, env, policy_values)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             raise ValueError('RETRY_CONFIGURATION_INVALID') from None
-        transport = KubernetesHTTP(target, env, duration=self.cfg.get('max_duration_seconds', 120),
-            binary=self.cfg.get('kubectl_binary', 'kubectl'), runner=self.runner, profile=REQUIRED_EVENT_PROFILE)
+        transport = self._transport(target, env)
         ctx = Ctx(check=check, env=env, adapter=adapter, target=target, policy_values=policy_values,
             timeout=10, allow_mutating=False, keys={}, secrets=[], cprobe=transport, workdir=workdir, started=utcnow())
         ctx._retry_scope, ctx._retry_gap, ctx._retry_cleanup = scope, True, []
@@ -120,7 +196,7 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
         try:
             reader = RequiredEventReader(ctx.cprobe, ctx.target, values['retry_session'],
                 binary=self.cfg.get('kubectl_binary', 'kubectl'), duration=self.cfg.get('max_duration_seconds', 120),
-                runner=self.runner or capture_pipes)
+                runner=self.runner or capture_pipes, snapshot_only=self.cfg.get(RETRY_RECORD_SNAPSHOT_OPTION) is True)
             reader.snapshot()
             collect_stage('before')
             reader.snapshot()

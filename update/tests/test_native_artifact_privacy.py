@@ -15,7 +15,7 @@ from guard.models import ExecStatus, Verdict, canonical_json
 from guard.report.log_integrity import render_log_integrity
 from guard.validation_evidence import inventory_tree
 from tests import test_log_integrity as source
-from tests.test_log_integrity_parser import native
+from tests.test_log_integrity_parser import PREFIX, native
 from tests.test_html_artifact_persistence import scenario
 from tests.builders import evidence, policy, baseline_pack, T0
 
@@ -24,14 +24,15 @@ CANARY = "EXAMPLE_NATIVE_PRIVATE_PAYLOAD_08D78F"
 TOKEN = 8725148612537489
 
 
-def fixture(*, change=None):
+def fixture(*, change=None, cases=PLANNED_CASES, request_logger_line=65):
     trials, lines = [], []
-    for case in PLANNED_CASES:
+    prefix = PREFIX.replace("request_logger.py:65", f"request_logger.py:{request_logger_line}")
+    for case in cases:
         rid = "EXAMPLE_PRIVATE_ID_" + case + ({"multiline": "\nSECOND", "cr": "\rCR", "crlf": "\r\nCRLF"}.get(case, ""))
         trials.append({"case": case, "request_id": rid, "request_id_trust": "untrusted_correlation",
             "request_fixture_sha256": hashlib.sha256(case.encode()).hexdigest(), "http_outcome": 200,
             "response_id": "cmpl-" + rid, "normal_generation": "pass", "response_id_matches_body": True})
-        lines.append(native("Received request cmpl-" + rid + "-0: params: " + CANARY + ", lora_request: None."))
+        lines.append(native("Received request cmpl-" + rid + "-0: params: " + CANARY + ", lora_request: None.", prefix))
     capture = {"text": "".join(lines), "stderr_text": "", "returncode": 0, "truncated": False,
         "timed_out": False, "source_complete": True, "stderr_present": False,
         "window": {"since": "2026-10-23T03:00:00Z", "until": "2026-10-23T03:01:00Z"}}
@@ -41,10 +42,10 @@ def fixture(*, change=None):
     before, after = deepcopy(identity), deepcopy(identity)
     if change:
         change(capture, trials, before, after)
-    original = analyze_integrity_capture(capture, trials, before, after)
-    sample = project_native(capture, trials, before, after, analysis=original)
+    original = analyze_integrity_capture(capture, trials, before, after, request_logger_line=request_logger_line)
+    sample = project_native(capture, trials, before, after, analysis=original, request_logger_line=request_logger_line)
     replay = analyze_integrity_capture(sample["capture"], sample["trials"], sample["source_identity_before"],
-        sample["source_identity_after"], initial_gaps=sample["replay_initial_gaps"])
+        sample["source_identity_after"], initial_gaps=sample["replay_initial_gaps"], request_logger_line=request_logger_line)
     collection = replay["collection"]
     collection.update(capture_window=capture["window"], redaction="guard-native-predicate-projection/1")
     html = render_log_integrity(collection)
@@ -114,6 +115,16 @@ def test_native_projection_rejects_raw_values_or_inconsistent_predicates(change)
     change(sample)
     with pytest.raises((ValueError, TypeError, KeyError)):
         replay_native(sample)
+
+
+def test_ordinary_native_replay_requires_the_reviewed_request_logger_line():
+    _, _, original, sample = fixture(cases=("before", "after"), request_logger_line=63)
+    assert original["normal_logs"] and original["reached"] == ["before", "after"]
+    assert "[request_logger.py:63]" in sample["capture"]["text"]
+    assert decision(replay_native(sample, request_logger_line=63)) == decision(original)
+    with pytest.raises(ValueError, match="^NATIVE_PROJECTION_INVALID$"):
+        replay_native(sample)
+    assert "request_logger_line" not in sample and "request_logger_line" not in sample["capture"]
 
 
 @pytest.mark.parametrize("raw", [CANARY, str(TOKEN), "GNI_OTHER " + CANARY, '{"secret":"'+CANARY+'"}'])

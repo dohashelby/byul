@@ -1,22 +1,187 @@
 """REQ-10 transport implementation; reuses its fixtures, observations and judge."""
 from pathlib import Path
 import json
+import math
 
-from guard.models import DataOrigin
+from guard.adapters.engine_profiles import supports
+from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
 from guard.models.base import utcnow
-from guard.runtime.kubernetes_http import KubernetesHTTP, PROFILE
+from guard.runtime.bounded import strict_json
+from guard.runtime.comparison import execution_conditions
+from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesBindingError, KubernetesHTTP, PROFILE
+from .base import DraftArtifact, EvidenceDraft
+from .content_common import control_state
 from .http_common import Ctx
+from .response_projection import capture_metadata
 from .sampling_validation import SamplingValidationExecutor
+
+NORMAL_OPTION = "normal_sampling_only"
+NORMAL_PROFILE = "kubernetes-owned-normal-sampling/1"
+NORMAL_PATH = "/v1/completions"
+NORMAL_LABEL = "func|POST_" + NORMAL_PATH
+NORMAL_OPTIONS = {"temperature": 0.5, "top_p": 0.9, "max_tokens": 1, "min_tokens": 0}
+NORMAL_FIXTURE = {"model": "{model}", "prompt": "guard sampling control", "max_tokens": 1}
 
 
 class KubernetesSamplingExecutor(SamplingValidationExecutor):
     version = "0.2.2"
 
-    def __init__(self, cfg, *, runner=None, environ=None):
+    def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         super().__init__(cfg, environ=environ)
         self._kubectl_runner = runner
+        self._expected_target_sha256 = expected_target_sha256
+
+    def keys(self):
+        if self.cfg.get(NORMAL_OPTION) is True:
+            return {}
+        return super().keys()
+
+    def validate_configuration(self, check):
+        if NORMAL_OPTION not in self.cfg:
+            return super().validate_configuration(check)
+        if (self.cfg[NORMAL_OPTION] is not True or check.id != "REQ-10" or check.executor != self.name
+                or getattr(check, "collection_profile", None) is not None
+                or set(self.cfg) - {"target", NORMAL_OPTION, "kubectl_binary", "request_timeout", "max_duration_seconds"}
+                or type(self.cfg.get("target")) is not str or not self.cfg["target"]
+                or len(check.functional_probes) != 1):
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_SCOPE_INVALID")
+        probe, = check.functional_probes
+        timeout = self.cfg.get("request_timeout", 3)
+        if (probe.via != "engine" or probe.path != NORMAL_PATH or probe.method != "POST" or probe.expect != [200]
+                or canonical_json(probe.body) != canonical_json(NORMAL_FIXTURE)
+                or type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30):
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_SCOPE_INVALID")
+
+    def validate_policy(self, check, values):
+        if NORMAL_OPTION not in self.cfg:
+            return super().validate_policy(check, values)
+        self.validate_configuration(check)
+        if type(values) is not dict or set(values) != {"allowed_sampling_options", "rejection_codes"}:
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_POLICY_INVALID")
+        options, codes = values["allowed_sampling_options"], values["rejection_codes"]
+        if (type(options) is not list or any(type(key) is not str or key not in NORMAL_OPTIONS for key in options)
+                or len(set(options)) != len(options) or "max_tokens" not in options
+                or type(codes) is not list or not codes or any(code not in ("400", "422") for code in codes)
+                or len(set(codes)) != len(codes)):
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_POLICY_INVALID")
+
+    def _normal_transport(self, target, env, *, expected_target_sha256=None):
+        if (not supports(env.engine.name, env.engine.version, "sampling") or type(target) is not dict
+                or target["lab"] is not False or target.get("synthetic") is True):
+            raise ValueError
+        target_sha = sha256_hex(canonical_json(target))
+        pins = [pin for pin in (self._expected_target_sha256, expected_target_sha256) if pin is not None]
+        if not pins or any(pin != target_sha for pin in pins):
+            raise ValueError
+        transport = KubernetesHTTP(target, env, duration=self.cfg.get("max_duration_seconds", 120),
+            binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner, profile=INPUT_VALIDATION_PROFILE)
+        return target_sha, transport
+
+    def prepared_normal_sampling(self, check, env, values, *, expected_target_sha256=None):
+        """Validate the saved normal control declaration without building or dispatching a request."""
+        from guard.adapters.vllm_file_read_sensor import dependency
+
+        if self.cfg.get(NORMAL_OPTION) is not True:
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_SCOPE_INVALID")
+        self.validate_policy(check, values)
+        try:
+            target = strict_json(dependency(self.cfg["target"], None), limit=65536)
+            self._normal_transport(target, env, expected_target_sha256=expected_target_sha256)
+        except (KeyError, TypeError, ValueError, OSError, OverflowError, KubernetesBindingError):
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED") from None
+
+    def _run_normal(self, check, env, values, adapter, workdir):
+        self.validate_policy(check, values)
+        started = utcnow()
+        try:
+            with Path(self.cfg["target"]).open("rb") as stream:
+                target = strict_json(stream.read(65537), limit=65536)
+            if adapter is None:
+                raise ValueError
+            target_sha, transport = self._normal_transport(target, env)
+            options = values["allowed_sampling_options"]
+            body = {"model": transport.api_model, "prompt": NORMAL_FIXTURE["prompt"],
+                    **{key: NORMAL_OPTIONS[key] for key in options}}
+            transport.declare_input_contract({"path": NORMAL_PATH, "control": body, "prompt_tokens": None, "fields": {}})
+        except (KeyError, TypeError, ValueError, OSError, KubernetesBindingError):
+            raise ValueError("KUBERNETES_SAMPLING_NORMAL_TARGET_UNVERIFIED") from None
+        request = {"id": NORMAL_LABEL, "mode": "json", "method": "POST",
+                   "url": target["engine"]["trusted_url"] + NORMAL_PATH, "headers": {}, "body": body}
+        response = {}
+        try:
+            response, = transport("kubernetes-probe", [request], self.cfg.get("request_timeout", 3))
+        except KubernetesBindingError:
+            pass
+        report = transport.report()
+        capture = capture_metadata(response)
+        reports = report["requests"]
+        bound = bool(len(reports) == 1 and reports[0]["id"] == NORMAL_LABEL
+                     and reports[0]["binding_verified_before_after"] is True
+                     and reports[0]["outcome"] == response.get("outcome"))
+        complete = bool(bound and response.get("capture_complete") is True and response.get("eof") is True
+                        and response.get("utf8_valid") is True and response.get("body_truncated") is False
+                        and capture["original_json_state"] == "valid"
+                        and capture.get("original_body_bytes") == response.get("body_bytes")
+                        and capture.get("original_body_sha256") == response.get("body_sha256"))
+        normal = False
+        if complete and control_state(response, transport.api_model, NORMAL_PATH) == "pass":
+            try:
+                payload = strict_json(response["body"].encode(), limit=131072)
+                normal = len(payload["choices"]) == 1 and payload["usage"]["completion_tokens"] == NORMAL_OPTIONS["max_tokens"]
+            except (KeyError, TypeError, ValueError):
+                normal = False
+        cleanup = list(report["cleanup_errors"])
+        error = None if normal and not report["collection_gap"] and not cleanup else "SAMPLING_NORMAL_OBSERVATION_INCOMPLETE"
+        observations = {
+            "sampling_options_planned": (options, True), "sampling_options_tested": (None, False),
+            "sampling_challenge_outcomes": (None, False), "sampling_accepted_options": (None, False),
+            "functional_probes_planned": ([NORMAL_LABEL], True),
+            "functional_probe_results": ({NORMAL_LABEL: "pass"} if normal else None, normal),
+            "sampling_health_results": (None, False), "runner_consumption_verified": (False, True),
+        }
+        summary = {"profile": NORMAL_PROFILE, "target_sha256": target_sha,
+                   "probe_source_sha256": report["probe_source_sha256"], "binding_sha256": report["binding_sha256"],
+                   "request_body_sha256": sha256_hex(canonical_json(body)), "supplied_sampling_options": options,
+                   "http_dispatch_observed": True if bound and type(response.get("outcome")) is int else None,
+                   "ownership_verified_before_after": bound, "outcome": response.get("outcome") if bound else None,
+                   "response_capture": capture if bound else None, "normal_completion_shape_verified": normal,
+                   "uncollected": ["sampling_limits", "runner_consumption", "rejections", "structured_output", "tool_selection"]}
+        artifacts = []
+        try:
+            path = Path(workdir) / "normal_sampling.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("xb") as stream:
+                stream.write(canonical_json(summary))
+            artifacts.append(DraftArtifact(name=path.name, path=path, collector=f"{self.name}/{self.version}"))
+        except OSError:
+            cleanup.append("SAMPLING_NORMAL_ARTIFACT_UNAVAILABLE")
+            error = error or "SAMPLING_NORMAL_ARTIFACT_UNAVAILABLE"
+        origin = DataOrigin(transport.process_observation_origin)
+        if error and origin == DataOrigin.MEASURED:
+            origin = DataOrigin.DECLARED
+        comparability = {}
+        if not error and type(target.get("comparison_config")) is dict and target["comparison_config"]:
+            fixture = {"profile": NORMAL_PROFILE, "request_body_sha256": summary["request_body_sha256"]}
+            settings = {"profile": NORMAL_PROFILE, "request_timeout": self.cfg.get("request_timeout", 3),
+                        "max_duration_seconds": self.cfg.get("max_duration_seconds", 120),
+                        "probe_source_sha256": report["probe_source_sha256"]}
+            comparability = {
+                "fixture_sha256": sha256_hex(canonical_json(fixture)),
+                "config_sha256": sha256_hex(canonical_json(execution_conditions(target, settings, []))),
+                "model_inventory_sha256": env.model.inventory_sha256, "gpu": env.runtime.gpu_model,
+                "driver": env.runtime.driver, "cpu": env.runtime.cpu,
+            }
+        return EvidenceDraft(status=ExecStatus.ABORTED if error else ExecStatus.COMPLETED, data_origin=origin,
+            normal_control={"attempted": True, "succeeded": normal if bound else None,
+                            "detail": "One in-policy collection attempt. HTTP dispatch is recorded only with a verified response."},
+            challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
+            observations={key: {"value": value, "collected": collected} for key, (value, collected) in observations.items()},
+            artifacts=artifacts, comparability=comparability, config={NORMAL_OPTION: True, "target_sha256": target_sha},
+            started_at=started, finished_at=utcnow(), abort_reason=error, cleanup_errors=cleanup)
 
     def run(self, check, env, policy_values, adapter, workdir):
+        if NORMAL_OPTION in self.cfg:
+            return self._run_normal(check, env, policy_values, adapter, workdir)
         allowed = {"target", "constraint_source", "constraint_engine_version", "max_output_tokens", "max_total_requests",
                    "max_probe_tokens", "max_duration_seconds", "request_timeout", "kubectl_binary", "roles",
                    "wrong_key_env", "denied_key_env", "allow_mutating_routes", "runner_input", "runner_capture"}

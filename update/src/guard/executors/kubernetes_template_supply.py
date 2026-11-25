@@ -2,6 +2,7 @@
 from copy import deepcopy
 
 from guard.collectors.file import load_bounded_json
+from guard.automation_policy import validate_template_policy
 from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
 from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
 from .content_common import append_artifact
@@ -31,14 +32,27 @@ class KubernetesTemplateSupplyExecutor(HttpCheckExecutor):
         return None
 
     def validate_policy(self, check, values):
+        if check.id == "REQ-07" and self.cfg.get("req07_normal_only") is True:
+            if (getattr(check, "collection_profile", None) is not None or self.b_cpu_support_input is not None
+                    or "supply_reads_input" in self.cfg
+                    or type(values) is not dict
+                    or set(values) != {"allowed_template_sha256", "max_rendered_input_tokens", "request_template_override_allowed"}):
+                raise ValueError("KUBERNETES_TEMPLATE_NORMAL_POLICY_UNSUPPORTED")
+            validate_template_policy(values)
+            supply.validate_policy(check, values, self.cfg)
+            return
         if check.id != "SUP-03" or getattr(check, "collection_profile", None) != supply.PROFILE:
             raise ValueError("KUBERNETES_TEMPLATE_PROFILE_UNSUPPORTED")
+        if "req07_normal_only" in self.cfg:
+            raise ValueError("KUBERNETES_TEMPLATE_NORMAL_CONFIGURATION_INVALID")
         supply.validate_policy(check, values, self.cfg)
 
     def run(self, check, env, policy_values, adapter, workdir):
         self.validate_policy(check, policy_values)
+        self.version = "0.1.0+k8s-normal" if check.id == "REQ-07" else "0.1.0"
         try:
-            allowed = {"target", "kubectl_binary", "request_timeout", "endpoint", "tokenize_endpoint", "supply_reads_input", *supply.DEFAULTS}
+            allowed = {"target", "kubectl_binary", "request_timeout", "endpoint", "tokenize_endpoint",
+                       "supply_reads_input", "req07_normal_only", *supply.DEFAULTS}
             if type(self.cfg) is not dict or set(self.cfg) - allowed or adapter is None:
                 raise ValueError
             target = load_bounded_json(self.cfg["target"])
@@ -68,4 +82,22 @@ class KubernetesTemplateSupplyExecutor(HttpCheckExecutor):
                                   ctx.check, self.b_cpu_support_input, ctx.workdir)
 
     def collect(self, ctx):
-        return supply.collect(self, ctx, kubernetes=True)
+        if ctx.check.id != "REQ-07":
+            return supply.collect(self, ctx, kubernetes=True)
+
+        original, normal, challenges, summary = supply.collect(
+            self, ctx, kubernetes=True, normal_input_limit=ctx.policy_values["max_rendered_input_tokens"])
+        count = summary["tokenize_response_token_count"]
+        verified = original["template_identity_verified"]["value"]
+        exact = original["input_projection_exact_match"]["value"]
+        observations = {obs.key: {"value": None, "collected": False} for obs in ctx.check.required_observations}
+        for key in ("selected_template_sha256", "template_identity_verified", "functional_probes_planned",
+                    "functional_probe_results"):
+            observations[key] = original[key]
+        observations["rendered_input_token_counts"] = {
+            "value": {"normal": count} if count is not None and verified else None,
+            "collected": count is not None and verified,
+        }
+        observations["rendered_prompt_tokens_exact_match"] = {"value": True if exact else None, "collected": exact}
+        observations["collection_complete"] = {"value": False, "collected": True}
+        return observations, normal, challenges, summary

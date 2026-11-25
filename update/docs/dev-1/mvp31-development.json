@@ -1,4 +1,5 @@
 {
+  "subsequent_work_order": "../WORK_ORDER_VLLM_030_031_AB.md (2026-11-18). The decisions below record the 2026-11-16 work and its closed AWS session.",
   "schema": "byul-mvp-development-target/1",
   "status": "IN_PROGRESS",
   "authority": "2026-11-16 user requested actual all69 verification on 0.31.0, observer implementation/qualification/registration, UNKNOWN root-cause fixes and real execution/report footage",

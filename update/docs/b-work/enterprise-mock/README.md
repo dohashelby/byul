@@ -45,7 +45,7 @@ PACK-BASELINE@39의 69개 공식 비교(2026-11-23 TP2, `RPT-01M83D7MZWJQ2RME46S
 
 ## A가 할 일
 
-1. **POL**: `enterprise-mock-inputs.json`의 `policy_values`로 DRAFT·EXAMPLE POL을 만든다. PLT-12 `copy_treatments`는 `copy_rule`과 사본 목록으로 `tools/mvp_credential_copy_inputs.py`가 채운다.
+1. **POL**: `enterprise-mock-inputs.json`의 `policy_values`로 DRAFT·EXAMPLE POL을 만든다. PLT-12는 `tools/mvp_credential_copy_inputs.py --example-source`에 POL에 고정한 EXAMPLE 원본을 넘긴다. 도구는 실제 생성 시각과 사본 선택을 받아 `copy_treatments`를 채운다.
 2. **Gateway 인증**: OBS-01·REQ-02·REQ-03 주체를 쪽별 auth Secret에 넣고, 경로 권한은 `shared_gateway.route_roles` 하나만 쓴다. 토큰은 Secret과 실행 환경변수에만 둔다.
 3. **엔진 Pod 볼륨**: 기록을 읽는 위치를 읽기 전용으로 붙인다.
    - `/guard-route`: REQ-02
@@ -65,10 +65,10 @@ PACK-BASELINE@39의 69개 공식 비교(2026-11-23 TP2, `RPT-01M83D7MZWJQ2RME46S
 - **PLT-10 확인값 불일치**: 11-16 확인 정책의 `revocation_subject_label`은 `byul-mvp69-retired`다. 그런데 `credential_revocation_contract.normalize_policy`는 `retired` 하나만 받는다. 확인값을 그대로 쓰면 `CREDENTIAL_REVOCATION_POLICY_INVALID`로 실행 전에 막힌다. 모의 입력은 `retired`를 쓴다. 확인 정책 쪽 정정 여부는 사용자가 정한다.
 - **REQ-17 표본 수**: 역할별 최소 200을 채우려면 사용자 결정23의 분할 수집(504개씩 두 묶음)이 필요하다([설계](../../dev-1/req17-split-collection.md)).
 - **LIF-13 정책값 미사용**: 세 정책값은 팩과 `tools/overrides/LIF-13.yaml`에만 있고 실행기·판정 규칙이 읽지 않는다.
-- **REQ-02**: 1차 실측에서 기준 쪽 native 부분 수집이 준비물 없이 실패해 양쪽 ABORTED였다. 두 판본 엔진 lifecycle 센서 준비물이 선행 조건이다.
+- **REQ-02**: 1차 실측에서 기준 쪽 센서 준비물이 없어 양쪽 제품 결과가 ABORTED였다. 양쪽 lifecycle 센서를 준비하고 Gateway 경로 기록을 보관할 `lab:true` 대상을 발견한 뒤, [REQ-02 입력 도구](../../../tools/mvp_req02_native_inputs.py)로 쪽별 ENV·대상·manifest·경로 기록 세션을 묶은 `guard.toml`을 만든다. 설치 자격과 실제 기록은 실행 때 확인한다.
 - **PLT-10 실행 창**: guard는 실행 직전에 창을 새로 계산하고, 계약은 창 시작 <= `deny_after` <= 창 끝을 요구한다. 엔진 재기동으로 철회하면 사건과 1초 마감이 창보다 앞서 결합이 거절된다. 창 안에서 철회할 수 있는 발급자 구성이나 계약 결정이 먼저 필요하다.
-- **OBS-11 설정**: Kubernetes 경로는 `[check_config.OBS-11]`의 `target`·`collection_status_snapshot_only = true`를 쓴다. `collection_status = {container, image}`는 Docker 경로 설정이다. 상태 기록은 실행 target에 결합된 probe 컨테이너에 둔다.
-- **PLT-12 결합**: `tools/mvp_credential_copy_inputs.py`는 확인 운영 POL 전용이다. EXAMPLE에서는 `credential_copy_contract`의 `treatments`·`validate_treatments`·`validate_inventory`로 결합한다. `deadline_at`은 실제 canary 생성 시각이 생긴 뒤 채운다.
+- **OBS-11 설정**: Kubernetes 경로는 `[check_config.OBS-11]`의 `target`·`collection_status_snapshot_only = true`를 쓴다. [결과 도착 수집 도구](../../../tools/obs11_collection_status.py)는 같은 노드의 `lab:false` 대상과 probe의 읽기 전용 `/guard-collection` 마운트를 결합해 Gateway 결과 도착 한 건을 기록할 수 있다. 나머지 필수 사건과 공백·경보에는 별도 실제 수집원이 필요하다.
+- **PLT-12 결합**: `--example-source`는 DRAFT POL의 원본 바이트 해시와 선택한 사본 ID를 확인한다. 기존 POL을 재사용할 때는 그 실행에서 봉인한 EXAMPLE JSON을 넘긴다. `--store`로 원본과 새 POL을 같은 실행 저장소에 넣는다. DRAFT 실행은 외부 prebound TOML의 `[check_config.PLT-12]`에 `copy_record_snapshot_only = true`를 설정한다. `deadline_at`은 실제 canary 생성 시각에서 계산되며, 별도 생산자가 실제 사본 기록을 실행 창 안에 남겨야 한다.
 - **OBS-01 범위**: 스냅숏 경로는 허용 기록만 수집한다. ACCESS_DENIED까지 EVD에 넣으려면 비스냅숏 경로(소유 probe가 허용·거부를 직접 일으키는 경로)가 필요하다.
 - **PLT-11**: vLLM API 키는 기동 때 고정이라 살아 있는 연결 중에 철회할 수 없다. 엔진을 재기동해 철회하면 기존 연결이 끊긴다. 그러면 "철회 뒤 기존 세션 거부"를 시험한 것이 아니다. 엔진 앞에 철회 가능한 인증 대역을 둘지 A와 사용자가 정해야 한다.
 - **REQ-17·LIF-13**: 정책값은 이미 확정돼 있다. NOT_RUN의 남은 원인은 기업 입력이 아니라 두 판본의 엔진 센서 준비물이다.

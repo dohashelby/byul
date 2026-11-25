@@ -36,7 +36,10 @@ _RELEASES = {
     ),
 }
 _SHA = re.compile("[a-f0-9]{64}")
-GENERAL_PROFILE_SCHEMA = "guard-sup11-vllm-general-observer/1"
+GENERAL_PROFILE_SCHEMA = "guard-sup11-vllm-general-observer/2"
+GENERAL_DIAGNOSTIC_PROFILE_SCHEMA = "guard-sup11-vllm-general-path-qualification/1"
+GENERAL_WORKDIR = "/cache"
+GENERAL_HOME = "/cache/home"
 GENERAL_MODULE_FILE = "guard_sup11_lifecycle_observer.py"
 GENERAL_DIST_INFO = "guard_sup11_lifecycle_observer-1.0.dist-info"
 GENERAL_PLUGIN_NAMES = ["guard_sup11_lifecycle_observer", "lora_filesystem_resolver", "lora_hf_hub_resolver"]
@@ -52,8 +55,21 @@ _GENERAL_QUALIFICATIONS = {}
 _GENERAL_QUALIFICATION_ERROR = "SUP11_GENERAL_OBSERVER_OCI_QUALIFICATION_UNAVAILABLE"
 _GENERAL_QUALIFICATION_KEYS = {
     "oci_source_qualification_sha256", "plugin_discovery_sha256", "site_roster_sha256",
-    "plugin_loader_sha256", "service_activation_sha256", "worker_activation_sha256",
-    "sitecustomize_origin", "sitecustomize_target", "sitecustomize_sha256",
+    "ordinary_import_path_sha256", "ordinary_interpreter_context_sha256",
+}
+GENERAL_PATH_ROLES = ("service", "worker-0", "worker-1")
+# Exact installed source bytes from the manifest-bound stock OCI receipts.
+_GENERAL_ACTIVATION_SOURCES = {
+    "0.30.0": (
+        "fb6e6ee432c5a4ae207aaffe4b546aca9381f56ee8498b0a3e0d9af2d289d023",
+        "ead004ca266419cd25f54a7aefc0e20e1eb046f363b7f5cc977e14f52ee44bb1",
+        "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c",
+    ),
+    "0.31.0": (
+        "06942d64e526c2c7407265e1903d625c4d2118d8d7fc39c616b1cc6aa6fc2c8f",
+        "95be1adb96f55933f6a52260c8cb2181d04707401ca21d97c33108c5ab58f3ac",
+        "41cdc6fb72d5cb2352093de7fdf35bf829fbb9e097dc6113d4597cd9a88a46aa",
+    ),
 }
 
 
@@ -87,15 +103,32 @@ def validate_observer_profile(profile, env):
         raise ValueError("SUP11_INSTALLED_SOURCE_PROFILE_INVALID")
 
 
-def general_observer_profile(env):
+def general_observer_diagnostic_profile(env):
+    """Create fixed producer input that the official product cannot admit."""
     profile = observer_profile(env)
+    plugin, service, worker = _GENERAL_ACTIVATION_SOURCES[env.engine.version]
+    return {**profile, "schema": GENERAL_DIAGNOSTIC_PROFILE_SCHEMA, "qualification": {
+        "plugin_loader_sha256": plugin,
+        "service_activation_sha256": service,
+        "worker_activation_sha256": worker,
+        "sitecustomize_origin": "/usr/lib/python3.12/sitecustomize.py",
+        "sitecustomize_target": "/etc/python3.12/sitecustomize.py",
+        "sitecustomize_sha256": "43d81125d92376b1a69d53a71126a041cc9a18d8080e92dea0a2ae23be138b1e",
+    }}
+
+
+def general_observer_profile(env):
+    profile = general_observer_diagnostic_profile(env)
     pins = _GENERAL_QUALIFICATIONS.get(env.engine.version)
     if (type(pins) is not dict or set(pins) != _GENERAL_QUALIFICATION_KEYS
-            or any(not is_sha256(pins[key]) for key in pins if key.endswith("_sha256"))
-            or pins["sitecustomize_origin"] != "/usr/lib/python3.12/sitecustomize.py"
-            or pins["sitecustomize_target"] != "/etc/python3.12/sitecustomize.py"):
+            or any(not is_sha256(pins[key]) for key in pins.keys() - {"ordinary_import_path_sha256"})
+            or type(pins["ordinary_import_path_sha256"]) is not dict
+            or set(pins["ordinary_import_path_sha256"]) != set(GENERAL_PATH_ROLES)
+            or not all(is_sha256(digest) for digest in pins["ordinary_import_path_sha256"].values())):
         raise ValueError(_GENERAL_QUALIFICATION_ERROR)
-    return {**profile, "schema": GENERAL_PROFILE_SCHEMA, "qualification": dict(pins)}
+    return {**profile, "schema": GENERAL_PROFILE_SCHEMA,
+            "qualification": {**profile["qualification"], **pins,
+                              "ordinary_import_path_sha256": dict(pins["ordinary_import_path_sha256"])}}
 
 
 def launch_command(env):

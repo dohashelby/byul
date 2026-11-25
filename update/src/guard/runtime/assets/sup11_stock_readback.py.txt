@@ -61,7 +61,7 @@ def observe():
         labels = ["service.json", "worker-0.json", "worker-1.json"]
         if set(os.listdir(receipt)) != set(labels):
             raise ValueError()
-        rows = [json.loads(read(receipt, name, 4096)) for name in labels]
+        rows = [json.loads(read(receipt, name, 8192 if extra else 4096)) for name in labels]
         for row in rows:
             pid = row["pid"]
             if type(pid) is not int or not 0 < pid < 2**23:

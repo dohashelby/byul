@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import sys
 import time
@@ -18,6 +19,12 @@ PLUGIN = "vllm.plugins"
 MODULE_PATH = ROOT / "guard_sup11_lifecycle_observer.py"
 OBSERVATION_PLUGIN = "guard_sup11_lifecycle_observer"
 PROFILE_SECONDS = 540
+GENERAL_PROFILE = "guard-sup11-vllm-general-observer/2"
+DIAGNOSTIC_PROFILE = "guard-sup11-vllm-general-path-qualification/1"
+CUTLASS = "/usr/local/lib/python3.12/dist-packages/nvidia_cutlass_dsl"
+HOME = "/cache/home"
+USER_SITE = HOME + "/.local/lib/python3.12/site-packages"
+PATH_TEXT = re.compile(r"/[A-Za-z0-9_./+-]{1,190}")
 STOCK_PLUGINS = {
     "lora_filesystem_resolver": ("vllm.plugins.lora_resolvers.filesystem_resolver", "register_filesystem_resolver"),
     "lora_hf_hub_resolver": ("vllm.plugins.lora_resolvers.hf_hub_resolver", "register_hf_hub_resolver"),
@@ -96,6 +103,59 @@ def general_plugins(loader):
     return sorted(loaded)
 
 
+def closed_path(value):
+    if (type(value) is not str or not PATH_TEXT.fullmatch(value)
+            or str(Path(value)) != value or ".." in Path(value).parts):
+        raise ValueError()
+    return value
+
+
+def ordinary_path():
+    paths = list(sys.path)
+    if not 0 < len(paths) <= 20:
+        raise ValueError()
+    paths = [closed_path(path) for path in paths]
+    if paths.count(str(ROOT)) != 1 or paths.count(CUTLASS + "/dsl_packages") != 1:
+        raise ValueError()
+    cwd, home, uid, gid = os.getcwd(), os.environ.get("HOME"), os.getuid(), os.getgid()
+    if (cwd != "/cache" or home != HOME or (uid, gid, os.geteuid(), os.getegid()) != (2000, 0, 2000, 0)
+            or sys.flags.isolated or sys.flags.no_user_site or sys.flags.ignore_environment
+            or sys.flags.safe_path or sys.flags.optimize != 0 or sys.flags.no_site):
+        raise ValueError()
+    site = loaded_module("site")
+    # The prefix receipt records the loaded module's file, including when it
+    # was initialized from a frozen ModuleSpec.
+    site_origin = site.get("__file__")
+    if (site.get("USER_SITE") != USER_SITE or site.get("ENABLE_USER_SITE") is not True
+            or site_origin != "/usr/lib/python3.12/site.py"
+            or USER_SITE in paths or "usercustomize" in sys.modules):
+        raise ValueError()
+    cutlass = loaded_module("nvidia_cutlass_dsl")
+    origin = vars(cutlass["__spec__"]).get("origin")
+    package_paths = cutlass["__path__"]
+    namespace_type = type(package_paths)
+    if (namespace_type.__module__, namespace_type.__name__) == ("_frozen_importlib_external", "_NamespacePath"):
+        package_paths = vars(package_paths).get("_path")
+    if (type(package_paths) not in {list, tuple} or list(package_paths) != [CUTLASS]
+            or origin not in {None, CUTLASS + "/__init__.py"}):
+        raise ValueError()
+    executable = closed_path(sys.executable)
+    executable_realpath = str(Path(executable).resolve(strict=True))
+    if executable_realpath != "/usr/bin/python3.12":
+        raise ValueError()
+    return {"entries": paths, "cwd": cwd, "home": home, "uid": uid, "gid": gid,
+            "executable": executable, "executable_realpath": executable_realpath, "prefix": closed_path(sys.prefix),
+            "exec_prefix": closed_path(sys.exec_prefix), "base_prefix": closed_path(sys.base_prefix),
+            "base_exec_prefix": closed_path(sys.base_exec_prefix),
+            "user_site": site["USER_SITE"], "user_site_enabled": site["ENABLE_USER_SITE"],
+            "site_origin": site_origin, "vendor_hook_origin": loaded_module("sitecustomize")["__file__"],
+            "cutlass_origin": origin, "cutlass_package_path": [CUTLASS]}
+
+
+def canonical_digest(value):
+    return hashlib.sha256(json.dumps(value, separators=(",", ":"), sort_keys=True).encode("ascii")).hexdigest()
+
+
 def observe(frame, event, profile, role, startup):
     if event != "call":
         return
@@ -132,10 +192,23 @@ def observe(frame, event, profile, role, startup):
             if type(rank) is not int or rank not in {0, 1}:
                 return
             role, module = "worker", MODEL
+        label = role if rank is None else f"worker-{rank}"
+        anchor_path = ordinary_path()
+        discovered_path = startup["activation_path"]
+        if profile["schema"] == GENERAL_PROFILE:
+            qualification = profile["qualification"]
+            expected = qualification["ordinary_import_path_sha256"][label]
+            context_digest = qualification["ordinary_interpreter_context_sha256"]
+            if any(canonical_digest(state["entries"]) != expected or canonical_digest({
+                    key: value for key, value in state.items() if key != "entries"}) != context_digest
+                    for state in (discovered_path, anchor_path)):
+                return
         row = {"role": role, "rank": rank, "pid": os.getpid(), "start_ticks": start_ticks(),
                "python_optimize": sys.flags.optimize, "anchor_module": name, "anchor_sha256": anchor_digest,
-               "module": module, "module_sha256": module_digest, **startup}
-        label = role if rank is None else f"worker-{rank}"
+               "module": module, "module_sha256": module_digest,
+               "general_plugins": startup["general_plugins"], "activation_sha256": startup["activation_sha256"],
+               "sitecustomize_sha256": startup["sitecustomize_sha256"], "producer_sha256": startup["producer_sha256"],
+               "ordinary_import_path": {"activation": discovered_path, "anchor": anchor_path}}
         path = DESTINATION / (label + ".json")
         flags = os.O_WRONLY | os.O_NOFOLLOW | os.O_CREAT | os.O_EXCL
         with os.fdopen(os.open(path, flags, 0o600), "wb") as stream:
@@ -166,7 +239,7 @@ def activate():
                 or "VLLM_PLUGINS" in os.environ):
             return
         profile = json.loads(read_file(ROOT / "profile.json", 8192))
-        if (profile["schema"] != "guard-sup11-vllm-general-observer/1"
+        if (profile["schema"] not in {GENERAL_PROFILE, DIAGNOSTIC_PROFILE}
                 or profile["service"]["module"] != SERVICE
                 or profile["installed_root"] != "/usr/local/lib/python3.12/dist-packages"):
             return
@@ -180,6 +253,7 @@ def activate():
             "activation_sha256": qualification[field],
             "sitecustomize_sha256": vendor_site_digest(qualification),
             "producer_sha256": hashlib.sha256(read_file(MODULE_PATH, 65536)).hexdigest(),
+            "activation_path": ordinary_path(),
         }
         deadline = time.monotonic() + PROFILE_SECONDS
 

@@ -16,6 +16,7 @@ from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha2
 from guard.store import Store
 from tests.builders import T0, assert_unconfirmed_security_failure, environment, policy
 from tests.test_kubernetes_sampling import World, inputs
+from tests.test_sup11_general_observer import INTERPRETER_CONTEXT, PATH_ENTRIES
 
 READY = "2026-10-26T00:00:01Z"
 PACK = Path(__file__).resolve().parents[1] / "packs" / "PACK-BASELINE"
@@ -59,9 +60,11 @@ def capsule(folder, side, version, *, general=False):
             "module_sha256": origin if rank is None else profile["model_source_sha256"],
             "producer_sha256": producer})
         if general:
+            path = {**INTERPRETER_CONTEXT, "entries": PATH_ENTRIES}
             processes[-1].update(activation_sha256=qualification[f"{role}_activation_sha256"],
                                  sitecustomize_sha256=qualification["sitecustomize_sha256"],
-                                 general_plugins=list(stock_adapter.GENERAL_PLUGIN_NAMES))
+                                 general_plugins=list(stock_adapter.GENERAL_PLUGIN_NAMES),
+                                 ordinary_import_path={"activation": deepcopy(path), "anchor": deepcopy(path)})
     readback = {"profile_sha256": profile_sha, "producer_sha256": producer, "processes": processes}
     if general:
         readback["plugin_metadata"] = {name: sha256_hex(raw) for name, raw in stock_adapter.GENERAL_METADATA.items()}
@@ -112,6 +115,8 @@ class OwnedWorld(World):
             readinessProbe={"httpGet": {"path": "/health", "port": 8000}})
         pod["spec"]["volumes"] = [{"name": name, "hostPath": {"path": path, "type": "Directory"}}
                                   for name, path in selected_mounts.items()]
+        if "plugin_metadata" in self.readback:
+            container["workingDir"] = stock_adapter.GENERAL_WORKDIR
         pod["status"]["conditions"][0]["lastTransitionTime"] = READY
 
 
@@ -124,14 +129,20 @@ def test_prebound_update_publishes_only_observed_default_mode(tmp_path, monkeypa
     if general:
         pins = {
             "oci_source_qualification_sha256": "1" * 64, "plugin_discovery_sha256": "2" * 64,
-            "site_roster_sha256": "3" * 64, "plugin_loader_sha256": "4" * 64,
-            "service_activation_sha256": "5" * 64, "worker_activation_sha256": "6" * 64,
-            "sitecustomize_origin": "/usr/lib/python3.12/sitecustomize.py",
-            "sitecustomize_target": "/etc/python3.12/sitecustomize.py", "sitecustomize_sha256": "7" * 64,
+            "site_roster_sha256": "3" * 64,
+            "ordinary_import_path_sha256": {
+                role: sha256_hex(canonical_json(PATH_ENTRIES)) for role in stock_adapter.GENERAL_PATH_ROLES},
+            "ordinary_interpreter_context_sha256": sha256_hex(canonical_json(INTERPRETER_CONTEXT)),
         }
         monkeypatch.setattr(stock_adapter, "_GENERAL_QUALIFICATIONS", {version: pins for version in SOURCES})
     rows = {side: capsule(tmp_path / side, side, version, general=general) for side, version in
             (("baseline", "0.30.0"), ("candidate", "0.31.0"))}
+    if general:
+        env = rows["baseline"][0]
+        exported = stock_adapter.general_observer_profile(env)
+        exported["qualification"]["ordinary_import_path_sha256"]["service"] = "f" * 64
+        with pytest.raises(ValueError, match="SUP11_INSTALLED_SOURCE_PROFILE_INVALID"):
+            stock_adapter.validate_observer_profile(exported, env)
     worlds = {}
     cfg = {"adapter": {"name": "vllm"}, "executors": {"supply_boot": "kubernetes"},
            "update": {"mode": "external", "kubernetes_candidate_binding": "prebound", "allowed_checks": ["SUP-11"]},
@@ -181,6 +192,14 @@ def test_general_plugin_requires_qualified_installed_sources(tmp_path, monkeypat
     provenance["profile"]["schema"] = stock_adapter.GENERAL_PROFILE_SCHEMA
     provenance["profile_sha256"] = sha256_hex(canonical_json(provenance["profile"]))
     with pytest.raises(ValueError, match="SUP11_GENERAL_OBSERVER_OCI_QUALIFICATION_UNAVAILABLE"):
+        stock.prepared_provenance(provenance, env, sha256_hex(canonical_json(target["kubernetes"])))
+
+
+def test_general_path_qualification_diagnostic_is_not_official(tmp_path):
+    env, target, provenance, _, _ = capsule(tmp_path / "single", "baseline", "0.30.0")
+    provenance["profile"] = stock_adapter.general_observer_diagnostic_profile(env)
+    provenance["profile_sha256"] = sha256_hex(canonical_json(provenance["profile"]))
+    with pytest.raises(ValueError, match="SUP11_INSTALLED_SOURCE_PROFILE_INVALID"):
         stock.prepared_provenance(provenance, env, sha256_hex(canonical_json(target["kubernetes"])))
 
 

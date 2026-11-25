@@ -21,6 +21,15 @@ ASSET = consumer._ASSETS / "sup11_general_observer.py.txt"
 PLUGIN_LOADER = "vllm.plugins"
 SERVICE_ACTIVATION = ("vllm.engine.arg_utils", "AsyncEngineArgs.add_cli_args")
 WORKER_ACTIVATION = ("vllm.v1.worker.worker_base", "WorkerWrapperBase.init_worker")
+CUTLASS = adapter.INSTALLED_ROOT + "/nvidia_cutlass_dsl"
+PATH_ENTRIES = ["/usr/local/bin", CUTLASS + "/dsl_packages", str(MOUNT), adapter.INSTALLED_ROOT]
+INTERPRETER_CONTEXT = {
+    "cwd": "/cache", "home": "/cache/home", "uid": 2000, "gid": 0, "executable": "/usr/bin/python3",
+    "executable_realpath": "/usr/bin/python3.12", "prefix": "/usr", "exec_prefix": "/usr",
+    "base_prefix": "/usr", "base_exec_prefix": "/usr", "user_site": "/cache/home/.local/lib/python3.12/site-packages",
+    "user_site_enabled": True, "site_origin": "/usr/lib/python3.12/site.py", "vendor_hook_origin": str(SITE_ORIGIN),
+    "cutlass_origin": None, "cutlass_package_path": [CUTLASS],
+}
 
 
 def module_file(name):
@@ -30,7 +39,7 @@ def module_file(name):
 
 class InstalledFixturePath(type(Path())):
     def resolve(self, *, strict=False):
-        return SITE_TARGET if self == SITE_ORIGIN else self
+        return {SITE_ORIGIN: SITE_TARGET, Path("/usr/bin/python3"): Path("/usr/bin/python3.12")}.get(self, self)
 
 
 class Process:
@@ -41,6 +50,7 @@ class Process:
         self.now = 0
         self.profile_callback = None
         self.accesses = []
+        self.paths = list(PATH_ENTRIES)
         self.modules = {}
         self.producer = ASSET.read_bytes()
         self.module_path = MOUNT / adapter.GENERAL_MODULE_FILE
@@ -55,6 +65,10 @@ class Process:
             self.modules[name] = SimpleNamespace(__name__=name, __file__=str(filename))
         self.modules["sitecustomize"] = SimpleNamespace(
             __file__=str(SITE_ORIGIN), __spec__=SimpleNamespace(origin=str(SITE_ORIGIN)))
+        self.modules["site"] = SimpleNamespace(USER_SITE=INTERPRETER_CONTEXT["user_site"], ENABLE_USER_SITE=True,
+                                               __file__=INTERPRETER_CONTEXT["site_origin"],
+                                               __spec__=SimpleNamespace(origin="frozen"))
+        self.modules["nvidia_cutlass_dsl"] = SimpleNamespace(__spec__=SimpleNamespace(origin=None), __path__=[CUTLASS])
         self.modules["vllm.distributed.parallel_state"] = SimpleNamespace(_TP=SimpleNamespace(rank_in_group=rank))
         self.model_type = type("Qwen2VLForConditionalGeneration", (), {"__module__": adapter.MODEL})
         setattr(self.modules[adapter.MODEL], self.model_type.__name__, self.model_type)
@@ -65,6 +79,9 @@ class Process:
             "plugin_loader_sha256": self.module_digest(PLUGIN_LOADER),
             "sitecustomize_origin": str(SITE_ORIGIN), "sitecustomize_target": str(SITE_TARGET),
             "sitecustomize_sha256": sha256_hex(self.files[SITE_TARGET]),
+            "ordinary_import_path_sha256": {
+                role: sha256_hex(canonical_json(PATH_ENTRIES)) for role in adapter.GENERAL_PATH_ROLES},
+            "ordinary_interpreter_context_sha256": sha256_hex(canonical_json(INTERPRETER_CONTEXT)),
         }
         self.profile = {
             "schema": adapter.GENERAL_PROFILE_SCHEMA, "installed_root": adapter.INSTALLED_ROOT,
@@ -74,12 +91,16 @@ class Process:
         }
         self.files[MOUNT / "profile.json"] = canonical_json(self.profile)
         fake_sys = SimpleNamespace(
-            modules=self.modules, flags=SimpleNamespace(no_site=0, optimize=0), gettrace=lambda: None,
+            modules=self.modules, path=self.paths,
+            flags=SimpleNamespace(no_site=0, optimize=0, isolated=0, no_user_site=0, ignore_environment=0, safe_path=0),
+            executable="/usr/bin/python3", prefix="/usr", exec_prefix="/usr", base_prefix="/usr", base_exec_prefix="/usr",
+            gettrace=lambda: None,
             getprofile=lambda: self.profile_callback, setprofile=self.set_profile,
             _getframe=lambda depth: self.plugin_frame,
         )
         fake_os = SimpleNamespace(
-            environ={"PYTHONPATH": str(MOUNT), "VLLM_WORKER_MULTIPROC_METHOD": "spawn"},
+            environ={"PYTHONPATH": str(MOUNT), "VLLM_WORKER_MULTIPROC_METHOD": "spawn", "HOME": "/cache/home"},
+            getcwd=lambda: "/cache", getuid=lambda: 2000, getgid=lambda: 0, geteuid=lambda: 2000, getegid=lambda: 0,
             statvfs=self.statvfs, ST_RDONLY=os.ST_RDONLY, getpid=lambda: self.pid, open=self.open_receipt,
             fdopen=os.fdopen, O_WRONLY=os.O_WRONLY, O_NOFOLLOW=os.O_NOFOLLOW,
             O_CREAT=os.O_CREAT, O_EXCL=os.O_EXCL,
@@ -92,7 +113,7 @@ class Process:
         def fixture_import(name, *args, **kwargs):
             if name in imports:
                 return imports[name]
-            assert name in {"hashlib", "json", "stat"}
+            assert name in {"hashlib", "json", "re", "stat"}
             return builtins.__import__(name, *args, **kwargs)
 
         self.observer = {"__file__": str(self.module_path),
@@ -172,13 +193,16 @@ def test_fixed_observer_records_are_accepted_by_the_product(tmp_path):
     assert consumer._processes(readback, profile, profile_digest) == rows
 
 
-@pytest.mark.parametrize("failure", ["digest", "expiry"])
+@pytest.mark.parametrize("failure", ["digest", "expiry", "path"])
 def test_fixed_observer_stops_after_unverified_or_expired_startup(tmp_path, failure):
     process = Process(tmp_path, rank=0)
     process.observer["activate"]()
     assert process.profile_callback is not None
     if failure == "digest":
         process.files[module_file(adapter.LOADER)] = b"changed loader bytes"
+        frame = process.anchor
+    elif failure == "path":
+        process.paths.append("/fixture/unreviewed")
         frame = process.anchor
     else:
         process.now = process.observer["PROFILE_SECONDS"]

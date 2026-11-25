@@ -6,8 +6,8 @@ import re
 
 from guard.adapters.vllm_file_read_sensor import dependency
 from guard.adapters.vllm_stock_python_mode import (
-    CONFIG_SHA256, FILE_SIZES, GENERAL_METADATA, GENERAL_PLUGIN_NAMES, GENERAL_PROFILE_SCHEMA, LOADER, MODEL, STOCK_MODEL,
-    is_sha256, launch_command, validate_observer_profile,
+    CONFIG_SHA256, FILE_SIZES, GENERAL_HOME, GENERAL_METADATA, GENERAL_PLUGIN_NAMES, GENERAL_PROFILE_SCHEMA,
+    GENERAL_WORKDIR, LOADER, MODEL, STOCK_MODEL, is_sha256, launch_command, validate_observer_profile,
 )
 from guard.configuration import NORMAL_PYTHON_MODE_OPTION, NORMAL_PYTHON_MODE_SCOPE_ERROR
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
@@ -37,9 +37,12 @@ _PROCESS_FIELDS = {"role", "rank", "pid", "start_ticks", "python_optimize", "anc
 _OWNER_KEYS = ("namespace_uid", "pod_uid", "container_id", "started_at")
 _OFFLINE = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"}
 _OBSERVER_ENV = {"PYTHONPATH": "/guard-sup11", "VLLM_WORKER_MULTIPROC_METHOD": "spawn"}
-_GENERAL_OBSERVER_ENV = {"PYTHONPATH": "/guard-sup11"}
+_GENERAL_OBSERVER_ENV = {"PYTHONPATH": "/guard-sup11", "HOME": GENERAL_HOME}
 _GENERAL_STOCK_ENV = {"PYTHONNOUSERSITE", "PYTHONSAFEPATH", "PYTHONUSERBASE", "VLLM_PLUGINS",
                       "VLLM_WORKER_MULTIPROC_METHOD", "VLLM_TRACE_FUNCTION"}
+_PATH_CONTEXT = {"cwd", "home", "uid", "gid", "executable", "executable_realpath", "prefix", "exec_prefix",
+                 "base_prefix", "base_exec_prefix", "user_site", "user_site_enabled", "site_origin",
+                 "vendor_hook_origin", "cutlass_origin", "cutlass_package_path"}
 _LAUNCH_OPTIONS = {"--served-model-name", "--host", "--port", "--max-model-len", "--max-num-seqs",
                    "--gpu-memory-utilization", "--tensor-parallel-size", "--pipeline-parallel-size",
                    "--data-parallel-size", "--distributed-executor-backend"}
@@ -110,7 +113,7 @@ def _owned_pod(transport, target, *, general=False):
     if general:
         forbidden |= _GENERAL_STOCK_ENV
     expected = _OFFLINE | (_GENERAL_OBSERVER_ENV if general else _OBSERVER_ENV)
-    if (len(by_name) != len(env) or forbidden & by_name.keys()
+    if (len(by_name) != len(env) or forbidden & by_name.keys() or (general and container.get("workingDir") != GENERAL_WORKDIR)
             or any(by_name.get(key) != {"name": key, "value": value} for key, value in expected.items())):
         raise ValueError(_PROOF_ERROR)
     mounts = container["volumeMounts"]
@@ -171,6 +174,20 @@ def _load(path):
     return strict_json(dependency(path, None), limit=65536)
 
 
+def _qualified_import_path(row, qualification, role):
+    path = row["ordinary_import_path"]
+    if type(path) is not dict or set(path) != {"activation", "anchor"}:
+        raise ValueError(_PROOF_ERROR)
+    expected = qualification["ordinary_import_path_sha256"][role]
+    for snapshot in path.values():
+        if (type(snapshot) is not dict or set(snapshot) != _PATH_CONTEXT | {"entries"}
+                or type(snapshot["entries"]) is not list
+                or sha256_hex(canonical_json(snapshot["entries"])) != expected
+                or sha256_hex(canonical_json({key: snapshot[key] for key in _PATH_CONTEXT}))
+                != qualification["ordinary_interpreter_context_sha256"]):
+            raise ValueError(_PROOF_ERROR)
+
+
 def _processes(readback, profile, profile_digest):
     general = profile["schema"] == GENERAL_PROFILE_SCHEMA
     producer = GENERAL_PRODUCER_SHA256 if general else PRODUCER_SHA256
@@ -178,7 +195,8 @@ def _processes(readback, profile, profile_digest):
     process_fields = _PROCESS_FIELDS
     if general:
         readback_fields |= {"plugin_metadata"}
-        process_fields = process_fields | {"activation_sha256", "sitecustomize_sha256", "general_plugins"}
+        process_fields = process_fields | {"activation_sha256", "sitecustomize_sha256", "general_plugins",
+                                           "ordinary_import_path"}
     if (type(readback) is not dict or set(readback) != readback_fields
             or readback["profile_sha256"] != profile_digest or readback["producer_sha256"] != producer
             or (general and readback["plugin_metadata"] != _GENERAL_METADATA_SHA256)):
@@ -200,6 +218,7 @@ def _processes(readback, profile, profile_digest):
                     or row["sitecustomize_sha256"] != qualification["sitecustomize_sha256"]
                     or row["general_plugins"] != GENERAL_PLUGIN_NAMES):
                 raise ValueError(_PROOF_ERROR)
+            _qualified_import_path(row, qualification, role if rank is None else f"worker-{rank}")
         service = profile["service"]
         selected = (service["module"], service["sha256"], service["module"], service["sha256"]) if rank is None else (
             LOADER, profile["worker_loader_sha256"], MODEL, profile["model_source_sha256"])
@@ -234,9 +253,10 @@ def _readback(transport, target, source, *, general=False):
     budget = min(5, transport.deadline - transport.clock())
     if budget <= 0:
         raise ValueError(_PROOF_ERROR)
+    cap = 32768 if general and source == _READER else 8192
     receipt = transport._call([f"--namespace={engine['namespace']}", "exec", engine["pod"],
         f"--container={engine['container']}", "--", "python3", "-I", "-S", "-B", "-c", source, str(budget)],
-        cap=8192, budget=budget)
+        cap=cap, budget=budget)
     _owned_pod(transport, target, general=general)
     return receipt
 

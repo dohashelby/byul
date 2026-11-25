@@ -1,0 +1,365 @@
+{
+  "schema": "byul-enterprise-mock-inputs/1",
+  "data_origin": "EXAMPLE",
+  "policy_status": "DRAFT",
+  "official": false,
+  "created_on": "2026-11-25",
+  "request": "기업 입력이 없어서 NOT_RUN인 점검은 모의 데이터로 실행한다 (사용자, 2026-11-25). 모의 입력은 B가 만들고 AWS 실측은 A가 기존 실측 도구로 한다.",
+  "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 39,
+    "sha256": "f0b5e643361e6a0ba21fa09ecdd0f385c9b430a342882e480d4b69c1a23e97dd"
+  },
+  "source_tree_checked": "d85f89c8e4e4e19bb987149f8fd3af9823a2be49",
+  "rules": [
+    "모든 값은 EXAMPLE이다. 기업 승인값이 아니며 이 값으로 만든 POL은 DRAFT, 보고서는 official=false다.",
+    "두 판본(기준·후보)에 같은 값을 쓴다. 판본별로 값을 바꾸지 않는다.",
+    "모의는 기업 쪽 결정과 기업 시스템만 대신한다. 엔진·Gateway·실험실 구성요소가 실제로 남긴 기록만 관측하고, 기록 파일을 손으로 써서 관측 결과처럼 넣지 않는다(INV-02).",
+    "자격 원문·토큰·세션 키는 파일·로그·EVD에 남기지 않는다. 식별자는 불투명 ID나 SHA-256 지문으로만 둔다.",
+    "<...>로 감싼 값은 실행마다 A가 채운다. 세션은 실행마다 새 32자리 16진수, 시각은 실제 발생·수집 시각이다.",
+    "policy_values는 팩 39 CheckDef의 policy_params 키·형식과 같다. 실행 결합 키(ENV·target·세션·창·생산자 SHA)는 guard가 계산하므로 여기에 넣지 않는다."
+  ],
+  "id_rule": "고정 EXAMPLE 식별자는 sha256('byul-enterprise-mock/1:<label>')의 앞 32자리(불투명 ID) 또는 64자리 전체(지문)다.",
+  "principal_digest_rule": "OBS-01 test_actors 값은 sha256('principal:' + principal_id) 64자리다 (kubernetes_gateway_observation.principal_sha256).",
+  "checks": {
+    "OBS-01": {
+      "executor": "required_event_record",
+      "implementation": "kubernetes",
+      "collection_profile": "kubernetes-required-event-record-observation-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 1차 범위에서 제외. 실행 경로를 준비하고 UNKNOWN으로 남기면 완성으로 본다.",
+      "policy_values": {
+        "observation_max_delay_ms": 5000,
+        "observation_required_events": ["ACCESS_ALLOWED", "ACCESS_DENIED"],
+        "observation_required_fields": ["actor_sha256", "target_sha256", "run_sha256", "policy_sha256", "request_sha256", "result_sha256", "source_sha256"]
+      },
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json의 확정값(USER_DELEGATED_POLICY_DESIGN, 0.30.0 lab 범위)을 그대로 옮겼다.",
+      "mock_enterprise_facts": {
+        "test_principals": [
+          {"principal_id": "obs01-allowed-<run_id>", "roles": ["ordinary-chat"], "allowed_models": ["<API 모델명>"], "disabled": false,
+           "purpose": "Gateway가 ACCESS_ALLOWED로 기록하는 허용 주체"},
+          {"principal_id": "obs01-denied-<run_id>", "roles": [], "allowed_models": ["<API 모델명>"], "disabled": false,
+           "purpose": "같은 chat 경로에 역할이 없어 Gateway가 ACCESS_DENIED로 기록하는 거부 주체"}
+        ],
+        "route_roles": {"POST /v1/chat/completions": ["ordinary-chat"]},
+        "trigger_plan": [
+          "허용 주체 토큰으로 무해 chat 요청 1건 (엔진까지 전달)",
+          "거부 주체 토큰으로 같은 chat 요청 1건 (Gateway에서 거부, 엔진 미전달)"
+        ]
+      },
+      "run_binding": {
+        "record_session": "<per-run 32 hex>",
+        "record_producer": "<검토된 runtime Gateway 생산자 파일 경로 (REQ-13 실측의 gateway.reviewed_producer 대상과 같은 파일)>",
+        "test_actors": {
+          "allowed": "<sha256('principal:obs01-allowed-<run_id>')>",
+          "denied": "<sha256('principal:obs01-denied-<run_id>')>"
+        }
+      },
+      "collection_mode": "Codex가 11-23~24에 만든 Gateway 기록 스냅숏 경로(gateway_record_snapshot_only, gateway_record_source). 조립은 tools/mvp_metadata_wiring.py가 한다.",
+      "lab_stand_in": "REQ-13 실측과 같은 소유 runtime Gateway. auth.json에 위 두 주체와 route_roles를 넣는다. 토큰은 Kubernetes Secret에만 두고 파일·로그에 남기지 않는다.",
+      "records": [
+        {"producer": "runtime Gateway", "path": "/srv/serving/runtime/data/gateway_records.jsonl", "schema": "runtime-mvp-record/1.0",
+         "contract": "src/guard/executors/kubernetes_gateway_observation.py"}
+      ],
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "기록 생산자 미인증·독립 트리거 미검증이라 충족을 주장하지 않는다. 기록이 5000ms 기한을 넘기면 FAIL 근거가 된다."}
+    },
+    "REQ-02": {
+      "executor": "route_record",
+      "implementation": "kubernetes",
+      "collection_profile": "kubernetes-route-record-native-composite-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 1차 범위에서 제외. 실행 경로를 준비하고 UNKNOWN으로 남기면 완성으로 본다.",
+      "policy_values": {},
+      "policy_values_note": "팩 39 REQ-02는 policy_params가 없다. 승인 경로·권한 매핑은 아래 Gateway 인증 구성이 기업 결정을 대신한다.",
+      "mock_enterprise_facts": {
+        "approved_route_authorization": {
+          "POST /v1/chat/completions": ["ordinary-chat"],
+          "POST /v1/completions": ["completions-user"],
+          "GET /v1/models": ["ordinary-chat"]
+        },
+        "test_principals": [
+          {"principal_id": "req02-general-<run_id>", "roles": ["ordinary-chat"], "allowed_models": ["<API 모델명>"], "disabled": false}
+        ],
+        "trigger_plan": [
+          "일반 주체로 chat 요청 1건 (허용, 엔진 전달)",
+          "일반 주체로 completions 요청 1건 (역할 불일치로 Gateway 거부)",
+          "토큰 없이 chat 요청 1건 (인증 실패로 Gateway 거부)"
+        ]
+      },
+      "run_binding": {"record_session": "<per-run 32 hex>"},
+      "executor_config": {
+        "target": "<쪽별 엔진 target.json>",
+        "native_route": {"target": "<쪽별 엔진 target.json>", "prepared": "<엔진 lifecycle 센서 준비물 경로>"}
+      },
+      "lab_stand_in": "소유 runtime Gateway의 gateway_records.jsonl을 tools/dev1_runtime_records.py의 route_packet으로 옮겨 엔진 컨테이너에서 읽히는 위치에 둔다. 엔진 Pod에 /guard-route 읽기 전용 볼륨이 있어야 한다.",
+      "records": [
+        {"producer": "runtime Gateway → tools/dev1_runtime_records.route_packet", "path": "/guard-route/data/<record_session>/route-observations.json",
+         "container": "엔진 컨테이너", "schema": "guard-route-native-observations/1", "contract": "src/guard/executors/kubernetes_route_record.py"}
+      ],
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "route 기록 생산자와 인가 범위가 미인증이다. native 부분은 lifecycle 센서 준비물이 없으면 부분 수집 공백으로 남는다."},
+      "open_issues": [
+        "run_binding이 native_route.prepared 파일로 route_native_prepared_sha256을 계산한다(_FILE_OVERRIDES, lifecycle 로더). 준비물이 없을 때 결합 실패로 NOT_RUN이 되는지 A가 확인해야 한다."
+      ]
+    },
+    "REQ-03": {
+      "executor": "role_route",
+      "implementation": "kubernetes",
+      "collection_profile": null,
+      "scope_decision": "2026-11-08 사용자 결정으로 정책값을 BYUL 기준 정책으로 확정(EXAMPLE 아님).",
+      "policy_values": {"general_allowed_kinds": ["inference"]},
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json (PRIOR_USER_CONFIRMED)",
+      "mock_enterprise_facts": {
+        "role_table": {
+          "general": {"principal_id": "req03-general-<run_id>", "gateway_roles": ["ordinary-chat"], "allowed_kinds": ["inference"]},
+          "admin": {"principal_id": "req03-admin-<run_id>", "gateway_roles": ["ordinary-chat", "guard-admin"], "allowed_kinds": ["inference", "admin", "diagnostic"]}
+        },
+        "admin_routes": "<소유 Gateway가 실제로 등록·전달하는 관리·진단 route 목록. 엔진 route를 Gateway가 전달하지 않으면 빈 목록이다>",
+        "wrong_key": "실행 중 임의 생성(http_common 기본 동작). 값은 남기지 않는다."
+      },
+      "executor_config": {
+        "target": "<Gateway를 포함한 쪽별 routes target.json>",
+        "roles": {"general": "<일반 토큰 환경변수 이름, 예: REQ03_GENERAL_TOKEN>", "admin": "<관리 토큰 환경변수 이름, 예: REQ03_ADMIN_TOKEN>"},
+        "admin_role": "admin"
+      },
+      "lab_stand_in": "소유 runtime Gateway auth.json에 일반·관리 두 주체를 넣고, 관리 역할에 Gateway가 등록한 관리·진단 route를 매핑한다.",
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "11-05 실측처럼 Gateway가 관리 경로(/metrics 등)를 전달하지 않아 404면 보안 UNKNOWN·기능 FAIL이다. runtime Gateway는 update에서 고치지 않는다."}
+    },
+    "REQ-17": {
+      "executor": "engine_sensor",
+      "implementation": "kubernetes",
+      "collection_profile": "engine-sensor-cache-timing-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 정책값 확정(EXAMPLE 아님). 현황표의 '기업 입력 대기'는 그 이전 기록이다.",
+      "policy_values": {"cache_timing_max_auc_percent": 55, "cache_timing_min_samples": 200},
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json (PRIOR_USER_CONFIRMED)",
+      "mock_enterprise_facts": {
+        "cache_sharing_groups": [
+          {"group_id": "req17-group-a", "principals": ["req17-a1-<run_id>", "req17-a2-<run_id>"], "shares_prefix_cache": true},
+          {"group_id": "req17-group-b", "principals": ["req17-b1-<run_id>"], "shares_prefix_cache": false}
+        ],
+        "metrics_readers": {"general": [], "admin": ["<공개 metrics 필드 전체>"]},
+        "sample_plan": "역할별 최소 표본 200을 채운다. 묶음당 512개 상한이 있어 사용자 결정23(2026-11-14)의 분할 수집·집계(504개씩 두 묶음, 같은 ENV·target·모델·정책·엔진 세대)를 쓴다. docs/dev-1/req17-split-collection.md"
+      },
+      "lab_stand_in": "Gateway의 주체별 cache salt로 두 집단을 나눈다(REQ-15 실측 방식). 엔진 센서 준비물·manifest는 두 판본 모두 필요하다.",
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "control 표본 전부에 자격 확인된 native cache 적중이 있어야 정상 대조의 검출력이 검증된다(DECISIONS.md 2026-11-15 'M-A6 기준 V1 cache/slot 관측 범위')."},
+      "open_issues": [
+        "NOT_RUN의 남은 원인은 기업 입력이 아니라 두 판본의 engine_sensor 준비물·센서 고정값이다. 이 범위는 A의 실측 도구가 맡는다."
+      ]
+    },
+    "LIF-13": {
+      "executor": "engine_sensor",
+      "implementation": "kubernetes",
+      "collection_profile": "engine-sensor-weights-lifetime-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 정책값 확정(EXAMPLE 아님). 현황표의 'release 기업 인가 정책 부재'는 그 이전 기록이다.",
+      "policy_values": {"release_allowed_roles": ["runtime_controller"], "reacquire_same_approved_generation_only": true, "disk_fallback_allowed": false},
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json (PRIOR_USER_CONFIRMED)",
+      "mock_enterprise_facts": {
+        "release_actor": {"role": "runtime_controller", "actor_id": "lif13-runtime-controller-<run_id>",
+                          "action": "가중치 공유 daemon에 release 1회를 요청한다"},
+        "reacquire_plan": "release 뒤 같은 승인 세대로만 재취득한다. 디스크 fallback은 켜지 않는다."
+      },
+      "lab_stand_in": "11-05 실측의 zero-copy 가중치 공유 daemon과 소비자 2개 구성(docs/dev-1/gpu-20261105.md). release를 runtime_controller 신원이 요청한다.",
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "11-05에는 daemon 프로세스 행이 요청 경계를 못 봐 분기와 release 인가가 UNKNOWN이었다."},
+      "open_issues": [
+        "NOT_RUN의 남은 원인은 두 판본의 가중치 수명 센서 준비물이다. 기업 입력(release 허용 역할)은 이미 확정돼 있다.",
+        "release_allowed_roles·reacquire_same_approved_generation_only·disk_fallback_allowed는 팩과 tools/overrides/LIF-13.yaml에만 있고, src/guard의 실행기·판정 규칙이 읽지 않는다. 값이 판정에 쓰이는지 B 검토가 필요하다."
+      ]
+    },
+    "OBS-06": {
+      "executor": "record_access",
+      "implementation": "kubernetes",
+      "collection_profile": "kubernetes-record-access-scope-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 1차 범위에서 제외. 실행 경로를 준비하고 UNKNOWN으로 남기면 완성으로 본다.",
+      "policy_values": {},
+      "policy_values_note": "팩 39 OBS-06(r10)은 policy_params가 없다. record_access_policy_ref는 계획이 현재 봉인 POL Ref로 채운다.",
+      "mock_enterprise_facts": {
+        "subjects": {
+          "schema": "guard-record-access-subjects/1",
+          "environment_ref": "<쪽별 ENV Ref>",
+          "target_sha256": "<쪽별 lifecycle target 정규 JSON SHA-256>",
+          "policy_ref": "<이번 실행의 봉인 POL Ref>",
+          "subjects": [
+            {"role": "authorized_reader", "username": "obs06-log-reader", "groups": ["obs06-log-readers", "system:authenticated"]},
+            {"role": "unauthorized_reader", "username": "obs06-no-reader", "groups": ["obs06-no-readers", "system:authenticated"]}
+          ]
+        },
+        "rbac": "소유 namespace에 Role(엔진 Pod 하나의 pods get·pods/log get)과 obs06-log-reader에게만 주는 RoleBinding. 두 신원은 kubectl --as로 쓴다.",
+        "copy_inventory": {
+          "schema": "guard-record-copy-inventory/1",
+          "environment_ref": "<쪽별 ENV Ref>",
+          "target_sha256": "<쪽별 lifecycle target 정규 JSON SHA-256>",
+          "source_sha256": "<사본 목록 생산자 파일 SHA-256 = record_producer>",
+          "copies": [
+            {"location_sha256": "52e47664a421c076fc4460586e5329dcaa70e7a9bf8e923d70825f6ed893c91f", "kind": "original", "grade": "internal",
+             "encryption_required": false, "encryption_applied": null, "key_reference_sha256": null,
+             "unauthorized_export": "<생산자가 거부 신원으로 실제 시도한 결과 true|false, 시도하지 않았으면 null>", "unauthorized_decrypt": null},
+            {"location_sha256": "ea732e8f8ebce669ec660591a31c68ce28a7661c4133e2f4f2332672a9ced61d", "kind": "collector", "grade": "internal",
+             "encryption_required": false, "encryption_applied": null, "key_reference_sha256": null,
+             "unauthorized_export": "<실제 시도 결과 또는 null>", "unauthorized_decrypt": null},
+            {"location_sha256": "612548202b3ec13b5229281d71b859604c8029bd736dcc281aa4610293bd4b0e", "kind": "backup", "grade": "confidential",
+             "encryption_required": true, "encryption_applied": "<생산자가 확인한 실제 암호화 여부 true|false>",
+             "key_reference_sha256": "4df8a525b6124bef74beea8c83241f67e483b3bc2e51465f63de990935cc4776",
+             "unauthorized_export": "<실제 시도 결과 또는 null>", "unauthorized_decrypt": "<실제 시도 결과 또는 null>"}
+          ]
+        },
+        "copy_locations": {
+          "original": "엔진 컨테이너 stdout(kubelet 로그)",
+          "collector": "실험실 로그 수집 사이드카가 쓰는 소유 hostPath 파일 (권한 0600, 소유 UID만 읽기)",
+          "backup": "수집 파일을 암호화한 소유 백업 파일 (키는 Secret, 값은 남기지 않음)"
+        }
+      },
+      "run_binding": {"record_session": "<per-run 32 hex>", "record_producer": "<사본 목록 생산자 파일 경로>"},
+      "executor_config": {"target": "<쪽별 lifecycle target.json>", "subjects": "<위 subjects 파일 경로>", "kubectl_binary": "kubectl", "max_duration_seconds": 60},
+      "lab_stand_in": "로그 수집 사이드카와 백업 작업을 소유 namespace에 띄운다. 생산자는 거부 신원으로 반출·복호를 실제로 시도한 결과만 적고, 시도하지 않은 칸은 null로 둔다.",
+      "records": [
+        {"producer": "실험실 사본 목록 생산자", "path": "/guard-record-access/data/<record_session>/copy-inventory.json", "container": "lifecycle target의 엔진 컨테이너(FixedRecordReader)",
+         "schema": "guard-record-copy-inventory/1", "contract": "src/guard/executors/kubernetes_record_access_product.py"}
+      ],
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "사본 목록 생산자 미인증. 클라이언트 오류만으로 정책 거부를 확정하지 않는다. 생산자가 실제로 확인한 반출·복호 성공이나 필수 암호화 부재는 위반 근거가 된다."}
+    },
+    "OBS-11": {
+      "executor": "log_integrity",
+      "implementation": "kubernetes",
+      "collection_profile": "collection-gap-visibility-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 1차 범위에서 제외. 실행 경로를 준비하고 UNKNOWN으로 남기면 완성으로 본다.",
+      "policy_values": {
+        "required_records": ["access", "request", "policy", "execution", "result"],
+        "collection_deadline_ms": {"access": 5000, "request": 5000, "policy": 5000, "execution": 5000, "result": 5000},
+        "max_clock_uncertainty_ms": {"access": 100, "request": 100, "policy": 100, "execution": 100, "result": 100},
+        "detection_deadline_ms": {"access": 5000, "request": 5000, "policy": 5000, "execution": 5000, "result": 5000},
+        "alert_deadline_ms": {"access": 10000, "request": 10000, "policy": 10000, "execution": 10000, "result": 10000}
+      },
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json (USER_DELEGATED_POLICY_DESIGN)",
+      "mock_enterprise_facts": {
+        "collector": "실험실 수집기 대역(collection-status 컨테이너). Gateway 기록(access·request·policy·result)과 엔진 로그(execution)를 따라 읽고 도착 시각을 적는다.",
+        "gap_drill": "수집기 읽기를 3초 멈췄다가 재개한다. 멈춘 동안 발생한 사건에 gap_marked_at_ms·alert_at_ms를 남기고, 재개 뒤 도착 시각을 남긴다.",
+        "dependent_result": "수집 공백 동안의 사건에 의존하는 판정은 UNKNOWN으로 표시한다."
+      },
+      "run_binding": {"record_session": "<per-run 32 hex>"},
+      "executor_config": {"target": "<쪽별 target.json>", "collection_status": {"container": "collection-status", "image": "<수집기 대역 이미지 digest 참조>"}},
+      "records": [
+        {"producer": "실험실 수집기 대역", "path": "/guard-collection/data/<record_session>/collection-status.json", "container": "collection-status",
+         "schema": "guard-collection-status/1",
+         "event_fields": ["record", "event_at_ms", "arrived_at_ms", "gap_marked_at_ms", "alert_at_ms", "dependent_result", "clock_uncertainty_ms"],
+         "contract": "src/guard/executors/log_collection_gap.py validate_record"}
+      ],
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "상태 기록 생산자 미인증이라 기록 자체가 인정한 기한 위반만 FAIL 근거가 되고 전체 충족은 주장하지 않는다."}
+    },
+    "PLT-10": {
+      "executor": "credential_revocation",
+      "implementation": "kubernetes",
+      "collection_profile": "kubernetes-credential-revocation-observation-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 1차 범위에서 제외. 실행 경로를 준비하고 UNKNOWN으로 남기면 완성으로 본다.",
+      "policy_values": {
+        "revocation_deadline_basis": "absolute-unconditional",
+        "revocation_propagation_limit_ms": 1000,
+        "revocation_max_clock_skew_ms": 100,
+        "revocation_subject_label": "retired",
+        "revocation_max_new_access_samples": 3
+      },
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json (USER_DELEGATED_POLICY_DESIGN). 단 revocation_subject_label만 확인값 'byul-mvp69-retired' 대신 'retired'를 쓴다. credential_revocation_contract.normalize_policy가 'retired' 하나만 받아 확인값으로는 CREDENTIAL_REVOCATION_POLICY_INVALID가 된다.",
+      "mock_enterprise_facts": {
+        "issuer": "실험실 자격 발급자 대역. 실행마다 대조 키와 퇴역 키를 새로 만들고, 엔진을 대조 키만으로 기동해 퇴역 키를 철회한다(11-05 실측 방식).",
+        "issuer_event_file": {
+          "issuer_id": "byul-lab-key-issuer",
+          "event_id": "plt10-revocation-<run_id>",
+          "event_at": "<퇴역 키를 뺀 엔진 기동 시각, ISO-8601 UTC>",
+          "deny_after": "<event_at + 1000ms, ISO-8601 UTC>"
+        },
+        "issuer_event_constraints": "issuer_id·event_id는 [A-Za-z][A-Za-z0-9_.-]{0,63}. 창 안에서 event_at <= deny_after (credential_revocation_contract.normalize_policy)."
+      },
+      "run_binding": {"issuer_event": "<위 issuer_event_file을 담은 닫힌 JSON 파일 경로>"},
+      "executor_config": {"target": "<쪽별 엔진 target.json>", "prepared": "<엔진 lifecycle 센서 준비물 경로>",
+                          "retired_key_env": "<퇴역 키 환경변수 이름>", "control_key_env": "<대조 키 환경변수 이름>"},
+      "lab_stand_in": "엔진을 --api-key(대조 키)로 기동한다. 키 값은 환경변수로만 넘긴다.",
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "발급자 사건은 선언일 뿐 검증되지 않는다(11-05 PLT-10도 COMPLETED/UNKNOWN). 퇴역 키로 새 접근이 성공하면 FAIL 근거다."}
+    },
+    "PLT-11": {
+      "executor": "session_revocation",
+      "implementation": "kubernetes",
+      "collection_profile": "kubernetes-existing-http-session-observation-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 1차 범위에서 제외. 실행 경로를 준비하고 UNKNOWN으로 남기면 완성으로 본다.",
+      "policy_values": {
+        "session_deadline_basis": "absolute-unconditional",
+        "session_propagation_limit_ms": 1000,
+        "session_max_clock_skew_ms": 100,
+        "session_max_wait_seconds": 5,
+        "session_residual_policy": "deny-existing-after-deadline"
+      },
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json (USER_DELEGATED_POLICY_DESIGN)",
+      "mock_enterprise_facts": {
+        "issuer": "실험실 자격 발급자 대역(PLT-10과 같은 키 쌍 방식).",
+        "issuer_event_file": {
+          "issuer_id": "byul-lab-key-issuer",
+          "event_id": "plt11-revocation-<run_id>",
+          "event_at": "<철회 시각, ISO-8601 UTC>",
+          "open_before": "<기존 연결을 연 시각(event_at 이전), ISO-8601 UTC>",
+          "deny_after": "<event_at + 1000ms, ISO-8601 UTC>"
+        },
+        "issuer_event_constraints": "issuer_id·event_id는 [A-Za-z][A-Za-z0-9_.-]{0,63}. 창 시작 < open_before <= event_at <= deny_after <= 창 끝, session_max_wait_seconds 1~10 (session_revocation_contract.normalize_policy)."
+      },
+      "run_binding": {"issuer_event": "<위 issuer_event_file을 담은 닫힌 JSON 파일 경로>"},
+      "executor_config": {"target": "<쪽별 엔진 target.json>", "prepared": "<엔진 lifecycle 센서 준비물 경로>",
+                          "retired_key_env": "<퇴역 키 환경변수 이름>", "control_key_env": "<대조 키 환경변수 이름>"},
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "발급자 사건이 선언뿐이다."},
+      "open_issues": [
+        "vLLM API 키는 기동 때 고정이라 살아 있는 연결 중 철회할 수 없다(phase1 노트). 엔진 재기동으로 철회하면 기존 연결이 끊겨 '철회 후 기존 세션 거부'를 시험한 것이 아니다. 철회 가능한 발급자(엔진 앞 인증 대역)를 둘지 A와 사용자가 정해야 한다."
+      ]
+    },
+    "PLT-12": {
+      "executor": "required_event_record",
+      "implementation": "kubernetes",
+      "collection_profile": "kubernetes-credential-copy-record-observation-v1",
+      "scope_decision": "2026-11-08 사용자 결정으로 1차 범위에서 제외. 실행 경로를 준비하고 UNKNOWN으로 남기면 완성으로 본다.",
+      "policy_values": {
+        "copy_treatments": "<tools/mvp_credential_copy_inputs.py가 아래 규칙과 사본 목록으로 채우는 사본별 {required_action, deadline_at, retention_exception}>",
+        "copy_max_record_delay_ms": 5000
+      },
+      "copy_rule": {"rule": "delete_all_owned_canary_credential_copies", "deadline_from_start_ms": 30000, "retention_exception": null, "require_bounded_owned_inventory": true},
+      "policy_values_source": "docs/dev-1/mvp-enterprise-policy-20261116.json (copy_treatments는 USER_DELEGATED_RUNTIME_RULE, copy_max_record_delay_ms는 USER_DELEGATED_POLICY_DESIGN)",
+      "mock_enterprise_facts": {
+        "copy_selection": {
+          "schema": "guard-mvp-credential-copy-selection/1",
+          "base_policy_ref": "<copy_rule을 담은 POL Ref>",
+          "environments": {"baseline": "<기준 ENV Ref>", "candidate": "<후보 ENV Ref>"},
+          "started_at": "<canary 사본을 만든 시각, ISO-8601 UTC>",
+          "credential_family_id": "1352629eaa493557d50200292ca08020",
+          "copies": [
+            {"copy_id": "6af95c3499e7fa824551f57003bccac0", "generation": 0, "location_id": "7e5f86ae51f51c6adb7490568f087ad3",
+             "location_kind": "SECRET_OBJECT", "recipient_id": "a43e0da03e27400e33c414d199b1c958"},
+            {"copy_id": "de076aa9236277bdda774fb2841986fe", "generation": 0, "location_id": "b501754e3120aa63137be4c505ccd294",
+             "location_kind": "ENV", "recipient_id": "a43e0da03e27400e33c414d199b1c958"},
+            {"copy_id": "1b5d81dd937378cae06c10c4690946c7", "generation": 0, "location_id": "fa7326ba560031b05131f281937ede7b",
+             "location_kind": "FILE", "recipient_id": "a43e0da03e27400e33c414d199b1c958"}
+          ]
+        },
+        "copy_locations": {
+          "SECRET_OBJECT": "소유 namespace의 Secret plt12-canary (임의 canary 값, 실제 서비스 자격 아님)",
+          "ENV": "canary Pod 환경변수 PLT12_CANARY (Secret 참조)",
+          "FILE": "canary Pod 파일 /canary/credential (Secret 볼륨)"
+        },
+        "treatment_drill": "세 사본을 만든 뒤 30초 안에 Secret·canary Pod를 지워 세 사본을 모두 없앤다. 생산자는 생성(present)·삭제(completed)·삭제 확인(absent)을 실제 시각으로 적는다."
+      },
+      "run_binding": {"record_session": "<per-run 32 hex>", "record_producer": "<사본 기록 생산자 파일 경로>"},
+      "executor_config": {"copy_record_snapshot_only": true, "target": "<쪽별 target.json>", "copy_inventory": "<mvp_credential_copy_inputs.py가 만든 inventory 파일 경로>"},
+      "records": [
+        {"producer": "실험실 사본 기록 생산자 (producer_id 77dde4143b17df29e656b6a94c8699d1)", "path": "/guard-observation/data/<record_session>/required-events.json",
+         "container": "엔진 컨테이너", "schema": "guard-credential-copy-records/1",
+         "event_types": ["COPY_INVENTORY_CLAIM(present→absent)", "TREATMENT_CLAIM(method=delete, outcome=completed)"],
+         "contract": "src/guard/executors/credential_copy_contract.py validate_record"}
+      ],
+      "expected": {"execution": "COMPLETED", "security": "UNKNOWN",
+                   "reason": "스냅숏 경로는 선언 수집만 하고 실제 사본 구성·처리·재사용 차단을 검증하지 않는다(copy_membership_verified 등 False)."},
+      "open_issues": [
+        "tools/mvp_credential_copy_inputs.py는 EXAMPLE ENV를 거절하고 확인 정책의 승인 규칙을 읽는다. EXAMPLE·DRAFT POL로 돌릴 때 이 도구를 그대로 쓸지 A가 정해야 한다."
+      ]
+    }
+  }
+}

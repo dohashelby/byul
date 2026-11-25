@@ -95,9 +95,19 @@ def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
                 gaps.append('CALLBACK_CAPTURE_NOT_FINALIZED')
         elif segmented:
             gaps.append('CALLBACK_JOURNAL_STATE_UNAVAILABLE')
-    if (not checkpoints and files != sorted(snapshot)) or any(name not in files for name in snapshot):
+    # Only new segments of a writer that acknowledged this cut can be outside its fixed prefix.
+    extras = set(files) - snapshot.keys()
+    if (snapshot.keys() - set(files) or any(
+            (pid := int(NAME.fullmatch(name)[1])) not in checkpoints
+            or not name.startswith(f'callbacks-{pid}-') or name in checkpoints[pid]['offsets']
+            for name in extras)):
         gaps.append('CALLBACK_SOURCE_SET_CHANGED')
-    if capture_id is not None and any(item['pid'] not in checkpoints for item in snapshot.values()):
+    # Only queued journal writers (a state file or rotated segments) answer capture cuts. A legacy
+    # synchronous writer (one callbacks-<pid>.jsonl, no state file) writes each row inside the callback,
+    # so its snapshot size is already a row-consistent cut; a torn last row stays CALLBACK_ROW_INCOMPLETE.
+    journaled = {item['pid'] for name, item in snapshot.items()
+                 if name.startswith(f"callbacks-{item['pid']}-") or (root / f"callbacks-{item['pid']}.state.json").exists()}
+    if capture_id is not None and any(pid not in checkpoints for pid in journaled):
         gaps.append('CALLBACK_CHECKPOINT_UNAVAILABLE')
     if seek_end:
         return dict(schema='guard-callback-page/2', snapshot=snapshot, cursor={k:v['size'] for k,v in snapshot.items()},

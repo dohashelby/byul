@@ -231,7 +231,8 @@ def test_proposed_consumption_through_existing_product_cli_and_exact_saved_refs(
     evd, = store.find_latest("EVD", lambda r: True)
     res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
-    assert res.verdicts.security.value == "UNKNOWN" and evd.data_origin.value == "EXAMPLE"
+    assert res.verdicts.security.value == "FAIL" and evd.data_origin.value == "EXAMPLE"
+    assert "CONFIRMED_VIOLATION" not in res.security_failure_tags
     assert evd.environment == env.ref() and evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     assert len(calls) == (0 if approved is None else 1)
     assert evd.execution.status.value == ("NOT_RUN" if approved is None else "COMPLETED")

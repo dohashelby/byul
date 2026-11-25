@@ -36,7 +36,8 @@ def test_supported_response_contract_keeps_normal_control_and_prior_verdict(tmp_
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.normal_control.succeeded is True
     assert evd.observations['functional_probe_results'].value == {'POST /v1/completions':'pass'}
-    assert result.verdicts.security == (Verdict.FAIL if connected else Verdict.UNKNOWN)
+    assert result.verdicts.security == Verdict.FAIL
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is connected
     assert result.verdicts.functional == result.verdicts.performance == Verdict.UNKNOWN
 
 
@@ -49,7 +50,8 @@ def test_uncorrelated_response_is_unknown_control_and_cannot_erase_ipc_violation
     assert evd.normal_control.attempted and evd.normal_control.succeeded is False
     assert evd.observations['functional_probe_results'].value == {'POST /v1/completions':'no_response'}
     assert bool(evd.observations['unix_ipc_violations'].value) is connected
-    assert result.verdicts.security == (Verdict.FAIL if connected else Verdict.UNKNOWN)
+    assert result.verdicts.security == Verdict.FAIL
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is connected
     assert result.verdicts.functional == result.verdicts.performance == Verdict.UNKNOWN
     assert evd.observations['ipc_scope_complete'].value is False
     summary = (store.root/evd.artifacts[0].path).read_text(encoding='utf-8')

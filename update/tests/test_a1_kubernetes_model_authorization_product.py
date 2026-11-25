@@ -21,7 +21,7 @@ from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
 from tests.run_binding_support import for_pack
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
 from tests.test_kubernetes_lifecycle import group,target as native_target,World as NativeWorld
 from tests.test_lifecycle_capture import case,external,revised
 from tests.test_lifecycle_sensor import writer_factory
@@ -175,7 +175,9 @@ def test_registered_cli_owned_probe_native_and_exact_refs(tmp_path,group,native_
     cli(["judge","--plan",plan.id,"--as-of",T0.isoformat(),*common])
     cli(["report","--plan",plan.id,"--as-of",T0.isoformat(),"--json",tmp_path/"report.json",*common]);cli(["verify",*common])
     store=Store.read_only(tmp_path/"store");e,=store.iter_kind("EVD");res,=store.iter_kind("RES")
-    assert e.data_origin.value=="EXAMPLE" and all(getattr(res.verdicts,a).value=="UNKNOWN" for a in ("security","functional","performance"))
+    assert e.data_origin.value=="EXAMPLE"
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert not e.observations["model_authorization_scope_complete"].value
     assert not e.observations["model_retirement_scope_complete"].value and not e.observations["final_model_identity_verified"].value
     trials=e.observations["model_use_trials"].value

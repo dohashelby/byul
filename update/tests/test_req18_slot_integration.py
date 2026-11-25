@@ -9,6 +9,7 @@ import pytest
 from guard.executors import registry
 from guard.models import DataOrigin, Environment, Policy
 from guard.store import Store
+from tests.builders import assert_unconfirmed_security_failure
 from tests.test_kubernetes_request_binding import env as live_env, target
 from tools import b_req18_slot as producer
 
@@ -80,7 +81,9 @@ def test_absent_standalone_and_real_zero_row_are_semantic_controls_not_fabricate
     before = dict(registry.EXECUTORS)
     summary, calls, store, evidence, result = run(tmp_path, inputs, cpu_record())
     assert len(calls) == 1 and calls[0][1] == {'source_profile': 'target031'}
-    assert summary['execution_status'] == 'COMPLETED' and result.verdicts.security.value == 'UNKNOWN'
+    assert summary['execution_status'] == 'COMPLETED'
+    assert_unconfirmed_security_failure(result)
+    assert 'NO_PASS_RULE' in summary['security_failure_tags']
     assert summary['installed_target'] is None and not summary['gpu_execution_verified']
     assert not summary['full_live_coverage'] and evidence.data_origin == DataOrigin.EXAMPLE
     artifact = json.loads((store.root / evidence.artifacts[0].path).read_text())
@@ -94,6 +97,7 @@ def test_absent_standalone_and_real_zero_row_are_semantic_controls_not_fabricate
 def test_only_mask_consumption_and_identical_logits_output_difference_produce_fail(tmp_path, inputs):
     summary, _, _, evidence, result = run(tmp_path, inputs, mismatch(cpu_record()))
     assert result.verdicts.security.value == 'FAIL'
+    assert 'CONFIRMED_VIOLATION' in summary['security_failure_tags']
     assert evidence.observations['req18_mask_inheritance_mismatch'].value is True
     assert summary['restore_verified']
 
@@ -110,7 +114,7 @@ def test_host_state_alone_or_unqualified_trial_is_not_consumption_fail(tmp_path,
     elif change == 'no_reuse': row['slot_reused'] = False
     else: row['source_validation']['post']['status'] = 'mismatch'
     _, _, _, _, result = run(tmp_path, inputs, record)
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
 
 
 def test_earlier_verified_failure_survives_late_case_and_global_post_failure(tmp_path, inputs):
@@ -120,6 +124,7 @@ def test_earlier_verified_failure_survives_late_case_and_global_post_failure(tmp
     record['source_validation']['post']['status'] = 'unavailable'
     summary, _, _, evidence, result = run(tmp_path, inputs, record)
     assert evidence.execution.status.value == 'ABORTED' and result.verdicts.security.value == 'FAIL'
+    assert {'ABORTED', 'CONFIRMED_VIOLATION'} <= set(result.security_failure_tags)
     assert summary['restore_verified']
 
 
@@ -153,7 +158,8 @@ def test_unconfigured_component_gate_closes_before_actual_cpu_capture(tmp_path, 
     monkeypatch.setattr(producer, 'GATE_SHA256', None)
     summary = producer.run_pipeline('cpu', *inputs, tmp_path / 'closed',
         source_root=tmp_path / 'source', execute=True)
-    assert summary['capture_calls'] == 0 and summary['security'] == 'UNKNOWN' and summary['restore_verified']
+    assert summary['capture_calls'] == 0 and summary['security'] == 'FAIL' and summary['restore_verified']
+    assert 'CONFIRMED_VIOLATION' not in summary['security_failure_tags']
 
 
 def test_original_req18_remains_unregistered_and_private_diagnostic_has_no_pass_rule(inputs):
@@ -319,7 +325,9 @@ def test_live_capability_missing_closes_before_http_and_reader(tmp_path, inputs,
     monkeypatch.setattr(producer.readers.KubernetesLifecycleReader, 'snapshot', forbidden)
     summary = producer.run_pipeline('kubernetes', environment, policy, pack, tmp_path / 'live',
         target=destination, prepared=prepared, manifest=manifest, execute=True)
-    assert summary['mode'] == 'kubernetes' and summary['security'] == 'UNKNOWN'
+    assert summary['mode'] == 'kubernetes' and summary['security'] == 'FAIL'
+    assert 'ABORTED' in summary['security_failure_tags']
+    assert 'CONFIRMED_VIOLATION' not in summary['security_failure_tags']
     assert summary['execution_status'] == 'ABORTED' and summary['restore_verified']
 
 

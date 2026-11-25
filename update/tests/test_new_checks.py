@@ -9,7 +9,7 @@ from guard.core.run import run_plan, RunConfig
 from guard.core.judge import judge_plan
 from guard.runtime.docker import CmdResult
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, completion_response
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy, completion_response
 from tests.response_semantics_support import with_legacy_check
 from tests.test_credential_mount_semantics import FakeDocker as CredentialFixture, IMAGE as CREDENTIAL_IMAGE, RUN as CREDENTIAL_RUN
 
@@ -62,7 +62,7 @@ def test_input_budget_aborts_before_requests(tmp_path):
     evd, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
                           {"vocab_size": 100, "max_input_tokens": 1000000, "rejection_codes":["400"]})
     assert evd.execution.status.value == "ABORTED"
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize("budget", [8, 1, "9", True])
@@ -77,7 +77,7 @@ def test_same_response_changes_with_explicit_rejection_policy(tmp_path):
     probe = lambda n,rs,t: [completion_response(r, 200 if r["body"]["prompt"] == [0] else 400) for r in rs]
     _, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
                          {"vocab_size":100,"max_input_tokens":8,"rejection_codes":["422"]})
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize("leak, unreadable, expected", [(False,False,"PASS"),(True,False,"FAIL"),(False,True,"UNKNOWN"),(True,True,"FAIL")])
@@ -103,7 +103,8 @@ def test_req09_http_200_error_body_does_not_establish_normal_inference(tmp_path,
     evd, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
                            {"max_input_tokens": 8, "rejection_codes": ["400"]})
     assert evd.execution.status.value == "COMPLETED" and evd.normal_control.succeeded is False
-    assert result.verdicts.security.value == result.verdicts.functional.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional.value == "UNKNOWN"
     assert len(sent) == 1
 
 

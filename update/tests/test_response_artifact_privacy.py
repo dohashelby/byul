@@ -98,7 +98,8 @@ def test_malformed_outcome_is_a_safe_gap_and_cannot_erase_earlier_leak(tmp_path,
     store,evd,res=source.run_content(tmp_path,monkeypatch,transport("leak" if leak else "normal",[],[],
                                   bad_outcome=outcome,change_outcome=True))
     assert_no_content(store,evd,res)
-    assert res.verdicts.security.value==("FAIL" if leak else "UNKNOWN")
+    assert res.verdicts.security.value == "FAIL"
+    assert ("CONFIRMED_VIOLATION" in res.security_failure_tags) is leak
     row=next(item for item in payload(store,evd)["samples"] if item["case"]=="option:return_prompt_text")
     assert row["outcome"]=="probe_error" and evd.observations["response_coverage_complete"].value is False
 

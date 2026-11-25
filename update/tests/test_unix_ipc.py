@@ -13,7 +13,7 @@ from guard.executors import registry
 from guard.executors.unix_ipc import UnixIPCExecutor, _parse, policy_shape
 from guard.models import ExecStatus, Verdict, new_id
 from guard.store import Store
-from tests.builders import baseline_pack, completion_response, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, completion_response, environment, policy
 
 
 PIN = "example.invalid/engine@sha256:" + "a" * 64
@@ -92,7 +92,8 @@ def test_allowed_control_and_disallowed_denial_are_partial_unknown(tmp_path, mon
     assert evd.observations["unix_ipc_violations"].value == []
     assert evd.observations["unix_ipc_trials"].collected is True
     assert evd.normal_control.succeeded is True
-    assert res.verdicts.security == res.verdicts.functional == res.verdicts.performance == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == Verdict.UNKNOWN
     assert any(not c.attempted for c in evd.challenges)
     assert ("connect", 0) in world.calls and ("connect", 1001) in world.calls
     raw = (store.root / evd.artifacts[0].path).read_text(encoding="utf-8")
@@ -118,12 +119,12 @@ def test_verified_unapproved_connection_fail_survives_later_control_failure(tmp_
 def test_mismatch_is_not_a_verified_connection_violation(tmp_path, monkeypatch, change):
     _, _, _, evd, res, _ = run(tmp_path, monkeypatch, World(connected=True, mutate=change))
     assert evd.observations["unix_ipc_violations"].value == []
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
 
 
 def test_source_failure_is_unknown_and_diagnostics_never_echo_raw_errors(tmp_path, monkeypatch):
     store, _, _, evd, res, _ = run(tmp_path, monkeypatch, World(source_error=True))
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
     assert evd.observations["unix_ipc_trials"].collected is False
     assert "PRIVATE_" not in (store.root / evd.artifacts[0].path).read_text(encoding="utf-8")
 
@@ -134,7 +135,7 @@ def test_untrusted_outcomes_are_rejected_without_retaining_raw_values(tmp_path, 
         if value["mode"] == "connect":
             value["rows"][0]["outcome"] = outcome
     store, _, _, evd, result, _ = run(tmp_path, monkeypatch, World(connected=True, mutate=malformed))
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert evd.observations["unix_ipc_trials"].collected is False
     assert evd.observations["unix_ipc_violations"].value == []
     raw = (store.root / evd.artifacts[0].path).read_text(encoding="utf-8")
@@ -355,7 +356,8 @@ def test_unverified_target_is_aborted_before_health_request_or_uid_exec(tmp_path
         def probe(self, *args, **kwargs):
             pytest.fail("ownership must be established before even /health")
     _, _, _, evd, result, world = run(tmp_path, monkeypatch, UnownedWorld())
-    assert evd.execution.status == ExecStatus.ABORTED and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert_unconfirmed_security_failure(result)
     assert world.calls and all(c[0] == "identity" for c in world.calls)
 
 
@@ -367,7 +369,8 @@ def test_same_pid_with_changed_start_is_not_stable_endpoint_proof(tmp_path, monk
             value["rows"][0]["owners"][0]["start"] = str(12 + count % 2)
     world.mutate = reused
     _, _, _, evd, result, _ = run(tmp_path, monkeypatch, world)
-    assert evd.observations["unix_ipc_violations"].value == [] and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.observations["unix_ipc_violations"].value == []
+    assert_unconfirmed_security_failure(result)
 
 
 def test_verified_violation_survives_later_container_restart(tmp_path, monkeypatch):

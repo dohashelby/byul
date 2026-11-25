@@ -103,7 +103,8 @@ def test_html_storage_failure_preserves_collected_observations_and_other_success
     assert evd.normal_control == baseline.evd.normal_control and evd.challenges == baseline.evd.challenges
     assert evd.comparability.fixture_sha256 == baseline.evd.comparability.fixture_sha256
     assert len(case.world.requests) == 7 and all(c.attempted for c in evd.challenges)
-    assert case.res.verdicts.security == (Verdict.FAIL if violation else Verdict.UNKNOWN)
+    assert case.res.verdicts.security == Verdict.FAIL
+    assert ("CONFIRMED_VIOLATION" in case.res.security_failure_tags) is violation
     assert case.res.verdicts.functional == Verdict.UNKNOWN and case.res.verification_level is None
     names = {a.name for a in evd.artifacts}
     expected = {"probe_log.jsonl", "log_integrity_samples.json", "log_integrity_events.json"}

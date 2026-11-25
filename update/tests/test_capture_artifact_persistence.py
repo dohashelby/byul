@@ -130,7 +130,8 @@ def test_capture_failure_preserves_valid_observations_and_successful_refs(scenar
     names = {item.name for item in evd.artifacts}
     expected = set() if fault=="mkdir" else ({FIRST,SECOND} if fault.startswith("log-") else {"probe_log.jsonl",SECOND})
     assert names == expected
-    assert case.result.verdicts.security == (Verdict.FAIL if violation else Verdict.UNKNOWN)
+    assert case.result.verdicts.security == Verdict.FAIL
+    assert ("CONFIRMED_VIOLATION" in case.result.security_failure_tags) is violation
     assert case.result.verdicts.functional == case.result.verdicts.performance == Verdict.UNKNOWN
     assert case.result.verification_level is None
     assert evd.comparability.fixture_sha256 == sha256_hex(canonical_json({"profile":"EXAMPLE-capture"}))

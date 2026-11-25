@@ -22,7 +22,8 @@ from guard.models import Evidence
 from guard.models.checkdef import ObsSpec
 from guard.models.objects import Observation
 from guard.store import Store
-from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy, completion_response
+from tests.builders import (PACK_DIR, ROOT, T0, assert_unconfirmed_security_failure, baseline_pack,
+                            completion_response, environment, policy)
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.response_semantics_support import (SyntheticInputAdapter, synthetic_input_response,
                                                with_legacy_check)
@@ -351,7 +352,9 @@ def test_manual_versions_hash_history_sides_and_report(tmp_path, pack, version, 
     for sha,data in old.items():
         assert st.get(data["id"],data["revision"]).to_dict()==data
     results=judge_plan(st,pack,plan,T0)
-    assert all(r.verdicts.security=="UNKNOWN" for r in results if r.check_id=="REQ-09")
+    for result in results:
+        if result.check_id == "REQ-09":
+            assert_unconfirmed_security_failure(result)
     after=snapshot(st); judge_plan(st,pack,plan,T0)
     assert snapshot(st)==after and not st.verify()
 
@@ -389,7 +392,9 @@ def test_invalid_policy_keeps_declared_fail_and_unknown(pack):
 
 
 def test_automatic_report_forwards_only_safe_context(tmp_path,monkeypatch,pack):
-    st,plan,evd,res,_=run(tmp_path,monkeypatch,pack,values(pack.checks["REQ-09"]))
+    check = pack.checks["REQ-09"]
+    st, plan, evd, _, _ = run(tmp_path, monkeypatch, pack, values(check))
+    res = judge_evidence(check, evd, st.resolve(plan.inputs.policy), T0, plan=plan)
     st.put(res)
     rpt=build_report(st,pack,plan,T0)
     assert not rpt.official and any("INPUT_SCOPE_MATCHED" in note for note in rpt.limitations)

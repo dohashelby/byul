@@ -12,7 +12,7 @@ from guard.runtime import generation_readiness as readiness
 from guard.runtime import sandbox
 from guard.runtime.docker import DockerError
 from guard.store import Store
-from tests.builders import T0, policy
+from tests.builders import T0, assert_unconfirmed_security_failure, policy
 from tests.test_managed_update_sentinel import _inputs, _memory_runtime
 from tests.test_managed_gpu_launch import setup_inputs
 
@@ -216,7 +216,9 @@ def test_update_keeps_static_conditions_equal_and_does_not_replace_test_normal_c
     assert targets[0]["generation_readiness"]["sha256"] != targets[1]["generation_readiness"]["sha256"]
     evds = list(store.iter_kind("EVD"))
     assert len(evds) == 2 and all(not e.normal_control.succeeded for e in evds)
-    assert all(r.verdicts.security.value == "UNKNOWN" for r in store.iter_kind("RES"))
+    for result in store.iter_kind("RES"):
+        assert_unconfirmed_security_failure(result)
+        assert "CONDITIONS_UNMET" in result.security_failure_tags
     for side in ("baseline", "candidate"):
         _assert_preserved_generation(store, report, run_dir, side)
     assert not store.verify()
@@ -235,7 +237,9 @@ def test_failed_generation_keeps_side_abort_and_original_record_without_retry(tm
     assert failed and [call[0] for call in calls] == expected_calls
     evidence = next(e for e in store.iter_kind("EVD") if e.side.value == side)
     result = next(r for r in store.iter_kind("RES") if r.side.value == side)
-    assert evidence.execution.status.value == "ABORTED" and result.verdicts.security.value == "UNKNOWN"
+    assert evidence.execution.status.value == "ABORTED"
+    assert_unconfirmed_security_failure(result)
+    assert "ABORTED" in result.security_failure_tags
     assert not (run_dir / side / "target.json").exists()
     raw = _assert_preserved_generation(store, report, run_dir, side)
     doc = json.loads(raw)

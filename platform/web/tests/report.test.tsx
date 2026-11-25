@@ -131,7 +131,7 @@ describe("검증 보고서 화면", () => {
     expect(details.open).toBe(false);
     expect(details.textContent).toContain("recorded-revision");
     expect(drawer.getByText(/기준 vLLM 0.7.0은 보안 충족으로 기록됐습니다/)).toBeTruthy();
-    expect(screen.getByText("두 판본에 모두 기록된 보안 판정 중 1건이 달라졌습니다.")).toBeTruthy();
+    expect(screen.getByText(`보안 비교에서 변화가 확인된 점검 ${comparison === "REGRESSED" ? 1 : 0}건`)).toBeTruthy();
     expect(drawer.getByText(/로드 기록과 저장된 모듈의 해시가 일치했습니다/)).toBeTruthy();
   });
 
@@ -241,6 +241,43 @@ describe("검증 보고서 화면", () => {
     const unknownGroup = screen.getByText("미확인 1건").closest("section")!;
     expect(within(unknownGroup).queryByText("보안 충족")).toBeNull();
     expect(within(unknownGroup).getAllByText("보안 미확인").length).toBe(2); // 기준·후보
+    expect(within(unknownGroup).queryByText("증거 부족")).toBeNull();
+  });
+
+  it("양쪽 미충족의 원인과 위반 확인을 각 판본에서 표시한다", () => {
+    mockApi({});
+    const notRun = check("REQ-01", {
+      headline: "FAIL", comparison: "UNKNOWN",
+      baseline: { ...side("FAIL"), security_failure_tags: ["NOT_RUN", "INSUFFICIENT_EVIDENCE"] },
+      candidate: { ...side("FAIL"), security_failure_tags: ["ABORTED", "CONDITIONS_UNMET", "NO_PASS_RULE"] },
+    });
+    const violation = check("REQ-02", {
+      headline: "FAIL", comparison: "NOT_COMPARABLE",
+      candidate: { ...side("FAIL"), security_failure_tags: ["CONFIRMED_VIOLATION"] },
+    });
+    renderAt("/update/results", "/update/results", <FullReport report={{
+      ...report, security_verdict_version: "binary-v1", checks: [notRun, violation],
+      counts: { ...report.counts, selected: 2, fail: 2, unknown: 0, regressed: 0 },
+      focus: { regressed: [], fail: ["REQ-01", "REQ-02"], unknown: [] },
+    }} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
+
+    const baseline = within(screen.getByRole("article", { name: "기준 환경" }));
+    const candidate = within(screen.getByRole("article", { name: "후보 환경" }));
+    expect(baseline.getByText(/보안 미충족 사유별 집계/).textContent).toContain("미실행 1건");
+    expect(baseline.queryByText(/위반 확인/)).toBeNull();
+    expect(candidate.getByText(/보안 미충족 사유별 집계/).textContent).toContain("위반 확인 1건");
+
+    const drawer = within(screen.getByLabelText("상세"));
+    const baselineCard = within(drawer.getByText("기준 · 엔진 판본 기록 없음").parentElement!);
+    const candidateCard = within(drawer.getByText("후보 · 엔진 판본 기록 없음").parentElement!);
+    expect(baselineCard.getByText("보안 미충족")).toBeTruthy();
+    expect(baselineCard.getByText("증거 부족")).toBeTruthy();
+    expect(baselineCard.getByText("미실행")).toBeTruthy();
+    expect(candidateCard.getByText("실행 중단")).toBeTruthy();
+    expect(candidateCard.getByText("조건 미충족")).toBeTruthy();
+    expect(candidateCard.getByText("PASS 규칙 미정의")).toBeTruthy();
+    expect(candidateCard.queryByText("위반 확인")).toBeNull();
+    expect(screen.getByText("보안 비교에서 변화가 확인된 점검 0건")).toBeTruthy();
   });
 
   it("표시 항목 문구 — 예외는 상태대로(만료를 승인됨으로 쓰지 않음)", () => {

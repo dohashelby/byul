@@ -20,6 +20,7 @@ from tools import b_lif07_native_capture as helper
 from tools import verify_req10_consumption as gate
 from tests.test_b_lif07_readiness import case, PRIVATE
 from tests.test_b_lif07_http_readiness import World, A_PRIVATE
+from tests.builders import assert_unconfirmed_security_failure
 
 
 @pytest.mark.parametrize('mode',['unready','partial-body','cleanup-after-canary','attachment'])
@@ -68,7 +69,8 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         assert len(objects)==6 and left.verify()==right.verify()==[]
         assert all(right.resolve(obj.ref()).to_dict()==obj.to_dict() for obj in objects)
         result,=left.iter_kind('RES');report,=left.iter_kind('RPT');plan,=left.iter_kind('PLAN')
-        assert result.verdicts.model_dump(mode='json')=={key:'UNKNOWN' for key in ('security','functional','performance')}
+        assert_unconfirmed_security_failure(result)
+        assert result.verdicts.functional == result.verdicts.performance == "UNKNOWN"
         assert report.as_of == result.as_of
         runner=CliRunner();checked=runner.invoke(app,['judge','--plan',plan.id,'--as-of',report.as_of.isoformat(),'--store',str(out/'restored')])
         assert checked.exit_code==0
@@ -129,7 +131,8 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     assert all(right.resolve(o.ref()).to_dict()==o.to_dict() for o in objects)
     result,=left.iter_kind('RES');report,=left.iter_kind('RPT');plan,=left.iter_kind('PLAN');policy,=left.iter_kind('POL')
     assert not policy.exceptions and report.as_of == result.as_of
-    assert result.verdicts.model_dump(mode='json')=={key:'UNKNOWN' for key in ('security','functional','performance')}
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == result.verdicts.performance == "UNKNOWN"
     # Original B run already restored/rejudged with its exact original pack.
     # Also resolve the saved pack through the existing A CLI, without --pack.
     runner=CliRunner()

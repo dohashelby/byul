@@ -96,6 +96,9 @@ def test_confirmed_fail_is_valid_trial_and_never_overwritten_to_pass(tmp_path, b
     assert all(row["comparison"] == comparison for row in result["checks"].values())
     assert all(row["candidate"]["actual"]["security"] == ("FAIL" if candidate else "PASS")
                for row in result["checks"].values())
+    for row in result["checks"].values():
+        side = row["candidate"] if candidate else row["baseline"]
+        assert "CONFIRMED_VIOLATION" in side["security_failure_tags"]
 
 
 def test_distinct_digest_same_version_is_image_comparison_not_version_upgrade(tmp_path):
@@ -162,17 +165,52 @@ def test_independent_fail_survives_normal_control_failure_and_trial_still_reject
     assert result["checks"]["REQ-01"]["candidate"]["pass_gate_blocks"]
 
 
-def test_all_unknown_is_not_accepted_even_when_pinned_rules_and_collection_are_consistent(tmp_path):
+@pytest.mark.parametrize("binary_security", [False, True])
+def test_unproven_security_is_not_accepted_when_saved_rules_and_collection_are_consistent(tmp_path, binary_security):
     def mutate(cid, side, raw):
         for observation in raw["observations"].values():
             observation.update(value=None, collected=False)
-    result = assess(build_update_case(tmp_path, mutate_evidence=mutate))
+    result = assess(build_update_case(tmp_path, mutate_evidence=mutate, binary_security=binary_security))
     assert result["evidence_contract_valid"] is True, result["problems"]
     assert result["accepted"] is False
-    assert result["checks"]["REQ-01"]["candidate"]["actual"]["security"] == "UNKNOWN"
-    assert all(row[side]["actual"]["security"] == "UNKNOWN"
-               for row in result["checks"].values() for side in ("baseline", "candidate"))
+    for row in result["checks"].values():
+        assert row["comparison"] == "UNKNOWN"
+        for side in ("baseline", "candidate"):
+            assert row[side]["actual"]["security"] == ("FAIL" if binary_security else "UNKNOWN")
+            if binary_security:
+                assert "INSUFFICIENT_EVIDENCE" in row[side]["security_failure_tags"]
+                assert "CONFIRMED_VIOLATION" not in row[side]["security_failure_tags"]
+            else:
+                assert "security_failure_tags" not in row[side]
     assert any("concrete security and functional" in problem for problem in result["problems"])
+
+
+def test_legacy_untagged_fail_preserves_sealed_outcome(tmp_path):
+    report, objects, pack = build_update_case(tmp_path, candidate_fail=True, binary_security=False)
+    result = assess((report, objects, pack))
+    assert result["accepted"], result["problems"]
+    assert "security_verdict_version" not in report
+    assert all(row["comparison"] == "REGRESSED" and "security_failure_tags" not in row["candidate"]
+               for row in result["checks"].values())
+
+
+def test_matching_resealed_rpt_and_res_cannot_hide_unproven_security(tmp_path):
+    def mutate(cid, side, raw):
+        if (cid, side) == ("REQ-01", "candidate"):
+            raw["normal_control"]["succeeded"] = False
+
+    case = build_update_case(tmp_path, mutate_evidence=mutate)
+    case = patch_case(case, "RES", lambda obj: obj.update(security_failure_tags=["CONFIRMED_VIOLATION"]),
+                      lambda obj: (obj["check_id"], obj["side"]) == ("REQ-01", "candidate"))
+
+    def amend_row(obj):
+        row = next(item for item in obj["by_check"] if item["check_id"] == "REQ-01")
+        row["candidate"]["security_failure_tags"] = ["CONFIRMED_VIOLATION"]
+        row["comparison"] = "REGRESSED"
+
+    result = assess(patch_case(case, "RPT", amend_row))
+    assert not result["evidence_contract_valid"]
+    assert "REQ-01/candidate: saved RES differs from the fixed rules and PASS gate" in result["problems"]
 
 
 def test_cleanup_error_keeps_concrete_fail_but_rejects_trial(tmp_path):
@@ -301,7 +339,8 @@ def test_missing_required_stored_object_cannot_be_filtered_out(tmp_path, missing
      "selected report checks differ"),
     ("RPT", lambda obj: obj.update(official=True), "official flag"),
     ("RES", lambda obj: obj["judge"].update(version="unsupported-version"), "judge version/parameters"),
-    ("RES", lambda obj: obj["verdicts"].update(security="UNKNOWN"), "saved RES differs"),
+    ("RES", lambda obj: obj.update(verdicts={**obj["verdicts"], "security": "FAIL"},
+                                   security_failure_tags=["INSUFFICIENT_EVIDENCE"]), "saved RES differs"),
 ])
 def test_contract_mismatches_are_rejected_with_descendant_refs_resealed(tmp_path, kind, change, reason):
     result = assess(patch_case(build_update_case(tmp_path), kind, change))
@@ -323,7 +362,9 @@ def test_report_cannot_relabel_config_diagnostic_as_fixed(tmp_path):
 
 def test_report_side_cannot_hide_result_fail(tmp_path):
     def change(obj):
-        next(row for row in obj["by_check"] if row["check_id"] == "REQ-01")["candidate"]["security"] = "PASS"
+        candidate = next(row for row in obj["by_check"] if row["check_id"] == "REQ-01")["candidate"]
+        candidate["security"] = "PASS"
+        candidate.pop("security_failure_tags")
     result = assess(patch_case(build_update_case(tmp_path, candidate_fail=True), "RPT", change))
     assert not result["accepted"] and not result["evidence_contract_valid"]
     assert result["checks"]["REQ-01"]["candidate"]["actual"]["security"] == "FAIL"

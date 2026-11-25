@@ -16,7 +16,7 @@ from guard.runtime.kubernetes_stored_responses import KubernetesStoredResponsesH
 from guard.adapters.vllm_stored_responses import REVIEWED_SOURCES
 from guard.executors import kubernetes_stored_responses as product
 from tests.run_binding_support import for_pack, run_table_toml
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
 from tests.test_kubernetes_routes import inputs as route_inputs,World as RouteWorld
 from tests.test_stream_probe import _server
 from tools.build_kubernetes_stored_responses_pack import derive
@@ -129,7 +129,8 @@ def test_existing_registry_cli_all_operations_exact_refs_and_no_raw_objects(tmp_
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert e.data_origin.value=='EXAMPLE' and e.normal_control.succeeded is None
-    assert all(getattr(res.verdicts,k).value=='UNKNOWN' for k in ('security','functional','performance'))
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert all(e.observations[k].value is False for k in ('stored_producer_authenticated','stored_object_owner_verified','stored_worker_effect_verified','stored_scope_complete'))
     trials=e.observations['stored_trials'].value;objects=e.observations['stored_objects'].value;effects=e.observations['stored_effects'].value
     conflicts=e.observations['stored_conflict_candidates'].value;missing=e.observations['stored_missing'].value

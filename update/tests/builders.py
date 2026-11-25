@@ -87,6 +87,13 @@ def baseline_pack():
     return deepcopy(_verified_baseline_pack())
 
 
+def assert_unconfirmed_security_failure(result):
+    """A planned check failed to prove protection without confirming a violation."""
+    assert result.verdicts.security == "FAIL", result.reasons
+    assert result.security_failure_tags, result.reasons
+    assert "CONFIRMED_VIOLATION" not in result.security_failure_tags
+
+
 def environment(facts: dict[str, dict] | None = None, origin: DataOrigin = DataOrigin.EXAMPLE, **kw) -> Environment:
     return Environment(
         id=kw.pop("id", "ENV-TEST"),

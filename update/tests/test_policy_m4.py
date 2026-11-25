@@ -16,7 +16,7 @@ from guard.judges.declared import DeclaredJudge
 from guard.manual_policy import CASES, OBSERVATION, PARAMETERS, blank_evidence, normalize
 from guard.models import Evidence
 from guard.store import IntegrityError, Store
-from tests.builders import PACK_DIR, T0, baseline_pack, environment, evidence, policy
+from tests.builders import PACK_DIR, T0, assert_unconfirmed_security_failure, baseline_pack, environment, evidence, policy
 from tests.prepared_fixtures import dump_fixture_yaml, manual_setup_seed, put_baseline_snapshot
 
 runner = CliRunner()
@@ -235,13 +235,13 @@ def test_partial_evidence_never_passes(pack,cid,gap):
 
 @pytest.mark.parametrize("cid",list(PARAMETERS))
 @pytest.mark.parametrize("items",[[],[""],[" EXAMPLE-one"],["EXAMPLE-one","EXAMPLE-one"]])
-def test_empty_or_ambiguous_policy_is_unknown_not_type_error(tmp_path,pack,cid,items):
+def test_empty_or_ambiguous_policy_is_unconfirmed_failure(tmp_path,pack,cid,items):
     given={cid:{PARAMETERS[cid]:items}}
     st,plan,doc=setup(tmp_path,pack,given)
     assert "NO_POLICY_VALUE" not in plan.item(cid).gaps
     assert "NO_EXECUTOR" in plan.item(cid).gaps
     fill(doc); import_evidence(st,pack,write(tmp_path,doc),now=T0)
-    assert judge(st,pack,plan)[cid].verdicts.security=="UNKNOWN"
+    assert_unconfirmed_security_failure(judge(st,pack,plan)[cid])
 
 
 @pytest.mark.parametrize("cid",list(PARAMETERS))
@@ -336,7 +336,8 @@ def test_existing_core_pass_gate_is_preserved(tmp_path,pack,normal,steps):
         e["normal_control"]["result"]=normal
         for c in e["challenges"]: c["attempted"]=steps
     import_evidence(st,pack,write(tmp_path,doc),now=T0)
-    assert all(r.verdicts.security=="UNKNOWN" for r in judge(st,pack,plan).values())
+    for result in judge(st,pack,plan).values():
+        assert_unconfirmed_security_failure(result)
 
 
 def test_v1_import_and_old_definition_compatibility(tmp_path,pack):
@@ -346,7 +347,8 @@ def test_v1_import_and_old_definition_compatibility(tmp_path,pack):
     for e in doc["checks"]: e.pop("policy_evidence",None)
     import_evidence(st,pack,write(tmp_path,doc),now=T0)
     out=judge(st,pack,plan)
-    assert out["SUP-14"].verdicts.security=="UNKNOWN" and out["LIF-07"].verdicts.security=="UNKNOWN"
+    assert_unconfirmed_security_failure(out["SUP-14"])
+    assert_unconfirmed_security_failure(out["LIF-07"])
     assert out["SUP-05"].verdicts.security=="PASS"
     old=pack.checks["SUP-14"].model_copy(update={"policy_params":[]})
     evd,vals=unit(pack.checks["SUP-14"])

@@ -19,7 +19,7 @@ from guard.executors.kubernetes_template_supply import KubernetesTemplateSupplyE
 from guard.executors.reuse import preview_inputs
 from guard.models import DataOrigin, canonical_json, sha256_hex
 from guard.store import Store
-from tests.builders import baseline_pack, policy, T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, policy, T0
 from tests.test_model_preparation_integration import full_inputs, FullWorld
 from tests.test_template_supply_approval import SupplyWorld, SHA
 
@@ -254,7 +254,8 @@ def test_proposed_registry_cli_preserves_pack31_refs_and_observation_only_verdic
     evd, = original.iter_kind("EVD")
     res, = original.iter_kind("RES")
     assert evd.data_origin.value == "EXAMPLE"
-    assert all(axis.value == "UNKNOWN" for axis in res.verdicts.model_dump().values())
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     if mode == "attachment":
         assert evd.execution.status.value == "ABORTED" and len(evd.artifacts) == 1
         assert evd.observations["selected_template_approved"].value is False

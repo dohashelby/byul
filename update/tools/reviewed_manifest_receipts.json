@@ -775,6 +775,11 @@
       "manifest_sha256": "78506292a2c36694ff67130f3f41f3adf82c2f384669709248f87929e9db4c0c",
       "reviewed_by": "Codex / Linux CI handoff regression fixes / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-24T10:21:35.366Z"
+    },
+    {
+      "manifest_sha256": "3d103d300a8496d697eb9e277f338a7ed6efa6288bae6176fc2d95a4c16af330",
+      "reviewed_by": "Codex / UPDATE 보안 판정 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-25T06:53:51.951Z"
     }
   ]
 }

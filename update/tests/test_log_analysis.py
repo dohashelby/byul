@@ -13,7 +13,7 @@ from guard.executors.log_analysis import LogAnalysisExecutor
 from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, events
 from guard.runtime.docker import CmdResult
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy
 
 VALUES = {"allowed_log_fields": ["request_id", "event", "exception"], "forbidden_log_fields": ["prompt", "credential"],
           "forbidden_marker_contexts": ["caller_input", "error_input"], "required_sources": ["engine"],
@@ -120,14 +120,14 @@ def test_linked_structured_normal_error_and_actual_dump_can_pass(tmp_path, monke
 
 def test_http_4xx_without_trial_linked_dump_is_unknown(tmp_path, monkeypatch):
     _, evd, res = run_log(tmp_path, monkeypatch, Source(dump=False))
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert any("exception_dump" in g for g in evd.observations["log_coverage_gaps"].value)
 
 
 @pytest.mark.parametrize("options", [{"plain": True}, {"unreadable": True}, {"replaced": True}, {"driver": "none"}])
 def test_missing_unstructured_or_unstable_log_source_is_unknown(tmp_path, monkeypatch, options):
     _, _, res = run_log(tmp_path, monkeypatch, Source(**options))
-    assert res.verdicts.security.value == "UNKNOWN", res.reasons
+    assert_unconfirmed_security_failure(res)
 
 
 def test_observed_sensitive_marker_keeps_fail_despite_missing_copy(tmp_path, monkeypatch):
@@ -138,7 +138,7 @@ def test_observed_sensitive_marker_keeps_fail_despite_missing_copy(tmp_path, mon
 def test_completions_cannot_claim_private_system_log_coverage(tmp_path, monkeypatch):
     _, _, res = run_log(tmp_path, monkeypatch, Source(),
                          values={**VALUES, "forbidden_marker_contexts": ["private_system"]})
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
 
 
 def test_regular_dump_file_is_captured_with_actual_source_metadata(tmp_path, monkeypatch):
@@ -151,7 +151,7 @@ def test_regular_dump_file_is_captured_with_actual_source_metadata(tmp_path, mon
 def test_different_container_is_not_engine_evidence(tmp_path, monkeypatch):
     _, _, res = run_log(tmp_path, monkeypatch, Source(), source_cfg=[{
         "id": "engine", "kind": "docker_logs", "container": "other-engine"}])
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
 
 
 def test_managed_engine_token_resolves_to_actual_target_without_changing_config(tmp_path, monkeypatch):
@@ -167,7 +167,7 @@ def test_cannot_omit_basic_exception_branch_to_get_pass(tmp_path, monkeypatch):
     _, evd, res = run_log(tmp_path, monkeypatch, source,
                            values={**VALUES, "required_branches": ["normal", "error"]})
     assert evd.execution.status.value == "ABORTED"
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert source.events == []
 
 
@@ -177,7 +177,7 @@ def test_collector_only_evidence_does_not_replace_local_source(tmp_path, monkeyp
                           values={**VALUES, "required_sources": ["collector"]}, source_cfg=[{
                               "id": "collector", "kind": "docker_logs", "container": "collector", "role": "copy"}])
     assert evd.execution.status.value == "ABORTED"
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert source.events == []
 
 
@@ -203,7 +203,7 @@ def test_collector_exception_message_cannot_enter_observations_or_artifacts(tmp_
             raise RuntimeError("arbitrary-daemon-secret-never-save")
     store, evd, res = run_log(tmp_path, monkeypatch, Unreadable())
     assert evd.execution.status.value == "COMPLETED"
-    assert res.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     assert "engine: LOG_SOURCE_CAPTURE_UNAVAILABLE" in evd.observations["log_coverage_gaps"].value
     assert "RuntimeError" not in evd.model_dump_json()
     assert "arbitrary-daemon-secret-never-save" not in evd.model_dump_json()
@@ -217,7 +217,7 @@ def test_ambiguous_json_cannot_complete_new_log_collection(tmp_path, monkeypatch
     assert evd.execution.status.value == "COMPLETED"
     assert evd.execution.executor.version == "0.3.1"
     assert evd.observations["log_coverage_complete"].value is False
-    assert res.verdicts.security.value == "UNKNOWN", res.reasons
+    assert_unconfirmed_security_failure(res)
     sample_artifact = next(item for item in evd.artifacts if item.name == "log_samples.json")
     sample = json.loads((store.root / sample_artifact.path).read_bytes())["capture"]
     assert sample["schema"] == "guard-log-analysis-capture/4"

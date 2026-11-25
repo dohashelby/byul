@@ -362,7 +362,9 @@ def test_product_pipeline_and_portable_saved_pack_preserve_observation_only_cont
     assert evd.observations["template_consumer_verified"].value is False
     assert evd.normal_control.succeeded is True
     assert evd.challenges and not any(item.attempted for item in evd.challenges)
-    assert result.verdicts.security == result.verdicts.functional == Verdict.UNKNOWN
+    assert result.verdicts.security == Verdict.FAIL and result.verdicts.functional == Verdict.UNKNOWN
+    assert "NO_PASS_RULE" in result.security_failure_tags
+    assert "CONFIRMED_VIOLATION" not in result.security_failure_tags
     assert len(world.calls) == 2
     rpt = build_report(store, pack, plan, as_of=T0)
     store.put(rpt)
@@ -370,7 +372,8 @@ def test_product_pipeline_and_portable_saved_pack_preserve_observation_only_cont
     assert rpt.official is False and rpt.data_origin.value == "EXAMPLE"
     assert row.selected is True and row.evidence_source == "automated"
     assert row.single.result == result.ref()
-    assert row.single.security == row.single.functional == Verdict.UNKNOWN
+    assert row.single.security == Verdict.FAIL and row.single.functional == Verdict.UNKNOWN
+    assert row.single.security_failure_tags == result.security_failure_tags
     original = evd.to_dict()
     report_original = rpt.to_dict()
     export_bundle(store.root, tmp_path / "evidence.zip")
@@ -382,7 +385,7 @@ def test_product_pipeline_and_portable_saved_pack_preserve_observation_only_cont
     saved_plan = restored.resolve(plan.ref())
     (replayed,) = judge_plan(restored, saved_pack, saved_plan, as_of=T0)
     assert replayed.ref() == result.ref()
-    assert replayed.verdicts.security == replayed.verdicts.functional == Verdict.UNKNOWN
+    assert replayed.verdicts == result.verdicts and replayed.security_failure_tags == result.security_failure_tags
     assert restored.resolve(evd.ref()).to_dict() == original
     assert store.resolve(evd.ref()).to_dict() == original
     assert restored.resolve(rpt.ref()).to_dict() == report_original

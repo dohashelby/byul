@@ -12,7 +12,7 @@ from guard.executors import observation_identity_contract as identity
 from guard.models import canonical_json
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
-from tests.builders import policy,T0
+from tests.builders import assert_unconfirmed_security_failure, policy,T0
 from tests import test_a1_generation_file_product as product
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_lifecycle_sensor import writer_factory
@@ -42,7 +42,8 @@ def saved_objects(root):
     assert PRIVATE not in json.dumps([o.to_dict() for o in objects])
     evd,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert evd.data_origin.value=='EXAMPLE' and evd.normal_control.succeeded is None
-    assert res.verdicts.model_dump(mode='json')=={key:'UNKNOWN' for key in ('security','functional','performance')}
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert all(evd.observations[key].value is False for key in identity.TRUTH_FIELDS)
     return evd,objects
 

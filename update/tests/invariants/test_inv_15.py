@@ -59,12 +59,12 @@ def test_invalid_draft_becomes_aborted(tmp_path):
 
 
 def test_docker_probe_failure_becomes_aborted_evidence(tmp_path):
-    """실행 계층(Docker) 실패: probe 컨테이너가 비정상 종료하면 ABORTED → UNKNOWN. 가짜 Docker 실행기 사용."""
+    """실행 계층(Docker) 실패는 ABORTED 증거와 태그가 붙은 FAIL을 남긴다."""
     import json
 
     from guard.core.judge import judge_plan
     from guard.executors.direct_route import DirectRouteExecutor, docker_container_probe
-    from guard.models import Verdict
+    from guard.models import SecurityFailureTag, Verdict
     from guard.runtime.docker import CmdResult, Docker
     from tests.builders import T0
 
@@ -84,7 +84,9 @@ def test_docker_probe_failure_becomes_aborted_evidence(tmp_path):
     assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
     assert "network not found" not in str(evd.to_dict())
     (res,) = judge_plan(store, pack, plan, as_of=T0)
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert res.verdicts.security == Verdict.FAIL
+    assert SecurityFailureTag.ABORTED in res.security_failure_tags
+    assert SecurityFailureTag.CONFIRMED_VIOLATION not in res.security_failure_tags
 
 
 # 실제 vLLM 기동 실패 전파는 tests/test_vllm_engine.py::test_inv15_real_engine_start_failure_is_aborted_unknown (-m engine)

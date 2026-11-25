@@ -13,7 +13,7 @@ from pathlib import Path
 import stat
 import sqlite3
 
-from guard.core.judge import pass_gate
+from guard.core.judge import judge_evidence, pass_gate
 from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, analyze_log_captures, strict_json_loads
 from guard.executors.log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
 from guard.executors.log_integrity_parser import PROFILE, TRUSTED_FIELDS
@@ -331,8 +331,10 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 raise ValueError("report row does not pin the saved log result")
             if side_row.verification_level != res.verification_level:
                 raise ValueError("report verification level differs from pinned result")
-            if any(getattr(side_row, axis) != getattr(res.verdicts, axis)
-                   for axis in ("security", "functional", "performance")):
+            if (res.security_verdict_version != report.security_verdict_version
+                    or side_row.security_failure_tags != res.security_failure_tags
+                    or any(getattr(side_row, axis) != getattr(res.verdicts, axis)
+                           for axis in ("security", "functional", "performance"))):
                 raise ValueError("report verdicts differ from the pinned result")
             name = "log_samples.json" if check.id == "OBS-03" else "log_integrity_samples.json"
             envelope = _artifact(store, evd, name)
@@ -398,13 +400,21 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 expected = {axis: "UNKNOWN" if value == "PASS" else value for axis, value in expected.items()}
             if evd.comparability.cpu is not None:
                 expected["performance"] = "UNKNOWN"
-            if expected != res.verdicts.model_dump(mode="json"):
+            expected_tags = []
+            if res.security_verdict_version is not None:
+                current = judge_evidence(check, evd, policy, report.as_of or res.as_of or report.created_at,
+                                         plan=plan, binary_security=True)
+                expected["security"] = current.verdicts.security.value
+                expected_tags = current.security_failure_tags
+            if expected != res.verdicts.model_dump(mode="json") or expected_tags != res.security_failure_tags:
                 raise ValueError("pinned result differs from fixed-rule replay")
             row.update(status="PROJECTION_REPLAY_MATCH" if row.get("replay_basis") else "REPLAY_MATCH",
                        replayed=True, coverage_complete=complete,
                        result=res.ref().model_dump(mode="json"), verdicts=res.verdicts.model_dump(mode="json"))
+            if res.security_failure_tags:
+                row["security_failure_tags"] = [tag.value for tag in res.security_failure_tags]
             if not complete:
-                limitations.append(f"{check.id}/{evd.side.value}: capture remains incomplete; saved UNKNOWN/independent FAIL is preserved")
+                limitations.append(f"{check.id}/{evd.side.value}: capture remains incomplete; saved verdict is preserved")
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             row["status"] = "REPLAY_MISMATCH"
             # Only our fixed ValueErrors are shown; parser/payload exception

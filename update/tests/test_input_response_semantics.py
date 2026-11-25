@@ -15,7 +15,7 @@ from guard.executors.input_response_semantics import OBSERVATIONS, contract_stat
 from guard.executors.input_validation import InputValidationExecutor
 from guard.models import ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import baseline_pack, completion_response, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, completion_response, environment, policy
 
 
 def error(message, *, param=None, code=400, kind="BadRequestError"):
@@ -180,7 +180,8 @@ def test_healthy_controls_with_only_challenge_http200_error_are_security_unknown
     store, evd, result, sent = _pipeline(tmp_path, monkeypatch, challenge)
     assert evd.execution.status == ExecStatus.COMPLETED and evd.data_origin.value == "EXAMPLE"
     assert evd.execution.executor.version == "0.7.1" and evd.execution.adapter.version == "0.5.0"
-    assert result.verdicts.security == Verdict.UNKNOWN and result.verdicts.functional == Verdict.PASS
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == Verdict.PASS
     assert evd.normal_control.succeeded is True and len(sent) == 5
     assert evd.observations["challenge_outcomes"].value == {"token_id": "200", "length": "200"}
     assert evd.observations["accepted_challenges"].value == ["token_id", "length"]
@@ -208,7 +209,8 @@ def test_unrelated_http400_rejection_remains_unknown_with_healthy_controls(tmp_p
     _store, evd, result, _sent = _pipeline(tmp_path, monkeypatch, lambda _req, _case:
         response(error("The model does not exist", param="model")))
     assert evd.normal_control.succeeded is True
-    assert result.verdicts.security == Verdict.UNKNOWN and result.verdicts.functional == Verdict.PASS
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == Verdict.PASS
 
 
 def test_later_collection_error_preserves_earlier_verified_rejection(tmp_path, monkeypatch):
@@ -222,7 +224,8 @@ def test_later_collection_error_preserves_earlier_verified_rejection(tmp_path, m
     assert evd.observations["challenge_rejection_results"].value == {"token_id": "verified", "length": "unverified"}
     assert evd.observations["challenge_outcomes"].value == {"token_id": "400", "length": "probe_error"}
     assert evd.observations["confirmed_input_violations"].value == []
-    assert result.verdicts.security == Verdict.UNKNOWN and result.verdicts.functional == Verdict.PASS
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == Verdict.PASS
     for artifact in evd.artifacts:
         assert "PRIVATE_DAEMON_OR_AUTHORIZATION_TEXT" not in (store.root / artifact.path).read_text(encoding="utf-8")
 

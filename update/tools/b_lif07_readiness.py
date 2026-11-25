@@ -533,9 +533,9 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         doc['checks'] = [x for x in doc['checks'] if x['check_id'] == 'LIF-07' and x['side'] == 'single']; entry, = doc['checks']
         entry.update(entered_by=entered_by, entered_at=record['finished_at'], started_at=record['started_at'], finished_at=record['finished_at'],
             attachments=[attachment] if attachment else [], verdicts={k: 'UNKNOWN' for k in ('security', 'functional', 'performance')},
-            basis=('선정 health/chat HTTP 결과와 독립 API Pod readiness는 첨부에 보존한다. native 인과·상위 READY·준비 전 접수·준비 후 canary·통제 지연은 미확인으로 전체 준비 판정은 UNKNOWN이다.' if collect_http else
-                'worker 메서드 단계와 선정 bootstrap SEND 관측 상태는 첨부에 보존한다. 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt는 미확인으로 전체 준비 판정은 UNKNOWN이다.' if collect_native else
-                'worker 메서드 단계의 정제 metadata를 보존한다. 실제 READY-send/지연/접수·준비후canary 미관측으로 전체 준비 판정은 UNKNOWN이다.'),
+            basis=('선정 health/chat HTTP 결과와 독립 API Pod readiness는 첨부에 보존한다. native 인과·상위 READY·준비 전 접수·준비 후 canary·통제 지연은 미확인이다.' if collect_http else
+                'worker 메서드 단계와 선정 bootstrap SEND 관측 상태는 첨부에 보존한다. 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt는 미확인이다.' if collect_native else
+                'worker 메서드 단계의 정제 metadata를 보존한다. 실제 READY-send/지연/접수·준비후canary는 미관측이다.'),
             limitations=['required_readiness_items와 기업 기한·수락 기준은 입력 그대로다. 단계 RETURN과 generator factory 반환은 준비 완료 근거로 사용하지 않는다.',
                 'PodReady/HTTP200/단발 CPU generation_readiness를 rank·model 준비 완료로 올리지 않는다.',
                 'host/probe/native clock domain은 독립이다. A 인과 receipt 없는 교차 시각 순서는 미확인이다.',
@@ -554,6 +554,7 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         import_evidence(dest, original, form, document=doc); stages['manual_evidence_stored'] = True
         as_of = datetime.now(timezone.utc).replace(microsecond=0)
         results = judge_plan(dest, original, plan, as_of=as_of); report = build_report(dest, original, plan, as_of=as_of); dest.put(report)
+        result, = results
         stages['report_stored'] = True; verify_complete(dest); refs = _refs(dest)
         export_bundle(dest.root, out / 'evidence.zip'); restore_bundle(out / 'evidence.zip', out / 'restored'); restored = Store(out / 'restored')
         replay = judge_plan(restored, original, plan, as_of=as_of)
@@ -564,7 +565,9 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         summary = {'executed': True, 'actual_target_executed': record['target_io_attempted'] if collect_native and record['data_origin'] != 'EXAMPLE' else False, 'native_observation_invoked': collect_native, 'target_io_attempted': record['target_io_attempted'], 'target_io_origin': record['data_origin'], 'selected_session_seal_attempted': record['cleanup'].get('selected_session_seal_attempted'), 'selected_session_sealed': record['cleanup'].get('selected_session_sealed'), 'requests': record['requests'], 'http_requests_attempted': record.get('http_requests_attempted', 0), 'http_observation_invoked': collect_http, 'status': 'stored', **binding,
             'capability_supported': False, 'full_scope_coverage': False, 'capture_origin': record['data_origin'], 'input_mode': record['input_mode'], 'imported_from_file': import_capture is not None, 'source_authentication_verified': False,
             'source_unchanged': True, 'exact_refs_restored': True, 'issues': issues,
-            'verdicts': {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}, 'report': report.ref().model_dump(mode='json')}
+            'verdicts': result.verdicts.model_dump(mode='json'),
+            'security_failure_tags': [tag.value for tag in result.security_failure_tags],
+            'report': report.ref().model_dump(mode='json')}
         if attachment is None: summary['safe_facts'] = record
         _write(out / 'summary.json', summary); stages['summary_stored'] = True
         return summary

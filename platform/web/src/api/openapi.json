@@ -4551,6 +4551,21 @@
             "type": "array",
             "title": "Reasons"
           },
+          "security_failure_tags": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "CONFIRMED_VIOLATION",
+                "CONDITIONS_UNMET",
+                "INSUFFICIENT_EVIDENCE",
+                "NOT_RUN",
+                "ABORTED",
+                "NO_PASS_RULE"
+              ]
+            },
+            "type": "array",
+            "title": "Security Failure Tags"
+          },
           "result_sha256": {
             "anyOf": [
               {
@@ -4879,6 +4894,18 @@
           },
           "byul_policy_ref": {
             "$ref": "#/components/schemas/Common_nullable_policy_ref"
+          },
+          "security_verdict_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "binary-v1"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Verdict Version"
           }
         },
         "type": "object",
@@ -13513,6 +13540,10 @@
           "schema_version": {
             "const": "byul-verification-result/0.2"
           },
+          "security_verdict_version": {
+            "description": "선택. 원본 RPT의 보안 판정 방식.",
+            "const": "binary-v1"
+          },
           "report_ref": {
             "$ref": "#/components/schemas/Common_object_ref"
           },
@@ -13809,6 +13840,21 @@
                         "type": "array",
                         "items": {
                           "type": "string"
+                        }
+                      },
+                      "security_failure_tags": {
+                        "description": "선택. 원본 RPT가 기록한 이 쪽의 보안 미충족 사유 코드.",
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {
+                          "enum": [
+                            "CONFIRMED_VIOLATION",
+                            "CONDITIONS_UNMET",
+                            "INSUFFICIENT_EVIDENCE",
+                            "NOT_RUN",
+                            "ABORTED",
+                            "NO_PASS_RULE"
+                          ]
                         }
                       }
                     }

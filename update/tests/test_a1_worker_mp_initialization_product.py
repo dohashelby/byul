@@ -9,6 +9,7 @@ from guard.collectors.lifecycle import prepare_assets,load_prepared
 from guard.adapters import vllm_worker_initialization_sensor as sensor,vllm_worker_initialization_metadata as metadata
 from guard.models import canonical_json,sha256_hex
 from guard.store import Store
+from tests.builders import assert_unconfirmed_security_failure
 from tests.test_lifecycle_capture import case,external,revised
 from tests.test_lifecycle_sensor import writer_factory
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -104,7 +105,9 @@ def test_existing_LIF09_CLI_worker_facts_and_exact_refs(tmp_path,group,native_ta
         assert all(not c['actual_worker_observed'] for c in candidates)
         if mode=='duplicate':assert 'worker_startup_unique_call_pair_unavailable' in missing
         else:assert any(c['same_startup_model_root_candidate'] for c in candidates)
-    assert all(getattr(next(iter(Store.read_only(tmp_path/'store').iter_kind('RES'))).verdicts,key).value=='UNKNOWN' for key in ('security','functional','performance'))
+    result, = Store.read_only(tmp_path / 'store').iter_kind('RES')
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == result.verdicts.performance == "UNKNOWN"
 
 
 def test_public_prepare_thirteen_original_assets(tmp_path,group,native_target):

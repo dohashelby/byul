@@ -142,7 +142,8 @@ def test_provider_inventory_crosses_existing_evd_judge_report_and_export(tmp_pat
     cli(['run','--plan',plan.id,'--pack',pack.path,*common]);cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common])
     cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');evd,=store.iter_kind('EVD');res,=store.iter_kind('RES')
-    assert res.verdicts.security.value=='UNKNOWN'and evd.data_origin.value=='EXAMPLE'
+    assert res.verdicts.security.value == 'FAIL' and evd.data_origin.value == 'EXAMPLE'
+    assert 'CONFIRMED_VIOLATION' not in res.security_failure_tags
     artifact,=[a for a in evd.artifacts if a.name=='probe_log.jsonl']
     body=(tmp_path/'store'/artifact.path).read_text();summary=json.loads(body.splitlines()[-1])
     value=summary['credential_provider_inventory']

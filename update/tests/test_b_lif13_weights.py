@@ -199,7 +199,8 @@ def test_original_manual_exact_refs_restore_and_whole_unknown(case):
     assert tool._inventory(case['source'].root) == before and path.read_bytes() == original
     store = Store.read_only(case['args']['output'] / 'store'); evidence, = store.iter_kind('EVD'); res, = store.iter_kind('RES')
     assert evidence.data_origin.value == 'DECLARED' and evidence.plan == case['plan'].ref() and evidence.environment == case['env'].ref()
-    assert res.verdicts.model_dump(mode='json') == {'security': 'UNKNOWN', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
+    assert res.verdicts.model_dump(mode='json') == {'security': 'FAIL', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
+    assert 'CONFIRMED_VIOLATION' not in res.security_failure_tags
     assert all(not c.attempted for c in evidence.challenges) and not evidence.normal_control.attempted
     doc = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text()); entry, = doc['checks']
     check = case['pack'].checks['LIF-13']; assert entry['question'] == check.question

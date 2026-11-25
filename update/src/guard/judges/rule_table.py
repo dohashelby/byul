@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from guard.models import CheckDef, Evidence, Verdict
+from guard.models import CheckDef, Evidence, SecurityFailureTag, Verdict
 from guard.input_policy import policy_context
 
 from .base import AXES, JudgeOutput
@@ -132,6 +132,7 @@ class RuleTableJudge:
         reasons: list[str] = []
         missing: set[str] = set()
         policy_missing: set[str] = set()
+        security_tags: set[SecurityFailureTag] = set()
         policy_values = policy_values or {}
 
         def observed(key: str) -> Any:
@@ -169,6 +170,8 @@ class RuleTableJudge:
 
         for axis in AXES:
             table = tables.get(axis)
+            if axis == "security" and not (table or {}).get("pass_when_all"):
+                security_tags.add(SecurityFailureTag.NO_PASS_RULE)
             if not table:
                 verdicts[axis] = Verdict.UNKNOWN
                 reasons.append(f"{axis}: no rule for this axis")
@@ -195,6 +198,11 @@ class RuleTableJudge:
                     unobserved.append(_describe(rule))
                 elif not ok:
                     unmet.append(f"{_describe(rule)} (observed {evidence.observations[rule['obs']].value!r})")
+            if axis == "security":
+                if unobserved:
+                    security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
+                if unmet:
+                    security_tags.add(SecurityFailureTag.CONDITIONS_UNMET)
             if pass_rules and not unmet and not unobserved:
                 verdicts[axis] = Verdict.PASS
                 reasons.append(f"{axis}: all pass rules met: {'; '.join(_describe(r) for r in pass_rules)}")
@@ -215,9 +223,11 @@ class RuleTableJudge:
             reasons.extend(context.reasons)
             missing.update(context.missing)
             if context.blocked:
+                security_tags.add(SecurityFailureTag.INSUFFICIENT_EVIDENCE)
                 verdicts = {axis: Verdict.UNKNOWN if verdict == Verdict.PASS else verdict
                             for axis, verdict in verdicts.items()}
-        return JudgeOutput(verdicts=verdicts, reasons=reasons, missing_observations=sorted(missing))
+        return JudgeOutput(verdicts=verdicts, reasons=reasons, missing_observations=sorted(missing),
+                           security_failure_tags=sorted(security_tags))
 
 
 def _values(evidence: Evidence, rules: list[dict]) -> str:

@@ -84,7 +84,8 @@ def test_registered_api_hop_cli_exact_refs_and_source_ceiling(tmp_path,monkeypat
     assert bool(e.execution.cleanup_errors) is (mode=='cleanup')
     normal=mode in {'forbidden','allowed','attachment','cleanup'}
     assert e.normal_control.attempted and e.normal_control.succeeded is normal
-    assert res.verdicts.security.value==('FAIL' if mode in {'forbidden','attachment','cleanup'} else 'UNKNOWN')
+    assert res.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in res.security_failure_tags) == (mode in {'forbidden', 'attachment', 'cleanup'})
     assert res.verdicts.functional.value==res.verdicts.performance.value=='UNKNOWN'
     trial,=e.observations['api_transport_trials'].value
     assert e.observations['api_transport_scope_complete'].value is False

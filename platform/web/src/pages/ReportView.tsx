@@ -22,6 +22,7 @@ import {
   NOT_SELECTED,
   PACK_STATUS,
   POLICY_STATUS,
+  SECURITY_FAILURE_TAG,
   VERDICT,
   label,
 } from "../lib/labels";
@@ -41,6 +42,9 @@ const EXECUTION_LABELS = {
   ABORTED: "중단",
   NOT_RUN: "미실행",
 } as const;
+
+const CHANGE_COMPARISONS = new Set(["REGRESSED", "FIXED"]);
+const DETERMINED_COMPARISONS = new Set([...CHANGE_COMPARISONS, "NO_CHANGE", "STILL_FAILING"]);
 
 const VERDICT_COLOR: Record<string, string> = {
   PASS: "var(--accent)",
@@ -69,6 +73,19 @@ export function markText(m: ReportMark): string {
   }
 }
 
+function SecurityFailureBadges({ side }: { side: ReportSide | null | undefined }) {
+  return side?.security_failure_tags?.map((tag) => <EnumBadge key={tag} table={SECURITY_FAILURE_TAG} value={tag} />);
+}
+
+function SecurityCell({ side }: { side: ReportSide | null | undefined }) {
+  return (
+    <span className="row wrap" style={{ gap: 4 }}>
+      <VerdictBadge verdict={side?.security} />
+      <SecurityFailureBadges side={side} />
+    </span>
+  );
+}
+
 function SideChips({ side }: { side: ReportSide | null | undefined }) {
   if (!side) return <Value v={null} />;
   return (
@@ -80,6 +97,7 @@ function SideChips({ side }: { side: ReportSide | null | undefined }) {
           </Badge>
         ) : null,
       )}
+      <SecurityFailureBadges side={side} />
     </span>
   );
 }
@@ -159,19 +177,14 @@ function targetLabel(report: Report, side: SideKey) {
 }
 
 function comparisonText(check: ReportCheck) {
-  const changes = AXES.flatMap(([axis, name]) => {
-    const before = check.baseline?.[axis];
-    const after = check.candidate?.[axis];
-    return before && after && before !== after
-      ? [`${name} ${VERDICT[before]?.label ?? before} → ${VERDICT[after]?.label ?? after}`]
-      : [];
-  });
-  if (check.comparison === "NOT_COMPARABLE") {
-    return changes.length ? `비교 조건을 충족하지 못했으며 기록된 판정은 ${changes.join(", ")}입니다.` : "비교 조건을 충족하지 못했습니다.";
+  switch (check.comparison) {
+    case "REGRESSED": return "보안 비교에서 기준 충족과 후보 미충족이 확인됐습니다.";
+    case "FIXED": return "보안 비교에서 기준 미충족과 후보 충족이 확인됐습니다.";
+    case "STILL_FAILING": return "보안 비교에서 두 판본 모두 미충족으로 확인됐습니다.";
+    case "NO_CHANGE": return "보안 비교에서 두 판본 모두 충족으로 확인됐습니다.";
+    case "NOT_COMPARABLE": return "비교 조건을 충족하지 못했으며 각 판정은 별도로 표시됩니다.";
+    default: return "보안 비교 결과를 확정할 기록이 부족합니다.";
   }
-  if (check.comparison === "UNKNOWN" || !check.baseline || !check.candidate) return "변화 여부를 확정할 기록이 부족합니다.";
-  if (changes.length) return `기준과 후보에 기록된 판정이 달라졌습니다 (${changes.join(", ")}).`;
-  return "기록된 판정에 변화가 없습니다.";
 }
 
 const FINDING_TEXT = {
@@ -458,8 +471,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
   const byId = new Map(report.checks.map((c) => [c.check_id, c]));
   const selectedRows = report.checks.filter((c) => c.selected);
   const n = report.counts;
-  const pairedRows = update ? selectedRows.filter((row) => row.baseline?.security && row.candidate?.security) : [];
-  const changed = pairedRows.filter((row) => row.baseline?.security !== row.candidate?.security).length;
+  const changed = selectedRows.filter((row) => CHANGE_COMPARISONS.has(row.comparison ?? "")).length;
   const limitations = report.limitations;
   const total = Math.max(1, n.fail + n.unknown + n.pass + n.not_applicable);
   const current = selected ? byId.get(selected) : undefined;
@@ -472,8 +484,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
   });
   const evidence = Object.entries(report.evidence_counts);
   const sum = (k: string) => evidence.reduce((acc, [, c]) => acc + (c[k] ?? 0), 0);
-  const comparable = selectedRows.filter((row) => row.comparison != null &&
-    row.comparison !== "UNKNOWN" && row.comparison !== "NOT_COMPARABLE").length;
+  const comparable = selectedRows.filter((row) => DETERMINED_COMPARISONS.has(row.comparison ?? "")).length;
   const sides = update ? ["baseline", "candidate"] as const : ["single"] as const;
   const notSelectedByReason = new Map<string, string[]>();
   for (const ns of report.not_selected) notSelectedByReason.set(ns.reason ?? "–", [...(notSelectedByReason.get(ns.reason ?? "–") ?? []), ns.check_id ?? "–"]);
@@ -486,12 +497,12 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
     { id: "applicability", header: "적용", cell: (c) => <EnumBadge table={APPLICABILITY} value={c.applicability} />, sort: (c) => c.applicability },
     ...(update
       ? ([
-          { id: "baseline", header: "기준 보안", cell: (c) => <VerdictBadge verdict={c.baseline?.security} />, sort: (c) => c.baseline?.security },
-          { id: "candidate", header: "후보 보안", cell: (c) => <VerdictBadge verdict={c.candidate?.security} />, sort: (c) => c.candidate?.security },
+          { id: "baseline", header: "기준 보안", cell: (c) => <SecurityCell side={c.baseline} />, sort: (c) => c.baseline?.security },
+          { id: "candidate", header: "후보 보안", cell: (c) => <SecurityCell side={c.candidate} />, sort: (c) => c.candidate?.security },
           { id: "comparison", header: "비교", cell: (c) => <EnumBadge table={COMPARISON} value={c.comparison} />, sort: (c) => c.comparison },
         ] as Column<ReportCheck>[])
       : ([
-          { id: "security", header: "보안", cell: (c) => <VerdictBadge verdict={c.single?.security} />, sort: (c) => c.single?.security },
+          { id: "security", header: "보안", cell: (c) => <SecurityCell side={c.single} />, sort: (c) => c.single?.security },
           { id: "functional", header: "기능", cell: (c) => <VerdictBadge verdict={c.single?.functional} />, sort: (c) => c.single?.functional },
           { id: "performance", header: "성능", cell: (c) => <VerdictBadge verdict={c.single?.performance} />, sort: (c) => c.single?.performance, hidden: true },
         ] as Column<ReportCheck>[])),
@@ -514,6 +525,10 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
           {sides.map((side) => {
             const rows = selectedRows.map((row) => row[side]);
             const verdicts = update ? rows.flatMap((row) => row?.security ?? []) : [];
+            const tagCounts = Object.entries(SECURITY_FAILURE_TAG).flatMap(([tag, { label }]) => {
+              const count = rows.filter((row) => row?.security_failure_tags?.some((value) => value === tag)).length;
+              return count ? [`${label} ${count}건`] : [];
+            });
             const measured = rows.filter((row) => row?.execution_status === "COMPLETED"
               && row.data_origin === "MEASURED" && row.evidence_ref).length;
             return (
@@ -531,13 +546,16 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
                     ).join(" · ")}
                   </span>
                 )}
+                {tagCounts.length > 0 && (
+                  <span className="small muted">보안 미충족 사유별 집계 · {tagCounts.join(" · ")}</span>
+                )}
               </article>
             );
           })}
         </div>
-        {pairedRows.length > 0 && <p className="small">두 판본에 모두 기록된 보안 판정 중 {changed}건이 달라졌습니다.</p>}
+        {update && selectedRows.length > 0 && <p className="small">보안 비교에서 변화가 확인된 점검 {changed}건</p>}
         {update && <p className="small">비교 판정 확보 {comparable}/{selectedRows.length}건</p>}
-        <p className="small muted">PASS 충족 · FAIL 미충족 · UNKNOWN 근거 부족으로 판정 미확정</p>
+        <p className="small muted">PASS 충족 · FAIL 미충족 · UNKNOWN 미확인</p>
       </section>
 
       <div className={ui.cards}>
@@ -681,7 +699,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
         <>
           <FindingGroup title="위험" note="(기준 충족 → 후보 미충족)" ids={report.focus.regressed} byId={byId} update={update} onOpen={onSelect} pageParam="page_regressed" />
           <FindingGroup title="미충족" ids={report.focus.fail} byId={byId} update={update} onOpen={onSelect} pageParam="page_failed" />
-          <FindingGroup title="미확인" note="(근거 부족, 충족으로 집계하지 않음)" ids={report.focus.unknown} byId={byId} update={update} onOpen={onSelect} pageParam="page_unknown" />
+          <FindingGroup title="미확인" ids={report.focus.unknown} byId={byId} update={update} onOpen={onSelect} pageParam="page_unknown" />
         </>
       )}
 

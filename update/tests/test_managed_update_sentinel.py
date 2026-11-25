@@ -197,7 +197,9 @@ def test_managed_update_sentinel_failures_preserve_completed_violations_and_clea
     reason = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED' if cleanup_unverified else 'BASELINE_EXECUTION_FAILED'
     assert evds['candidate'].execution.status.value == 'ABORTED'
     assert evds['candidate'].execution.abort_reason == reason
-    assert results['candidate'].verdicts.security.value == 'UNKNOWN'
+    assert results['candidate'].verdicts.security.value == 'FAIL'
+    assert 'ABORTED' in results['candidate'].security_failure_tags
+    assert 'CONFIRMED_VIOLATION' not in results['candidate'].security_failure_tags
     assert not any(side == 'candidate' for side, _ in events)
     assert not (run_dir / 'candidate-sentinel').exists()
     if failure == 'cleanup':
@@ -205,7 +207,9 @@ def test_managed_update_sentinel_failures_preserve_completed_violations_and_clea
         assert results['baseline'].verdicts.security.value == 'FAIL'
     else:
         assert evds['baseline'].execution.status.value == 'ABORTED'
-        assert results['baseline'].verdicts.security.value == 'UNKNOWN'
+        assert results['baseline'].verdicts.security.value == 'FAIL'
+        assert 'ABORTED' in results['baseline'].security_failure_tags
+        assert 'CONFIRMED_VIOLATION' not in results['baseline'].security_failure_tags
     assert ('baseline', 'cleanup') in events
     assert (run_dir / 'baseline-sentinel' / 'synthetic-write.txt').exists()
     if cleanup_unverified: assert any('cleanup incomplete' in note for note in report.limitations)

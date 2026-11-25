@@ -1587,6 +1587,8 @@ export interface components {
             verification_level: string | null;
             /** Reasons */
             reasons: string[];
+            /** Security Failure Tags */
+            security_failure_tags?: ("CONFIRMED_VIOLATION" | "CONDITIONS_UNMET" | "INSUFFICIENT_EVIDENCE" | "NOT_RUN" | "ABORTED" | "NO_PASS_RULE")[];
             /** Result Sha256 */
             result_sha256?: string | null;
             /** Execution Status */
@@ -1671,6 +1673,8 @@ export interface components {
             /** As Of */
             as_of?: string | null;
             byul_policy_ref?: components["schemas"]["Common_nullable_policy_ref"];
+            /** Security Verdict Version */
+            security_verdict_version?: "binary-v1" | null;
         };
         /** RequestCounts */
         RequestCounts: {
@@ -3800,6 +3804,11 @@ export interface components {
         VerificationResult: {
             /** @constant */
             schema_version: "byul-verification-result/0.2";
+            /**
+             * @description 선택. 원본 RPT의 보안 판정 방식.
+             * @constant
+             */
+            security_verdict_version?: "binary-v1";
             report_ref: components["schemas"]["Common_object_ref"];
             /** @enum {unknown} */
             mode: "audit" | "update";
@@ -3872,6 +3881,8 @@ export interface components {
                         gaps?: components["schemas"]["VerificationResult_gap"][];
                         /** @description 선택. 이 쪽의 보안·기능·성능 중 FAIL·UNKNOWN 축이 있을 때 판정(RES)이 남긴 이유 원문. PASS·NOT_APPLICABLE 축의 이유는 뺀다. 없으면 생략한다. */
                         reasons?: string[];
+                        /** @description 선택. 원본 RPT가 기록한 이 쪽의 보안 미충족 사유 코드. */
+                        security_failure_tags?: ("CONFIRMED_VIOLATION" | "CONDITIONS_UNMET" | "INSUFFICIENT_EVIDENCE" | "NOT_RUN" | "ABORTED" | "NO_PASS_RULE")[];
                     };
                 };
                 comparison: components["schemas"]["VerificationResult_comparison"] | null;

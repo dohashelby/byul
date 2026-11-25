@@ -229,13 +229,15 @@ def _preserved_graph(source: Path) -> dict:
     for field in ("as_of", "execution_attempt_id"):
         if report.get(field) is not None and replay_report.get(field) != report[field]:
             raise ValueError(f"replay report uses different original {field}")
+    if replay_report.get("security_verdict_version") != report.get("security_verdict_version"):
+        raise ValueError("replay report changed the security verdict version")
     original_evidence = {tuple(sorted(ref.items())) for ref in report["inputs_manifest"] if ref["kind"] == "EVD"}
     replay_evidence = {tuple(sorted(ref.items())) for ref in replay_report["inputs_manifest"] if ref["kind"] == "EVD"}
     if original_evidence != replay_evidence:
         raise ValueError("replay report uses a different original EVD set")
     def outcomes(data):
         return {row["check_id"]: {field: row.get(field) for field in (
-            "selected", "single", "baseline", "candidate", "comparison", "functional_comparison")}
+            "selected", "single", "baseline", "candidate", "previous_result", "comparison", "functional_comparison")}
             for row in data["by_check"]}
     if outcomes(report) != outcomes(replay_report):
         raise ValueError("saved-pack replay changed verdicts or comparisons")

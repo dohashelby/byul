@@ -21,7 +21,7 @@ from guard.models import Policy, canonical_json, new_id, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle, verify_complete
 from guard.store.packs import get_pack, put_pack
-from tests.builders import environment
+from tests.builders import assert_unconfirmed_security_failure, environment
 from tests.test_a1_file_read_sensor import MODEL_BYTES, make_world, prepared_for, scope_value
 from tests.test_a1_weight_iteration_sensor import packet
 from tests.test_supply_boot_record_access import PACK, base_values, good_packet
@@ -151,7 +151,7 @@ def test_report_error_keeps_native_conflict_and_other_role(tmp_path, monkeypatch
 @pytest.mark.parametrize('native_missing', [False, True])
 def test_missing_records_or_native_do_not_create_pass(tmp_path, monkeypatch, native_missing):
     evd, result, _ = product(tmp_path, monkeypatch, mismatch=False, native_missing=native_missing)
-    assert result.verdicts.security.value == 'UNKNOWN'
+    assert_unconfirmed_security_failure(result)
     assert not evd.observations['supply_boot_complete'].value
     if native_missing:
         assert not evd.observations['supply_boot_violations'].collected

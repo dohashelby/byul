@@ -212,7 +212,8 @@ def test_expanded_persisted_text_uses_artifact_budget_and_replays_incomplete_wit
     result = analyze_saved_logs(source, newer)
     assert result["accepted"] and result["original_inventory_preserved"], result
     assert not result["checks"][0]["coverage_complete"]
-    assert result["checks"][0]["verdicts"]["security"] == "UNKNOWN"
+    assert result["checks"][0]["verdicts"]["security"] == "FAIL"
+    assert "CONFIRMED_VIOLATION" not in result["checks"][0]["security_failure_tags"]
     assert analyze_saved_logs(source, original)["accepted"]
 
 
@@ -258,7 +259,7 @@ def test_no_log_report_does_not_count_as_success(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("changes", [{}, {"duplicate": True}, {"no_logs": True}, {"wrong_owner": True}])
-def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknown(tmp_path, changes):
+def test_native_integrity_persisted_capture_replays_original_verdict_and_tags(tmp_path, changes):
     from guard.core.select import select
     from guard.models import Evidence
     from guard.store.packs import put_pack
@@ -292,19 +293,23 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     assert result["checks"][0]["status"] == "PROJECTION_REPLAY_MATCH"
     assert result["checks"][0]["raw_source_replayed"] is False
     assert result["checks"][0]["original_native_parser_replayed"] is False
-    assert result["checks"][0]["verdicts"]["security"] == ("FAIL" if changes.get("duplicate") else "UNKNOWN" if changes else "PASS")
+    assert result["checks"][0]["verdicts"]["security"] == ("FAIL" if changes else "PASS")
+    tags = result["checks"][0].get("security_failure_tags", [])
+    assert ("CONFIRMED_VIOLATION" in tags) == bool(changes.get("duplicate"))
+    assert bool(tags) == bool(changes)
 
 
-@pytest.mark.parametrize("kind,leak,expected", [(None, False, "PASS"), ("request", False, "UNKNOWN"),
-                                             ("nested", True, "FAIL"), ("nan", False, "UNKNOWN")])
-def test_new_strict_collection_replays_saved_pass_unknown_or_independent_fail(tmp_path, monkeypatch, kind, leak, expected):
+@pytest.mark.parametrize("kind,leak", [(None, False), ("request", False), ("nested", True), ("nan", False)])
+def test_new_strict_collection_replays_saved_verdict_and_tags(tmp_path, monkeypatch, kind, leak):
     from guard.executors.log_analysis_contract import STRICT_JSON_PROFILE
     from guard.store.packs import put_pack
     from tests.test_log_analysis import AmbiguousSource, Source, run_log
 
     source = AmbiguousSource(kind, leak=leak) if kind else Source()
     store, evd, res = run_log(tmp_path, monkeypatch, source)
+    expected = "FAIL" if kind else "PASS"
     assert res.verdicts.security.value == expected
+    assert ("CONFIRMED_VIOLATION" in res.security_failure_tags) is leak
     pack = baseline_pack()
     assert set(evd.observations) == {item.key for item in pack.checks["OBS-03"].required_observations}
     assert "log_violations" not in evd.observations
@@ -322,6 +327,7 @@ def test_new_strict_collection_replays_saved_pass_unknown_or_independent_fail(tm
     assert replay["checks"][0]["strict_json_profile_applied"] is True
     assert replay["checks"][0]["coverage_complete"] is (kind is None)
     assert replay["checks"][0]["verdicts"]["security"] == expected
+    assert replay["checks"][0].get("security_failure_tags", []) == res.security_failure_tags
     assert inventory_tree(store.root) == before
     if kind:
         item = next(artifact for artifact in evd.artifacts if artifact.name == "log_samples.json")

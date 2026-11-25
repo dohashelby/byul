@@ -13,7 +13,7 @@ from guard.cli import app
 from guard.models import canonical_json, utcnow
 from guard.runtime import kubernetes_http
 from guard.store import Store
-from tests.test_b_lif07_readiness import case, PRIVATE
+from tests.test_b_lif07_readiness import PRIVATE, UNVERIFIED_VERDICTS, case
 from tests.test_b_lif07_http_readiness import World, A_PRIVATE
 from tools import b_lif07_native_capture as helper, b_lif07_readiness as tool
 
@@ -48,7 +48,8 @@ def test_current394_real_gate_HTTP_main_and_exact_saved_pack(case, monkeypatch, 
     assert len(world.execs) == summary['requests'] == (3 if mode == 'unready' else 2)
     assert summary['capture_origin'] == 'EXAMPLE' and summary['actual_target_executed'] is False
     assert summary['exact_refs_restored'] and tool._inventory(case['source'].root) == before
-    assert summary['verdicts'] == {key: 'UNKNOWN' for key in ('security', 'functional', 'performance')}
+    assert summary['verdicts'] == UNVERIFIED_VERDICTS
+    assert 'INSUFFICIENT_EVIDENCE' in summary['security_failure_tags']
     assert summary['source_authentication_verified'] is False and summary['full_scope_coverage'] is False
     if mode == 'cleanup-after-canary':
         assert observation['snapshot']['cleanup_errors'] and observation['snapshot']['requests'][1]['outcome'] == 200

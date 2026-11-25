@@ -6,6 +6,7 @@ import pytest
 from guard.executors.container_config import MOUNTS_CMD, PROC_CMD
 from guard.models import Verdict
 from guard.runtime.docker import CmdResult
+from tests.builders import assert_unconfirmed_security_failure
 from tests.test_container_config import FakeDocker, _run
 from tests.test_pack_snapshot import _ok, workdir
 
@@ -33,13 +34,13 @@ def test_incomplete_root_worker_retains_confirmed_failure(tmp_path):
 
 def test_incomplete_nonroot_worker_is_not_pass(tmp_path):
     _, _, res = _run(tmp_path, IncompleteDocker(VALID + "PID 57\nUid:\t1000\t1000\t1000\t1000\n"))
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
 
 
 @pytest.mark.parametrize("mounts", ["", "malformed mount output\n"])
 def test_unreadable_mount_inventory_is_unknown(tmp_path, mounts):
     _, _, res = _run(tmp_path, IncompleteDocker(mounts=mounts))
-    assert res.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(res)
 
 
 @pytest.mark.parametrize("broken", ["missing", "corrupt"])

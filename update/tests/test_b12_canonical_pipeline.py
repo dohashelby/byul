@@ -12,7 +12,7 @@ from guard.executors.input_validation import InputValidationExecutor
 from guard.models import DataOrigin, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
-from tests.builders import completion_response, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, completion_response, environment, policy
 from tests.test_b12_runner_consumers import make_runner, pinned
 from tests.test_gpu_input_producers import SCOPE
 
@@ -80,13 +80,17 @@ def test_common_input_survives_registered_run_stored_pack_judge_and_report(
     assert evd.observations["reused_input_trials"].collected
     stored_pack = get_pack(store, plan.inputs.pack)
     result, = judge_plan(store, stored_pack, plan, utcnow())
-    assert result.verdicts.security.value == expected
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security.value == expected
     assert result.data_origin == DataOrigin.EXAMPLE
     report = build_report(store, stored_pack, plan, result.as_of)
     store.put(report)
     assert not report.official
     row, = [row for row in report.by_check if row.check_id == cid]
-    assert row.single.security.value == expected
+    assert row.single.security == result.verdicts.security
+    assert row.single.security_failure_tags == result.security_failure_tags
     assert store.resolve(evd.ref()).ref() == evd.ref()
     assert store.resolve(result.ref()).ref() == result.ref()
     assert store.resolve(report.ref()).ref() == report.ref()

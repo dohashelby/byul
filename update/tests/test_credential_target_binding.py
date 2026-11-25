@@ -11,7 +11,7 @@ from guard.executors import registry
 from guard.executors.credential_exposure import CredentialExposureExecutor
 from guard.models import canonical_json
 from guard.store import Store
-from tests.builders import baseline_pack, completion_response, environment, policy, T0
+from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, completion_response, environment, policy
 from tests.test_credential_mount_semantics import FakeDocker, context, IMAGE, RUN
 
 PATH = "/EXAMPLE-credentials/key"
@@ -194,7 +194,9 @@ def test_legacy_live_wrong_owner_is_aborted_unknown_through_the_product(tmp_path
         return executor
     monkeypatch.setattr(phase1, "_executor", wrong_source)
     _, _, _, _, evd, res = phase1._run(tmp_path, monkeypatch, "PLT-04", "PASS")
-    assert evd.execution.status.value == "ABORTED" and res.verdicts.security.value == "UNKNOWN"
+    assert evd.execution.status.value == "ABORTED" and res.verdicts.security.value == "FAIL"
+    assert "ABORTED" in res.security_failure_tags
+    assert "CONFIRMED_VIOLATION" not in res.security_failure_tags
     assert docker.environment_reads == 0 and not docker.requests
     assert CANARY not in canonical_json(evd.to_dict()).decode()
 
@@ -268,7 +270,11 @@ def test_binding_product_cli_report_bundle_and_exact_ref_replay(tmp_path, monkey
     evd, = store.find_latest("EVD", lambda r: True)
     res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
-    assert res.verdicts.security.value == expected and evd.data_origin.value == "EXAMPLE"
+    assert evd.data_origin.value == "EXAMPLE"
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(res)
+    else:
+        assert res.verdicts.security.value == expected
     assert evd.execution.executor.version == "0.5.2" and rpt.official is False
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     assert CANARY not in canonical_json(evd.to_dict()).decode()
@@ -287,4 +293,4 @@ def test_binding_product_cli_report_bundle_and_exact_ref_replay(tmp_path, monkey
     cli(["judge", "--plan", plan, "--pack", str(pack.path), "--as-of", T0.isoformat(), *restored_common])
     cli(["verify", *restored_common])
     replayed, = restored.find_latest("RES", lambda r: True)
-    assert replayed.ref() == res.ref() and replayed.verdicts.security.value == expected
+    assert replayed.ref() == res.ref() and replayed.verdicts.security == res.verdicts.security

@@ -58,7 +58,8 @@ def test_b_fixed_cpu_registered_cli_and_exact_ref_roundtrip(tmp_path,monkeypatch
     assert seen==[(str(tmp_path/'source'),'fixture-model')] and registry.resolve_executor(executor,kind) is factory
     assert e.data_origin.value=='EXAMPLE' and e.execution.executor.name==executor
     assert e.execution.status.value==('ABORTED' if mode in {'missing','attachment'} else 'COMPLETED')
-    assert res.verdicts.security.value==('FAIL' if mode in {'violation-followup-gap','attachment'} else 'UNKNOWN')
+    assert res.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in res.security_failure_tags) == (mode in {'violation-followup-gap', 'attachment'})
     assert res.verdicts.functional.value==('PASS' if mode=='normal' else 'UNKNOWN')
     assert res.verdicts.performance.value=='UNKNOWN'
     if mode=='missing':

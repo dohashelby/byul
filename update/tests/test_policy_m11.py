@@ -11,7 +11,7 @@ from guard.judges.declared import DeclaredJudge
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import Evidence
 from guard.models.checkdef import JudgeSpec
-from tests.builders import T0, baseline_pack, policy
+from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, policy
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import snapshot, write
 from tests.test_policy_m10 import fixture_evidence, manual_setup, values
@@ -136,7 +136,11 @@ def test_real_manual_import_rejudge_history_sides_and_reports(tmp_path, pack, ve
     results = judge_plan(st, pack, plan, T0)
     axis = "security" if scenario == "security_fail" else "functional"
     for r in results:
-        assert r.verdicts.model_dump()[axis] == ("UNKNOWN" if r.check_id == "REQ-09" and r.side == side else "PASS")
+        affected = r.check_id == "REQ-09" and r.side == side
+        if affected and axis == "security":
+            assert_unconfirmed_security_failure(r)
+        else:
+            assert r.verdicts.model_dump()[axis] == ("UNKNOWN" if affected else "PASS")
     rpt = build_report(st, pack, plan, T0)
     assert not rpt.official and any("REQ09_MANUAL_OBSERVATION_CONFLICT" in x for x in rpt.limitations)
     assert "REQ09_MANUAL_OBSERVATION_CONFLICT" in json.dumps(rpt.to_dict(), ensure_ascii=False)

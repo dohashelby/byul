@@ -13,11 +13,12 @@ from guard.core.select import select
 from guard.models import DataOrigin, Environment, Policy, new_id
 from guard.store import Store
 from guard.store.packs import put_pack
-from tests.builders import baseline_pack, PACK_DIR
+from tests.builders import PACK_DIR, assert_unconfirmed_security_failure, baseline_pack
 from tests.test_kubernetes_request_binding import env as example_env, target as example_target
 from tools import b_lif07_readiness as tool
 
 PRIVATE = 'EXAMPLE_PRIVATE_PROMPT_RID_TOKEN_NOT_PERSISTED'
+UNVERIFIED_VERDICTS = {'security': 'FAIL', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
 
 @pytest.fixture
 def case(request):
@@ -152,7 +153,8 @@ def test_original_manual_policy_and_refs_survive_store_restore(case):
     assert tool._refs(st)==tool._refs(restored) and st.verify()==restored.verify()==[] and tool._inventory(case['source'].root)==before
     evd,=st.iter_kind('EVD');res,=st.iter_kind('RES');assert evd.data_origin.value=='DECLARED' and not evd.normal_control.attempted and all(not c.attempted for c in evd.challenges)
     assert evd.observations['declared_policy_evidence'].value=={'version':'guard-policy-evidence/1','parameter':'required_readiness_items','records':[]}
-    assert res.verdicts.model_dump(mode='json')=={k:'UNKNOWN' for k in ('security','functional','performance')}
+    assert res.verdicts.model_dump(mode='json') == UNVERIFIED_VERDICTS
+    assert_unconfirmed_security_failure(res)
     assert 'NO_POLICY_VALUE' in [x.value for x in case['plan'].item('LIF-07').gaps]
     assert summary['capture_origin']=='EXAMPLE' and not summary['actual_target_executed']
     doc=yaml.safe_load((out/'manual-evidence.yaml').read_text());entry,=doc['checks'];check=case['pack'].checks['LIF-07']
@@ -191,7 +193,8 @@ def test_actual_producer_default_and_unsupported_records_reach_consumer(case):
     assert value['rows'][1]['point']=='unsupported' and value['rows'][1]['gaps']
     raw['observer_close']=observer.close()
     summary=tool.run(**case['args'],execute=True,_example_capture=lambda *a:raw)
-    assert summary['capture_origin']=='EXAMPLE' and summary['verdicts']=={k:'UNKNOWN' for k in ('security','functional','performance')}
+    assert summary['capture_origin'] == 'EXAMPLE' and summary['verdicts'] == UNVERIFIED_VERDICTS
+    assert 'INSUFFICIENT_EVIDENCE' in summary['security_failure_tags']
     saved=json.loads((case['args']['output']/'worker-readiness.json').read_text())
     assert len(saved['rows'])==2 and saved['observer_close']['complete'] is True
 
@@ -272,7 +275,8 @@ def test_import_cli_actual_producer_records_roundtrip_without_live_execution(cas
     st=Store.read_only(out/'store');restored=Store.read_only(out/'restored');assert tool._refs(st)==tool._refs(restored) and st.verify()==restored.verify()==[]
     assert tool._inventory(case['source'].root)==before and p.read_bytes()==input_before
     evd,=st.iter_kind('EVD');res,=st.iter_kind('RES');assert evd.data_origin.value=='DECLARED' and len(evd.artifacts)==1
-    assert res.verdicts.model_dump(mode='json')=={k:'UNKNOWN' for k in ('security','functional','performance')}
+    assert res.verdicts.model_dump(mode='json') == UNVERIFIED_VERDICTS
+    assert_unconfirmed_security_failure(res)
 
 
 def test_import_and_live_modes_are_explicitly_separate(case):
@@ -544,7 +548,8 @@ def test_actual_native_helper_default_public_entrypoint_store_restore_preserved(
         assert tool._refs(st) == tool._refs(restored) and st.verify() == restored.verify() == []
         evd, = st.iter_kind('EVD'); res, = st.iter_kind('RES')
         assert evd.data_origin.value == 'DECLARED' and not evd.normal_control.attempted
-        assert res.verdicts.model_dump(mode='json') == {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}
+        assert res.verdicts.model_dump(mode='json') == UNVERIFIED_VERDICTS
+        assert_unconfirmed_security_failure(res)
         assert tool._inventory(source.root) == before and PRIVATE not in json.dumps(saved)
     finally:
         if destination is not None:
@@ -634,7 +639,8 @@ def test_native_manual_text_separates_bootstrap_SEND_from_upper_READY_and_servic
     saved = json.loads((case['args']['output'] / 'worker-readiness.json').read_text())
     assert saved['native21']['ready_sends'][0]['original_send_return_observed'] is True
     assert entry['normal_control']['result'] == 'not_attempted' and all(not row['attempted'] for row in entry['challenges'])
-    assert summary['verdicts'] == {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}
+    assert summary['verdicts'] == UNVERIFIED_VERDICTS
+    assert 'INSUFFICIENT_EVIDENCE' in summary['security_failure_tags']
 
 
 @pytest.mark.parametrize('claimed', [

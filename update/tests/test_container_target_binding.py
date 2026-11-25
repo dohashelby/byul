@@ -12,7 +12,7 @@ from guard.executors import registry
 from guard.executors.container_config import ContainerConfigExecutor, PROC_CMD, SENTINEL_CMD, MOUNTS_CMD
 from guard.models import canonical_json
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, T0
+from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.test_container_config import FakeDocker, IMAGE, CONTAINER_ID, RUN, LAB_POLICY, _probe
 from tests.test_credential_mount_semantics import context as credential_context
 
@@ -195,7 +195,11 @@ def test_permission_binding_product_cli_report_restore_and_exact_refs(tmp_path, 
     evd, = store.find_latest("EVD", lambda r: True); res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
     assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.3"
-    assert res.verdicts.security.value == expected and rpt.official is False
+    assert rpt.official is False
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(res)
+    else:
+        assert res.verdicts.security.value == expected
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     assert CANARY not in canonical_json(evd.to_dict()).decode()
     if violated:
@@ -212,4 +216,4 @@ def test_permission_binding_product_cli_report_restore_and_exact_refs(tmp_path, 
          "--config", str(config), "--store", str(restored_path)])
     cli(["verify", "--config", str(config), "--store", str(restored_path)])
     replayed, = restored.find_latest("RES", lambda r: True)
-    assert replayed.ref() == res.ref() and replayed.verdicts.security.value == expected
+    assert replayed.ref() == res.ref() and replayed.verdicts.security == res.verdicts.security

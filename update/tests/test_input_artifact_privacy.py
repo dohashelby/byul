@@ -8,7 +8,7 @@ import pytest
 from guard.executors.input_validation import InputValidationExecutor, ARTIFACT_PROFILE, _capture_projection, _log_projection
 from guard.models import Verdict, canonical_json, sha256_hex
 from tests import test_input_response_semantics as semantic
-from tests.builders import completion_response
+from tests.builders import assert_unconfirmed_security_failure, completion_response
 
 PRIVATE = "EXAMPLE_PRIVATE_RESPONSE_CONTENT_NOT_A_CONFIGURED_KEY"
 
@@ -35,7 +35,10 @@ def test_product_evidence_omits_raw_content_but_preserves_proof_hashes_and_verdi
         return {**semantic.response(payload),"body_preview":PRIVATE,"detail":PRIVATE,"headers":{"Authorization":PRIVATE}}
     store,evd,result,sent=semantic._pipeline(tmp_path,monkeypatch,challenge)
     assert len(sent)==5 and evd.normal_control.succeeded
-    assert result.verdicts.security==(Verdict.PASS if mode=="reviewed" else Verdict.UNKNOWN)
+    if mode == "reviewed":
+        assert result.verdicts.security == Verdict.PASS
+    else:
+        assert_unconfirmed_security_failure(result)
     assert result.verdicts.functional==Verdict.PASS
     assert evd.observations["challenge_consumption"].value=={"token_id":"unknown","length":"unknown"}
     assert evd.observations["confirmed_input_violations"].value==[]

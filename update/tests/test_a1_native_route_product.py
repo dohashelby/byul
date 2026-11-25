@@ -11,7 +11,7 @@ from guard.runtime import kubernetes_http as http
 from guard.executors.session_seal import SESSION_SEALER
 from guard.collectors.lifecycle import load_prepared
 from guard.store import Store
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
 from tests.test_lifecycle_capture import case,external,revised
 from tests.test_lifecycle_sensor import writer_factory,CANARY
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -112,7 +112,8 @@ def test_registered_product_keeps_observations_unknown_and_exact_refs(tmp_path,g
     assert e.data_origin.value=='EXAMPLE' and e.normal_control.succeeded is None
     if mode in {'normal','denied','missing-key','rewrite','duplicate'}:assert e.execution.status.value=='COMPLETED'
     else:assert e.execution.status.value=='ABORTED'
-    assert all(getattr(res.verdicts,a).value=='UNKNOWN' for a in ('functional','security','performance'))
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert e.observations['native_route_authorization_verified'].value is e.observations['native_route_scope_complete'].value is False
     associations=e.observations['native_route_associations'].value
     if mode in {'normal','rewrite','duplicate','source-module-missing','after-timeout','seal-failure','unclosed','attachment','http-cleanup','native-one-missing'}:assert associations

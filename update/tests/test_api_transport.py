@@ -14,7 +14,7 @@ from guard.core.select import PolicyValueError, select
 from guard.executors import api_transport as api, stream_pressure, stream_probe
 from guard.models import DataOrigin, ExecStatus, Verdict, canonical_json, sha256_hex
 from guard.store import Store
-from tests.builders import T0, baseline_pack, policy
+from tests.builders import assert_unconfirmed_security_failure, T0, baseline_pack, policy
 from tests.test_stream_pressure import inputs, owner, CONTAINER_ID
 
 
@@ -117,7 +117,8 @@ def test_allowed_denied_and_incomplete_are_unknown_never_pass(case, mode):
                 value["stages"][0]["responses"][0][key] = bad
         case.state.mutation = mutate
     evd, result = case.run()
-    assert all(v == Verdict.UNKNOWN for v in result.verdicts.model_dump().values())
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == result.verdicts.performance == Verdict.UNKNOWN
     assert evd.observations["forbidden_plaintext_successes"].value == []
 
 
@@ -126,7 +127,8 @@ def test_allowed_denied_and_incomplete_are_unknown_never_pass(case, mode):
 def test_binding_mismatch_is_aborted_not_a_plaintext_fail(case, field):
     case.state.mutation = lambda value: value.update({field: None})
     evd, result = case.run()
-    assert evd.execution.status == ExecStatus.ABORTED and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert_unconfirmed_security_failure(result)
     assert evd.execution.abort_reason == "API_TRANSPORT_BINDING_UNVERIFIED"
 
 
@@ -142,7 +144,8 @@ def test_invalid_policy_never_reaches_runtime_or_http(case, field, bad):
         return
     evd, result = case.run()
     assert evd.execution.status in (ExecStatus.ABORTED, ExecStatus.NOT_RUN)
-    assert result.verdicts.security == Verdict.UNKNOWN and case.state.captures == 0
+    assert_unconfirmed_security_failure(result)
+    assert case.state.captures == 0
 
 
 def test_policy_target_mismatch_is_rejected_before_capture(case):
@@ -150,7 +153,7 @@ def test_policy_target_mismatch_is_rejected_before_capture(case):
     evd, result = case.run()
     assert evd.execution.status == ExecStatus.ABORTED
     assert case.state.captures == 0 and case.state.cleaned == 1
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
 
 
 def test_cleanup_failure_does_not_erase_verified_plaintext_operation(case):
@@ -164,7 +167,8 @@ def test_cleanup_failure_does_not_erase_verified_plaintext_operation(case):
 def test_cleanup_never_uses_the_target_owner_id(case):
     case.state.client_id = case.target["run_id"]
     evd, result = case.run()
-    assert evd.execution.status == ExecStatus.ABORTED and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert_unconfirmed_security_failure(result)
     assert case.state.cleaned == case.state.captures == 0
 
 
@@ -187,7 +191,8 @@ def test_unverified_source_window_is_unknown(case, mode):
             sample["capture_hashes"]["transport_complete"] = False
     case.state.mutation = mutate
     evd, result = case.run()
-    assert evd.execution.status == ExecStatus.ABORTED and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert_unconfirmed_security_failure(result)
 
 
 def test_extra_capture_detail_is_not_stored_as_body_secret_or_exception(case):
@@ -222,7 +227,8 @@ def test_predecessor_definition_hashes_and_no_stream_changes(tmp_path):
 @pytest.mark.parametrize("bad", [None, ["EXAMPLE_PRIVATE_CONFIG_CANARY"], "EXAMPLE_PRIVATE_CONFIG_CANARY"])
 def test_invalid_configuration_has_fixed_diagnostic_without_raw_input(case, bad):
     evd, result = case.run({"api_transport": bad})
-    assert evd.execution.status == ExecStatus.ABORTED and result.verdicts.security == Verdict.UNKNOWN
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert_unconfirmed_security_failure(result)
     assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
     assert "EXAMPLE_PRIVATE_CONFIG_CANARY" not in canonical_json(evd.to_dict()).decode()
     assert case.state.captures == case.state.cleaned == 0

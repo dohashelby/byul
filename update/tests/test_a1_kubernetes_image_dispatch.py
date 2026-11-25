@@ -15,7 +15,7 @@ from guard.executors.reuse import preview_inputs
 from guard.models import canonical_json, sha256_hex
 from guard.runtime import kubernetes_http as kube
 from guard.store import Store
-from tests.builders import baseline_pack, policy, T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, policy, T0
 from tests.test_model_preparation_integration import full_inputs, FullWorld
 
 PRIVATE="EXAMPLE_A1_API_DISPATCH_PRIVATE_829a"
@@ -146,7 +146,7 @@ def test_real_registry_cli_exact_refs_restore_and_no_fake_executor(tmp_path,monk
     cli(["verify",*common])
     store=Store.read_only(tmp_path/"store")
     evd,=store.find_latest("EVD",lambda e:True);res,=store.find_latest("RES",lambda r:True)
-    assert res.verdicts.security.value=="UNKNOWN"
+    assert_unconfirmed_security_failure(res)
     if mode=="missing-policy":assert evd.execution.executor is None
     else:assert evd.execution.executor.name=="container_config"
     assert evd.data_origin.value=="EXAMPLE" and PRIVATE not in canonical_json(evd.to_dict()).decode()

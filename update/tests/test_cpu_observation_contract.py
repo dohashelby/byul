@@ -63,9 +63,10 @@ def _case(folder, monkeypatch, expected):
                                     "comparability": evd.comparability.model_copy(update={"cpu": env.runtime.cpu})}).seal()
         store.put(evd)
         result = judge_evidence(pack.checks[cid], evd, pol, T0,
-                                condition_origins=[c.origin for c in plan.item(cid).conditions], plan=plan)
+                                condition_origins=[c.origin for c in plan.item(cid).conditions], plan=plan,
+                                binary_security=False)
         store.put(result)
-    rpt = build_report(store, pack, plan, T0)
+    rpt = build_report(store, pack, plan, T0, binary_security=False)
     store.put(rpt)
     output = folder / "validation" / "VALIDATE-EXAMPLE"
     output.mkdir(parents=True)

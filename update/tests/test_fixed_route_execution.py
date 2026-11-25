@@ -15,7 +15,7 @@ from guard.executors.direct_route import DirectRouteExecutor
 from guard.executors.role_route import RoleRouteExecutor
 from guard.models import ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy
 from tests.test_direct_route import ALLOWED, DENIED, World, _target as direct_target
 from tests.test_role_route import ADMIN, GENERAL, WRONG, RoleWorld, _target as role_target
 
@@ -115,7 +115,7 @@ def test_unexpected_registered_route_aborts_before_security_requests(tmp_path, m
     evd, result, summary, submitted = run(tmp_path / "new", monkeypatch, "REQ-01", world, "0.32.0",
         sorted(["GET /v1/models", "POST /invocations", "POST /v1/completions"]))
     assert evd.execution.status == ExecStatus.ABORTED
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert result.verdicts.functional == Verdict.UNKNOWN
     assert summary is None
     assert all(r["url"].endswith("/openapi.json") for r in submitted)
@@ -137,5 +137,5 @@ def test_mislabelled_transport_cannot_establish_route_coverage(tmp_path, monkeyp
     fixed = sorted(["GET /v1/models", "POST /invocations", "POST /v1/completions"])
     evd, result, summary, submitted = run(tmp_path / "broken", monkeypatch, "REQ-01", Broken(False), "0.32.0", fixed)
     assert evd.execution.status == ExecStatus.ABORTED
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert summary is None and submitted

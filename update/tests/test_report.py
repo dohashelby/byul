@@ -3,7 +3,7 @@
 import json
 
 from guard.core.report import build_report
-from guard.models import Verdict
+from guard.models import SecurityFailureTag, Verdict
 from tests.builders import T0, baseline_pack
 from tests.report_setup import pipeline
 
@@ -29,11 +29,11 @@ def test_full_pack_report_structure(tmp_path):
     rows = {r.check_id: r for r in rpt.by_check}
     assert len(rows) == 77
     assert rows["REQ-01"].single.security == Verdict.PASS
-    assert rows["SUP-01"].single.security == Verdict.UNKNOWN
+    assert rows["SUP-01"].single.security == Verdict.FAIL
+    assert SecurityFailureTag.NOT_RUN in rows["SUP-01"].single.security_failure_tags
     assert rows["SUP-01"].tested_while_undetermined
     assert len(rpt.manual_required) == 76 and "REQ-01" not in rpt.manual_required
-    # DRAFT 팩 → inventory 미완결 → 목적·영역은 PASS가 될 수 없다 (INV-13)
-    assert rpt.by_purpose[PURPOSE].security == Verdict.UNKNOWN
+    assert rpt.by_purpose[PURPOSE].security == Verdict.FAIL  # 선택된 REQ-02에 근거가 없다.
     assert rpt.by_purpose[PURPOSE].inventory_complete is False
     assert set(rpt.by_area) == {"SUP", "REQ", "PLT", "LIF", "OBS"}
     refs = {(r.kind, r.id) for r in rpt.inputs_manifest}
@@ -127,3 +127,43 @@ def test_reasons_omitted_when_every_axis_settled():
     assert _verdict_reasons(mixed) == ["performance: no rule for this axis", "execution ABORTED: target lost"]
     # 이유가 없으면 직렬화에서 빠져 기존 RPT 해시가 그대로다
     assert "reasons" not in SideResult(security=Verdict.PASS).model_dump(mode="json")
+
+
+def test_missing_evd_and_res_close_selected_update_sides_as_fail(tmp_path):
+    from guard.core.select import select
+    from guard.store import Store
+    from tests.builders import environment, policy
+
+    store = Store(tmp_path / ".guard")
+    pack = baseline_pack()
+    envs = [
+        environment({"gateway": {"value": True, "origin": "DECLARED", "source": "test"}},
+                    id=f"ENV-SYNTHETIC-{side}", engine={"name": "vllm", "version": f"test-{side}"})
+        for side in ("baseline", "candidate")
+    ]
+    pol = policy(pack.ref(), scope={"include": ["REQ-01"]})
+    for obj in [*envs, pol]:
+        store.put(obj)
+    plan = select(pack, envs, pol, mode="update")
+    store.put(plan)
+
+    report = build_report(store, pack, plan, as_of=T0)
+    store.put(report)
+    (row,) = [r for r in report.by_check if r.selected]
+    assert report.security_verdict_version == "binary-v1"
+    assert row.comparison == "NOT_COMPARABLE"
+    assert row.functional_comparison is None
+    for side in (row.baseline, row.candidate):
+        assert side.security == Verdict.FAIL
+        assert side.security_failure_tags == [SecurityFailureTag.INSUFFICIENT_EVIDENCE]
+        assert side.result is None and side.evidence_ref is None and side.execution_status is None
+    assert report.evidence_counts["REQ"].not_run == 1
+    assert report.by_area["REQ"].security == Verdict.FAIL
+
+    legacy = build_report(store, pack, plan, as_of=T0, binary_security=False)
+    store.put(legacy)
+    (old_row,) = [r for r in legacy.by_check if r.selected]
+    assert "security_verdict_version" not in legacy.to_dict()
+    assert old_row.comparison is None
+    assert old_row.baseline.security == old_row.candidate.security == Verdict.UNKNOWN
+    assert "security_failure_tags" not in old_row.candidate.model_dump(mode="json")

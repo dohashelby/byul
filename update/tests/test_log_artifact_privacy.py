@@ -18,7 +18,7 @@ from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import get_pack, put_pack
 from guard.validation_evidence import inventory_tree
-from tests.builders import PACK_DIR, T0, baseline_pack
+from tests.builders import PACK_DIR, T0, assert_unconfirmed_security_failure, baseline_pack
 from tests import test_log_analysis as source
 
 INPUT, OUTPUT, KEY = "EXAMPLE_PRIVATE_LOG_INPUT", "EXAMPLE_PRIVATE_LOG_OUTPUT", "EXAMPLE_PRIVATE_LOG_KEY"
@@ -196,7 +196,10 @@ def test_alias_fix_keeps_saved_projection_versions_closed_and_old_evidence_uncha
     ("leak-late","FAIL"),("file","PASS"),("no-control","UNKNOWN"),("bad-error-status","UNKNOWN"),("credential","FAIL")])
 def test_real_collector_path_preserves_verdicts_and_omits_raw_values(product,mode,verdict):
     case=product(mode)
-    assert case.res.verdicts.security.value==verdict
+    if verdict == "UNKNOWN":
+        assert_unconfirmed_security_failure(case.res)
+    else:
+        assert case.res.verdicts.security.value == verdict
     assert case.evd.execution.status.value=="COMPLETED" and case.evd.data_origin.value=="EXAMPLE"
     assert case.evd.execution.executor.version=="0.3.1"
     assert case.sample["projection_profile"]==PROFILE and case.sample["markers"]==PUBLIC_MARKERS
@@ -238,7 +241,8 @@ def test_saved_projection_audit_bundle_and_ref_replay_are_read_only_and_labelled
 def test_projection_or_capture_failure_keeps_original_safe_facts_and_independent_fail(product,fault,mode):
     case=product(mode,fault=fault)
     assert case.evd.execution.status.value=="ABORTED" and case.evd.execution.abort_reason=="ARTIFACT_CAPTURE_INCOMPLETE"
-    assert case.res.verdicts.security.value==("FAIL" if mode=="leak" else "UNKNOWN")
+    assert case.res.verdicts.security.value == "FAIL"
+    assert ("CONFIRMED_VIOLATION" in case.res.security_failure_tags) == (mode == "leak")
     assert case.evd.normal_control.succeeded and case.evd.observations["log_fields_seen"].collected
     assert case.sample is None and [a.name for a in case.evd.artifacts]==["probe_log.jsonl"]
 

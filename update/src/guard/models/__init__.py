@@ -14,6 +14,7 @@ from .enums import (
     NotSelectedReason,
     PolicyStatus,
     ReviewStatus,
+    SecurityFailureTag,
     Side,
     Verdict,
 )

@@ -26,7 +26,7 @@ from guard.models.objects import ExecutorInfo, Observation, PluginInfo
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import get_pack, put_pack
-from tests.builders import PACK_DIR, ROUTES, T0, baseline_pack, environment, policy, req01_obs
+from tests.builders import PACK_DIR, ROUTES, T0, assert_unconfirmed_security_failure, baseline_pack, environment, policy, req01_obs
 
 
 ERROR_CANARY = "EXAMPLE_ARTIFACT_ERROR_CANARY"
@@ -161,7 +161,8 @@ def test_passing_rule_candidates_remain_unknown_after_auxiliary_persistence_fail
     raw = RuleTableJudge().judge(case.check, case.evd, case.check.judge.params, case.policy.values[case.check.id])
     assert raw.verdicts["security"] == raw.verdicts["functional"] == Verdict.PASS
     assert case.evd.execution.status == ExecStatus.ABORTED
-    assert case.result.verdicts.security == case.result.verdicts.functional == case.result.verdicts.performance == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(case.result)
+    assert case.result.verdicts.functional == case.result.verdicts.performance == Verdict.UNKNOWN
     assert_draft_metadata_preserved(case)
 
 
@@ -230,7 +231,8 @@ def test_incomplete_evidence_cannot_be_reused_even_with_preserved_metadata(run_c
     monkeypatch.setattr(change_selection, "preview_inputs", lambda *_args: preview)
     # The real result is already UNKNOWN and ABORTED must be rejected before
     # procedure/preview or result-PASS reuse gates can make any inference.
-    assert case.result.verdicts.security == Verdict.UNKNOWN and case.result.data_origin == DataOrigin.DECLARED
+    assert_unconfirmed_security_failure(case.result)
+    assert case.result.data_origin == DataOrigin.DECLARED
     before_evd = [value.to_dict() for value in case.store.iter_kind("EVD")]
     before_res = [value.to_dict() for value in case.store.iter_kind("RES")]
     context = change_selection.build_context(case.store, case.plan, case.pack, [case.env],

@@ -164,7 +164,7 @@ def test_vllm_topology_end_to_end(topology, expected):
 
 
 def test_inv15_real_engine_start_failure_is_aborted_unknown():
-    """존재하지 않는 모델(빈 모델 디렉토리)로 실제 vLLM 기동 → 실행기가 기동 실패를 감지 → ABORTED → UNKNOWN, 컨테이너 정리."""
+    """빈 모델 디렉토리의 기동 실패를 감지하고 중단 태그를 남긴 뒤 컨테이너를 정리한다."""
     vcfg = dict(_vllm_cfg())
     run_dir = _fresh("inv15")
     empty = run_dir / "empty_models"
@@ -185,7 +185,9 @@ def test_inv15_real_engine_start_failure_is_aborted_unknown():
                                                        "verdict": row["single"]}, ensure_ascii=False, indent=2))
     print(evd.execution.status.value, evd.execution.abort_reason)
     assert evd.execution.status.value == "ABORTED"
-    assert row["single"]["security"] == "UNKNOWN"
+    assert row["single"]["security"] == "FAIL"
+    assert "ABORTED" in row["single"]["security_failure_tags"]
+    assert "CONFIRMED_VIOLATION" not in row["single"]["security_failure_tags"]
     assert row["single"]["verification_level"] is None  # 실행 미완료 → 근거 없음 (INV-12)
     assert "REQ-01" not in data["manual_required"]
     assert _labelled() == ([], [])

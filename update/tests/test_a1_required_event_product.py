@@ -19,7 +19,7 @@ from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
 from tests.run_binding_support import for_pack, run_table_toml
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack,policy,T0
 from tests.test_kubernetes_request_binding import env,target
 from tests.test_kubernetes_sampling import World as PodWorld
 from tools.build_kubernetes_required_event_pack import derive
@@ -140,7 +140,9 @@ def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts
     cli(['run','--plan',plan.id,'--pack',pack.path,*common],1 if mode in {'http-cleanup','record-cleanup'} else 0)
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
-    assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,k).value=='UNKNOWN' for k in ('security','functional','performance'))
+    assert e.data_origin.value=='EXAMPLE'
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert e.normal_control.succeeded is None
     for key in ('required_event_producer_authenticated','required_event_independent_trigger_verified','required_event_scope_complete'):assert e.observations[key].value is False
     assert e.execution.status.value==('COMPLETED' if mode=='normal' else 'ABORTED')

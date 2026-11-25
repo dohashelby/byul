@@ -18,7 +18,7 @@ from byul_platform.diff import json_diff
 from byul_platform.inputs import MVP_PACK
 from byul_platform.main import create_app
 from byul_platform.sources.report_evidence import _decisions, _enrich, _finding, _import_violation
-from byul_platform.sources.update import report_content_sha256, rpt_to_verification_result
+from byul_platform.sources.update import report_content_sha256, report_view, rpt_to_verification_result
 from byul_platform.store import FileDocumentStore, RevisionExists
 from conftest import EXAMPLES, FIXTURES, load_json
 
@@ -71,6 +71,51 @@ def test_rpt_verdicts_are_not_recomputed():
     converted = rpt_to_verification_result(rpt)
     assert converted["summary"]["by_area"]["REQ"]["security"] == "PASS"
     assert converted["checks"][0]["sides"]["single"]["security"] == "FAIL"
+
+
+def test_security_failure_tags_preserve_sides_and_recorded_comparison(contracts):
+    rpt = load_json(FIXTURES / "update" / "synthetic-update-mode.rpt.json")
+    rpt["security_verdict_version"] = "binary-v1"
+    source = rpt["by_check"][0]
+    source["baseline"]["security"] = "FAIL"
+    source["baseline"]["security_failure_tags"] = ["NOT_RUN", "INSUFFICIENT_EVIDENCE"]
+    source["candidate"]["security"] = "FAIL"
+    source["candidate"]["security_failure_tags"] = ["CONFIRMED_VIOLATION"]
+    source["comparison"] = "UNKNOWN"
+
+    converted = rpt_to_verification_result(rpt)
+    assert contracts.errors("verification-result", converted) == []
+    assert converted["security_verdict_version"] == "binary-v1"
+    row = converted["checks"][0]
+    assert row["sides"]["baseline"]["security_failure_tags"] == ["NOT_RUN", "INSUFFICIENT_EVIDENCE"]
+    assert row["sides"]["candidate"]["security_failure_tags"] == ["CONFIRMED_VIOLATION"]
+
+    view = report_view(converted)
+    row = view["checks"][0]
+    assert view["security_verdict_version"] == "binary-v1"
+    assert row["baseline"]["security_failure_tags"] == ["NOT_RUN", "INSUFFICIENT_EVIDENCE"]
+    assert row["candidate"]["security_failure_tags"] == ["CONFIRMED_VIOLATION"]
+    assert row["baseline"]["security"] == row["candidate"]["security"] == "FAIL"
+    assert row["comparison"] == "UNKNOWN"
+    assert source["check_id"] not in view["focus"]["regressed"]
+
+    for invalid in (["ABORTED", "ABORTED"], ["UNRECOGNIZED"]):
+        invalid_doc = copy.deepcopy(converted)
+        invalid_doc["checks"][0]["sides"]["baseline"]["security_failure_tags"] = invalid
+        assert contracts.errors("verification-result", invalid_doc)
+
+
+def test_historical_unknown_report_has_no_fabricated_security_failure_tags(contracts):
+    rpt = load_json(RPT)
+    rpt["by_check"][0]["single"]["security"] = "UNKNOWN"
+    converted = rpt_to_verification_result(rpt)
+    assert contracts.errors("verification-result", converted) == []
+    assert "security_verdict_version" not in converted
+    assert "security_failure_tags" not in converted["checks"][0]["sides"]["single"]
+    view = report_view(converted)
+    assert view["security_verdict_version"] is None
+    assert view["checks"][0]["single"]["security"] == "UNKNOWN"
+    assert view["checks"][0]["single"]["security_failure_tags"] == []
 
 
 def test_reports_dir_source(tmp_path):
@@ -204,6 +249,13 @@ def test_report_security_finding_requires_matching_collected_evidence(check_id, 
     observed = {"collected": True, "value": value}
     evidence = {"data_origin": "MEASURED", "execution": {"status": "COMPLETED"}, "observations": {observation: observed}}
     assert _finding(check_id, view, result, evidence) == {"code": code}
+    blocked = {**view, "security_failure_tags": ["INSUFFICIENT_EVIDENCE"]}
+    assert _finding(check_id, blocked, result, evidence) is None
+    trace = {"security": {"observations": [observation]}}
+    assert _decisions(blocked, result, evidence, trace) == []
+    confirmed = {**view, "security_failure_tags": ["CONFIRMED_VIOLATION", "INSUFFICIENT_EVIDENCE"]}
+    assert _finding(check_id, confirmed, result, evidence) == {"code": code}
+    assert _decisions(confirmed, result, evidence, trace)[0]["verdict"] == "FAIL"
     for origin in ("EXAMPLE", "DECLARED", None):
         assert _finding(check_id, view, result, {**evidence, "data_origin": origin}) is None
     assert _finding(check_id, {**view, "security": "UNKNOWN"}, result, evidence) is None

@@ -209,7 +209,8 @@ def test_separated_axes_survive_report_export_snapshot_rejudge_and_original_byte
 
     report, _objects, _pack = build_update_case(tmp_path, mutate_evidence=mutate)
     rows = {row["check_id"]: row for row in report["by_check"] if row["selected"]}
-    assert rows["REQ-09"]["candidate"]["security"] == "UNKNOWN"
+    assert rows["REQ-09"]["candidate"]["security"] == "FAIL"
+    assert "CONFIRMED_VIOLATION" not in rows["REQ-09"]["candidate"]["security_failure_tags"]
     assert rows["REQ-09"]["comparison"] == "UNKNOWN"
     assert rows["PLT-04"]["candidate"]["security"] == "FAIL"
     assert rows["PLT-04"]["comparison"] == "REGRESSED"

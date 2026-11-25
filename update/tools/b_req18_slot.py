@@ -768,6 +768,7 @@ def run_pipeline(mode, env, policy, pack, output, *, source_root=None, target=No
         'full_live_coverage': False, 'gpu_execution_verified': False, 'installed_target': None if mode == 'cpu' else digest(target),
         'execution_status': evidence.execution.status.value, 'data_origin': evidence.data_origin.value,
         'security': result.verdicts.security.value, 'pack': pack.ref().model_dump(mode='json'),
+        'security_failure_tags': [tag.value for tag in result.security_failure_tags],
         'environment': env.ref().model_dump(mode='json'), 'policy': policy.ref().model_dump(mode='json'),
         'plan': plan.ref().model_dump(mode='json'), 'evidence': evidence.ref().model_dump(mode='json'),
         'result': result.ref().model_dump(mode='json'), 'report': report.ref().model_dump(mode='json'),

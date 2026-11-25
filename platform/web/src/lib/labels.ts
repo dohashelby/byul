@@ -38,6 +38,15 @@ export const VERDICT: Record<string, Entry> = {
   NOT_APPLICABLE: { label: "해당 없음", tone: "faint" },
 };
 
+export const SECURITY_FAILURE_TAG = {
+  CONFIRMED_VIOLATION: { label: "위반 확인", tone: "error" },
+  CONDITIONS_UNMET: { label: "조건 미충족", tone: "warn" },
+  INSUFFICIENT_EVIDENCE: { label: "증거 부족", tone: "muted" },
+  NOT_RUN: { label: "미실행", tone: "muted" },
+  ABORTED: { label: "실행 중단", tone: "muted" },
+  NO_PASS_RULE: { label: "PASS 규칙 미정의", tone: "muted" },
+} as const satisfies Record<string, Entry>;
+
 export const DATA_ORIGIN: Record<string, Entry> = {
   MEASURED: { label: "측정", tone: "accent" },
   DECLARED: { label: "신고", tone: "neutral" },

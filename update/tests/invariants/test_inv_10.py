@@ -1,4 +1,4 @@
-"""INV-10: 미선정 점검은 EVD·RES를 만들지 않는다. 선정됐지만 실행 못 한 점검은 EVD(NOT_RUN/ABORTED)와 RES(UNKNOWN)."""
+"""INV-10: 미선정 점검은 EVD·RES를 만들지 않는다. 선정 뒤 미실행은 EVD와 태그가 붙은 FAIL을 남긴다."""
 
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
@@ -47,14 +47,16 @@ def test_rerun_appends_new_revision(tmp_path):
     assert store.get(first.id, 1) == first
 
 
-def test_judge_makes_unknown_result_for_not_run_and_nothing_for_unselected(tmp_path):
+def test_judge_tags_not_run_and_emits_nothing_for_unselected(tmp_path):
     from guard.core.judge import judge_plan
-    from guard.models import Verdict
+    from guard.models import SecurityFailureTag, Verdict
     from tests.builders import T0
 
     store, pack, plan = _setup(tmp_path, ["REQ-01", "SUP-01"])
     run_plan(store, pack, plan, RunConfig(executors={"direct_route": "fake"}))
     results = {r.check_id: r for r in judge_plan(store, pack, plan, as_of=T0)}
     assert set(results) == {"REQ-01", "SUP-01"}  # 미선정 75행은 RES 없음
-    assert results["SUP-01"].verdicts.security == Verdict.UNKNOWN
+    assert results["SUP-01"].verdicts.security == Verdict.FAIL
+    assert SecurityFailureTag.NOT_RUN in results["SUP-01"].security_failure_tags
+    assert SecurityFailureTag.CONFIRMED_VIOLATION not in results["SUP-01"].security_failure_tags
     assert results["REQ-01"].verdicts.security == Verdict.PASS

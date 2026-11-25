@@ -21,7 +21,7 @@ from guard.executors.http_common import Ctx
 from guard.models import Evidence, DataOrigin, canonical_json, load_pack, sha256_hex, utcnow
 from guard.models.objects import Artifact
 from guard.store import Store
-from tests.builders import completion_response, environment, policy
+from tests.builders import assert_unconfirmed_security_failure, completion_response, environment, policy
 from tests.test_gpu_input_producers import POD, SCOPE, PARAMS, api_rows, crow
 
 from tests.published_pack38 import original as published_pack38
@@ -150,10 +150,11 @@ def test_registered_input_collect_finish_survives_normalization_and_stored_artif
     assert any(a.name == "b_common_consumption.json" for a in evd.artifacts)
 
 
-@pytest.mark.parametrize("consumed,verdict", [(False, "UNKNOWN"), (True, "FAIL")])
-def test_unregistered_input_caps_pass_and_keeps_independent_fail(tmp_path, consumed, verdict):
+@pytest.mark.parametrize("consumed", [False, True])
+def test_unregistered_input_caps_pass_and_keeps_independent_fail(tmp_path, consumed):
     draft, evd, result = input_finish(tmp_path, unsupported=True, consumed=consumed)
-    assert draft.status.value == "ABORTED" and result.verdicts.security.value == verdict
+    assert draft.status.value == "ABORTED" and result.verdicts.security.value == "FAIL"
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is consumed
     if consumed: assert evd.observations["reused_input_violations"].value
 
 
@@ -238,7 +239,10 @@ def test_registered_sampling_collect_requires_all_selected_native_fields(tmp_pat
         timeout=1, allow_mutating=False, keys={}, secrets=[], cprobe=probe, workdir=tmp_path / "work", started=utcnow())
     draft = executor._finish(ctx)
     evd, result = judged(tmp_path, "REQ-10", draft, env, values)
-    assert result.verdicts.security.value == expected
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security.value == expected
     assert evd.data_origin == DataOrigin.EXAMPLE and result.data_origin == DataOrigin.EXAMPLE
     if include_min_tokens:
         source = next(a for a in draft.artifacts if a.name == "b_common_consumption.json")
@@ -277,7 +281,7 @@ def test_sup03_real_collect_finish_keeps_projection_artifact_and_unknown(tmp_pat
     assert "files" in projection and projection["files"]
     assert projection["actual_consumer_verified"] is False
     assert evd.observations["template_consumer_verified"].value is False
-    assert result.verdicts.security.value == "UNKNOWN"
+    assert_unconfirmed_security_failure(result)
 
 
 def test_input_exception_is_preserved_without_erasing_independent_failure(tmp_path):
@@ -324,4 +328,5 @@ def test_req09_unbound_process_cannot_create_confirmed_fail(tmp_path, damage, in
     assert gap in projection["gaps"]
     assert draft.observations["confirmed_input_violations"].value == existing
     _, result = judged(tmp_path, "REQ-09", draft, env, values)
-    assert result.verdicts.security.value == ("FAIL" if independent else "UNKNOWN")
+    assert result.verdicts.security.value == "FAIL"
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is independent

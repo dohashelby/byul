@@ -21,6 +21,7 @@ from .enums import (
     NotSelectedReason,
     PolicyStatus,
     ReviewStatus,
+    SecurityFailureTag,
     Side,
     Verdict,
 )
@@ -557,10 +558,28 @@ class Result(GuardObject):
     verification_level: DataOrigin | None = None
     as_of: datetime | None = None
     evaluation_mode: Literal["carryover"] | None = None
+    security_verdict_version: Literal["binary-v1"] | None = None
+    security_failure_tags: list[SecurityFailureTag] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _security_verdict_contract(self) -> "Result":
+        tags = self.security_failure_tags
+        if self.security_verdict_version is None:
+            if tags:
+                raise ValueError("security failure tags require a verdict version")
+            return self
+        if self.verdicts.security not in (Verdict.PASS, Verdict.FAIL):
+            raise ValueError("binary security verdict must be PASS or FAIL")
+        if (self.verdicts.security == Verdict.FAIL) != bool(tags) or len(set(tags)) != len(tags):
+            raise ValueError("security FAIL requires unique tags and PASS cannot have tags")
+        return self
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("as_of", "evaluation_mode"))
+        data = _drop_none(handler(self), ("as_of", "evaluation_mode", "security_verdict_version"))
+        if not self.security_failure_tags:
+            data.pop("security_failure_tags", None)
+        return data
 
 
 # --- 4.7 RPT -----------------------------------------------------------------
@@ -577,10 +596,21 @@ class SideResult(Strict):
     evidence_ref: Ref | None = None
     execution_status: ExecStatus | None = None
     data_origin: DataOrigin | None = None
+    security_failure_tags: list[SecurityFailureTag] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _security_failure_tag_contract(self) -> "SideResult":
+        tags = self.security_failure_tags
+        if tags and (self.security != Verdict.FAIL or len(set(tags)) != len(tags)):
+            raise ValueError("security failure tags must be unique and apply to security FAIL")
+        return self
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("reasons", "evidence_ref", "execution_status", "data_origin"))
+        data = _drop_none(handler(self), ("reasons", "evidence_ref", "execution_status", "data_origin"))
+        if not self.security_failure_tags:
+            data.pop("security_failure_tags", None)
+        return data
 
 
 class ExceptionDisplay(Strict):
@@ -682,11 +712,13 @@ class Report(GuardObject):
     execution_attempt_id: str | None = None
     as_of: datetime | None = None
     diagnostic_artifacts: list[Artifact] | None = None
+    security_verdict_version: Literal["binary-v1"] | None = None
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
         return _drop_none(handler(self), ("evidence_counts", "change_summary", "carry_counts",
-                                          "execution_attempt_id", "as_of", "diagnostic_artifacts"))
+                                          "execution_attempt_id", "as_of", "diagnostic_artifacts",
+                                          "security_verdict_version"))
 
 
 OBJECT_CLASSES: dict[str, type[GuardObject]] = {

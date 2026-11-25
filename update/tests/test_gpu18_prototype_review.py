@@ -30,7 +30,7 @@ EXPECTED_IDS = frozenset({
     "PLT-02", "REQ-08", "REQ-09", "REQ-10", "SUP-03", "SUP-05",
     "SUP-06", "SUP-08", "SUP-09", "SUP-10", "SUP-11", "SUP-16",
 })
-EXPECTED_VERDICTS = {"normal": "PASS", "violation": "FAIL", "missing": "UNKNOWN"}
+EXPECTED_VERDICTS = {"normal": "PASS", "violation": "FAIL", "missing": "FAIL"}
 KINDS = ("ENV", "POL", "CHG", "PLAN", "EVD", "RES", "RPT")
 
 
@@ -172,6 +172,9 @@ def test_public_summary_has_exact_scope_and_expected_scenarios(demo):
     for run in summary["runs"]:
         assert isinstance(run["plan_id"], str) and isinstance(run["report_id"], str)
         assert run["verdicts"] == dict.fromkeys(EXPECTED_IDS, EXPECTED_VERDICTS[run["scenario"]])
+        tags = run["security_failure_tags"]
+        assert set(tags) == (set() if run["scenario"] == "normal" else EXPECTED_IDS)
+        assert all(("CONFIRMED_VIOLATION" in values) is (run["scenario"] == "violation") for values in tags.values())
     assert set(summary["integration_required"]) == EXPECTED_IDS
     assert all(isinstance(text, str) and text.strip()
                for text in summary["integration_required"].values())
@@ -187,6 +190,8 @@ def test_stored_pipeline_refs_and_judgments_match_summary(demo):
         evidence, results = _evidence_results(store, plan)
         assert set(evidence) == set(results) == EXPECTED_IDS
         assert {cid: result.verdicts.security.value for cid, result in results.items()} == run["verdicts"]
+        assert {cid: [tag.value for tag in result.security_failure_tags]
+                for cid, result in results.items() if result.security_failure_tags} == run["security_failure_tags"]
         policy = store.resolve(plan.inputs.policy)
         for cid, evd in evidence.items():
             values = policy.values[cid]
@@ -213,6 +218,8 @@ def test_stored_pipeline_refs_and_judgments_match_summary(demo):
         selected = {row.check_id: row for row in report.by_check if row.selected}
         assert set(selected) == EXPECTED_IDS
         assert {cid: row.single.security.value for cid, row in selected.items()} == run["verdicts"]
+        assert {cid: [tag.value for tag in row.single.security_failure_tags]
+                for cid, row in selected.items() if row.single.security_failure_tags} == run["security_failure_tags"]
 
 
 def test_every_saved_object_remains_example_and_draft_nonofficial(demo):
@@ -312,6 +319,8 @@ def test_independent_failure_is_not_erased_by_failed_pass_gate(demo):
         result = judge_evidence(pack.checks[cid], incomplete_control, policy,
                                 datetime.fromisoformat(demo.summary["as_of"]), plan=plan)
         assert result.verdicts.security.value == "FAIL", cid
+        assert "CONFIRMED_VIOLATION" in result.security_failure_tags
+        assert "INSUFFICIENT_EVIDENCE" in result.security_failure_tags
         assert result.data_origin.value == "EXAMPLE"
 
 

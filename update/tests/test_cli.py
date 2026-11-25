@@ -40,7 +40,10 @@ def test_end_to_end(workdir, scenario, expected):
     _ok(["report", "--plan", plan_id, "--json", "out.json"])
     data = json.loads((workdir / "out.json").read_text(encoding="utf-8"))
     (row,) = [r for r in data["by_check"] if r["check_id"] == "REQ-01"]
-    assert row["single"]["security"] == expected
+    assert row["single"]["security"] == ("FAIL" if expected == "UNKNOWN" else expected)
+    tags = row["single"].get("security_failure_tags", [])
+    assert ("CONFIRMED_VIOLATION" in tags) == (expected == "FAIL")
+    assert bool(tags) == (expected != "PASS")
     assert data["official"] is False and data["approval"] is None
     assert "OK" in _ok(["verify"])
 

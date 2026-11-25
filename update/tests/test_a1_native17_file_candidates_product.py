@@ -11,7 +11,7 @@ from guard.runtime import kubernetes_http as http
 from guard.store import Store
 from guard.adapters import vllm_file_read_sensor as sensor
 from guard.executors import observation_identity_contract as contract
-from tests.builders import policy,T0
+from tests.builders import assert_unconfirmed_security_failure, policy,T0
 from tests.test_lifecycle_sensor import writer_factory
 from tests.test_lifecycle_capture import case,external,revised
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -121,7 +121,8 @@ def test_existing_identity_product_dedicated_native17_consumption_and_exact_refs
     cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');evd,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert evd.data_origin.value=='EXAMPLE' and evd.normal_control.succeeded is None
-    assert all(getattr(res.verdicts,key).value=='UNKNOWN' for key in ('security','functional','performance'))
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert all(evd.observations[key].value is False for key in contract.TRUTH_FIELDS)
     candidates=evd.observations['identity_native_models'].value
     weights=[weight for row in candidates for model in row['configured_model_candidates'] for weight in model.get('weight_iteration_candidates',[])]

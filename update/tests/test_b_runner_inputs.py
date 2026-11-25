@@ -13,7 +13,7 @@ from guard.collectors.engine_callbacks import prepare_assets
 from guard.executors import common_consumption as bridge, registry
 from guard.executors.http_common import Ctx
 from guard.models import canonical_json, sha256_hex, utcnow
-from tests.builders import completion_response, environment
+from tests.builders import assert_unconfirmed_security_failure, completion_response, environment
 from tests.test_b12_runner_consumers import PACK, judged, make_runner
 from tools import b_runner_inputs as tool
 
@@ -257,7 +257,10 @@ def test_prepared_config_enters_registered_factory_and_stored_evidence(tmp_path,
         timeout=1, allow_mutating=False, keys={}, secrets=[], cprobe=probe, workdir=tmp_path / "work", started=utcnow())
     draft = executor._finish(ctx)
     evd, result = judged(tmp_path, "REQ-08", draft, case["env"], values)
-    assert result.verdicts.security.value == expected
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security.value == expected
     assert evd.data_origin.value == result.data_origin.value == "EXAMPLE"
     artifact = next(a for a in evd.artifacts if a.name == "b_common_consumption.json")
     assert artifact.sha256 and (tmp_path / "stored" / artifact.path).is_file()

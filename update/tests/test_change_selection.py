@@ -7,7 +7,7 @@ import pytest
 
 from guard.core.change_selection import input_diff, selection_triggers, source_image_relation
 from guard.models.objects import Change
-from guard.models import DataOrigin, PolicyStatus, Verdict
+from guard.models import DataOrigin, PolicyStatus, SecurityFailureTag, Verdict
 from tests.builders import T0, baseline_pack, environment, policy
 
 
@@ -233,7 +233,11 @@ def test_no_previous_plan_is_full_scope_without_store_writes(reuse_case):
 def test_nonpass_result_is_reselected(reuse_case, axis, value):
     case = reuse_case
     verdicts = case["result"].verdicts.model_copy(update={axis: Verdict(value)})
-    result = case["result"].model_copy(update={"revision": 2, "verdicts": verdicts}).seal()
+    result = case["result"].model_copy(update={
+        "revision": 2, "verdicts": verdicts,
+        "security_verdict_version": "binary-v1" if value == "FAIL" else None,
+        "security_failure_tags": [SecurityFailureTag.INSUFFICIENT_EVIDENCE] if value == "FAIL" else [],
+    }).seal()
     case["store"].put(result)
     assert "PLT-04" not in _context(case).carried_over
 

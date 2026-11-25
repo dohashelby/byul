@@ -236,7 +236,9 @@ def test_current_guard_generated_rpt_obeys_platform_contract_without_rejudging(t
     assert converted["byul_policy_ref"] is None
     row = next(c for c in converted["checks"] if c["check_id"] == "REQ-01")
     original = next(c for c in rpt["by_check"] if c["check_id"] == "REQ-01")
-    assert row["sides"]["single"]["security"] == original["single"]["security"] == "UNKNOWN"
+    assert converted["security_verdict_version"] == "binary-v1"
+    assert row["sides"]["single"]["security"] == original["single"]["security"] == "FAIL"
+    assert row["sides"]["single"]["security_failure_tags"] == ["INSUFFICIENT_EVIDENCE"]
     assert row["sides"]["single"]["functional"] is None
     assert row["sides"]["single"]["performance"] is None
     assert row["sides"]["single"]["result_ref"] is None
@@ -298,8 +300,9 @@ def test_platform_reads_current_rpt_and_keeps_u1_raw_detail(tmp_path, current_pa
     pytest.param(False, "FAIL", id="unapproved-running-image"),
     pytest.param(True, "UNKNOWN", id="approved-image-partial-supply-scope"),
 ])
+@pytest.mark.parametrize("binary_security", [False, True], ids=["legacy", "binary"])
 def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
-        tmp_path, monkeypatch, contracts, current_pack, approved_matches, expected):
+        tmp_path, monkeypatch, contracts, current_pack, approved_matches, expected, binary_security):
     """제품 실행·판정·보고 경로를 대역으로 통과시킨다. 실제 Docker/vLLM 실증 아님."""
     pinned = "example.invalid/cpu-engine@sha256:" + "a" * 64
     other = "example.invalid/cpu-engine@sha256:" + "c" * 64
@@ -357,23 +360,30 @@ def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
     store.put(plan)
     (evidence,) = run_plan(store, current_pack, plan,
                           RunConfig(executors={"container_config": "contract-sim"}, adapter="vllm"))
-    (result,) = judge_plan(store, current_pack, plan, as_of=T0)
+    (result,) = judge_plan(store, current_pack, plan, as_of=T0, binary_security=binary_security)
     assert evidence.execution.status.value == "COMPLETED"
     assert evidence.normal_control.succeeded is True
     assert any(not step.attempted for step in evidence.challenges)
     assert evidence.observations["running_image_identity_verified"].value is True
     assert evidence.observations["supply_execution_scope_complete"].value is False
-    assert result.verdicts.security.value == expected
+    security = "FAIL" if binary_security else expected
+    assert result.verdicts.security.value == security
     assert result.verdicts.functional.value == result.verdicts.performance.value == "UNKNOWN"
     originals = {obj.id: obj.to_dict() for obj in (env, pol, plan, evidence, result)}
-    report = build_report(store, current_pack, plan, None)
+    report = build_report(store, current_pack, plan, None, binary_security=binary_security)
     assert report.as_of == result.as_of == T0
     rpt = report.to_dict()
     before = deepcopy(rpt)
     converted = rpt_to_verification_result(rpt)
     assert contracts.errors("verification-result", converted) == []
     check = next(row for row in converted["checks"] if row["check_id"] == "SUP-04")
-    assert check["selected"] is True and check["sides"]["single"]["security"] == expected
+    assert check["selected"] is True and check["sides"]["single"]["security"] == security
+    tags = check["sides"]["single"].get("security_failure_tags")
+    if binary_security:
+        assert tags == [tag.value for tag in result.security_failure_tags]
+        assert ("CONFIRMED_VIOLATION" in tags) is not approved_matches
+    else:
+        assert tags is None
     assert check["sides"]["single"]["result_ref"] == result.ref().model_dump(mode="json")
     assert check["sides"]["single"]["verification_level"] == "EXAMPLE"
     assert check["sides"]["single"]["functional"] == check["sides"]["single"]["performance"] == "UNKNOWN"
@@ -390,8 +400,9 @@ def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
 
 
 @pytest.mark.parametrize("approved", [True, False])
-def test_sup03_saved_observation_projects_unknown_without_consumption_claim(
-        tmp_path, contracts, current_pack, approved):
+@pytest.mark.parametrize("binary_security", [False, True], ids=["legacy", "binary"])
+def test_sup03_saved_observation_projects_evidence_gap_without_consumption_claim(
+        tmp_path, contracts, current_pack, approved, binary_security):
     """수집기는 guard suite에서 검증한다. 여기서는 EXAMPLE 저장 EVD의 경계를 확인한다."""
     store = Store(tmp_path / "observation-store")
     env = Environment(id=new_id("ENV"), created_at=T0, data_origin="EXAMPLE",
@@ -420,16 +431,21 @@ def test_sup03_saved_observation_projects_unknown_without_consumption_claim(
         observations={key: {"value": value, "collected": True} for key, value in observations.items()},
     ).seal()
     store.put(evidence)
-    (result,) = judge_plan(store, current_pack, plan, as_of=T0)
-    report = build_report(store, current_pack, plan, T0)
+    (result,) = judge_plan(store, current_pack, plan, as_of=T0, binary_security=binary_security)
+    report = build_report(store, current_pack, plan, T0, binary_security=binary_security)
     before = deepcopy(report.to_dict())
     converted = rpt_to_verification_result(before)
     assert contracts.errors("verification-result", converted) == []
     row = next(item for item in converted["checks"] if item["check_id"] == "SUP-03")
     side = row["sides"]["single"]
-    assert side["security"] == side["functional"] == side["performance"] == "UNKNOWN"
+    assert side["security"] == ("FAIL" if binary_security else "UNKNOWN")
+    assert side["functional"] == side["performance"] == "UNKNOWN"
+    if binary_security:
+        assert set(side["security_failure_tags"]) == {"INSUFFICIENT_EVIDENCE", "NO_PASS_RULE"}
+    else:
+        assert "security_failure_tags" not in side
     assert side["result_ref"] == result.ref().model_dump(mode="json")
-    # 세 축이 모두 UNKNOWN이라 RES의 판정 이유를 원문 그대로 모두 옮긴다(RPT → 계약 → 화면)
+    # 세 축의 판정 이유가 RES에서 보고서와 계약 화면으로 이어진다.
     assert result.reasons and side["reasons"] == result.reasons
     view_check = next(c for c in report_view(converted)["checks"] if c["check_id"] == "SUP-03")
     assert view_check["single"]["reasons"] == result.reasons

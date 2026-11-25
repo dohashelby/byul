@@ -182,7 +182,8 @@ def test_existing_two_registry_factories_to_exact_A_artifacts_EVD_RES_RPT(tmp_pa
     at=datetime.now(timezone.utc)
     results=judge_plan(store,PACK,plan,as_of=at)
     rpt=build_report(store,PACK,plan,as_of=at);store.put(rpt)
-    assert len(results)==2 and all(r.verdicts.security.value=='UNKNOWN' for r in results)
+    assert len(results) == 2 and all(r.verdicts.security.value == 'FAIL' for r in results)
+    assert all('CONFIRMED_VIOLATION' not in r.security_failure_tags for r in results)
     assert rpt.official is False
     refs=[o.ref().model_dump(mode='json') for o in [*evds,*results,rpt]]
     (tmp_path/'exact-new-support-refs.json').write_bytes(canonical_json({

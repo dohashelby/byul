@@ -13,7 +13,7 @@ from guard.executors.fake import DEFAULT_CAPS, SCENARIOS_BY_CHECK
 from guard.models import ExecStatus, Verdict
 from guard.runtime.docker import CmdResult
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, completion_response
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, environment, policy, completion_response
 
 LAB_POLICY = {"allowed_capabilities": [], "allowed_mounts": ["/models:ro"], "allowed_devices": [], "require_non_root": True,
               "allowed_exec_writable_paths": ["/guard-cache"]}
@@ -332,14 +332,15 @@ def test_independent_permission_violation_survives_later_source_error(tmp_path, 
     assert store.verify() == []
 
 
-@pytest.mark.parametrize("profile,expected", [("tmp_exec", Verdict.FAIL), ("hardened", Verdict.UNKNOWN)])
-def test_partial_exec_write_keeps_violation_but_cannot_establish_allowed_subset_pass(tmp_path, profile, expected):
+@pytest.mark.parametrize("profile", ["tmp_exec", "hardened"])
+def test_partial_exec_write_keeps_violation_but_cannot_establish_allowed_subset_pass(tmp_path, profile):
     _, evd, result = _run(tmp_path, PartialDocker(profile, fault="/dev"))
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.observations["permission_scan_complete"].value is False
     assert evd.observations["exec_writable_mounts"].collected is True
     assert evd.observations["exec_writable_mounts"].value == ["/tmp" if profile == "tmp_exec" else "/guard-cache"]
-    assert result.verdicts.security == expected, result.reasons
+    assert result.verdicts.security == Verdict.FAIL, result.reasons
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) == (profile == "tmp_exec")
 
 
 def test_partial_host_sentinel_write_retains_confirmed_success(tmp_path):
@@ -368,7 +369,7 @@ def test_missing_inspect_fields_are_unknown_instead_of_empty_safe_inventory(tmp_
     _, evd, result = _run(tmp_path, PartialDocker(inspect_change=lambda ins: ins.pop(field)))
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.observations["permission_scan_complete"].value is False
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     if field == "HostConfig":
         assert evd.observations["privileged"].collected is False
         assert evd.observations["privileged"].value is None
@@ -389,7 +390,7 @@ def test_missing_inspect_fields_are_unknown_instead_of_empty_safe_inventory(tmp_
 def test_malformed_permission_inventory_does_not_claim_completeness(tmp_path, change):
     _, evd, result = _run(tmp_path, PartialDocker(inspect_change=change))
     assert evd.observations["permission_scan_complete"].value is False
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
 
 
 def test_valid_mount_violation_survives_another_malformed_mount(tmp_path):
@@ -417,7 +418,7 @@ def test_permission_source_failure_without_violation_is_unknown(tmp_path, fault)
     store, evd, result = _run(tmp_path, PartialDocker(fault=fault))
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.observations["permission_scan_complete"].value is False
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
     assert "NEVER_PERSIST" not in json.dumps(_summary(store, evd))
 
 
@@ -437,7 +438,7 @@ def test_invalid_uid_or_caps_cannot_create_phantom_permission_values(tmp_path, f
     _, evd, result = _run(tmp_path, PartialDocker(proc_text="PID 1\n" + fields))
     assert evd.observations["process_scan_complete"].value is False
     assert evd.observations["root_uid_present"].collected is False
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
 
 
 def test_known_root_survives_malformed_later_process(tmp_path):
@@ -452,7 +453,7 @@ def test_duplicate_process_header_keeps_scan_incomplete(tmp_path):
     _, evd, result = _run(tmp_path, PartialDocker(proc_text=
         ("PID 1\nUid:\t1000\t1000\t1000\t1000\nCapEff:\t0\n") * 2))
     assert evd.observations["process_scan_complete"].value is False
-    assert result.verdicts.security == Verdict.UNKNOWN
+    assert_unconfirmed_security_failure(result)
 
 
 def test_saved_partial_permission_evidence_remains_verifiable_after_restore(tmp_path):

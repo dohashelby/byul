@@ -6,7 +6,7 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import Field
 
-from guard.models import CheckDef, Evidence, Verdict
+from guard.models import CheckDef, Evidence, SecurityFailureTag, Verdict
 from guard.models.base import Strict
 
 AXES = ("security", "functional", "performance")
@@ -16,6 +16,9 @@ class JudgeOutput(Strict):
     verdicts: dict[str, Verdict]  # 축별. 빠진 축은 코어가 UNKNOWN으로 둔다
     reasons: list[str] = Field(default_factory=list)
     missing_observations: list[str] = Field(default_factory=list)
+    security_failure_tags: list[SecurityFailureTag] = Field(default_factory=list)
+    # A judge may distinguish an unverified negative assertion from its validated FAIL.
+    security_violation_confirmed: bool | None = None
 
 
 @runtime_checkable

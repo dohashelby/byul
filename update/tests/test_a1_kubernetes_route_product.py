@@ -17,7 +17,7 @@ from guard.executors.kubernetes_lifecycle_capture import supervised_source, Kube
 from guard.executors.owned_capture import _FILE_READER
 from guard.models import canonical_json, load_pack, utcnow
 from guard.store import Store
-from tests.builders import baseline_pack, policy, T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, policy, T0
 from tests.test_kubernetes_request_binding import env, target
 from tests.test_kubernetes_sampling import World as PodWorld, PRIVATE
 from tests.test_native_observations import native_record, CaptureWorld
@@ -146,7 +146,8 @@ def test_product_cli_unknown_exact_ref_and_failure_boundaries(tmp_path, monkeypa
     assert e.observations["route_record_collected"].value is collected
     assert not e.observations["route_producer_authenticated"].value
     assert not e.observations["route_authorization_scope_complete"].value
-    assert all(getattr(res.verdicts, axis).value == "UNKNOWN" for axis in ("security", "functional", "performance"))
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert not e.normal_control.attempted and e.normal_control.succeeded is None
     assert bool(e.execution.cleanup_errors) is (mode == "cleanup")
     assert e.execution.status.value == ("COMPLETED" if mode in {"normal", "reported-bypass", "cleanup"} else "ABORTED")

@@ -112,7 +112,7 @@ class _PureGraph:
 
 def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, different_config=False,
                       same_version=False, same_image=False, mutate_evidence=None, in_memory=False,
-                      model_metadata=None):
+                      model_metadata=None, binary_security=True):
     """Build only synthetic objects with the real pack/rules and product report.
 
     mutate_evidence(cid, side, raw) may modify test input before sealing and
@@ -170,8 +170,8 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
                 mutate_evidence(cid, side, raw)
             store.put(Evidence(**raw).seal())
     judge = judge_plan_locked if in_memory else judge_plan
-    judge(store, pack, plan, T0)
-    report = build_report(store, pack, plan, T0)
+    judge(store, pack, plan, T0, binary_security=binary_security)
+    report = build_report(store, pack, plan, T0, binary_security=binary_security)
     store.put(report)
     objects = [obj.to_dict() for kind in ("ENV", "POL", "CHG", "PLAN", "EVD", "RES", "RPT")
                for obj in store.iter_kind(kind)]

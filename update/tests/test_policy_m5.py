@@ -155,7 +155,8 @@ def test_manual_approval_to_report_preserves_history_and_escapes_context(tmp_pat
     import_evidence(st, pack, write(tmp_path, doc), now=T0)
     results = {r.check_id: r for r in judge_plan(st, pack, plan, T0)}
     assert results["SUP-01"].verdicts.security == "PASS"
-    assert results["SUP-02"].verdicts.security == "UNKNOWN"
+    assert results["SUP-02"].verdicts.security == "FAIL"
+    assert "CONFIRMED_VIOLATION" not in results["SUP-02"].security_failure_tags
     # The evidence is declared; the result keeps the weaker EXAMPLE ENV/POL
     # provenance rather than promoting this synthetic contract to real data.
     assert all(r.judge.version == "0.14.0" and r.data_origin == "EXAMPLE" for r in results.values())

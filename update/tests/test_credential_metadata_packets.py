@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from guard.executors.credential_candidates import decode_metadata
+from tests.builders import assert_unconfirmed_security_failure
 from tests.test_credential_mount_semantics import FakeDocker, context
 
 PATH = "/EXAMPLE-credentials/key"
@@ -154,7 +155,11 @@ def test_packet_product_storage_report_restore_and_exact_rejudge(tmp_path, monke
             later.setattr(Store, "put_artifact", unavailable)
         evd, = run_plan(store, pack, plan, RunConfig(executors={"credential_exposure": "real"}, adapter="vllm"))
     result, = judge_plan(store, pack, plan, as_of=env.created_at)
-    assert evd.data_origin.value == "EXAMPLE" and result.verdicts.security.value == expected
+    assert evd.data_origin.value == "EXAMPLE"
+    if expected == "UNKNOWN":
+        assert_unconfirmed_security_failure(result)
+    else:
+        assert result.verdicts.security.value == expected
     assert evd.execution.executor.version == "0.5.2"
     assert evd.execution.status.value == ("ABORTED" if mode == "later_attachment_failure" else "COMPLETED")
     assert evd.observations["credential_candidates_complete"].value is (mode == "normal")
@@ -162,7 +167,8 @@ def test_packet_product_storage_report_restore_and_exact_rejudge(tmp_path, monke
         assert not evd.artifacts and "ARTIFACT_PERSISTENCE_INCOMPLETE" in evd.execution.abort_reason
     report = build_report(store, pack, plan, as_of=env.created_at); store.put(report)
     row, = [row for row in report.by_check if row.check_id == "PLT-04"]
-    assert row.single.security.value == expected and report.official is False
+    assert row.single.security == result.verdicts.security and report.official is False
+    assert row.single.security_failure_tags == result.security_failure_tags
     original = canonical_json(evd.to_dict())
     assert CANARY not in original.decode()
     export_bundle(store.root, tmp_path / "packet.zip")
@@ -171,4 +177,4 @@ def test_packet_product_storage_report_restore_and_exact_rejudge(tmp_path, monke
     assert restored.verify() == [] and canonical_json(restored.resolve(evd.ref()).to_dict()) == original
     assert restored.resolve(report.ref()).to_dict() == report.to_dict()
     replayed, = judge_plan(restored, get_pack(restored, pack.ref()), restored.resolve(plan.ref()), as_of=env.created_at)
-    assert replayed.ref() == result.ref() and replayed.verdicts.security.value == expected
+    assert replayed.ref() == result.ref() and replayed.verdicts.security == result.verdicts.security

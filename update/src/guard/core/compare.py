@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from guard.models import Comparison, Verdict
+from collections.abc import Collection
+
+from guard.models import Comparison, SecurityFailureTag, Verdict
 from guard.models.objects import Comparability
 
 _TABLE: dict[tuple[Verdict, Verdict], Comparison] = {
@@ -38,3 +40,12 @@ def compare(baseline: Verdict, candidate: Verdict, comparable: bool) -> Comparis
 
 def compare_results(base: Verdict, base_cmp: Comparability, cand: Verdict, cand_cmp: Comparability) -> Comparison:
     return compare(base, cand, comparable(base_cmp, cand_cmp))
+
+
+def security_comparison_verdict(
+    verdict: Verdict, failure_tags: Collection[SecurityFailureTag],
+) -> Verdict:
+    """An unproven FAIL blocks a conclusive update comparison."""
+    if verdict == Verdict.FAIL and failure_tags and SecurityFailureTag.CONFIRMED_VIOLATION not in failure_tags:
+        return Verdict.UNKNOWN
+    return verdict

@@ -15,7 +15,7 @@ from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.models import canonical_json, load_pack, sha256_hex, utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
-from tests.builders import baseline_pack, policy, T0
+from tests.builders import assert_unconfirmed_security_failure, baseline_pack, policy, T0
 from tests.test_a1_required_event_product import World as OriginalWorld, PRIVATE
 from tests.test_a1_retry_record_contract import example, bind, automatic, rows_of, append_row
 from tests.test_kubernetes_request_binding import env
@@ -122,7 +122,8 @@ def test_existing_request_termination_retry_records_cli_exact_refs(tmp_path,monk
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');evd,=store.iter_kind('EVD');result,=store.iter_kind('RES')
     assert evd.data_origin.value=='EXAMPLE' and evd.normal_control.attempted is False and evd.normal_control.succeeded is None
-    assert result.verdicts.model_dump(mode='json')=={k:'UNKNOWN' for k in ('security','functional','performance')}
+    assert_unconfirmed_security_failure(result)
+    assert result.verdicts.functional == result.verdicts.performance == "UNKNOWN"
     assert all(evd.observations[k].value is False for k in ('retry_producer_authenticated','automatic_retry_verified','retry_nonoccurrence_verified',
         'retry_previous_work_termination_verified','retry_cost_enforcement_verified','retry_scope_complete'))
     assert world.sent==[] and receipt['unchanged_definition_bytes']==76 and not receipt['full_LIF12_complete']

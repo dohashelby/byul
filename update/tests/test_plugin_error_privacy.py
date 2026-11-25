@@ -98,10 +98,8 @@ def test_judge_fallback_never_formats_exception_and_retains_unknown(monkeypatch,
     error, calls = failure(kind)
     monkeypatch.setitem(judges.JUDGES, "rule_table", broken_judge(error))
     res = judge(evidence(observations=OK))
-    assert_unconfirmed_security_failure(res)
-    assert res.verdicts.functional == res.verdicts.performance == Verdict.UNKNOWN
-    assert "INSUFFICIENT_EVIDENCE" in res.security_failure_tags
-    assert ("ABORTED" in res.security_failure_tags) == (stage == "executor")
+    assert set(res.verdicts.model_dump().values()) == {Verdict.UNKNOWN}
+    assert not res.security_failure_tags
     assert res.reasons == ["JUDGE_PLUGIN_FAILURE"] and calls == []
     assert CANARY not in canonical_json(res.to_dict()).decode()
 
@@ -136,7 +134,10 @@ def test_private_error_is_absent_from_saved_report_bundle_and_exact_ref_replay(c
         case.add_files(1)
     evd = case.invoke()
     res, = judge_plan(case.store, case.pack, case.plan, as_of=T0)
-    assert set(res.verdicts.model_dump().values()) == {Verdict.UNKNOWN}
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == Verdict.UNKNOWN
+    assert "INSUFFICIENT_EVIDENCE" in res.security_failure_tags
+    assert ("ABORTED" in res.security_failure_tags) == (stage == "executor")
     assert evd.execution.status == (ExecStatus.ABORTED if stage == "executor" else ExecStatus.COMPLETED)
     assert evd.execution.abort_reason == ("EXECUTOR_FAILURE" if stage == "executor" else None)
     if stage == "judge":

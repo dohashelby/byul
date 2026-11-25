@@ -163,6 +163,25 @@ def test_normal_stream_preparation_matches_the_declared_transport(tmp_path, monk
             executor.prepared_normal_stream(check, env, values, expected_target_sha256=digest)
 
 
+def test_normal_stream_rejects_a_late_target_alias_before_transport(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail('An aliased LIF-04 target must not reach the transport')
+
+    env, _, cfg, values = configuration(tmp_path)
+    check = load_pack(PACK_PATH).checks['LIF-04']
+    digest = values['buffer_target_sha256']
+    executor = KubernetesStreamBufferExecutor(cfg, runner=forbidden, environ={}, expected_target_sha256=digest)
+    executor.prepared_normal_stream(check, env, values, expected_target_sha256=digest)
+    selected = Path(cfg['target'])
+    original = selected.with_name('original-target.json')
+    selected.rename(original)
+    selected.symlink_to(original.name)
+    monkeypatch.setattr(executor, '_transport', forbidden)
+
+    with pytest.raises(ValueError, match='^STREAM_BUFFER_CONFIGURATION_INVALID$'):
+        executor.run(check, env, values, VllmAdapter(), tmp_path / 'work')
+
+
 def test_failed_normal_transport_keeps_only_its_typed_diagnostic_in_artifact(tmp_path, monkeypatch):
     def binding_unavailable(*args, **kwargs):
         raise KubernetesBindingError()

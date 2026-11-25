@@ -8,6 +8,7 @@ import pytest
 from guard.executors import registry
 from guard.models import DataOrigin, Policy
 from guard.store import Store
+from tests.builders import assert_unconfirmed_security_failure
 from tests.test_kubernetes_request_binding import env, target
 from tools import b_online_kubernetes_run as runner
 
@@ -130,16 +131,20 @@ def test_later_errors_preserve_independent_fail_and_cleanup(tmp_path, inputs, la
     assert {r.check_id: r.verdicts.security.value for r in results}['REQ-08'] == 'FAIL'
 
 
-def test_missing_attribution_stays_unknown_without_erasing_other_fail(tmp_path, inputs):
+def test_missing_attribution_remains_unconfirmed_without_erasing_other_fail(tmp_path, inputs):
     _, _, evidence, results = run(tmp_path, inputs, unqualified='REQ-08')
-    assert {r.check_id: r.verdicts.security.value for r in results} == {
-        'REQ-07': 'FAIL', 'REQ-08': 'UNKNOWN', 'SUP-08': 'FAIL'}
+    by_check = {r.check_id: r for r in results}
+    assert set(by_check) == {'REQ-07', 'REQ-08', 'SUP-08'}
+    assert_unconfirmed_security_failure(by_check['REQ-08'])
+    for cid in ('REQ-07', 'SUP-08'):
+        assert by_check[cid].verdicts.security.value == 'FAIL'
+        assert 'CONFIRMED_VIOLATION' in by_check[cid].security_failure_tags
     missing = next(e for e in evidence if e.check_id == 'REQ-08')
     assert missing.observations['online_input_confirmed_violations'].value is None
 
 
 @pytest.mark.parametrize('execute', [False, True])
-def test_actual_entry_stays_closed_without_a_capabilities_and_stores_unknown(tmp_path, inputs, monkeypatch, execute):
+def test_actual_entry_stays_closed_without_capabilities_and_records_abort(tmp_path, inputs, monkeypatch, execute):
     def forbidden(*args, **kwargs):
         raise AssertionError('network must not run')
     monkeypatch.setattr(runner.lifecycle_reader.KubernetesLifecycleReader, 'snapshot', forbidden)
@@ -149,7 +154,11 @@ def test_actual_entry_stays_closed_without_a_capabilities_and_stores_unknown(tmp
     assert summary['started_at'] is None and not summary['execution_complete']
     store = Store(tmp_path / 'closed/store')
     assert len(list(store.iter_kind('EVD'))) == 3
-    assert all(r.verdicts.security.value == 'UNKNOWN' for r in store.iter_kind('RES'))
+    results = list(store.iter_kind('RES'))
+    assert len(results) == 3
+    for result in results:
+        assert_unconfirmed_security_failure(result)
+        assert 'ABORTED' in result.security_failure_tags
 
 
 @pytest.mark.parametrize('change', ['envref', 'targethash', 'session', 'owner', 'isolation', 'model', 'duplicate', 'verified'])
@@ -350,9 +359,15 @@ def test_production_adapter_calls_public_http_reader_and_one_capture(tmp_path, i
     assert summary['execution_complete'] is native and summary['restore_verified']
     store=Store(tmp_path / 'public/store')
     if native:
-        assert {r.check_id:r.verdicts.security.value for r in store.iter_kind('RES')}['REQ-08']=='FAIL'
+        result = next(r for r in store.iter_kind('RES') if r.check_id == 'REQ-08')
+        assert result.verdicts.security.value == 'FAIL'
+        assert 'CONFIRMED_VIOLATION' in result.security_failure_tags
         assert all(len(e.artifacts)==1 for e in store.iter_kind('EVD'))
-    else:assert all(r.verdicts.security.value=='UNKNOWN' for r in store.iter_kind('RES'))
+    else:
+        results = list(store.iter_kind('RES'))
+        assert len(results) == 3
+        for result in results:
+            assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize('change', ['image', 'callback_bytes', 'callback_code', 'source', 'module_code', 'missing_contract'])

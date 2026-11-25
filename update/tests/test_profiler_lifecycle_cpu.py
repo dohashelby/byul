@@ -188,7 +188,9 @@ def test_parent_postcheck_failure_keeps_qualified_fail_through_core(tmp_path, mo
     assert all(item.attempted for item in evd.challenges)
     assert evd.observations['profiler_cpu_stop_mismatch'].value is True
     judged = judge_evidence(selected,evd,pol,plan.created_at,plan=plan)
-    assert judged.verdicts.functional == Verdict.FAIL and judged.verdicts.security == Verdict.UNKNOWN
+    assert judged.verdicts.functional == Verdict.FAIL and judged.verdicts.security == Verdict.FAIL
+    assert {'ABORTED', 'NO_PASS_RULE'} <= set(judged.security_failure_tags)
+    assert 'CONFIRMED_VIOLATION' not in judged.security_failure_tags
     artifact = json.loads((store.root / evd.artifacts[0].path).read_text())
     assert artifact['source_postcheck']['status'] == status
     assert all(row['source_postcheck']['status']=='verified' for row in artifact['rows'])

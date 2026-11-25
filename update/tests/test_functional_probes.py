@@ -76,8 +76,8 @@ def test_non_inference_metrics_and_health_keep_their_status_expectation():
     assert set(functional.values()) == {"pass"} and normal["succeeded"] is True
 
 
-@pytest.mark.parametrize("exposed, expected", [(False, "UNKNOWN"), (True, "FAIL")])
-def test_direct_security_pass_withheld_but_independent_violation_kept_if_inference_is_invalid(tmp_path, exposed, expected):
+@pytest.mark.parametrize("exposed", [False, True])
+def test_direct_security_pass_withheld_but_independent_violation_kept_if_inference_is_invalid(tmp_path, exposed):
     from tests.test_direct_route import World, _run
     world = World(exposed=exposed)
     original = world.handle
@@ -89,5 +89,7 @@ def test_direct_security_pass_withheld_but_independent_violation_kept_if_inferen
     world.handle = handle
     _, evd, res = _run(tmp_path, world)
     assert evd.normal_control.succeeded is False
-    assert res.verdicts.security.value == expected
+    assert res.verdicts.security == Verdict.FAIL
+    assert 'CONDITIONS_UNMET' in res.security_failure_tags
+    assert ('CONFIRMED_VIOLATION' in res.security_failure_tags) is exposed
     assert res.verdicts.functional.value == "UNKNOWN"

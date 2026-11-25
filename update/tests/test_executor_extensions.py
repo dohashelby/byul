@@ -211,15 +211,18 @@ def receipt(fields, sink="sink"):
 START = {"schema": usage_report.START_SCHEMA}
 
 
-@pytest.mark.parametrize("after,sink,security", [
-    (usage_snapshot(), [[START], [START]], "PASS"),
-    (usage_snapshot(sha="b" * 64), [[START], [START]], "FAIL"),
-    (usage_snapshot(), [[START], [START, receipt(["event"])]], "FAIL"),
-    (usage_snapshot(), None, "UNKNOWN"),
+@pytest.mark.parametrize("after,sink,security,confirmed", [
+    (usage_snapshot(), [[START], [START]], "PASS", False),
+    (usage_snapshot(sha="b" * 64), [[START], [START]], "FAIL", True),
+    (usage_snapshot(), [[START], [START, receipt(["event"])]], "FAIL", True),
+    (usage_snapshot(), None, "FAIL", False),
 ])
-def test_obs04_silence_needs_a_send_sensor(tmp_path, monkeypatch, after, sink, security):
+def test_obs04_silence_needs_a_send_sensor(tmp_path, monkeypatch, after, sink, security, confirmed):
     _, result = usage_run(tmp_path, "OBS-04", HelperDocker([usage_snapshot(), after]), USAGE, monkeypatch, deepcopy(sink))
     assert result.verdicts.security.value == security
+    assert ('CONFIRMED_VIOLATION' in result.security_failure_tags) is confirmed
+    if sink is None:
+        assert_unconfirmed_security_failure(result)
 
 
 def test_obs04_existing_old_file_is_not_a_new_report(tmp_path, monkeypatch):
@@ -323,14 +326,17 @@ PLAIN = {"tcp": True, "tls": False, "reason": "no_tls"}
 GONE = {"tcp": False, "tls": False, "reason": "unreachable"}
 
 
-@pytest.mark.parametrize("reply,security", [
-    (handshake(OK, REFUSED_PEER), "UNKNOWN"), (handshake(PLAIN, PLAIN), "FAIL"),
-    (handshake(OK, OK), "FAIL"), (handshake(GONE, GONE), "UNKNOWN"),
+@pytest.mark.parametrize("reply,confirmed", [
+    (handshake(OK, REFUSED_PEER), False), (handshake(PLAIN, PLAIN), True),
+    (handshake(OK, OK), True), (handshake(GONE, GONE), False),
 ])
-def test_plt09_handshake_results(tmp_path, reply, security):
+def test_plt09_handshake_results(tmp_path, reply, confirmed):
     evd, result = pipeline(tmp_path, "PLT-09", lambda c: APITransportExecutor(c, docker=HelperDocker([reply])), TRANSPORT,
                            extra_cfg={"record_segments": [SEGMENT]})
-    assert result.verdicts.security.value == security
+    assert result.verdicts.security.value == 'FAIL'
+    assert ('CONFIRMED_VIOLATION' in result.security_failure_tags) is confirmed
+    if not confirmed:
+        assert_unconfirmed_security_failure(result)
     assert evd.observations["record_transport_sender_verified"].value is False
 
 

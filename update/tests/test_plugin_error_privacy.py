@@ -11,7 +11,7 @@ from guard.models import ExecStatus, Verdict, canonical_json
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import get_pack, put_pack
-from tests.builders import PACK_DIR, T0, evidence
+from tests.builders import PACK_DIR, T0, assert_unconfirmed_security_failure, evidence
 from tests.judging import OK, judge
 from tests.test_run import assert_empty_aborted, case  # noqa: F401 - shared EXAMPLE fixture
 
@@ -98,7 +98,10 @@ def test_judge_fallback_never_formats_exception_and_retains_unknown(monkeypatch,
     error, calls = failure(kind)
     monkeypatch.setitem(judges.JUDGES, "rule_table", broken_judge(error))
     res = judge(evidence(observations=OK))
-    assert set(res.verdicts.model_dump().values()) == {Verdict.UNKNOWN}
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == Verdict.UNKNOWN
+    assert "INSUFFICIENT_EVIDENCE" in res.security_failure_tags
+    assert ("ABORTED" in res.security_failure_tags) == (stage == "executor")
     assert res.reasons == ["JUDGE_PLUGIN_FAILURE"] and calls == []
     assert CANARY not in canonical_json(res.to_dict()).decode()
 
@@ -137,7 +140,9 @@ def test_private_error_is_absent_from_saved_report_bundle_and_exact_ref_replay(c
     assert evd.execution.status == (ExecStatus.ABORTED if stage == "executor" else ExecStatus.COMPLETED)
     assert evd.execution.abort_reason == ("EXECUTOR_FAILURE" if stage == "executor" else None)
     if stage == "judge":
-        assert res.reasons == ["JUDGE_PLUGIN_FAILURE"] and len(evd.artifacts) == 1
+        assert len(res.reasons) == 2 and res.reasons[0] == "JUDGE_PLUGIN_FAILURE"
+        assert res.reasons[1].startswith("security: FAIL because PASS requirements were not established")
+        assert len(evd.artifacts) == 1
     put_pack(case.store, PACK_DIR)
     rpt = build_report(case.store, case.pack, case.plan, as_of=T0)
     case.store.put(rpt)

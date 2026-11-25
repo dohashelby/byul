@@ -168,8 +168,7 @@ def test_json_and_html_report_explain_input_only_scope_and_output_gap(tmp_path, 
     data = json.loads(json.dumps(report.to_dict(), ensure_ascii=False))
     row = next(row for row in data["by_check"] if row["check_id"] == "REQ-11")
     assert row["single"]["security"] == "FAIL"
-    assert "INSUFFICIENT_EVIDENCE" in row["single"]["security_failure_tags"]
-    assert "CONFIRMED_VIOLATION" not in row["single"]["security_failure_tags"]
+    assert row["single"]["security_failure_tags"] == ["NO_PASS_RULE"]
     assert row["single"]["functional"] == "PASS"
     assert data["official"] is False and data["data_origin"] == "EXAMPLE"
     for required in ("입력 projection", "생성 출력 자체의 귀속은 미검증", "보안 PASS를 보류"):

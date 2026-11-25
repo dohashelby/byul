@@ -74,7 +74,11 @@ def test_observer_example_metadata_survives_original_manual_and_exact_ref_restor
     assert evidence.plan == case['plan'].ref() and evidence.environment == case['env'].ref()
     assert verdict.evidence == evidence.ref() and verdict.ref() in report.inputs_manifest
     assert evidence.data_origin.value == 'DECLARED'
-    assert verdict.verdicts.model_dump(mode='json') == dict.fromkeys(('security', 'functional', 'performance'), 'UNKNOWN')
+    assert verdict.verdicts.model_dump(mode='json') == {
+        'security': 'FAIL', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN',
+    }
+    assert 'INSUFFICIENT_EVIDENCE' in verdict.security_failure_tags
+    assert 'CONFIRMED_VIOLATION' not in verdict.security_failure_tags
     assert not evidence.normal_control.attempted and all(not row.attempted for row in evidence.challenges)
     artifact, = evidence.artifacts
     capture_bytes = (output / 'graph-capture.json').read_bytes()

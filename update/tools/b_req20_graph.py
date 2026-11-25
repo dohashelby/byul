@@ -599,6 +599,7 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
             issues.append('MANUAL_FORM_WRITE_UNAVAILABLE')
         import_evidence(dest, original, form, document=doc); stages['manual_evidence_stored'] = True; as_of = datetime.now(timezone.utc).replace(microsecond=0)
         results = judge_plan(dest, original, plan, as_of=as_of); report = build_report(dest, original, plan, as_of=as_of)
+        result, = results
         dest.put(report); stages['report_stored'] = True; verify_complete(dest); refs = _refs(dest)
         export_bundle(dest.root, output / 'evidence.zip'); restore_bundle(output / 'evidence.zip', output / 'restored')
         restored = Store(output / 'restored'); replay = judge_plan(restored, original, plan, as_of=as_of)
@@ -607,7 +608,9 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         verify_complete(restored); stages['bundle_restored'] = True
         if _inventory(source.root) != before or any(hashlib.sha256(Path(p).read_bytes()).hexdigest() != h for p, h in inputs.items()):
             raise ValueError('REQ20_ORIGINAL_INPUT_CHANGED')
-        summary = {'executed': True, 'status': 'stored', 'facts_storage': 'artifact' if attachment else 'manual_declared_observation_notes', **binding, 'collector_calls': 1, 'security': 'UNKNOWN',
+        summary = {'executed': True, 'status': 'stored', 'facts_storage': 'artifact' if attachment else 'manual_declared_observation_notes', **binding, 'collector_calls': 1,
+            'security': result.verdicts.security.value,
+            'security_failure_tags': [tag.value for tag in result.security_failure_tags],
             'candidate_count': record['candidate_count'], 'qualified_rows': sum(r['qualified'] for r in record['rows']),
             'capture_origin': record['data_origin'], 'real_gpu_execution_verified': False,
             'native_capability_supported': supported, 'full_scope_coverage': False, 'issues': issues,

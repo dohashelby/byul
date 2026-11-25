@@ -263,7 +263,9 @@ def test_product_cli_stores_exact_binding_judges_reports_and_verifies(tmp_path, 
             assert get_pack(store, plan.inputs.pack).ref() == plan.inputs.pack
     row, = [r for r in json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["by_check"] if r["check_id"] == "REQ-10"]
     assert {axis: row["single"][axis] for axis in ("security", "functional", "performance")} == {
-        "security": "UNKNOWN", "functional": "PASS", "performance": "UNKNOWN"}
+        "security": "FAIL", "functional": "PASS", "performance": "UNKNOWN"}
+    assert row["single"]["security_failure_tags"]
+    assert "CONFIRMED_VIOLATION" not in row["single"]["security_failure_tags"]
     assert row["single"]["verification_level"] == "EXAMPLE"
     stored_result, = store.find_latest("RES", lambda r: True)
     assert row["single"]["result"] == stored_result.ref().model_dump(mode="json")

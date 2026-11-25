@@ -3,16 +3,20 @@ from copy import deepcopy
 
 import pytest
 
-from guard.models import Verdict
+from guard.models import SecurityFailureTag, Verdict
+from tests.builders import assert_unconfirmed_security_failure
 from tests.test_container_config import FakeDocker, _run, _summary
 
 
-@pytest.mark.parametrize('profile,expected', [
-    ('hardened', Verdict.UNKNOWN), ('overprivileged', Verdict.FAIL),
-])
-def test_gpu_device_declarations_never_prove_effective_worker_access(tmp_path, profile, expected):
+@pytest.mark.parametrize('profile', ['hardened', 'overprivileged'])
+def test_gpu_device_declarations_never_prove_effective_worker_access(tmp_path, profile):
     store, evd, result = _run(tmp_path, FakeDocker(profile), gpu_count=1)
-    assert result.verdicts.security == expected
+    if profile == 'hardened':
+        assert_unconfirmed_security_failure(result)
+        assert SecurityFailureTag.INSUFFICIENT_EVIDENCE in result.security_failure_tags
+    else:
+        assert result.verdicts.security == Verdict.FAIL
+        assert SecurityFailureTag.CONFIRMED_VIOLATION in result.security_failure_tags
     assert evd.observations['devices'].collected is False
     assert evd.observations['devices'].value is None
     summary = _summary(store, evd)
@@ -21,17 +25,17 @@ def test_gpu_device_declarations_never_prove_effective_worker_access(tmp_path, p
     assert 'GPU_EFFECTIVE_DEVICE_ACCESS_UNVERIFIED' in summary['collection_errors']
 
 
-@pytest.mark.parametrize('requests,known_device,profile,expected', [
-    (None, False, 'hardened', Verdict.PASS),
-    ([], False, 'hardened', Verdict.PASS),
+@pytest.mark.parametrize('requests,known_device,profile', [
+    (None, False, 'hardened'),
+    ([], False, 'hardened'),
     ([{'Driver': '', 'Count': -1, 'DeviceIDs': None, 'Capabilities': [['gpu']], 'Options': {}}],
-     False, 'hardened', Verdict.UNKNOWN),
-    ([{'Driver': 'nvidia', 'Count': 1, 'Capabilities': [['gpu']]}], True, 'hardened', Verdict.FAIL),
-    ({'malformed': 'EXAMPLE'}, False, 'hardened', Verdict.UNKNOWN),
-    ([{'Driver': 'nvidia', 'Count': 1, 'Capabilities': [['gpu']]}], False, 'overprivileged', Verdict.FAIL),
+     False, 'hardened'),
+    ([{'Driver': 'nvidia', 'Count': 1, 'Capabilities': [['gpu']]}], True, 'hardened'),
+    ({'malformed': 'EXAMPLE'}, False, 'hardened'),
+    ([{'Driver': 'nvidia', 'Count': 1, 'Capabilities': [['gpu']]}], False, 'overprivileged'),
 ])
 def test_unresolved_device_requests_cannot_prove_empty_devices_or_erase_known_fail(
-        tmp_path, requests, known_device, profile, expected):
+        tmp_path, requests, known_device, profile):
     class RequestedDocker(FakeDocker):
         def inspect_json(self, container, *, timeout):
             row = super().inspect_json(container, timeout=timeout)
@@ -44,7 +48,14 @@ def test_unresolved_device_requests_cannot_prove_empty_devices_or_erase_known_fa
     store, evd, result = _run(tmp_path, RequestedDocker(profile))
     unresolved = requests not in (None, [])
     assert evd.data_origin.value == 'EXAMPLE'
-    assert result.verdicts.security == expected
+    if known_device or profile == 'overprivileged':
+        assert result.verdicts.security == Verdict.FAIL
+        assert SecurityFailureTag.CONFIRMED_VIOLATION in result.security_failure_tags
+    elif unresolved:
+        assert_unconfirmed_security_failure(result)
+        assert SecurityFailureTag.INSUFFICIENT_EVIDENCE in result.security_failure_tags
+    else:
+        assert result.verdicts.security == Verdict.PASS
     assert evd.observations['devices'].collected is (not unresolved or known_device)
     assert evd.observations['permission_scan_complete'].value is (not unresolved)
     if unresolved:

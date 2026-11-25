@@ -13,7 +13,7 @@ from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.runtime.kubernetes_stream_buffer_http import KubernetesStreamBufferHTTP
 from guard.store import Store
-from tests.builders import baseline_pack,policy,T0
+from tests.builders import T0, assert_unconfirmed_security_failure, baseline_pack, policy
 from tests.test_a1_kubernetes_model_authorization_product import World as BaseWorld
 from tests.test_a1_stream_buffer_sensor import make_observer,invoke,REPO
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -117,7 +117,9 @@ def test_registered_cli_native_samples_and_exact_ref_roundtrip(tmp_path,group,na
     cli(['run','--plan',plan.id,'--pack',pack.path,*common],1 if mode=='http-cleanup' else 0)
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
-    assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,a).value=='UNKNOWN' for a in ('security','functional','performance'))
+    assert e.data_origin.value == "EXAMPLE"
+    assert_unconfirmed_security_failure(res)
+    assert res.verdicts.functional == res.verdicts.performance == "UNKNOWN"
     assert e.normal_control.succeeded is None
     flags=('buffer_producer_authenticated','buffer_inventory_complete','buffer_release_verified','buffer_scope_complete')
     if mode=='actual-lab-false':assert all(e.observations[key].value is None and not e.observations[key].collected for key in flags)

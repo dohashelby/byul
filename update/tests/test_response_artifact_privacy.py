@@ -8,6 +8,7 @@ import pytest
 from guard.executors import response_content as content
 from guard.models import canonical_json, sha256_hex
 from tests import test_response_content as source
+from tests.builders import assert_unconfirmed_security_failure
 
 INPUT = "EXAMPLE_PRIVATE_RESPONSE_INPUT"
 OUTPUT = "EXAMPLE_PRIVATE_RESPONSE_OUTPUT_AND_DIAGNOSTIC"
@@ -67,9 +68,13 @@ def test_original_response_policy_uses_complete_transient_data_without_saving_it
     store,evd,res=source.run_content(tmp_path,monkeypatch,transport(mode,sent,captures),
                                    endpoint="/v1/completions" if mode=="completion" else "/v1/chat/completions")
     assert_no_content(store,evd,res)
-    expected = "FAIL" if mode in {"leak","leak-late","field","tokens","unparsed","exception"} else (
-        "UNKNOWN" if mode in {"ignored","completion"} else "PASS")
-    assert res.verdicts.security.value==expected
+    if mode in {"ignored", "completion"}:
+        assert_unconfirmed_security_failure(res)
+    elif mode in {"normal", "own-quote"}:
+        assert res.verdicts.security.value == "PASS" and not res.security_failure_tags
+    else:
+        assert res.verdicts.security.value == "FAIL"
+        assert "CONFIRMED_VIOLATION" in res.security_failure_tags
     assert evd.normal_control.succeeded is (mode not in {"leak-late","exception"})
     assert evd.execution.executor.version=="0.2.1" and evd.data_origin.value=="EXAMPLE"  # 0.2.1: API 별칭으로 모델 비교
     data=payload(store,evd)

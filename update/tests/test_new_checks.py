@@ -48,13 +48,18 @@ def pipeline(tmp_path, cid, factory, values):
         else: registry.EXECUTORS[name + ":sim"] = old
 
 
-@pytest.mark.parametrize("outcome, expected", [(400,"PASS"),(200,"FAIL"),(206,"FAIL"),("timeout","UNKNOWN"),(500,"UNKNOWN")])
-def test_token_boundary_contract(tmp_path, outcome, expected):
+@pytest.mark.parametrize("outcome, expected, confirmed", [
+    (400, "PASS", False), (200, "FAIL", True), (206, "FAIL", True), ("timeout", "FAIL", False), (500, "FAIL", False),
+])
+def test_token_boundary_contract(tmp_path, outcome, expected, confirmed):
     def probe(net, requests, timeout):
         return [completion_response(r, 200 if r["body"]["prompt"] == [0] else outcome) for r in requests]
     _, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
                          {"vocab_size": 100, "max_input_tokens": 8, "rejection_codes":["400","422"]})
     assert result.verdicts.security.value == expected
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is confirmed
+    if expected == "FAIL" and not confirmed:
+        assert_unconfirmed_security_failure(result)
 
 
 def test_input_budget_aborts_before_requests(tmp_path):
@@ -80,8 +85,8 @@ def test_same_response_changes_with_explicit_rejection_policy(tmp_path):
     assert_unconfirmed_security_failure(result)
 
 
-@pytest.mark.parametrize("leak, unreadable, expected", [(False,False,"PASS"),(True,False,"FAIL"),(False,True,"UNKNOWN"),(True,True,"FAIL")])
-def test_credential_exposure_contract(tmp_path, leak, unreadable, expected):
+@pytest.mark.parametrize("leak, unreadable", [(False, False), (True, False), (False, True), (True, True)])
+def test_credential_exposure_contract(tmp_path, leak, unreadable):
     class Docker(CredentialFixture):
         def exec(self, container, argv, *, timeout):
             assert argv == ["sh","-c",ENV_CMD]
@@ -91,7 +96,10 @@ def test_credential_exposure_contract(tmp_path, leak, unreadable, expected):
     _, result = pipeline(tmp_path, "PLT-04",
                          lambda c: CredentialExposureExecutor(c, container_probe=probe, docker=Docker()),
                          {"forbidden_env_names":["GUARD_TEST_CREDENTIAL"],"forbidden_mount_paths":["/test-creds"]})
-    assert result.verdicts.security.value == expected
+    assert result.verdicts.security.value == ("FAIL" if leak or unreadable else "PASS")
+    assert ("CONFIRMED_VIOLATION" in result.security_failure_tags) is leak
+    if unreadable and not leak:
+        assert_unconfirmed_security_failure(result)
 
 
 @pytest.mark.parametrize("raw", ["{}", '{"error":"generation failed"}', "<html>not inference</html>"])

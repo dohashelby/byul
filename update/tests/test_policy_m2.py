@@ -16,7 +16,7 @@ from guard.core.select import PolicyValueError, select
 from guard.judges.declared import DeclaredJudge
 from guard.models.checkdef import PolicyParam
 from guard.store import Store
-from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, evidence
+from tests.builders import PACK_DIR, ROOT, T0, assert_unconfirmed_security_failure, baseline_pack, environment, evidence
 from tools.build_policy_template_metadata import build_metadata
 
 runner = CliRunner()
@@ -134,12 +134,16 @@ def test_cli_real_attachment_policy_to_manual_judgment(tmp_path, monkeypatch, mo
     for res in results:
         # M4 requires linked item evidence, not only the M2 policy key. This
         # fixture intentionally leaves all new observation cells blank.
-        expected = declared if declared == "FAIL" or res.check_id not in PARAMS else "UNKNOWN"
-        assert res.verdicts.security == expected
+        withheld = declared == "PASS" and res.check_id in PARAMS
+        if declared == "FAIL" or withheld:
+            assert_unconfirmed_security_failure(res)
+            assert "INSUFFICIENT_EVIDENCE" in res.security_failure_tags
+        else:
+            assert res.verdicts.security == "PASS" and not res.security_failure_tags
         assert res.judge.version == "0.14.0"
-        if expected == "UNKNOWN" and res.check_id not in supplied:
+        if withheld and res.check_id not in supplied:
             assert any("NO_POLICY_VALUE" in reason and PARAMS[res.check_id] in reason for reason in res.reasons)
-        elif expected == "UNKNOWN":
+        elif withheld:
             assert any("POLICY_ITEMS:" in reason for reason in res.reasons)
     original = {obj.ref().sha256: obj.to_dict() for obj in [*store.iter_kind("EVD"), *results]}
     _ok(args)  # 동일 입력/판정 시각 재판정은 멱등이며 과거 객체를 덮지 않는다.

@@ -217,6 +217,8 @@ def test_original_manual_store_restore_and_privacy(case):
     assert evidence.data_origin.value == 'DECLARED' and len(evidence.artifacts) == 1
     assert all(not c.attempted for c in evidence.challenges) and not evidence.normal_control.attempted
     assert res.verdicts.model_dump(mode='json') == {'security': 'FAIL', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'}
+    assert result['security_failure_tags'] == res.to_dict()['security_failure_tags']
+    assert 'INSUFFICIENT_EVIDENCE' in res.security_failure_tags
     assert 'CONFIRMED_VIOLATION' not in res.security_failure_tags
     assert tool._inventory(case['source'].root) == before
     doc = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text()); entry, = doc['checks']

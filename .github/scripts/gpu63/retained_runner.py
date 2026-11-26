@@ -16,9 +16,15 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _ec2_client(region):
+    from botocore.config import Config
+    return boto3.client("ec2", region_name=region,
+                        config=Config(retries={"total_max_attempts": 1, "mode": "standard"}))
+
+
 def handler(event, context):
     required = {"action", "job", "source_main", "harness_commit", "workload_sha256"}
-    if type(event) is not dict or set(event) != required or event["action"] not in {"launch", "stop"}:
+    if type(event) is not dict or set(event) != required or event["action"] not in {"preflight", "launch", "stop"}:
         raise ValueError("EXACT_RETAINED_RUNNER_REQUEST_REQUIRED")
     for field in required - {"action"}:
         if event[field] != os.environ[field.upper()]:
@@ -29,7 +35,7 @@ def handler(event, context):
     expected = "arn:aws:sts::" + account + ":assumed-role/" + os.environ["EXECUTION_ROLE"] + "/"
     if caller["Account"] != account or not caller["Arn"].startswith(expected):
         raise ValueError("DEDICATED_EXECUTION_ROLE_REQUIRED")
-    ec2 = boto3.client("ec2", region_name=region)
+    ec2 = _ec2_client(region)
     result = ec2.describe_instances(InstanceIds=[instance])
     owned = [item for reservation in result["Reservations"] for item in reservation["Instances"]]
     if (len(owned) != 1 or owned[0]["InstanceId"] != instance or owned[0]["InstanceType"] != "g6.2xlarge"
@@ -49,6 +55,15 @@ def handler(event, context):
             or _time(watch["deadline"]) != _time(os.environ["DEADLINE"])):
         raise ValueError("FRESH_WATCH_AND_LEASE_REQUIRED")
     credit_amount(boto3.client("freetier", region_name="us-east-1").get_account_plan_state(), account)
+    if event["action"] == "preflight":
+        try:
+            ec2.start_instances(InstanceIds=[instance], DryRun=True)
+        except Exception as error:
+            if getattr(error, "response", {}).get("Error", {}).get("Code") != "DryRunOperation":
+                raise
+            return {"action": "preflight", "job": job, "instance": instance,
+                    "execution_role": caller["Arn"], "start_permission_verified_without_launch": True}
+        raise ValueError("START_DRY_RUN_RESULT_UNVERIFIED")
     # A response loss keeps this lock. Never retry a possibly submitted start.
     ssm.put_parameter(Name=os.environ["LOCK_PARAMETER"], Type="String", Overwrite=False,
                       Value=json.dumps({**event, "requested_utc": now.isoformat()}, sort_keys=True))

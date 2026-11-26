@@ -52,6 +52,11 @@ class RunnerTests(unittest.TestCase):
                 test.calls.append(("lock", args))
 
             def start_instances(self, **args):
+                if args.get("DryRun") is True:
+                    test.calls.append(("dry-run", args))
+                    error = RuntimeError("DryRunOperation")
+                    error.response = {"Error": {"Code": "DryRunOperation"}}
+                    raise error
                 test.calls.append(("start", args))
                 return {"StartingInstances": []}
 
@@ -63,7 +68,8 @@ class RunnerTests(unittest.TestCase):
 
     def invoke(self):
         with patch.dict(os.environ, self.env, clear=True), patch.object(runner, "_now", return_value=self.now), \
-                patch.object(runner.boto3, "client", side_effect=self.client, create=True):
+                patch.object(runner.boto3, "client", side_effect=self.client, create=True), \
+                patch.object(runner, "_ec2_client", side_effect=lambda region: self.client("ec2")):
             return runner.handler(self.event, None)
 
     def test_source_bound_fresh_job_locks_before_starting_exact_instance(self):
@@ -101,6 +107,12 @@ class RunnerTests(unittest.TestCase):
         self.env["DEADLINE"] = (self.now - timedelta(minutes=1)).isoformat()
         self.watch["blocked"] = True
         self.assertEqual(self.invoke()["action"], "stop")
+
+    def test_preflight_checks_actual_start_permission_without_claiming_a_launch(self):
+        self.event["action"] = "preflight"
+        self.assertTrue(self.invoke()["start_permission_verified_without_launch"])
+        self.assertEqual([item[0] for item in self.calls], ["dry-run"])
+        self.assertFalse(self.locked)
 
 
 if __name__ == "__main__":

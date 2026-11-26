@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from dataclasses import asdict
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -16,8 +17,10 @@ import platform
 import subprocess
 import sys
 
+from guard.adapters.engine_profiles import executor_feature, resolve
 from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS
 from guard.core.select import check_policy_value
+from guard.executors import run_binding, supply_boot_contract
 from guard.models import load_pack
 from tools.mvp_live_readiness import audit, template
 
@@ -87,6 +90,14 @@ def main():
             codes.append("RUNTIME_POLICY_VALUES_NOT_MATERIALIZED")
         if invalid:
             codes.append("POLICY_DECISION_TYPE_INVALID")
+        binding_keys = set()
+        for mapping in (run_binding.KEYS_BY_CHECK, run_binding.KEYS_BY_CHECK_2,
+                        run_binding.KEYS_BY_CHECK_3, run_binding.KEYS_BY_CHECK_4):
+            binding_keys.update(mapping.get(cid, ()))
+        if cid in supply_boot_contract.CHECK_PROFILES:
+            binding_keys.update(supply_boot_contract.COMMON_POLICY)
+        expected = raw["expected_engine"]
+        feature = executor_feature(check.executor)
         rows.append({
             **raw,
             "collection_profile": getattr(check, "collection_profile", None),
@@ -96,6 +107,12 @@ def main():
             "required_policy_decisions_absent": missing,
             "policy_decision_type_errors": invalid,
             "runtime_policy_rules_requiring_current_values": runtime_rules,
+            "full_scope_policy_binding_keys_to_verify_in_current_run": sorted(binding_keys),
+            "default_engine_feature_catalog": {
+                "feature": feature,
+                **asdict(resolve(expected["engine"], expected["version"], feature)),
+                "note": "Default feature catalog only; bounded options and actual source qualification require separate checks.",
+            },
             "missing_current_input_files": ["sealed environment", "run-bound policy", "side/check configuration"],
             "current_target_and_prepared_assets_verified": False,
             "static_implementation_available": bool(raw["available_implementations"]),

@@ -16,7 +16,7 @@ from pathlib import Path
 import signal
 import traceback
 
-from guard.application import run_config
+from guard.application import run_config, _credentials, _validate_canary_policy
 from guard.core.execution_recipe import bind_recipe
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
@@ -64,18 +64,50 @@ def policy(pack, deadline):
                   source_document_sha256=sha256(canonical_json([base, amendment])).hexdigest()).seal()
 
 
-def configuration(pack, target_path):
+def configuration(pack, target_path, pol, *, canary_prefix="GUARD_GPU63_CANARY"):
     names = sorted({pack.checks[cid].executor for cid in scope(pack) if pack.checks[cid].executor})
     result = {"adapter": {"name": "vllm"}, "executors": {name: "kubernetes" for name in names}}
     for name in names:
         result[name] = {"target": str(target_path)}
+    allowed = pol.values.get("REQ-01", {}).get("allowed_callers")
+    if type(allowed) is not list or not allowed or any(type(role) is not str for role in allowed):
+        raise ValueError("DECLARED_ROUTE_PRINCIPALS_REQUIRED")
+    result["direct_route"]["roles"] = {role: f"{canary_prefix}_CALLER_{index}" for index, role in enumerate(allowed)}
+    result["role_route"]["roles"] = {role: f"{canary_prefix}_{role.upper()}" for role in ("general", "admin")}
+    result["validation"] = {"credential_canary": True}
     return result
+
+
+def audit_each_input(index, folder, pack, side):
+    rows = []
+    for source in index["inputs"]:
+        path = stock.save(folder, "preflight-source-" + source["check_id"] + ".json", {**index, "inputs": [source]})
+        try:
+            result = live_audit(path, pack=pack, side=side)
+            row, = [row for row in result["rows"] if row["check_id"] == source["check_id"]]
+        except Exception as error:
+            row = {"check_id": source["check_id"], "side": side, "input_preflight_passed": False,
+                   "blocking_codes": ["PRODUCT_PREFLIGHT_EXCEPTION"], "exception_type": type(error).__name__,
+                   "exception_frames": [{"file": Path(frame.filename).name, "line": frame.lineno, "function": frame.name}
+                                        for frame in traceback.extract_tb(error.__traceback__)],
+                   "actual_results": None, "engine_executed": False}
+        rows.append(row)
+    return {"schema": "byul-single-gpu-per-check-input-preflight/1", "side": side, "rows": rows,
+            "requested_checks": scope(pack), "engine_executed": False,
+            "all_rows_preserved": len(rows) == len(scope(pack))}
 
 
 def run_side(root, folder, side, captured, pack, pol):
     env = captured["environment"]
     target_path = captured["target_path"]
-    cfg = configuration(pack, target_path)
+    cfg = configuration(pack, target_path, pol, canary_prefix="GUARD_GPU63_" + root.name.replace("-", "_").upper())
+    _validate_canary_policy((cfg,), pol, "validation")
+    cfg, private_keys = _credentials(cfg, "roles")
+    runtime_environ = cfg.pop("_runtime_environ")
+    del private_keys
+    stock.save(folder, "credential-fixture-scope.json", {"memory_only_canary": True,
+               "enterprise_identity_authenticated": False, "policy_status": pol.status.value,
+               "purpose": "owned isolated request fixtures, no external credentials or acceptance claim"})
     cfg_path = stock.save(folder, "guard.toml", dumps_toml(cfg).encode())
     policy_path = stock.save(folder, "policy.json", pol.model_dump(mode="json"))
     index = {"schema": INDEX_SCHEMA, "pack_ref": pack.ref().model_dump(mode="json"), "inputs": []}
@@ -85,7 +117,7 @@ def run_side(root, folder, side, captured, pack, pol):
             for role, path in (("environment", captured["environment_path"]),
                                ("policy", policy_path), ("configuration", cfg_path))}})
     index_path = stock.save(folder, "current-input-sources.json", index)
-    stock.save(folder, "live-input-preflight.json", live_audit(index_path, pack=pack, side=side))
+    stock.save(folder, "live-input-preflight.json", audit_each_input(index, folder, pack, side))
     preparation = [_row(pack, cid, side, cfg, env, pol.values.get(cid, {}), policy_ref=pol.ref())
                    for cid in scope(pack)]
     stock.save(folder, "check-preparation.json", {"side": side, "rows": preparation,
@@ -99,6 +131,7 @@ def run_side(root, folder, side, captured, pack, pol):
     store.put(plan)
     stock.save(folder, "plan.json", plan.model_dump(mode="json"))
     rc = run_config(cfg)
+    rc.runtime_environ = runtime_environ
     evidence = run_plan(store, pack, plan, rc)
     attempted = {item.check_id for item in evidence}
     selected = {item.check_id for item in plan.items if item.selected}

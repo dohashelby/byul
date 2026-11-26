@@ -31,11 +31,35 @@ class SequentialScopeTests(unittest.TestCase):
         self.assertNotIn("copy_treatments", policy.values["PLT-12"])
 
     def test_actual_target_configuration_names_every_requested_executor(self):
-        cfg = run.configuration(self.pack, Path("/owned/current/target.json"))
+        policy = run.policy(self.pack, utcnow() + timedelta(minutes=45))
+        cfg = run.configuration(self.pack, Path("/owned/current/target.json"), policy)
         validate_requested_config(cfg)
         self.assertEqual(set(cfg["executors"]), {self.pack.checks[cid].executor for cid in run.scope(self.pack)})
         self.assertEqual(set(cfg["executors"].values()), {"kubernetes"})
         self.assertNotIn("allowed_checks", cfg.get("update", {}))
+
+    def test_route_roles_match_the_existing_policy_without_persisting_keys(self):
+        from guard.executors import registry
+        policy = run.policy(self.pack, utcnow() + timedelta(minutes=45))
+        cfg = run.configuration(self.pack, Path("/owned/current/target.json"), policy)
+        self.assertEqual(set(cfg["direct_route"]["roles"]), set(policy.values["REQ-01"]["allowed_callers"]))
+        for version in ("0.30.0", "0.31.0"):
+            factory = registry.resolve_executor("direct_route", "kubernetes", engine="vllm", version=version)
+            factory(cfg).validate_policy(self.pack.checks["REQ-01"], policy.values["REQ-01"])
+        effective, keys = run._credentials(cfg, "roles")
+        private = effective.pop("_runtime_environ")
+        saved = json.dumps(effective)
+        for value in keys.values():
+            self.assertNotIn(value, saved)
+
+    def test_one_preflight_exception_keeps_all_requested_rows(self):
+        index = {"inputs": [{"check_id": "REQ-01"}, {"check_id": "REQ-03"}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(run, "live_audit", side_effect=RuntimeError("credentials unavailable")):
+                result = run.audit_each_input(index, Path(temporary), self.pack, "baseline")
+        self.assertEqual([row["check_id"] for row in result["rows"]], ["REQ-01", "REQ-03"])
+        self.assertTrue(all(row["input_preflight_passed"] is False for row in result["rows"]))
+        self.assertTrue(all(row["blocking_codes"] == ["PRODUCT_PREFLIGHT_EXCEPTION"] for row in result["rows"]))
 
     def test_two_physical_gpus_are_not_accepted_as_the_single_gpu_job(self):
         one = "GPU-00000000-0000-0000-0000-000000000001,L4,580.0\n"

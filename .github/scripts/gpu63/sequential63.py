@@ -228,7 +228,9 @@ def execute(args):
             phases[side] = {"phase": phase, "report_published": True}
         except Exception as error:
             phases[side] = {"phase": phase, "report_published": side in summaries,
-                            "error_type": type(error).__name__, "diagnostic": stock.diagnostic(error)}
+                            "error_type": type(error).__name__, "diagnostic": stock.diagnostic(error),
+                            "exception_frames": [{"file": Path(frame.filename).name, "line": frame.lineno, "function": frame.name}
+                                                 for frame in traceback.extract_tb(error.__traceback__)]}
             print(json.dumps(phases[side]), flush=True)
         finally:
             cleanup = stock.cleanup_namespaces(args.kubeconfig, namespaces) if namespaces else {}

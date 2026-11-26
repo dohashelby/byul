@@ -77,6 +77,8 @@ def handler(event, context):
     if reason is not None and state in {"pending", "running"}:
         ec2.stop_instances(InstanceIds=[instance])
         stop_requested = True
+    if reason is not None and state == "stopped":
+        boto3.client("events", region_name=region).disable_rule(Name=os.environ["RULE"])
     record = {
         "schema": "byul-retained-gpu63-guard/1", "job": job, "instance": instance,
         "recorded_utc": now.isoformat(), "deadline": deadline.isoformat(),

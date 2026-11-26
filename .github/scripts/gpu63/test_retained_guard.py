@@ -20,6 +20,7 @@ class GuardTests(unittest.TestCase):
         self.now = datetime(2026, 11, 26, 4, tzinfo=timezone.utc)
         self.calls = []
         self.owner = "job-one"
+        self.instance_state = "running"
         self.credit_error = False
         self.lease_error = False
         self.credits = {"accountId": "123456789012", "accountPlanStatus": "ACTIVE",
@@ -28,7 +29,7 @@ class GuardTests(unittest.TestCase):
                     "JOB": "job-one", "STARTED": self.now.isoformat(),
                     "DEADLINE": (self.now + timedelta(minutes=45)).isoformat(),
                     "HOURLY_USD": "1.20208", "BUDGET_USD": "6", "EXECUTION_ROLE": "execution-owned",
-                    "STATE_PARAMETER": "/byul/owned-job/state"}
+                    "STATE_PARAMETER": "/byul/owned-job/state", "RULE": "owned-watch-rule"}
 
     def client(self, service, **kwargs):
         test = self
@@ -36,7 +37,7 @@ class GuardTests(unittest.TestCase):
         class Client:
             def describe_instances(self, **args):
                 test.calls.append((service, "describe", args))
-                return {"Reservations": [{"Instances": [{"InstanceId": "i-owned", "State": {"Name": "running"},
+                return {"Reservations": [{"Instances": [{"InstanceId": "i-owned", "State": {"Name": test.instance_state},
                     "Tags": [{"Key": "byul:gpu63-session", "Value": test.owner}]}]}]}
 
             def get_account_plan_state(self):
@@ -54,6 +55,9 @@ class GuardTests(unittest.TestCase):
 
             def put_parameter(self, **args):
                 test.calls.append((service, "state", args))
+
+            def disable_rule(self, **args):
+                test.calls.append((service, "disable", args))
 
         return Client()
 
@@ -113,6 +117,12 @@ class GuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "FIXED_SESSION_LIMIT_INVALID"):
             self.invoke()
         self.assertEqual(self.calls, [])
+
+    def test_expired_stopped_session_disables_only_its_watch_rule(self):
+        self.instance_state = "stopped"
+        self.invoke(self.now + timedelta(minutes=45))
+        self.assertIn(("events", "disable", {"Name": "owned-watch-rule"}), self.calls)
+        self.assertFalse(any(call[1] == "stop" for call in self.calls))
 
 
 if __name__ == "__main__":

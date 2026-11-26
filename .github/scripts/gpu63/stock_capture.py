@@ -513,5 +513,3 @@ def verify_generation(kubeconfig, run, uid, metadata, probe_name, account_uid, c
             or any(capture["target"]["kubernetes"][role] != bindings[role] for role in ROLE_LABELS)
             or default_service_account(kubeconfig, run, uid, wait=False) != account_uid):
         raise ValueError("MAIN_OWNED_POD_GENERATION_CHANGED")
-
-

@@ -28,3 +28,13 @@ jobs:
         env:
           PYTHONPATH: src:.:../.github/scripts/gpu63
         run: uv run --frozen python -m unittest discover -s ../.github/scripts/gpu63 -p 'test_*.py' -v
+      - name: Export static per-check input requirements
+        working-directory: update
+        env:
+          PYTHONPATH: src:.:../.github/scripts/gpu63
+        run: uv run --frozen python ../.github/scripts/gpu63/input_requirements.py --out ../gpu63-input-requirements.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: gpu63-input-requirements
+          path: gpu63-input-requirements.json
+          retention-days: 7

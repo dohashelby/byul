@@ -43,7 +43,7 @@ def inventory():
                 else:
                     entry["policy_validation"] = "ACCEPTED_STATIC"
             versions[version] = entry
-        rows[cid] = {"executor": check.executor, "collection_profile": check.collection_profile,
+        rows[cid] = {"executor": check.executor, "collection_profile": getattr(check, "collection_profile", None),
                      "run_binding_entries": sorted(run_binding.config_keys(check)),
                      "file_slots": slots,
                      "required_policy_fields": sorted(p.key for p in check.policy_params if p.required),

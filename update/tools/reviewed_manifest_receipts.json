@@ -1365,6 +1365,11 @@
       "manifest_sha256": "78c5f1a772517e4ddd2edebba2ca4d474b0c602de60f33b379e8a8b2967c80ac",
       "reviewed_by": "Codex / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-28T13:07:49+00:00"
+    },
+    {
+      "manifest_sha256": "b32397b80462a61cfc4a360487f88476abd043eb67340cf2324fc9f3323e3869",
+      "reviewed_by": "Codex / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-28T15:00:36+00:00"
     }
   ]
 }

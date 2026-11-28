@@ -440,33 +440,31 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     if cfg.kubernetes_target_pins is not None:
         key = "_kubernetes_target_sha256_by_executor"
         raw = {**raw, key: {**cfg.kubernetes_target_pins, **raw.get(key, {})}}
-    if staged_observer:
-        # The candidate file was absent at selection. Its exact observed
-        # generation must be pinned before any executor or passive projection.
-        pins = raw.get("_kubernetes_target_sha256_by_executor", {})
-        pin = pins.get(item.executor) if type(pins) is dict else None
-        if not isinstance(pin, str) or re.fullmatch(r"[0-9a-f]{64}", pin) is None:
-            return stopped(ExecStatus.NOT_RUN, "KUBERNETES_STAGED_TARGET_UNVERIFIED")
+    hashes = raw.get("_kubernetes_target_sha256_by_executor")
+    expected_target = hashes.get(item.executor) if type(hashes) is dict else None
+    unverified_staged_target = staged_observer and (
+        not isinstance(expected_target, str) or re.fullmatch(r"[0-9a-f]{64}", expected_target) is None)
     if passive_hop:
+        # This projection returns before the ordinary run-binding path.
+        if unverified_staged_target:
+            return stopped(ExecStatus.NOT_RUN, "KUBERNETES_STAGED_TARGET_UNVERIFIED")
         if source_ref is None:
             return stopped(ExecStatus.NOT_RUN, "PASSIVE_API_HOP_SOURCE_NOT_COLLECTED")
         try:
             passive_api_hop.validate_policy(check, policy_values)
             target = passive_api_hop.read_target(raw[item.executor]["target"], env)
-            hashes = raw.get("_kubernetes_target_sha256_by_executor")
-            expected = hashes.get(item.executor) if type(hashes) is dict else None
             projection = passive_api_hop.draft_passive_api_hop
             if raw.get("update", {}).get(REVIEWED_NORMAL_OPTION) is True:
                 from guard.core import reviewed_normal_dispatch
-                if type(expected) is not str or sha256_hex(canonical_json(target)) != expected:
+                if type(expected_target) is not str or sha256_hex(canonical_json(target)) != expected_target:
                     return stopped(ExecStatus.NOT_RUN, "REVIEWED_PASSIVE_TARGET_UNQUALIFIED")
                 with reviewed_normal_dispatch.invocation(store, check, env, None, plan, cfg.attempt_id,
-                        common["side"].value, None, expected, projection=projection, source_evidence=source_ref):
+                        common["side"].value, None, expected_target, projection=projection, source_evidence=source_ref):
                     draft = projection(store, plan_ref=plan.ref(), side=common["side"], attempt_id=cfg.attempt_id,
-                                       source_ref=source_ref, target=target, expected_target_sha256=expected)
+                                       source_ref=source_ref, target=target, expected_target_sha256=expected_target)
             else:
                 draft = projection(store, plan_ref=plan.ref(), side=common["side"], attempt_id=cfg.attempt_id,
-                                   source_ref=source_ref, target=target, expected_target_sha256=expected)
+                                   source_ref=source_ref, target=target, expected_target_sha256=expected_target)
         except passive_api_hop.PassiveApiHopUnavailable as exc:
             return stopped(ExecStatus.NOT_RUN, str(exc))
         binding = passive_api_hop.execution_binding(
@@ -514,8 +512,6 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             target_options = {}
             if (check.id in {'LIF-01', 'LIF-03', 'OBS-02', 'PLT-07', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12', *BOOT_IDENTITY_OPTIONS}
                     and type(section) is dict and option in section):
-                hashes = raw.get("_kubernetes_target_sha256_by_executor")
-                expected_target = hashes.get(item.executor) if type(hashes) is dict else None
                 if expected_target is None:
                     check_label = check.id.replace('-', '')
                     raise run_binding.RunBindingUnavailable(f"RUN_BINDING_{check_label}_NORMAL_TARGET_UNAVAILABLE")
@@ -581,6 +577,10 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)
+
+    # Preserve check-specific binding diagnostics before gating dispatch.
+    if unverified_staged_target:
+        return stopped(ExecStatus.NOT_RUN, "KUBERNETES_STAGED_TARGET_UNVERIFIED")
 
     started = utcnow()
     info_stub: ExecutorInfo | None = None

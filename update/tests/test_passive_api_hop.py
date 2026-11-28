@@ -318,7 +318,7 @@ def test_product_update_withholds_projection_if_source_has_not_been_committed(pa
             assert evd.execution.status == ExecStatus.COMPLETED
 
 
-@pytest.mark.parametrize('mode', ['fresh', 'missing', 'changed-after-proof'])
+@pytest.mark.parametrize('mode', ['fresh', 'missing', 'changed-after-proof', 'missing-projection-pin'])
 def test_product_update_stages_only_verified_same_attempt_controls(
         tmp_path, passive_update, paired_original, monkeypatch, mode):
     from guard.runtime.kubernetes_transition import KubernetesTransition
@@ -366,6 +366,8 @@ def test_product_update_stages_only_verified_same_attempt_controls(
                 altered = json.loads(raw)
                 altered['engine']['command'] = ['changed']
                 path.write_bytes(canonical_json(altered))
+            elif mode == 'missing-projection-pin':
+                selected.executors = tuple(name for name in selected.executors if name != 'api_transport')
 
         selected.candidate_ready = candidate_ready
         return selected
@@ -384,10 +386,15 @@ def test_product_update_stages_only_verified_same_attempt_controls(
             assert source.execution.attempt_id == derived.execution.attempt_id == report.execution_attempt_id
             assert source.plan == derived.plan and source.environment == derived.environment
             assert not derived.normal_control.attempted and not derived.observations['api_transport_scope_complete'].value
+        elif mode == 'missing-projection-pin':
+            assert source.execution.status == ExecStatus.COMPLETED
+            assert derived.execution.status == ExecStatus.NOT_RUN
+            assert derived.execution.abort_reason == 'KUBERNETES_STAGED_TARGET_UNVERIFIED'
+            assert derived.refs == [derived.plan, derived.environment]
         else:
             assert derived.execution.status != ExecStatus.COMPLETED
     assert len(baseline.packets) == 2
-    assert len(candidate.packets) == (2 if mode == 'fresh' else 1)
+    assert len(candidate.packets) == (2 if mode in {'fresh', 'missing-projection-pin'} else 1)
 
 
 def test_product_update_rejects_scope_or_recipe_runtime_fallback(passive_update):

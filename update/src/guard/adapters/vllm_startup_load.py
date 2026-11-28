@@ -6,13 +6,22 @@ from .vllm import REQUEST_BINDING_GPU_IMAGE
 # The tagged final runtime stages install the vLLM wheel into system Python.
 # The collector verifies these files inside the selected container at runtime.
 _SOURCE_ROOT = "/usr/local/lib/python3.12/dist-packages/vllm"
+_AOT_LOG_PATTERN = (
+    r"(?P<time>[0-9T:.Z-]{20,30}) (?P<process>\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\) )?"
+    r"INFO [0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} "
+    r"\[decorators\.py:(?P<line>[0-9]{1,5})\] "
+    r"(?:saved AOT compiled function to|(?P<load>Directly load AOT compilation from path)) "
+    r"(?P<path>/cache/vllm/torch_compile_cache/torch_aot_compile/[a-f0-9]{64}/rank_0_0)/model"
+)
 _SOURCE_PROFILES = {
     "0.30.0": {
         "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
         "commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
         "line": 5416,
         "graph_capture_line": 6929,
+        "config_parser_sha256": "aaaf215c9166f85656b7491fca3c1abd48d395d084973e7ca8c3e73188b6b2e8",
         "compile_backend": ("fa4bff8920b363efbbde9456f135fa9d2c004a5bde1898877f177418b2d8b008", 1094),
+        "compile_aot": ("cab6962e8a1fead59c75f5ed8cb4732f9e5441ff972030c2f4b1c4ba0c58de3c", 719, 313),
         "safetensors_reader": {
             "file_sha256": {
                 "model_executor/model_loader/weight_utils.py":
@@ -37,7 +46,9 @@ _SOURCE_PROFILES = {
         "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
         "line": 5354,
         "graph_capture_line": 6854,
+        "config_parser_sha256": "bfa2d8ed9fc0971694e7873351a06dc9d5948775984f120148ad8a8e38a5acbc",
         "compile_backend": ("16af622b799f22f30eaa1c78f7ccca9d54c7c72785ad89e90c87e859bf8ef876", 1090),
+        "compile_aot": ("ebbb909015f31c9d71cddef6718dc77459e05e3c70f49383f6b639595272c8a7", 717, 312),
         "safetensors_reader": {
             "file_sha256": {
                 "model_executor/model_loader/weight_utils.py":
@@ -96,13 +107,35 @@ def source_profile(env):
     }
 
 
+def config_parser_profile(env):
+    """Select the installed config parser and the stock process journal contract."""
+    profile = _reviewed_profile(env)
+    if profile is None:
+        raise ValueError("SUP05_CONFIG_PARSER_SOURCE_UNQUALIFIED")
+    engine_parser = _SOURCE_ROOT + "/transformers_utils/config.py"
+    filesystem_parser = _SOURCE_ROOT.rsplit("/", 1)[0] + "/transformers/configuration_utils.py"
+    return {
+        "source_pins": {
+            engine_parser: profile["config_parser_sha256"],
+            filesystem_parser: "02826ac9e987487b645135d8f1d747f60a7e567d1b8f72327de8514d02b6f15d",
+        },
+        "argv_tokens": ("/usr/local/bin/vllm", "/models"),
+        "actor": "stock-vllm-cli",
+        "points": {
+            "engine-config": ("get_config", engine_parser, "approved_config_instance_returned"),
+            "hf-config": ("HFConfigParser.parse", engine_parser, "approved_config_pair_returned"),
+            "config-parser": ("PreTrainedConfig._dict_from_json_file", filesystem_parser, "approved_model_type_parsed"),
+        },
+    }
+
+
 def compile_cache_profile(env):
     """Select the compile log call sites and known cache layout for the same GPU image."""
     profile = _reviewed_profile(env)
     if profile is None:
         raise ValueError("SUP07_COMPILE_CACHE_SOURCE_UNQUALIFIED")
     backend_sha256, directory_line = profile["compile_backend"]
-    return {
+    source = {
         "file_sha256": {
             "compilation/backends.py": backend_sha256,
             "compilation/monitor.py": "43b24c5cb1bc4d32dc979f3222596905c7b3acc58415328a234402e6edc76abf",
@@ -114,6 +147,15 @@ def compile_cache_profile(env):
         "relative_directory_pattern": "torch_compile_cache/[0-9a-f]{10}/rank_0_0/backbone",
         "artifact_name": "vllm_compile_cache.py",
     }
+    if aot := profile.get("compile_aot"):
+        source_sha256, save_line, load_line = aot
+        source["aot"] = {
+            "file_sha256": {"compilation/decorators.py": source_sha256},
+            "save_call_linenumber": save_line,
+            "load_call_linenumber": load_line,
+            "log_pattern": _AOT_LOG_PATTERN,
+        }
+    return source
 
 
 def safetensors_reader_profile(env):

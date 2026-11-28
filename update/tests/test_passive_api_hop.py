@@ -163,6 +163,30 @@ def test_even_sealed_original_requires_consistent_bound_control_metadata(origina
         subject.read_passive_api_hop(Store.read_only(store.root), **scope)
 
 
+@pytest.mark.parametrize('mutation', ['missing', 'duplicate', 'wrong-route', 'outcome'])
+def test_passive_hop_requires_the_persisted_functional_receipt(original, mutation):
+    store, source, scope, world = original
+    old, = source.artifacts
+    rows = [json.loads(line) for line in (store.root / old.path).read_bytes().splitlines()]
+    index, = (i for i, row in enumerate(rows) if row.get('via') == 'functional-engine')
+    if mutation == 'missing':
+        del rows[index]
+    elif mutation == 'duplicate':
+        rows.insert(index, rows[index].copy())
+    elif mutation == 'wrong-route':
+        rows[index]['route'] = 'POST /v1/chat/completions'
+    else:
+        rows[index]['outcome'] = 503
+    # A valid seal does not establish agreement between the receipt and summary.
+    artifact = store.put_artifact(b'\n'.join(canonical_json(row) for row in rows) + b'\n')
+    updated = old.model_copy(update={'path': artifact.path, 'sha256': artifact.sha256, 'bytes': artifact.bytes})
+    alternate = source.model_copy(update={'revision': source.revision + 1, 'artifacts': [updated]}).seal()
+    store.put(alternate)
+    with pytest.raises(subject.PassiveApiHopUnavailable, match='PASSIVE_API_HOP_ARTIFACT_UNVERIFIED'):
+        subject.read_passive_api_hop(Store.read_only(store.root), **{**scope, 'source_ref': alternate.ref()})
+    assert len(world.packets) == world.process_reads == 1
+
+
 def test_passive_draft_inherits_both_sides_and_never_runs_a_normal_control(paired_original):
     check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['PLT-08']
     _, baseline, baseline_scope, _ = paired_original[Side.baseline]
@@ -292,6 +316,78 @@ def test_product_update_withholds_projection_if_source_has_not_been_committed(pa
             assert evd.refs == [plan.ref(), evd.environment]
         elif evd.check_id == 'PLT-01':
             assert evd.execution.status == ExecStatus.COMPLETED
+
+
+@pytest.mark.parametrize('mode', ['fresh', 'missing', 'changed-after-proof'])
+def test_product_update_stages_only_verified_same_attempt_controls(
+        tmp_path, passive_update, paired_original, monkeypatch, mode):
+    from guard.runtime.kubernetes_transition import KubernetesTransition
+    from tests.test_kubernetes_transition import Clock
+
+    store, pack, envs, pol, config, _ = passive_update
+    config['update'].update(kubernetes_candidate_binding='after_baseline',
+                            transition_timeout=0.05, transition_poll_interval=0.01)
+    path = Path(config['sides']['candidate']['api_transport']['target'])
+    baseline = paired_original[Side.baseline][3]
+    candidate = paired_original[Side.candidate][3]
+    raw = path.read_bytes()
+    # Deferred selection can only start before the candidate target exists.
+    with pytest.raises(ValueError, match='KUBERNETES_TRANSITION_CONFIGURATION_INVALID'):
+        application.update_inputs(envs, config)
+    path.unlink()
+    observed = {'retired': False}
+    clock = Clock()
+
+    def runner(argv, **kwargs):
+        if 'namespace' in argv:
+            owner = baseline.target['kubernetes']['engine']
+            body = {'metadata': {'name': owner['namespace'], 'uid': owner['namespace_uid']}}
+            return {'returncode': 0, 'stdout_bytes': canonical_json(body), 'stderr_bytes': b'',
+                    'capture': {'complete': True}}
+        if '--ignore-not-found' in argv:
+            assert observed['retired']
+            return {'returncode': 0, 'stdout_bytes': b'', 'stderr_bytes': b'', 'capture': {'complete': True}}
+        current = candidate if observed['retired'] and path.is_file() else baseline
+        return current.runner(argv, **kwargs)
+
+    def sleep(delay):
+        clock.sleep(delay)
+        if mode != 'missing' and not path.exists():
+            path.write_bytes(raw)
+
+    def gate(*args, **kwargs):
+        selected = KubernetesTransition(*args, **kwargs, runner=runner, clock=clock, sleep=sleep)
+        advance = selected.candidate_ready
+
+        def candidate_ready():
+            observed['retired'] = True
+            advance()
+            if mode == 'changed-after-proof':
+                altered = json.loads(raw)
+                altered['engine']['command'] = ['changed']
+                path.write_bytes(canonical_json(altered))
+
+        selected.candidate_ready = candidate_ready
+        return selected
+
+    monkeypatch.setattr(application, 'KubernetesTransition', gate)
+    report, _ = application.execute_update(store, pack, envs, pol, config, tmp_path / 'staged', T0)
+    row = next(row for row in report.by_check if row.check_id == 'PLT-08')
+    control_row = next(row for row in report.by_check if row.check_id == 'PLT-01')
+    for side in (Side.baseline, Side.candidate):
+        result = store.resolve(getattr(row, side.value).result)
+        source = store.resolve(store.resolve(getattr(control_row, side.value).result).evidence)
+        derived = store.resolve(result.evidence)
+        if side == Side.baseline or mode == 'fresh':
+            assert derived.execution.status == ExecStatus.COMPLETED
+            assert derived.refs[-1] == source.ref()
+            assert source.execution.attempt_id == derived.execution.attempt_id == report.execution_attempt_id
+            assert source.plan == derived.plan and source.environment == derived.environment
+            assert not derived.normal_control.attempted and not derived.observations['api_transport_scope_complete'].value
+        else:
+            assert derived.execution.status != ExecStatus.COMPLETED
+    assert len(baseline.packets) == 2
+    assert len(candidate.packets) == (2 if mode == 'fresh' else 1)
 
 
 def test_product_update_rejects_scope_or_recipe_runtime_fallback(passive_update):

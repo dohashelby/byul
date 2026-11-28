@@ -205,6 +205,54 @@ def test_normal_transition_ongoing_request_and_recovery_all_profiles(monkeypatch
     assert PRIVATE not in draft.artifacts[0].path.read_text(encoding='utf-8')
 
 
+@pytest.mark.parametrize('owner_bound', [True, False])
+def test_lif16_canonical_steps_require_owner_bound_http(monkeypatch, tmp_path, owner_bound):
+    from guard.core.run import _normalize
+    from guard.models import Evidence, load_pack
+    from tests.builders import dummy_ref
+
+    def observed_packet(generation, request):
+        if generation.key == 'restored' and request is not None:
+            return packet(sha256_hex(request.encode()), [('1' * 64, '2' * 64), ('3' * 64, '4' * 64)])
+        return packet()
+
+    executor, env, _ = harness(monkeypatch, lab=False, observed_packet=observed_packet)
+    probe = executor._probe
+
+    def selected_probe(*args):
+        row = probe(*args)
+        row['transport']['requests'][0]['binding_verified_before_after'] = owner_bound
+        return row
+
+    monkeypatch.setattr(executor, '_probe', selected_probe)
+    definition = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['LIF-16']
+    draft = executor.run(definition, env, policy(), None, tmp_path)
+    evd = Evidence(id='EVD-TRANSITION-LIF16', data_origin=draft.data_origin, plan=dummy_ref('PLAN'),
+        environment=env.ref(), check_id=definition.id, side='single', execution={'status': draft.status},
+        **_normalize(definition, draft)).seal()
+    observed = {key: row.value for key, row in evd.observations.items() if row.collected}
+    old_request = next(row['request_id_sha256'] for row in draft.observations['transition_trials'].value
+                       if row['case_id'] == 'inflight' and row['generation'] == 'old')
+    bindings = draft.observations['transition_request_generation_bindings'].value
+    assert any(row['request_id_sha256'] == old_request and row['generation'] == 'restored' for row in bindings)
+    assert draft.observations['transition_request_configuration_facts'].value
+    assert draft.observations['transition_request_configuration_conflicts'].value
+    if owner_bound:
+        step, = observed['activation_steps']
+        assert {row['case_id']: row['generation'] for row in step['normal_controls']} == {
+            'before': 'old', 'during': 'new', 'after': 'new', 'recovered': 'restored'}
+        assert not {'request_generation_bindings', 'request_configuration_facts',
+                    'request_configuration_conflict_candidates'} & step.keys()
+        assert not step['transition_activation_verified'] and not step['actual_consumption_verified']
+    else:
+        assert observed['activation_steps'] == []
+        assert 'selected_phase_normal_control_incomplete' in observed['activation_missing']
+    assert 'restore_material_integrity_and_actual_consumption_unverified' in observed['activation_missing']
+    assert 'residual_state_access_unverified' in observed['activation_missing']
+    assert observed['activation_violations'] == []
+    assert observed['activation_scope_complete'] is False
+
+
 def test_read_only_redeployment_does_not_seal_the_producer_session(monkeypatch, tmp_path):
     executor, env, log = harness(monkeypatch, lab=False)
     draft = executor.run(check(), env, policy(), None, tmp_path)

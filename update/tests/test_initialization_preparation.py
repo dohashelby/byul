@@ -127,8 +127,12 @@ def test_public_preparation_checks_exact_release_assets(external, monkeypatch, c
     ('candidate', 'LIF-07', 'wrong-model', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('candidate', 'LIF-09', 'aliased-owner', 'KUBERNETES_HTTP_BINDING_UNAVAILABLE'),
     ('baseline', 'LIF-07', 'other-profile', 'INITIALIZATION_CONFIGURATION_INVALID'),
-    ('candidate', 'LIF-07', generation.PROFILE, 'INITIALIZATION_CONFIGURATION_INVALID'),
-    ('candidate', 'LIF-09', endpoint.PROFILE, 'INITIALIZATION_CONFIGURATION_INVALID'),
+    ('candidate', 'LIF-07', generation.PROFILE, None),
+    ('candidate', 'LIF-09', endpoint.PROFILE, 'INITIALIZATION_NORMAL_NODE_IMAGE_PROOF_CONFIGURATION_REQUIRED'),
+    ('candidate', 'LIF-09', 'endpoint-with-node-proof', None),
+    ('baseline', 'LIF-07', 'cross-release-generation', 'INITIALIZATION_NORMAL_WORKER_RELEASE_UNSUPPORTED'),
+    ('candidate', 'LIF-09', 'incomplete-activation', 'INITIALIZATION_CONFIGURATION_INVALID'),
+    ('candidate', 'LIF-07', 'non-normal-phase', 'INITIALIZATION_CONFIGURATION_INVALID'),
     ('candidate', 'LIF-09', 'scope-mismatch', 'MODEL_READ_SCOPE_TARGET_MISMATCH'),
 ])
 def test_executor_prepared_inputs_reuse_run_checks_without_owner_reads(
@@ -151,7 +155,13 @@ def test_executor_prepared_inputs_reuse_run_checks_without_owner_reads(
         assets = external / 'other-profile'
         prepare_assets(assets, REPOSITORY)
         settings['prepared'] = str(assets / 'manifest.json')
-    if change in {generation.PROFILE, endpoint.PROFILE, 'scope-mismatch'}:
+    native_profile = {
+        'incomplete-activation': generation.PROFILE,
+        'non-normal-phase': generation.PROFILE,
+        'cross-release-generation': generation.PROFILE,
+        'endpoint-with-node-proof': endpoint.PROFILE,
+    }.get(change, change)
+    if native_profile in {generation.PROFILE, endpoint.PROFILE, 'scope-mismatch'}:
         native = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': True,
             'run_id': target['kubernetes']['run_id'], 'environment_ref': target['environment_ref'],
             'kubernetes': {key: target['kubernetes'][key] for key in ('context', 'engine')}}
@@ -160,16 +170,25 @@ def test_executor_prepared_inputs_reuse_run_checks_without_owner_reads(
             scope['target_sha256'] = '0' * 64
         scope_path = _write(external / 'model-scope.json', scope)
         assets = external / 'model-profile'
-        prepare_assets(assets, REPOSITORY, profile=joint.PROFILE if change == 'scope-mismatch' else change,
+        prepare_assets(assets, REPOSITORY, profile=joint.PROFILE if change == 'scope-mismatch' else native_profile,
                        model_read_scope=scope_path)
         settings['prepared'] = str(assets / 'manifest.json')
-    _, values = run_binding.effective_values(check, settings, env, pol.values[check_id], side=side,
+        if change == 'endpoint-with-node-proof':
+            settings['node_image_verification'] = 'local-containerd-v1'
+    if change == 'incomplete-activation':
+        check = check.model_copy(update={'required_observations': [
+            item for item in check.required_observations if item.key != 'activation_scope_complete']})
+    policy_values = dict(pol.values[check_id])
+    if change == 'non-normal-phase':
+        policy_values['init_phase'] = 'partial-failure'
+    _, values = run_binding.effective_values(check, settings, env, policy_values, side=side,
         attempt_id=None, issued_at=utcnow(), run_cfg=cfg['run_binding'][check_id])
     executor = KubernetesInitializationExecutor(settings, runner=_forbidden)
     if error is None:
         bound_target, prepared, transport = executor.prepared_inputs(check, env, values)
         assert bound_target == target
-        assert prepared['profile'] == (release.PROFILE if side == 'baseline' else legacy.PROFILE)
+        expected_profile = native_profile or (release.PROFILE if side == 'baseline' else legacy.PROFILE)
+        assert prepared['profile'] == expected_profile
         assert transport.binding == target['kubernetes']
     else:
         with pytest.raises(ValueError, match=f'^{error}$'):

@@ -15,6 +15,10 @@ from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
 from .initialization_contract import PROFILE,POLICY_TYPES,normalize_policy,stamp
+from .initialization_normal_worker import (
+    GENERATION_PROFILES, generation_release_supported, has_activation_contract, normal_worker_steps,
+)
+from .node_image_proof import PROFILE as NODE_IMAGE_PROOF_PROFILE
 
 
 READINESS_PROFILE='kubernetes-mp-readiness-observation-v1'
@@ -22,7 +26,6 @@ CHECK_PROFILES={'LIF-09':PROFILE,'LIF-07':READINESS_PROFILE}
 
 READINESS_POLICY_TYPES={**POLICY_TYPES,'required_readiness_items':'list[str]'}
 READINESS_OBSERVATIONS={'init_required_readiness_items':'list','init_unverified_readiness_items':'list'}
-ACTIVATION_OBSERVATIONS = {'activation_steps', 'activation_violations', 'activation_missing', 'activation_scope_complete'}
 
 
 def normalize_check_policy(check,values):
@@ -73,8 +76,10 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
         from guard.collectors.lifecycle import load_initialization_prepared
         from .run_binding import stages_for
 
+        canonical_generation = False
         try:
-            if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'}:raise ValueError
+            if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds','node_image_verification'}:
+                raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             if stages_for(check) == (1, 2):
                 target = strict_json(dependency(self.cfg['target'], None), limit=65536)
@@ -83,15 +88,26 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
             target_hash = sha256_hex(canonical_json(target))
             prepared = load_initialization_prepared(self.cfg['prepared'], env, expected_sha256=self.expected_prepared)
             start, end = normalize_check_policy(check, policy_values)
-            if prepared['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}:
+            if prepared['profile'] in GENERATION_PROFILES:
                 required={item.key for item in check.required_observations}
-                if not {'init_worker_generation_events','init_worker_generation_candidates','init_ready_send_observations'}<=required:raise ValueError
-            if prepared['profile']==endpoint_sensor.PROFILE:
-                if not {'init_ready_endpoint_events','init_ready_endpoint_candidates'}<=required:raise ValueError
+                dedicated = {'init_worker_generation_events','init_worker_generation_candidates','init_ready_send_observations'}
+                if prepared['profile'] == endpoint_sensor.PROFILE:
+                    dedicated |= {'init_ready_endpoint_events','init_ready_endpoint_candidates'}
+                canonical_generation = not dedicated <= required
+                if canonical_generation and not (
+                        policy_values['init_phase'] == 'normal' and has_activation_contract(check)):
+                    raise ValueError
             if (target_hash!=policy_values['init_target_sha256'] or env.ref().sha256!=policy_values['init_environment_sha256']
                     or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile'] not in {sensor.PROFILE,init_release.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
                     or sha256_hex(canonical_json(prepared))!=policy_values['init_prepared_sha256'] or not start<=utcnow()<=end or type(env.model.inventory_sha256) is not str or len(env.model.inventory_sha256)!=64):raise ValueError
         except (KeyError,ValueError,TypeError,RuntimeError,OSError):raise ValueError('INITIALIZATION_CONFIGURATION_INVALID') from None
+        if canonical_generation and not generation_release_supported(env, prepared['profile']):
+            raise ValueError('INITIALIZATION_NORMAL_WORKER_RELEASE_UNSUPPORTED')
+        needs_node_proof = canonical_generation and prepared['profile'] == endpoint_sensor.PROFILE
+        if needs_node_proof and self.cfg.get('node_image_verification') != NODE_IMAGE_PROOF_PROFILE:
+            raise ValueError('INITIALIZATION_NORMAL_NODE_IMAGE_PROOF_CONFIGURATION_REQUIRED')
+        if 'node_image_verification' in self.cfg and not (needs_node_proof and target.get('lab') is True):
+            raise ValueError('INITIALIZATION_CONFIGURATION_INVALID')
         transport=KubernetesInitializationHTTP(target,env,runner=self.runner,duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))
         return target, prepared, transport
 
@@ -102,8 +118,11 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
             'kubernetes': {'context': transport.binding['context'], 'engine': transport.binding['engine']}}
 
     def _native_reader(self, native_target, env, prepared):
+        options = ({'node_image_verification': self.cfg['node_image_verification']}
+                   if 'node_image_verification' in self.cfg else {})
         return KubernetesLifecycleReader(native_target, env, prepared, runner=self.runner,
-            binary=self.cfg.get('kubectl_binary', 'kubectl'), duration=self.cfg.get('max_duration_seconds', 120))
+            binary=self.cfg.get('kubectl_binary', 'kubectl'), duration=self.cfg.get('max_duration_seconds', 120),
+            **options)
 
     def prepared_inputs(self, check, env, policy_values):
         """Validate local inputs only, without taking ownership snapshots or dispatching."""
@@ -201,9 +220,21 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
         if ctx.check.id=='LIF-07':
             observations['init_required_readiness_items']=list(ctx.policy_values['required_readiness_items'])
             observations['init_unverified_readiness_items']=list(ctx.policy_values['required_readiness_items'])
-        if ACTIVATION_OBSERVATIONS <= {item.key for item in ctx.check.required_observations}:
-            observations.update(_activation_observations(projection, trials, diagnostics, source_sha256=source_sha256,
-                declared_phase=ctx.policy_values['init_phase']))
+        if has_activation_contract(ctx.check):
+            phase = ctx.policy_values['init_phase']
+            activation = _activation_observations(projection, trials, diagnostics, source_sha256=source_sha256,
+                declared_phase=phase)
+            if phase == 'normal' and ctx._init_prepared['profile'] in GENERATION_PROFILES:
+                steps = normal_worker_steps(packet, ctx._init_prepared, worker, declared_phase=phase,
+                    expected_ranks=ctx.policy_values['init_expected_ranks'], sealed=sealed)
+                activation['activation_steps'].extend(steps)
+                if not steps:
+                    missing = {*activation['activation_missing'], 'INITIALIZATION_NORMAL_WORKER_SOURCE_UNAVAILABLE'}
+                    if (ctx._init_prepared['profile'] == endpoint_sensor.PROFILE
+                            and not (read_report or {}).get('node_runtime_image_verified')):
+                        missing.add('INITIALIZATION_NORMAL_NODE_IMAGE_PROOF_UNVERIFIED')
+                    activation['activation_missing'] = sorted(missing)
+            observations.update(activation)
         return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Single declared startup stage: same-process readiness/aggregate facts, bounded HTTP admission samples; independent failure, full model readiness and repaired launch lineage unverified.'},[],summary
 

@@ -50,6 +50,9 @@ NORMAL_COMPILE_CACHE_OPTION = "normal_compile_cache_only"
 NORMAL_COMPILE_CACHE_SCOPE_ERROR = "NORMAL_COMPILE_CACHE_EXECUTION_SCOPE_INVALID"
 NORMAL_FILE_READS_OPTION = "normal_file_reads_only"
 NORMAL_FILE_READS_SCOPE_ERROR = "NORMAL_FILE_READS_EXECUTION_SCOPE_INVALID"
+SUP05_CONFIG_PARSER_OPTION = "normal_approved_config_parser_only"
+BOOT_IDENTITY_OPTIONS = {"SUP-11": "normal_python_runtime_only", "SUP-09": "normal_model_class_origin_only"}
+BOOT_IDENTITY_SCOPE_ERROR = "NORMAL_BOOT_IDENTITY_EXECUTION_SCOPE_INVALID"
 SUP05_PREPARATION_RECEIPT = "preparation_receipt"
 NORMAL_GRAPH_CAPTURE_OPTION = "normal_graph_capture_only"
 NORMAL_GRAPH_CAPTURE_SCOPE_ERROR = "NORMAL_GRAPH_CAPTURE_EXECUTION_SCOPE_INVALID"
@@ -72,6 +75,7 @@ _NORMAL_ONLY_CASES = {
     "SUP-07": ("supply_boot", NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
     "SUP-12": ("supply_boot", NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR),
     "SUP-10": ("supply_boot", INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR),
+    **{check: ("supply_boot", option, BOOT_IDENTITY_SCOPE_ERROR) for check, option in BOOT_IDENTITY_OPTIONS.items()},
 }
 RETRY_RECORD_SNAPSHOT_OPTION = "retry_record_snapshot_only"
 RETRY_RECORD_SNAPSHOT_SCOPE_ERROR = "RETRY_RECORD_SNAPSHOT_SCOPE_INVALID"
@@ -91,6 +95,74 @@ KUBERNETES_BOUND_CHECK_OPTIONS = {
     "PLT-06": "worker_trust_metadata_only",
     "PLT-08": "passive_from_plt01",
 }
+REVIEWED_NORMAL_OPTION = "reviewed_normal_campaign"
+REVIEW_ALL_SELECTED = "review_all_selected_checks"
+REVIEWED_NORMAL_CASES = {
+    check: (executor, SUP05_CONFIG_PARSER_OPTION if check == "SUP-05" else option)
+    for check, (executor, option, _) in _NORMAL_ONLY_CASES.items()
+    if check in {"LIF-01", "LIF-03", "LIF-04", "OBS-02", "PLT-07", "REQ-09", "REQ-10", "REQ-20",
+                 "SUP-05", "SUP-07", "SUP-09", "SUP-10", "SUP-11", "SUP-12"}
+}
+REVIEWED_NORMAL_CASES.update({
+    "OBS-03": ("log_analysis", None),
+    "OBS-04": ("boundary_egress", KUBERNETES_BOUND_CHECK_OPTIONS["OBS-04"]),
+    "PLT-01": ("container_config", None),
+    "PLT-02": ("unix_ipc", KUBERNETES_BOUND_CHECK_OPTIONS["PLT-02"]),
+    "PLT-04": ("credential_exposure", None),
+    "PLT-06": ("unix_ipc", KUBERNETES_BOUND_CHECK_OPTIONS["PLT-06"]),
+    "PLT-08": ("api_transport", KUBERNETES_BOUND_CHECK_OPTIONS["PLT-08"]),
+    "REQ-07": ("template_validation", "req07_normal_only"),
+    "REQ-11": ("request_binding", "normal_request_binding_only"),
+    "SUP-03": ("template_validation", None),
+    "SUP-04": ("container_config", "node_image_verification"),
+})
+
+
+def reviewed_check_settings(check_id):
+    _, option = REVIEWED_NORMAL_CASES[check_id]
+    if option is None:
+        return {}
+    return {option: "local-containerd-v1" if check_id == "SUP-04" else True}
+
+
+def reviewed_normal_executors(raw):
+    """Admit only explicit normal modes with a shared owned target on each side."""
+    options = raw.get("update", {})
+    keys = {REVIEWED_NORMAL_OPTION, "mode", "allowed_checks", "kubernetes_candidate_binding"}
+    if type(options) is not dict or set(options) not in (keys, keys | {REVIEW_ALL_SELECTED}):
+        return set()
+    review_all = REVIEW_ALL_SELECTED in options
+    allowed = options.get("allowed_checks")
+    if (review_all and options[REVIEW_ALL_SELECTED] is not True
+            or options.get(REVIEWED_NORMAL_OPTION) is not True or options.get("mode") != "external"
+            or options.get("kubernetes_candidate_binding") != "after_baseline"
+            or type(allowed) is not list or not allowed
+            or any(type(check) is not str for check in allowed)
+            or not review_all and not set(allowed) <= REVIEWED_NORMAL_CASES.keys()
+            or len(allowed) != len(set(allowed)) or ("PLT-08" in allowed and "PLT-01" not in allowed)
+            or any(key in raw for key in ("lab_activation", "record_attestation", "run_binding"))):
+        return set()
+    runnable = reviewed_dispatch_scope(raw, frozenset(allowed))
+    expected = {cid: settings for cid in runnable if (settings := reviewed_check_settings(cid))}
+    executors = {REVIEWED_NORMAL_CASES[cid][0] for cid in runnable}
+    if (raw.get(CHECK_CONFIG) != expected or raw.get("executors") != dict.fromkeys(executors, "kubernetes")):
+        return set()
+    targets = set()
+    for name in executors:
+        settings = raw.get(name)
+        if (type(settings) is not dict or set(settings) != {"target"}
+                or type(settings["target"]) is not str or not settings["target"]):
+            return set()
+        targets.add(settings["target"])
+    return executors if len(targets) == 1 else set()
+
+
+def reviewed_dispatch_scope(raw, declared_checks):
+    """Keep the original mode checks scoped to their explicitly reviewed entry points."""
+    update = raw.get("update", {}) if type(raw) is dict else None
+    if type(update) is dict and update.get(REVIEW_ALL_SELECTED) is True and declared_checks is not None:
+        return declared_checks & REVIEWED_NORMAL_CASES.keys()
+    return declared_checks
 
 
 def update_allowed_checks(raw, pack):
@@ -135,6 +207,7 @@ _STAGED_OBSERVER_OWNERS = {
     **{cid: executor for cid, (executor, _, _) in _NORMAL_ONLY_CASES.items() if cid != "SUP-05"},
     "OBS-04": "boundary_egress", "PLT-02": "unix_ipc", "PLT-06": "unix_ipc",
 }
+STAGED_PASSIVE_HOP_EXECUTORS = frozenset({"container_config", "api_transport"})
 
 
 def staged_observer_executors(candidate):
@@ -142,11 +215,27 @@ def staged_observer_executors(candidate):
     options = candidate.get("update", {})
     if options.get("mode", "external") != "external" or options.get("kubernetes_candidate_binding") != "after_baseline":
         return set()
+    if REVIEWED_NORMAL_OPTION in options:
+        return reviewed_normal_executors(candidate)
     allowed = options.get("allowed_checks")
     overlays = candidate.get(CHECK_CONFIG, {})
     implementations = candidate.get("executors", {})
     if (type(allowed) is not list or not allowed or type(overlays) is not dict
             or type(implementations) is not dict or candidate.get("lab_activation") or candidate.get("record_attestation")):
+        return set()
+    if (len(allowed) == 2 and "PLT-01" in allowed and "PLT-08" in allowed
+            and overlays == {"PLT-08": {KUBERNETES_BOUND_CHECK_OPTIONS["PLT-08"]: True}}
+            and implementations == dict.fromkeys(STAGED_PASSIVE_HOP_EXECUTORS, "kubernetes")):
+        control, passive = (candidate.get(name) for name in ("container_config", "api_transport"))
+        if (type(control) is dict and control.keys() == {"target"} and isinstance(control["target"], (str, Path))
+                and control["target"] and control == passive):
+            return set(STAGED_PASSIVE_HOP_EXECUTORS)
+        return set()
+    if allowed == ["SUP-05"] and overlays == {"SUP-05": {SUP05_CONFIG_PARSER_OPTION: True}}:
+        settings = candidate.get("supply_boot")
+        if (implementations == {"supply_boot": "kubernetes"} and type(settings) is dict
+                and set(settings) == {"target"} and type(settings["target"]) is str and settings["target"]):
+            return {"supply_boot"}
         return set()
     executors = set()
     for cid in allowed:
@@ -338,6 +427,20 @@ def normal_file_reads_requested(raw):
             or next(_sup05_preparation_receipts(raw), None) is not None)
 
 
+def approved_config_parser_requested(raw):
+    return next(_option_occurrences(raw, SUP05_CONFIG_PARSER_OPTION), None) is not None
+
+
+def boot_identity_requested(raw):
+    return any(next(_option_occurrences(raw, option), None) is not None for option in BOOT_IDENTITY_OPTIONS.values())
+
+
+def kubernetes_bound_option(check_id, settings):
+    if check_id == "SUP-05" and type(settings) is dict and SUP05_CONFIG_PARSER_OPTION in settings:
+        return SUP05_CONFIG_PARSER_OPTION
+    return KUBERNETES_BOUND_CHECK_OPTIONS.get(check_id)
+
+
 def normal_graph_capture_requested(raw):
     return next(_option_occurrences(raw, NORMAL_GRAPH_CAPTURE_OPTION), None) is not None
 
@@ -369,10 +472,26 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
     error = "OBSERVATION_RECORD_SNAPSHOT_SCOPE_INVALID"
     scopes = []
     gateway_modes = []
+    parser_modes = []
+    declared_checks = allowed_checks
     for raw in configurations:
         scoped = {}
         overlays = raw.get(CHECK_CONFIG)
         bindings = raw.get("run_binding")
+        parser_mode = approved_config_parser_requested(raw)
+        parser_modes.append(parser_mode)
+        campaign = reviewed_normal_executors(raw)
+        options = raw.get("update", {})
+        if type(options) is dict and {REVIEWED_NORMAL_OPTION, REVIEW_ALL_SELECTED} & options.keys() and not campaign:
+            raise ValueError("REVIEWED_NORMAL_CAMPAIGN_SCOPE_INVALID")
+        allowed_checks = reviewed_dispatch_scope(raw, declared_checks)
+        if parser_mode:
+            _validate_normal_option_placement(raw, SUP05_CONFIG_PARSER_OPTION,
+                {(CHECK_CONFIG, "SUP-05", SUP05_CONFIG_PARSER_OPTION)}, NORMAL_FILE_READS_SCOPE_ERROR)
+            if ((not campaign and (allowed_checks != {"SUP-05"} or staged_observer_executors(raw) != {"supply_boot"}))
+                    or normal_file_reads_requested(raw)
+                    or (bindings is not None and (type(bindings) is not dict or "SUP-05" in bindings))):
+                raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
         _validate_normal_option_placement(raw, NORMAL_SERVING_READINESS_OPTION, {
             ("observation_state", NORMAL_SERVING_READINESS_OPTION),
             (CHECK_CONFIG, "OBS-02", NORMAL_SERVING_READINESS_OPTION),
@@ -383,6 +502,8 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         _validate_normal_option_placement(raw, NORMAL_STARTUP_LOAD_OPTION, {
             (CHECK_CONFIG, "LIF-01", NORMAL_STARTUP_LOAD_OPTION),
         }, NORMAL_STARTUP_LOAD_SCOPE_ERROR)
+        for cid, marker in BOOT_IDENTITY_OPTIONS.items():
+            _validate_normal_option_placement(raw, marker, {(CHECK_CONFIG, cid, marker)}, BOOT_IDENTITY_SCOPE_ERROR)
         _validate_normal_option_placement(raw, NORMAL_COMPILE_CACHE_OPTION, {
             (CHECK_CONFIG, "SUP-07", NORMAL_COMPILE_CACHE_OPTION),
         }, NORMAL_COMPILE_CACHE_SCOPE_ERROR)
@@ -486,12 +607,12 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                     or raw.get("update", {}).get("mode", "external") != "external"
                     or raw.get("lab_activation")
                     or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-09", "REQ-10", "REQ-20",
-                                     "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
+                                     "SUP-05", "SUP-07", "SUP-10", "SUP-12", *BOOT_IDENTITY_OPTIONS}
                         and raw.get("record_attestation"))
-                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
+                    or (check_id in {"LIF-01", "LIF-03", "OBS-02", "PLT-07", "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12", *BOOT_IDENTITY_OPTIONS}
                         and "run_binding" in raw
                         and (type(bindings) is not dict or check_id in bindings))
-                    or (check_id in {"LIF-01", "PLT-07", "REQ-20", "SUP-07", "SUP-10", "SUP-12"}
+                    or (check_id in {"LIF-01", "PLT-07", "REQ-20", "SUP-07", "SUP-10", "SUP-12", *BOOT_IDENTITY_OPTIONS}
                         and set(settings) - {option, "target", "kubectl_binary", "max_duration_seconds"})):
                 raise ValueError(scope_error)
             scoped[check_id] = (settings, None)
@@ -513,10 +634,16 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
                                for settings in stream_cases.values())
                         or ("run_binding" in raw and (type(bindings) is not dict or set(stream_cases) & bindings.keys()))):
                     raise ValueError(stream_error)
-        supply_cases = {cid: scoped[cid][0] for cid in ("LIF-01", "SUP-07", "SUP-12", "SUP-10") if cid in scoped}
+        supply_cases = {cid: scoped[cid][0] for cid in ("LIF-01", "SUP-07", "SUP-12", "SUP-10", *BOOT_IDENTITY_OPTIONS)
+                        if cid in scoped}
+        if parser_mode:
+            parser_settings = for_check(raw, "supply_boot", "SUP-05")["supply_boot"]
+            scoped["SUP-05"] = (parser_settings, None)
+            if campaign:
+                supply_cases["SUP-05"] = parser_settings
         if receipt_present and "SUP-05" not in scoped:
             raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
-        if "SUP-05" in scoped:
+        if "SUP-05" in scoped and not parser_mode:
             settings, _ = scoped["SUP-05"]
             supply_checks = {cid for cid in allowed_checks if pack.checks[cid].executor == "supply_boot"}
             normal = settings.get("normal")
@@ -573,4 +700,6 @@ def bounded_metadata_scopes(configurations, pack, allowed_checks):
         raise ValueError(error)
     if any(gateway_modes) and not all(gateway_modes):
         raise ValueError(error)
+    if any(parser_modes) and (len(parser_modes) != 2 or not all(parser_modes)):
+        raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
     return scopes

@@ -38,11 +38,13 @@ def _run(tmp_path, version, fault=None, graph_option=None):
                 document["spec"]["containers"][0]["args"] = args
 
         world.mutate = pod_readback
-    proc = "(EngineCore pid=96) " if modern else ""
+    proc = "(EngineCore pid=96) " if modern or fault == "enginecore-progress" else ""
     callsite = adapter.graph_capture_source(env)["capture_completion_call_linenumber"]
     if fault == "wrong-callsite":
         callsite -= 1
     progress = f"2026-10-26T00:00:05.323Z \r{_ZERO}\r{_DONE}"
+    if fault == "enginecore-progress":
+        progress = f"2026-10-26T00:00:05.323Z {proc}\r{_ZERO}\r{_DONE}"
     if fault == "separate-cri-rows":
         progress = progress.replace(f"\r{_DONE}", f"\n2026-10-26T00:00:05.415Z \r{_DONE}")
     completion = (f"2026-10-26T00:00:06.514Z {proc}INFO 10-26 00:00:06 "
@@ -116,7 +118,9 @@ def _run(tmp_path, version, fault=None, graph_option=None):
     return draft, json.loads(summary), check, world
 
 
-@pytest.mark.parametrize(("version", "layout"), [("0.30.0", None), ("0.31.0", None), ("0.31.0", "separate-cri-rows")])
+@pytest.mark.parametrize(("version", "layout"), [
+    ("0.30.0", None), ("0.30.0", "enginecore-progress"), ("0.31.0", None), ("0.31.0", "separate-cri-rows"),
+])
 def test_req20_observes_nonempty_native_capture_baseline_only(tmp_path, version, layout):
     draft, summary, check, world = _run(tmp_path, version, layout)
     assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
@@ -131,6 +135,43 @@ def test_req20_observes_nonempty_native_capture_baseline_only(tmp_path, version,
                             "engine_sensor_full_scope": {"value": False, "collected": True}}
     result = RuleTableJudge().judge(check, evidence(check_id=check.id, observations=observations), check.judge.params, {})
     assert result.verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize(("first", "last", "returned"), [
+    ("(EngineCore pid=96) ", "(EngineCore pid=97) ", "(EngineCore pid=97) "),
+    ("(EngineCore pid=96) ", "", "(EngineCore pid=96) "),
+    ("(EngineCore pid=96) ", "(EngineCore pid=96) ", ""),
+    ("(EngineCore pid=96) ", "(EngineCore pid=96) ", "(EngineCore pid=97) "),
+    ("(Unknown pid=96) ", "(Unknown pid=96) ", "(Unknown pid=96) "),
+])
+def test_req20_rejects_mixed_or_unrecognized_progress_sources(first, last, returned):
+    window = {"container_started_at": "2026-10-26T00:00:01Z", "ready_at": "2026-10-26T00:00:08Z"}
+    rows = [f"2026-10-26T00:00:04Z {first}\r{_ZERO}",
+            f"2026-10-26T00:00:05Z {last}\r{_DONE}",
+            f"2026-10-26T00:00:06Z {returned}INFO 10-26 00:00:06 "
+            "[gpu_model_runner.py:6929] Graph capturing finished in 1 secs, took 0.03 GiB"]
+    with pytest.raises(graph._CaptureReportGap):
+        graph._capture_observation(("\n".join(rows) + "\n").encode(), window, 6929)
+
+
+def test_graph_capture_and_retained_return_obey_nanosecond_window():
+    prefix = "2026-10-26T00:00:05.000000"
+    window = {"container_started_at": prefix + "101Z", "ready_at": prefix + "105Z"}
+
+    def prefix_log(start, complete, returned):
+        rows = [f"{prefix}{start}Z \r{_ZERO}", f"{prefix}{complete}Z \r{_DONE}",
+                f"{prefix}{returned}Z INFO 10-26 00:00:05 "
+                "[gpu_model_runner.py:6929] Graph capturing finished in 1 secs, took 0.03 GiB"]
+        return ("\n".join(rows) + "\n").encode()
+
+    ordered = prefix_log(101, 103, 105)
+    assert graph._capture_observation(ordered, window, 6929)["native_capture_return_report_observed"]
+    assert graph._capture_return_report(ordered, window, 6929)["reported_at"] == prefix + "105+00:00"
+    for raw in (prefix_log(100, 103, 105), prefix_log(104, 103, 105),
+                prefix_log(101, 104, 103), prefix_log(101, 103, 106)):
+        with pytest.raises(graph._CaptureReportGap):
+            graph._capture_observation(raw, window, 6929)
+    assert graph._capture_return_report(prefix_log(101, 103, 106), window, 6929) is None
 
 
 @pytest.mark.parametrize("fault", [

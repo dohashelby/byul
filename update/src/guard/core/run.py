@@ -19,8 +19,11 @@ from guard.collectors import check_observations
 from guard.executors import passive_api_hop, registry
 from guard.executors.base import EvidenceDraft
 from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR,
+                                 BOOT_IDENTITY_OPTIONS, BOOT_IDENTITY_SCOPE_ERROR, boot_identity_requested,
+                                 REVIEWED_NORMAL_CASES, REVIEWED_NORMAL_OPTION, REVIEW_ALL_SELECTED,
                                  INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
-                                 KUBERNETES_BOUND_CHECK_OPTIONS, cilium_egress_status_requested,
+                                 SUP05_CONFIG_PARSER_OPTION, approved_config_parser_requested,
+                                 kubernetes_bound_option, cilium_egress_status_requested,
                                  NORMAL_COMPILE_CACHE_SCOPE_ERROR, normal_compile_cache_requested,
                                  NORMAL_FILE_READS_SCOPE_ERROR, normal_file_reads_requested,
                                  NORMAL_GRAPH_CAPTURE_SCOPE_ERROR, normal_graph_capture_requested,
@@ -45,6 +48,7 @@ from guard.models import (
     Pack,
     Plan,
     Policy,
+    PolicyStatus,
     Side,
     canonical_json,
     new_id,
@@ -69,6 +73,7 @@ class RunConfig:
     kubernetes_target_pins: dict[str, str] | None = None
     check_abort_reasons: dict[str, str] = field(default_factory=dict)  # Runtime preflight failures for this side.
     normal_file_read_sha256: dict[str, str | None] = field(default_factory=dict)  # Private PLAN input snapshots.
+    lif05_stage: Any = field(default=None, repr=False)  # Internal live coordinator handoff.
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -154,6 +159,9 @@ def run_plan_locked(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
     requested = cfg.requested if cfg.requested is not None else cfg.raw
     if plan.mode != Mode.update:
         configurations = (requested, cfg.raw, *(side.raw for side in cfg.side_configs.values()))
+        if any(REVIEWED_NORMAL_OPTION in config.get("update", {}) or REVIEW_ALL_SELECTED in config.get("update", {})
+               for config in configurations):
+            raise ValueError("REVIEWED_NORMAL_CAMPAIGN_SCOPE_INVALID")
         if any(cilium_egress_status_requested(config) for config in configurations):
             raise ValueError(CILIUM_EGRESS_STATUS_SCOPE_ERROR)
         if any(installed_plugin_inventory_requested(config) for config in configurations):
@@ -166,8 +174,10 @@ def run_plan_locked(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *,
             raise ValueError(NORMAL_STARTUP_LOAD_SCOPE_ERROR)
         if any(normal_compile_cache_requested(config) for config in configurations):
             raise ValueError(NORMAL_COMPILE_CACHE_SCOPE_ERROR)
-        if any(normal_file_reads_requested(config) for config in configurations):
+        if any(normal_file_reads_requested(config) or approved_config_parser_requested(config) for config in configurations):
             raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+        if any(boot_identity_requested(config) for config in configurations):
+            raise ValueError(BOOT_IDENTITY_SCOPE_ERROR)
         if any(normal_graph_capture_requested(config) for config in configurations):
             raise ValueError(NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
         if any(normal_safetensors_reader_requested(config) for config in configurations):
@@ -224,6 +234,9 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
     allowed_checks = None
     if plan.mode == Mode.update:
         allowed_checks = update_allowed_checks(requested, pack)
+        if requested.get("update", {}).get(REVIEW_ALL_SELECTED) is True and allowed_checks != {
+                item.check_id for item in plan.items if item.selected}:
+            raise ValueError("REVIEWED_ALL_SELECTED_PLAN_SCOPE_MISMATCH")
         validate_update_run_config(cfg)
         sides = ("baseline", "candidate")
         actual = bounded_metadata_scopes((cfg.side_configs.get(side, cfg).raw for side in sides), pack, allowed_checks)
@@ -253,7 +266,17 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
     existing = {
         (e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)
     }
+    staged_sides = {Side(side) for side, side_cfg in cfg.side_configs.items()
+                    if side_cfg.lif05_stage is not None and (only_side is None or Side(side) == only_side)}
+    if staged_sides:
+        if policy.status is not PolicyStatus.CONFIRMED or policy.data_origin is not DataOrigin.DECLARED:
+            raise ValueError('LIF05_STAGE_CONFIRMED_POLICY_REQUIRED')
+        if any((evd := existing.get(('LIF-05', side))) is not None
+               and evd.execution.attempt_id == cfg.attempt_id for side in staged_sides):
+            raise ValueError('LIF05_STAGE_ATTEMPT_ALREADY_SEALED')
 
+    approval_sha256 = (policy.source_document_sha256 if policy.status == PolicyStatus.CONFIRMED
+                       and policy.data_origin == DataOrigin.DECLARED else None)
     out: list[Evidence] = []
     decoded_by_side = {}
     source_refs = {}
@@ -306,6 +329,7 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, envs: list[E
             with check_observations.bind(record_reads, decoded_by_side.setdefault(side, {})):
                 evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,
                                policy_validity=(policy.valid_from, policy.valid_until), allowed_checks=allowed_checks,
+                               approval_sha256=approval_sha256,
                                passive_hop=passive_hop and check.id == passive_api_hop.CHECK,
                                source_ref=source_refs.get(side),
                                staged_observer=side == Side.candidate and item.executor in staged_observers,
@@ -345,7 +369,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
              transition_manifests=None, initialization_digests=None, response_route_digests=None,
              supply_record_digests=None, native_route_prepared_absent=False, rank_common_files=None,
              record_access_digests=None, record_target_bytes=None, retry_snapshot_files=None,
-             prebound_external_update=False) -> Evidence:
+             prebound_external_update=False, approval_sha256=None) -> Evidence:
     binding = None
 
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
@@ -357,6 +381,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             **_empty_evidence_parts(check),
         ).seal()
 
+    if cfg.raw.get("update", {}).get(REVIEW_ALL_SELECTED) is True and check.id not in REVIEWED_NORMAL_CASES:
+        return stopped(ExecStatus.NOT_RUN, "REVIEWED_NORMAL_PATH_UNAVAILABLE")
     factory, reason = _executor_for_item(item, cfg, env, allowed_checks=allowed_checks)
     if reason:
         return stopped(ExecStatus.NOT_RUN, reason)
@@ -369,9 +395,9 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         raw = for_check(cfg.raw, item.executor, check.id)  # [check_config.<CHECK>] (RB2-S)
     except ValueError:
         return stopped(ExecStatus.NOT_RUN, "CHECK_CONFIG_INVALID")
-    option = KUBERNETES_BOUND_CHECK_OPTIONS.get(check.id)
     check_hashes = (raw or {}).get("_kubernetes_target_sha256_by_check")
     section = (raw or {}).get(item.executor)
+    option = kubernetes_bound_option(check.id, section)
     if (response_route_digests is not None and check.id == 'REQ-13' and check.executor == 'response_content'
             and cfg.executors[item.executor] == 'kubernetes' and type(section) is dict):
         from guard.executors.kubernetes_response_content import GATEWAY_TARGET_REQUIRED, ROUTE_TARGET_CHANGED
@@ -411,6 +437,16 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         key = "_kubernetes_target_sha256_by_executor"
         hashes = raw.get(key)
         raw = {**raw, key: {**(hashes if type(hashes) is dict else {}), item.executor: check_hashes[check.id]}}
+    if cfg.kubernetes_target_pins is not None:
+        key = "_kubernetes_target_sha256_by_executor"
+        raw = {**raw, key: {**cfg.kubernetes_target_pins, **raw.get(key, {})}}
+    if staged_observer:
+        # The candidate file was absent at selection. Its exact observed
+        # generation must be pinned before any executor or passive projection.
+        pins = raw.get("_kubernetes_target_sha256_by_executor", {})
+        pin = pins.get(item.executor) if type(pins) is dict else None
+        if not isinstance(pin, str) or re.fullmatch(r"[0-9a-f]{64}", pin) is None:
+            return stopped(ExecStatus.NOT_RUN, "KUBERNETES_STAGED_TARGET_UNVERIFIED")
     if passive_hop:
         if source_ref is None:
             return stopped(ExecStatus.NOT_RUN, "PASSIVE_API_HOP_SOURCE_NOT_COLLECTED")
@@ -419,10 +455,18 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             target = passive_api_hop.read_target(raw[item.executor]["target"], env)
             hashes = raw.get("_kubernetes_target_sha256_by_executor")
             expected = hashes.get(item.executor) if type(hashes) is dict else None
-            draft = passive_api_hop.draft_passive_api_hop(
-                store, plan_ref=plan.ref(), side=common["side"], attempt_id=cfg.attempt_id,
-                source_ref=source_ref, target=target, expected_target_sha256=expected,
-            )
+            projection = passive_api_hop.draft_passive_api_hop
+            if raw.get("update", {}).get(REVIEWED_NORMAL_OPTION) is True:
+                from guard.core import reviewed_normal_dispatch
+                if type(expected) is not str or sha256_hex(canonical_json(target)) != expected:
+                    return stopped(ExecStatus.NOT_RUN, "REVIEWED_PASSIVE_TARGET_UNQUALIFIED")
+                with reviewed_normal_dispatch.invocation(store, check, env, None, plan, cfg.attempt_id,
+                        common["side"].value, None, expected, projection=projection, source_evidence=source_ref):
+                    draft = projection(store, plan_ref=plan.ref(), side=common["side"], attempt_id=cfg.attempt_id,
+                                       source_ref=source_ref, target=target, expected_target_sha256=expected)
+            else:
+                draft = projection(store, plan_ref=plan.ref(), side=common["side"], attempt_id=cfg.attempt_id,
+                                   source_ref=source_ref, target=target, expected_target_sha256=expected)
         except passive_api_hop.PassiveApiHopUnavailable as exc:
             return stopped(ExecStatus.NOT_RUN, str(exc))
         binding = passive_api_hop.execution_binding(
@@ -446,11 +490,29 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                            and GENERATION_MANIFEST_PIN in section)
     if pinned_redeployment and (not prebound_external_update or 2 not in run_binding.stages_for(check)):
         return stopped(ExecStatus.NOT_RUN, 'RUN_BINDING_TRANSITION_PAIRED_PLAN_REQUIRED')
+    from guard.executors.lif05_stages import SETTING as LIF05_STAGE_SETTING, StagedLif05
+    staged_issued_at = None
+    if type(section) is dict and LIF05_STAGE_SETTING in section:
+        stage = cfg.lif05_stage
+        if (check.id != 'LIF-05' or not pinned_redeployment or not prebound_external_update
+                or allowed_checks != {'LIF-05'} or type(stage) is not StagedLif05):
+            return stopped(ExecStatus.NOT_RUN, 'LIF05_STAGE_COORDINATOR_REQUIRED')
+        try:
+            stage.qualify(section[LIF05_STAGE_SETTING], attempt_id=cfg.attempt_id, side=common['side'].value,
+                          policy_ref=plan.inputs.policy.model_dump(mode='json'),
+                          pack_ref=plan.inputs.pack.model_dump(mode='json'), env=env)
+            staged_issued_at = stage.started_at
+            if ((policy_validity[0] is not None and staged_issued_at < policy_validity[0])
+                    or (policy_validity[1] is not None and staged_issued_at >= policy_validity[1])):
+                raise ValueError('LIF05_STAGE_POLICY_WINDOW_INVALID')
+        except ValueError as exc:
+            return stopped(ExecStatus.NOT_RUN, str(exc))
+        raw = {**raw, '_lif05_stage': stage}
     if run_binding.keys_for(check):
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
             target_options = {}
-            if (check.id in {'LIF-01', 'LIF-03', 'OBS-02', 'PLT-07', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12'}
+            if (check.id in {'LIF-01', 'LIF-03', 'OBS-02', 'PLT-07', 'REQ-20', 'SUP-05', 'SUP-07', 'SUP-10', 'SUP-12', *BOOT_IDENTITY_OPTIONS}
                     and type(section) is dict and option in section):
                 hashes = raw.get("_kubernetes_target_sha256_by_executor")
                 expected_target = hashes.get(item.executor) if type(hashes) is dict else None
@@ -458,7 +520,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                     check_label = check.id.replace('-', '')
                     raise run_binding.RunBindingUnavailable(f"RUN_BINDING_{check_label}_NORMAL_TARGET_UNAVAILABLE")
                 target_options["expected_target_sha256"] = expected_target
-                if check.id == 'SUP-05':
+                if check.id == 'SUP-05' and option != SUP05_CONFIG_PARSER_OPTION:
                     if (set(cfg.normal_file_read_sha256) != {'prepared', 'reference_manifest'}
                             or any(digest is None for digest in cfg.normal_file_read_sha256.values())):
                         raise run_binding.RunBindingUnavailable('RUN_BINDING_SUP05_NORMAL_FILES_UNAVAILABLE')
@@ -507,7 +569,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 target_options['expected_rank_prepared_file'] = rank_common_files['prepared']
             computed_binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
-                attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
+                attempt_id=cfg.attempt_id, issued_at=staged_issued_at or utcnow(),
+                valid_from=policy_validity[0], valid_until=policy_validity[1],
                 run_cfg=run_binding.run_config(cfg.raw, check.id), policy_ref=plan.inputs.policy, **target_options)
             if retry_target is not None:
                 if policy_values.get("retry_target_sha256") != retry_target:
@@ -519,33 +582,34 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)
 
-    if staged_observer:
-        # The candidate file did not exist at selection. Only a trusted
-        # coordinator can supply the observed generation's target digest.
-        pins = raw.get("_kubernetes_target_sha256_by_executor", {})
-        pin = pins.get(item.executor) if type(pins) is dict else None
-        if not isinstance(pin, str) or re.fullmatch(r"[0-9a-f]{64}", pin) is None:
-            return stopped(ExecStatus.NOT_RUN, "KUBERNETES_STAGED_TARGET_UNVERIFIED")
-
     started = utcnow()
     info_stub: ExecutorInfo | None = None
     try:
         from guard.adapters.engine_provider import PROVIDERS
         provider = PROVIDERS.get(env.engine.name)
         if provider is not None: provider.validate_environment(env, item.executor, impl_name)
-        if cfg.runtime_environ is not None or cfg.kubernetes_target_pins is not None:
-            raw = dict(raw)
-            if cfg.runtime_environ is not None:
-                raw["_runtime_environ"] = cfg.runtime_environ
-            if cfg.kubernetes_target_pins is not None:
-                raw["_kubernetes_target_sha256_by_executor"] = {
-                    **cfg.kubernetes_target_pins, **raw.get("_kubernetes_target_sha256_by_executor", {}),
-                }
+        if cfg.runtime_environ is not None:
+            raw = {**raw, "_runtime_environ": cfg.runtime_environ}
         with registry.environment_binding(env):
-            executor = registry.build_executor(item.executor, impl_name, raw, factory=factory)
+            executor = registry.build_executor(item.executor, impl_name, raw, factory=factory,
+                                               approval_sha256=approval_sha256)
         info_stub = ExecutorInfo(name=executor.name, version=executor.version, config_sha256=sha256_hex(b""))
         workdir = Path(store.root) / "work" / plan.id / cfg.attempt_id / check.id / str(common["side"])
-        draft = executor.run(check, env, policy_values, adapter, workdir)
+        if raw.get("update", {}).get(REVIEWED_NORMAL_OPTION) is True:
+            from guard.core import reviewed_normal_dispatch
+            pins = cfg.kubernetes_target_pins or {}
+            target_pin = pins.get(item.executor)
+            if (type(target_pin) is not str or re.fullmatch(r"[0-9a-f]{64}", target_pin) is None
+                    or not reviewed_normal_dispatch.eligible(check, raw.get(item.executor), executor)):
+                return stopped(ExecStatus.NOT_RUN, "REVIEWED_NORMAL_EXECUTOR_UNQUALIFIED")
+            input_gap = reviewed_normal_dispatch.required_input_gap(check, env, policy_values, executor, target_pin)
+            if input_gap:
+                return stopped(ExecStatus.NOT_RUN, input_gap)
+            with reviewed_normal_dispatch.invocation(store, check, env, executor, plan, cfg.attempt_id,
+                                                     common["side"].value, binding, target_pin):
+                draft = executor.run(check, env, policy_values, adapter, workdir)
+        else:
+            draft = executor.run(check, env, policy_values, adapter, workdir)
         if not isinstance(draft, EvidenceDraft):
             raise TypeError(f"executor returned {type(draft).__name__}, not EvidenceDraft")
         executor_info = ExecutorInfo(

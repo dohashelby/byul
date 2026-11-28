@@ -4,6 +4,7 @@ from pathlib import Path
 import time
 
 from guard.collectors.file import load_bounded_json
+from guard.configuration import STAGED_PASSIVE_HOP_EXECUTORS, reviewed_normal_executors, staged_observer_executors
 from .kubernetes_binding import verify_owned_pod
 from .kubernetes_http import KubernetesHTTP, INPUT_VALIDATION_PROFILE, REQUEST_BINDING_PROFILE
 
@@ -20,6 +21,18 @@ class KubernetesTransition:
         self.transports={};self.events=[];self.candidate_binding=candidate_binding
         self.envs=dict(zip(("baseline","candidate"),envs));self.side_configs=side_configs;self.runner=runner
         supported={"request_binding":REQUEST_BINDING_PROFILE,"input_validation":INPUT_VALIDATION_PROFILE}
+        reviewed = [reviewed_normal_executors(cfg) for cfg in side_configs.values()]
+        if candidate_binding == "after_baseline" and len(reviewed) == 2 and reviewed[0] and reviewed[0] == reviewed[1]:
+            supported.update({name: supported.get(name, REQUEST_BINDING_PROFILE) for name in reviewed[0]})
+        if candidate_binding == "after_baseline" and all(
+                staged_observer_executors(cfg) == STAGED_PASSIVE_HOP_EXECUTORS for cfg in side_configs.values()):
+            supported.update(dict.fromkeys(sorted(STAGED_PASSIVE_HOP_EXECUTORS), REQUEST_BINDING_PROFILE))
+        if candidate_binding == "after_baseline" and len(side_configs) == 2 and all(
+                staged_observer_executors(cfg) == {"supply_boot"} for cfg in side_configs.values()):
+            supported["supply_boot"] = REQUEST_BINDING_PROFILE
+        if candidate_binding == "after_baseline" and len(side_configs) == 2 and all(
+                staged_observer_executors(cfg) == {"observation_state"} for cfg in side_configs.values()):
+            supported["observation_state"] = REQUEST_BINDING_PROFILE
         selected={side:tuple(name for name in supported
             if side_configs[side].get("executors",{}).get(name)=="kubernetes")
             for side in ("baseline","candidate")}

@@ -13,11 +13,12 @@ from .kubernetes_lifecycle_capture import supervised_source
 from .plugin_loading import GROUPS
 
 NORMAL_OPTION = "installed_plugin_inventory_only"
-PROFILE = "kubernetes-owned-installed-plugin-inventory/1"
+PROFILE = "kubernetes-owned-installed-plugin-inventory/2"
 _CHECK_PROFILE = "supply-boot-plugin-v1"
-_SCHEMA = "guard-installed-plugin-metadata/1"
+_SCHEMA = "guard-installed-plugin-metadata/2"
 _CAP = 8192
 _LIMITS = {"root_count": 2, "directory_entries_per_root": 4096, "distribution_count": 1024, "entry_point_count": 16384,
+           "listed_entries_per_group": 16,
            "metadata_file_bytes": 1048576, "entry_point_file_bytes": 262144, "total_metadata_bytes": 32 * 1024**2}
 _READER = f"GROUPS = {GROUPS!r}\nSCHEMA = {_SCHEMA!r}\nLIMITS = {_LIMITS!r}\n" + r'''
 import configparser
@@ -85,6 +86,7 @@ def installed_roots():
         raise ValueError()
     executable = Path(sys.executable)
     prefix = Path(sys.prefix)
+    scheme = sysconfig.get_default_scheme()
     if executable.parent.name == 'bin':
         candidate = executable.parent.parent
         with_directory = directory(candidate)
@@ -97,9 +99,12 @@ def installed_roots():
                 if not stat.S_ISREG(venv.st_mode):
                     raise ValueError()
                 prefix = candidate
+                # Ubuntu's isolated -S invocation uses the system scheme
+                # even when this executable belongs to a verified venv.
+                scheme = 'venv'
         finally:
             os.close(with_directory)
-    roots = sorted({Path(sysconfig.get_path(key, vars={'base': str(prefix), 'platbase': str(prefix)}))
+    roots = sorted({Path(sysconfig.get_path(key, scheme=scheme, vars={'base': str(prefix), 'platbase': str(prefix)}))
                     for key in ('purelib', 'platlib')})
     if not 1 <= len(roots) <= LIMITS['root_count'] or any(not path.is_relative_to(prefix) or path == prefix
             or path.name not in {'site-packages', 'dist-packages'} for path in roots):
@@ -192,11 +197,14 @@ def scan(roots, expected_name, expected):
             os.close(root_fd)
     if engine_identities != [expected]:
         raise ValueError()
+    groups = []
+    for group, values in entries.items():
+        members = sorted(values)
+        groups.append({'group_sha256': digest(group), 'entry_count': len(members), 'entries_sha256': digest(members),
+                       'entry_fingerprints': members if len(members) <= LIMITS['listed_entries_per_group'] else None})
     return {'schema': SCHEMA, 'roots_sha256': digest([str(root) for root in roots]), 'root_count': len(roots),
             'distribution_count': len(identities), 'distributions_sha256': digest(sorted(identities)),
-            'engine_distribution_sha256': expected, 'groups': [
-                {'group_sha256': digest(group), 'entry_count': len(values), 'entries_sha256': digest(sorted(values))}
-                for group, values in entries.items()]}
+            'engine_distribution_sha256': expected, 'groups': groups}
 
 
 try:
@@ -225,6 +233,17 @@ def installed_plugin_inventory_transport(target, env, *, duration, binary="kubec
     return KubernetesHTTP(target, env, duration=duration, binary=binary, runner=runner, profile=REQUEST_BINDING_PROFILE)
 
 
+def _valid_entry_fingerprints(row):
+    # The complete small-group list lets a caller match a specific registration
+    # to its distribution's declaration without publishing module or entry names.
+    members = row["entry_fingerprints"]
+    if row["entry_count"] > _LIMITS["listed_entries_per_group"]:
+        return members is None
+    return (type(members) is list and len(members) == row["entry_count"]
+            and all(type(value) is str and _SHA.fullmatch(value) for value in members)
+            and members == sorted(members) and sha256_hex(canonical_json(members)) == row["entries_sha256"])
+
+
 def _inventory(transport, expected_name, expected):
     before = transport._verify(capture_snapshot=True)["engine"]
     engine = transport.binding["engine"]
@@ -247,11 +266,12 @@ def _inventory(transport, expected_name, expected):
             or type(result["groups"]) is not list or len(result["groups"]) != len(_GROUP_SHA256)):
         raise ValueError("SUP10_INVENTORY_UNAVAILABLE")
     for row, group in zip(result["groups"], _GROUP_SHA256, strict=True):
-        if (type(row) is not dict or set(row) != {"group_sha256", "entry_count", "entries_sha256"}
+        if (type(row) is not dict or set(row) != {"group_sha256", "entry_count", "entries_sha256", "entry_fingerprints"}
                 or row["group_sha256"] != group or type(row["entry_count"]) is not int
                 or not 0 <= row["entry_count"] <= _LIMITS["entry_point_count"]
                 or type(row["entries_sha256"]) is not str or _SHA.fullmatch(row["entries_sha256"]) is None
-                or (row["entry_count"] == 0) != (row["entries_sha256"] == _EMPTY_GROUP_SHA256)):
+                or (row["entry_count"] == 0) != (row["entries_sha256"] == _EMPTY_GROUP_SHA256)
+                or not _valid_entry_fingerprints(row)):
             raise ValueError("SUP10_INVENTORY_UNAVAILABLE")
     if sum(row["entry_count"] for row in result["groups"]) > _LIMITS["entry_point_count"]:
         raise ValueError("SUP10_INVENTORY_UNAVAILABLE")
@@ -260,7 +280,7 @@ def _inventory(transport, expected_name, expected):
 
 class KubernetesInstalledPluginInventoryExecutor:
     name = "supply_boot"
-    version = "0.1.0+k8s-installed-metadata"
+    version = "0.2.0+k8s-installed-metadata"
 
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         self.cfg = cfg

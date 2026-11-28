@@ -24,6 +24,7 @@ from guard.adapters.fake import FakeAdapter
 from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STATUS_SCOPE_ERROR,
+                                 BOOT_IDENTITY_OPTIONS, BOOT_IDENTITY_SCOPE_ERROR,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_COMPILE_CACHE_SCOPE_ERROR,
                                  NORMAL_FILE_READS_OPTION, NORMAL_FILE_READS_SCOPE_ERROR,
@@ -32,7 +33,7 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, CILIUM_EGRESS_STAT
                                  NORMAL_SAFETENSORS_READER_OPTION, NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_SERVING_READINESS_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_OPTION, NORMAL_STARTUP_LOAD_SCOPE_ERROR,
-                                 NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION)
+                                 NORMAL_STREAM_OPTION, NORMAL_TOKEN_INPUT_OPTION, SUP05_CONFIG_PARSER_OPTION)
 
 from .base import Executor
 from .container_config import ContainerConfigExecutor
@@ -90,6 +91,8 @@ from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .kubernetes_record_access_product import KubernetesRecordAccessExecutor
 from .kubernetes_supply_boot import KubernetesSupplyBootExecutor
 from .kubernetes_normal_compile_cache import KubernetesNormalCompileCacheExecutor
+from .kubernetes_normal_config_parser import KubernetesNormalConfigParserExecutor
+from .kubernetes_normal_boot_identity import KubernetesNormalBootIdentityExecutor
 from .kubernetes_normal_graph_capture import KubernetesNormalGraphCaptureExecutor
 from .kubernetes_normal_safetensors_reader import KubernetesNormalSafetensorsReaderExecutor
 from .kubernetes_normal_startup_load import KubernetesNormalStartupLoadExecutor
@@ -117,7 +120,8 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "engine_sensor:source-cpu": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="source-cpu"),
     "lifecycle_transition:kubernetes": lambda cfg: LifecycleTransitionExecutor(
         cfg.get("lifecycle_transition", {}), expected_target_sha256=cfg.get("_kubernetes_target_sha256"),
-        expected_manifest_sha256=cfg.get("_transition_generation_manifest_sha256")),
+        expected_manifest_sha256=cfg.get("_transition_generation_manifest_sha256"),
+        staged_lif05=cfg.get("_lif05_stage")),
     "profiler_observation:source-cpu": lambda cfg: KubernetesProfilerObservationExecutor(cfg.get("profiler_observation", {}), implementation="source-cpu"),
     "boundary_egress:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "boundary_egress", kubernetes_boundary_egress),
     "native_route:kubernetes": lambda cfg: _with_kubernetes_config(cfg, "native_route", KubernetesNativeRouteExecutor),
@@ -230,6 +234,7 @@ def resolve_executor(executor: str, impl: str, *, engine=None, version=None) -> 
 def build_executor(
     executor: str, impl: str, cfg: dict[str, Any], *,
     engine=None, version=None, factory: Callable[[dict[str, Any]], Executor] | None = None,
+    approval_sha256: str | None = None,
 ) -> Executor:
     """실행 설정에 lab_activation·record_attestation이 있으면 해당 계층을 덧씌운다."""
     if factory is None:
@@ -281,7 +286,9 @@ def build_executor(
         settings = cfg.get(executor)
         if type(settings) is dict:
             modes = {
+                **dict.fromkeys(BOOT_IDENTITY_OPTIONS.values(), (KubernetesNormalBootIdentityExecutor, BOOT_IDENTITY_SCOPE_ERROR)),
                 NORMAL_FILE_READS_OPTION: (KubernetesSupplyBootExecutor, NORMAL_FILE_READS_SCOPE_ERROR),
+                SUP05_CONFIG_PARSER_OPTION: (KubernetesNormalConfigParserExecutor, NORMAL_FILE_READS_SCOPE_ERROR),
                 NORMAL_STARTUP_LOAD_OPTION: (KubernetesNormalStartupLoadExecutor, NORMAL_STARTUP_LOAD_SCOPE_ERROR),
                 NORMAL_COMPILE_CACHE_OPTION: (KubernetesNormalCompileCacheExecutor, NORMAL_COMPILE_CACHE_SCOPE_ERROR),
                 NORMAL_SAFETENSORS_READER_OPTION: (
@@ -295,7 +302,10 @@ def build_executor(
                 if (len(selected) != 1 or impl != "kubernetes" or cfg.get("lab_activation")
                         or cfg.get("record_attestation")):
                     raise ValueError(scope_error)
-                return executor_type(settings, expected_target_sha256=cfg.get("_kubernetes_target_sha256"))
+                pins = {"expected_target_sha256": cfg.get("_kubernetes_target_sha256")}
+                if issubclass(executor_type, KubernetesNormalConfigParserExecutor):
+                    pins["expected_approval_sha256"] = approval_sha256
+                return executor_type(settings, **pins)
     if impl == "kubernetes":
         factory = activated(factory) if executor in ACTIVATED else attested(factory)
     return factory(cfg)

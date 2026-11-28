@@ -5,7 +5,10 @@ from pathlib import Path
 import re
 import stat
 
-from guard.configuration import KUBERNETES_BOUND_CHECK_OPTIONS, for_check, merge_config
+from guard.configuration import (
+    KUBERNETES_BOUND_CHECK_OPTIONS, STAGED_PASSIVE_HOP_EXECUTORS, for_check, merge_config, staged_observer_executors,
+    reviewed_dispatch_scope,
+)
 from guard.models import DataOrigin, Environment, Evidence, ExecStatus, Kind, Mode, Plan, Policy, Side, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_functional import LOGICAL_ID, PROFILE as CONTROL_PROFILE, WIRE_ID
@@ -59,9 +62,11 @@ def validate_scope(pack, configurations, allowed_checks, *, plan=None, explicitl
     if not explicitly_requested and not any(requested(raw) for raw in configurations):
         return False
     required = {CHECK, SOURCE_CHECK}
-    _require(len(configurations) == 2 and allowed_checks is not None and required <= allowed_checks
-             and {cid for cid in allowed_checks if pack.checks[cid].executor == EXECUTOR} == {CHECK},
-             'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
+    _require(len(configurations) == 2, 'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
+    scopes = [reviewed_dispatch_scope(raw, allowed_checks) for raw in configurations]
+    _require(all(scope is not None and required <= scope
+                 and {cid for cid in scope if pack.checks[cid].executor == EXECUTOR} == {CHECK}
+                 for scope in scopes), 'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
     if plan is not None:
         _require(plan.mode == Mode.update and required <= {item.check_id for item in plan.items if item.selected},
                  'PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID')
@@ -79,6 +84,8 @@ def validate_scope(pack, configurations, allowed_checks, *, plan=None, explicitl
                  and type(section) is dict and set(section) == {'target'}
                  and type(producer) is dict and isinstance(section['target'], (str, Path))
                  and producer.get('target') == section['target'], code)
+        if update.get('kubernetes_candidate_binding') == 'after_baseline':
+            _require(STAGED_PASSIVE_HOP_EXECUTORS <= staged_observer_executors(raw), code)
     return True
 
 
@@ -200,6 +207,15 @@ def _read_summary(store, source):
     decoded = [strict_json(line, limit=_MAX_ARTIFACT_BYTES) for line in lines]
     summaries = [row for row in decoded if type(row) is dict and row.get('summary') is True]
     _require(len(summaries) == 1 and summaries[0] is decoded[-1], code)
+    # PLT-01 writes its functional outcome before the final transport summary.
+    # A sealed, internally inconsistent artifact cannot establish the hop.
+    controls = [row for row in decoded[:-1] if type(row) is dict and row.get('via') == 'functional-engine']
+    _require(len(controls) == 1, code)
+    control, = controls
+    _require(control.get('origin') == 'trusted' and control.get('key') == 'allowed'
+             and control.get('method') == 'POST' and control.get('route') == LOGICAL_ID.removeprefix('func|')
+             and control.get('basis') == 'http' and type(control.get('outcome')) is int and control['outcome'] == 200,
+             code)
     return summaries[0], artifact.sha256
 
 

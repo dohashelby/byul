@@ -31,7 +31,8 @@ def build_scope(env,target,manifest_path,model_root,*,nonsecret_model_weights,ha
     for row in manifest['files']:
         if row['path'].endswith('.safetensors'):
             if approved and (row['path'] != PurePosixPath(row['path']).as_posix() or '\x00' in row['path']
-                             or type(row['bytes']) is not int or not 0 < row['bytes'] <= max_hash_bytes):
+                             or type(row['bytes']) is not int or row['bytes'] <= 0
+                             or hash_model_bytes and row['bytes'] > max_hash_bytes):
                 raise ValueError('MODEL_READ_SCOPE_APPROVED_FILE_INVALID')
             rows.append({'normalized_path_sha256':sha256_hex(str(PurePosixPath(model_root)/row['path']).encode()),
                 'reference_sha256':row['sha256'],'bytes':row['bytes']})

@@ -10,7 +10,7 @@ from guard.runtime.comparison import execution_conditions
 from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesBindingError, KubernetesHTTP
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_normal_startup_load import (
-    _read_logs, _ready_window, _source_profile, _stamp, _verify_launch, _verify_source,
+    _read_logs, _ready_window, _source_profile, _verify_launch, _verify_source, _window_stamp,
     normal_startup_load_transport as normal_graph_capture_transport,
 )
 
@@ -20,6 +20,7 @@ _CHECK_PROFILE = "engine-sensor-graph-lifetime-v1"
 _PROGRESS_TITLE = b"Capturing CUDA graphs (decode, FULL)"
 _RETURN_TITLE = b"Graph capturing finished"
 _SKIP_TITLE = b"Skipping CUDA graph capture"
+_ENGINE_CORE_PREFIX = re.compile(rb"\(EngineCore pid=[1-9][0-9]{0,8}\) ")
 _GRAPH_OVERRIDES = {"--enforce-eager", "--compilation-config", "-cc", "--optimization-level",
                     "--cudagraph-capture-sizes", "--max-cudagraph-capture-size"}
 # CR can re-render progress without opening a new CRI line. The bar can be ASCII or UTF-8.
@@ -29,7 +30,7 @@ _PROGRESS = re.compile(
     rb"\[[0-9:<>., ?a-zA-Z/]{1,64}\] *"
 )
 _RETURN = re.compile(
-    rb"(?:\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\) )?"
+    rb"(?P<process>\([A-Za-z0-9_-]{1,40} pid=[1-9][0-9]{0,8}\) )?"
     rb"INFO [0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} "
     rb"\[gpu_model_runner\.py:(?P<line>[0-9]{1,5})\] Graph capturing finished in "
     rb"[0-9]{1,9} secs, took -?[0-9]{1,6}\.[0-9]{2} GiB"
@@ -63,15 +64,16 @@ def _verify_graph_launch(target, container, source):
 
 
 def _capture_observation(raw, window, callsite):
-    started, ready = (_stamp(window[key]) for key in ("container_started_at", "ready_at"))
+    started, ready = (_window_stamp(window[key]) for key in ("container_started_at", "ready_at"))
     last_progress = previous = expected_total = None
+    progress_process = None
     returned = False
     for row in raw.split(b"\n")[:-1]:
         if not any(marker in row for marker in (_PROGRESS_TITLE, _RETURN_TITLE, _SKIP_TITLE)):
             continue
         timestamp, _, message = row.partition(b" ")
         try:
-            at = _stamp(timestamp.decode("ascii"))
+            at = _window_stamp(timestamp.decode("ascii"))
         except ValueError:
             raise _CaptureReportGap("REQ20_CAPTURE_LOG_TIMESTAMP_UNVERIFIED") from None
         if not started <= at <= ready or returned or _SKIP_TITLE in message:
@@ -79,11 +81,18 @@ def _capture_observation(raw, window, callsite):
         if _RETURN_TITLE in message:
             match = _RETURN.fullmatch(message)
             if (not match or int(match["line"]) != callsite or last_progress is None
+                    or (progress_process is not None and match["process"] != progress_process)
                     or at < last_progress or previous != expected_total):
                 raise _CaptureReportGap("REQ20_CAPTURE_LOG_SEQUENCE_UNVERIFIED")
             returned = True
             continue
-        for frame in message.split(b"\r"):
+        frames = message.split(b"\r")
+        # EngineCore can label the physical line once, before tqdm's first CR.
+        process = frames.pop(0) if _ENGINE_CORE_PREFIX.fullmatch(frames[0]) else None
+        if previous is not None and process != progress_process:
+            raise _CaptureReportGap("REQ20_CAPTURE_PROGRESS_UNVERIFIED")
+        progress_process = process
+        for frame in frames:
             if not frame:
                 continue
             progress = _PROGRESS.fullmatch(frame)
@@ -114,19 +123,21 @@ def _capture_return_report(raw, window, callsite):
     try:
         row, = (line for line in rows if _RETURN_TITLE in line)
         timestamp, _, message = row.partition(b" ")
-        at = _stamp(timestamp.decode("ascii"))
-        started, ready = (_stamp(window[key]) for key in ("container_started_at", "ready_at"))
+        time_text = timestamp.decode("ascii")
+        at = _window_stamp(time_text)
+        started, ready = (_window_stamp(window[key]) for key in ("container_started_at", "ready_at"))
     except ValueError:
         return None
     matched = _RETURN.fullmatch(message)
     if not matched or int(matched["line"]) != callsite or not started <= at <= ready:
         return None
-    return {"reported_at": at.isoformat(), "log_line_sha256": sha256_hex(row)}
+    reported_at = time_text.removesuffix("Z") + "+00:00" if at[1] else at[0].isoformat()
+    return {"reported_at": reported_at, "log_line_sha256": sha256_hex(row)}
 
 
 class KubernetesNormalGraphCaptureExecutor:
     name = "engine_sensor"
-    version = "0.1.0+k8s-normal-graph-capture"
+    version = "0.1.1+k8s-normal-graph-capture"
 
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
         self.cfg = cfg

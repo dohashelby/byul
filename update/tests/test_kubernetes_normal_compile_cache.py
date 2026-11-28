@@ -6,6 +6,7 @@ import sys
 
 import pytest
 
+from guard.adapters.engine_provider import EngineProvider, get_provider
 from guard.core.run import _normalize
 from guard.executors import kubernetes_normal_compile_cache as compile_cache
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
@@ -22,6 +23,15 @@ CACHE_PATH = f"/cache/vllm/torch_compile_cache/{CACHE_ID}/rank_0_0/backbone"
 ARTIFACT = "vllm_compile_cache.py"
 PRIVATE = "EXAMPLE_unrelated_console_text"
 FILES = ("compilation/backends.py", "compilation/monitor.py", "logger.py", "logging_utils/formatter.py")
+AOT_ID = "09" * 32
+AOT_PATH = f"/cache/vllm/torch_compile_cache/torch_aot_compile/{AOT_ID}/rank_0_0/model"
+AOT_SOURCE = "compilation/decorators.py"
+AOT_PINS = {
+    "0.30.0": ("5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+               "cab6962e8a1fead59c75f5ed8cb4732f9e5441ff972030c2f4b1c4ba0c58de3c", 719, 313),
+    "0.31.0": ("a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+               "ebbb909015f31c9d71cddef6718dc77459e05e3c70f49383f6b639595272c8a7", 717, 312),
+}
 
 
 class CompileAdapter(Adapter):
@@ -34,7 +44,7 @@ class CompileAdapter(Adapter):
 
 
 class CompileWorld(StartupWorld):
-    def __init__(self, target, adapter, modern, fault):
+    def __init__(self, target, adapter, modern, fault, *, aot=None):
         super().__init__(target, adapter, modern, fault)
         self.metadata_reads = []
         host = "(EngineCore pid=96) " if modern else ""
@@ -42,6 +52,8 @@ class CompileWorld(StartupWorld):
         selected = "/models/fixture" if fault == "wrong-directory" else CACHE_PATH
         completion = (f"2026-10-26T00:00:08.534Z {host}INFO 10-26 00:00:08 [monitor.py:53] "
                       "torch.compile took 3.27 s in total\n")
+        if fault == "different-process":
+            completion = completion.replace(f"{host}INFO", "(EngineCore pid=97) INFO")
         self.raw = (f"2026-10-26T00:00:03.324Z INFO {PRIVATE}\rprogress ended\n"
                     f"2026-10-26T00:00:04.517Z {host}INFO 10-26 00:00:04 [backends.py:{src}] "
                     f"Using cache directory: {selected} for vLLM's torch.compile\n").encode()
@@ -49,6 +61,17 @@ class CompileWorld(StartupWorld):
             self.raw += completion.encode()
         if fault == "duplicate-compile":
             self.raw += completion.encode()
+        self.aot = aot
+        self.aot_pin = None
+        if aot:
+            version = "0.31.0" if modern else "0.30.0"
+            _, self.aot_pin, save_line, load_line = AOT_PINS[version]
+            line, action = ((save_line, "saved AOT compiled function to") if aot == "save"
+                            else (load_line, "Directly load AOT compilation from path"))
+            if fault == "wrong-aot-line":
+                line += 1
+            event = f"2026-10-26T00:00:08.534000712Z {host}INFO 10-26 00:00:08 [decorators.py:{line}] {action} {AOT_PATH}\n".encode()
+            self.raw += event * (2 if fault == "duplicate-aot" else 1)
 
     def pod_readback(self, role, document, after):
         super().pod_readback(role, document, after)
@@ -76,10 +99,14 @@ class CompileWorld(StartupWorld):
             assert args[:10] == [f"--namespace={engine['namespace']}", "exec", "-i", engine["pod"],
                                  "--container=engine", "--", "python3", "-I", "-S", "-c"]
             request = json.loads(kwargs["input_bytes"])
-            assert request["roots"] == [ROOT] and {row["relative"] for row in request["files"]} == set(FILES)
+            expected_paths = ({AOT_SOURCE, *FILES[2:]} if self.aot else set(FILES))
+            assert request["roots"] == [ROOT] and {row["relative"] for row in request["files"]} == expected_paths
             self.hash_calls.append(request)
             files = [{**row, "sha256": sha256_hex(row["relative"].encode()), "state": "hashed"}
                      for row in request["files"]]
+            if self.aot:
+                selected, = [row for row in files if row["relative"] == AOT_SOURCE]
+                selected["sha256"] = "0" * 64 if self.fault == "wrong-aot-source" else self.aot_pin
             if self.fault == "wrong-installed-source" or (
                     self.fault in {"metadata-unavailable-source-changed", "metadata-absent-source-changed"}
                     and len(self.hash_calls) == 2):
@@ -88,13 +115,17 @@ class CompileWorld(StartupWorld):
         else:
             assert args[:10] == [f"--namespace={engine['namespace']}", "exec", engine["pod"],
                                 "--container=engine", "--", "python3", "-I", "-S", "-B", "-c"]
-            assert args[10] == compile_cache._METADATA_PROGRAM and len(args) == 13
-            assert 0 < float(args[11]) <= 5 and args[12] == CACHE_ID and kwargs["max_stdout_bytes"] == 4096
+            program = compile_cache._AOT_METADATA_PROGRAM if self.aot else compile_cache._METADATA_PROGRAM
+            assert args[10] == program and len(args) == 13
+            assert 0 < float(args[11]) <= 5 and args[12] == (AOT_ID if self.aot else CACHE_ID)
+            assert kwargs["max_stdout_bytes"] == 4096
             self.metadata_reads.append(args)
-            boot_ns = compile_cache._ns(compile_cache._stamp(STARTED))
+            boot_ns = compile_cache._ns(STARTED)
             artifact = {"device": 2, "inode": 100, "uid": 2000, "gid": 0, "size": 543,
                         "mode": stat.S_IFREG | 0o640, "mtime_ns": boot_ns + 7000000000, "ctime_ns": boot_ns + 7000000000}
             directory = {**artifact, "inode": 99, "size": 4096, "mode": stat.S_IFDIR | 0o700}
+            if self.aot == "load" and self.fault != "after-boot-aot-file":
+                artifact.update(mtime_ns=boot_ns-2000, ctime_ns=boot_ns-1000)
             if self.fault == "stale":
                 artifact["mtime_ns"] = boot_ns - 1000
             elif self.fault == "non-file":
@@ -111,10 +142,19 @@ class CompileWorld(StartupWorld):
         return {"returncode": 0, "stdout_bytes": canonical_json(source), "capture": {"complete": True}}
 
 
-def _run(tmp_path, version, fault=None):
+def _run(tmp_path, version, fault=None, *, aot=None, legacy_aot_line=False):
     env, target, path, startup = startup_inputs(tmp_path, version)
+    if aot:
+        image = "docker.io/vllm/vllm-openai@sha256:" + AOT_PINS[version][0]
+        env = env.model_copy(update={"engine": env.engine.model_copy(update={"image_digest": image})}).seal()
+        target["environment_ref"] = env.ref().model_dump(mode="json")
+        target["engine"]["image_digest"] = image
+        target["kubernetes"]["engine"].update(image=image, image_id=image)
     adapter = CompileAdapter(startup.adapter.line)
-    world = CompileWorld(target, adapter, version == "0.31.0", fault)
+    world = CompileWorld(target, adapter, version == "0.31.0", fault, aot=aot)
+    if legacy_aot_line:
+        world.raw += (f"2026-10-26T00:00:08.534Z INFO 10-26 00:00:08 [decorators.py:312] "
+                      f"Directly load AOT compilation from path {AOT_PATH}\n").encode()
     world.fault = None
     target["startup_log_prefix"] = capture_startup_log_prefix(target, env, runner=world.runner)
     assert world.log_calls == [65536] and not world.hash_calls and not world.metadata_reads
@@ -125,10 +165,42 @@ def _run(tmp_path, version, fault=None):
         {"normal_compile_cache_only": True, "target": str(path)},
         runner=world.runner, expected_target_sha256=sha256_hex(path.read_bytes()))
     check = load_pack(UPDATE / "packs/PACK-BASELINE").checks["SUP-07"]
-    draft = executor.run(check, env, {}, adapter, tmp_path / "work")
+    # For AOT use the registered provider to supply compile_cache_source and
+    # the existing mock adapter only for the unrelated startup source reader.
+    draft = executor.run(check, env, {}, startup.adapter if aot else adapter, tmp_path / "work")
     text = draft.artifacts[0].path.read_text()
-    assert all(raw not in text for raw in (CACHE_ID, CACHE_PATH, PRIVATE, ROOT, "pid=96", ARTIFACT))
+    assert all(raw not in text for raw in (CACHE_ID, CACHE_PATH, AOT_ID, AOT_PATH, PRIVATE, ROOT, "pid=96", ARTIFACT))
     return draft, json.loads(text), check, world
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+def test_report_uses_exact_boot_window(tmp_path, version):
+    env, target, _, world = startup_inputs(tmp_path, version)
+    adapter = CompileAdapter(world.adapter.line)
+    normal = CompileWorld(target, adapter, version == "0.31.0", None).raw
+    profile = adapter.compile_cache_source(env)
+    selected = b"2026-10-26T00:00:04.000000711Z"
+    finished = b"2026-10-26T00:00:04.000000712Z"
+    narrow = normal.replace(b"2026-10-26T00:00:04.517Z", selected).replace(b"2026-10-26T00:00:08.534Z", finished)
+    window = {"container_started_at": selected.decode(), "ready_at": finished.decode()}
+    _, report = compile_cache._compile_observation(narrow, window, profile)
+    assert report["selected_at"] == "2026-10-26T00:00:04.000000711+00:00"
+    assert report["completed_at"] == "2026-10-26T00:00:04.000000712+00:00"
+    assert report["log_process_labels_matched"] is (version == "0.31.0")
+    assert compile_cache._ns(window["ready_at"]) - compile_cache._ns(window["container_started_at"]) == 1
+    for raw in (narrow.replace(selected, selected.replace(b"711Z", b"710Z")),
+                narrow.replace(finished, finished.replace(b"712Z", b"713Z")),
+                normal.replace(b"04.517Z", b"04.000000712Z").replace(b"08.534Z", b"04.000000711Z")):
+        with pytest.raises(ValueError):
+            compile_cache._compile_observation(raw, window, profile)
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+def test_different_compile_log_processes_are_not_joined(tmp_path, version):
+    draft, artifact, _, world = _run(tmp_path, version, "different-process")
+    assert draft.status == ExecStatus.ABORTED and draft.abort_reason == "SUP07_COMPILE_REPORT_UNVERIFIED"
+    assert not world.metadata_reads and artifact["retained_compile_report"] is None
+    assert artifact["observation"] is None
 
 
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
@@ -186,6 +258,87 @@ def test_normal_compile_with_owned_boot_cache_metadata_is_partial(tmp_path, vers
     assert assessed.verdicts["security"] == Verdict.UNKNOWN
 
 
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+@pytest.mark.parametrize("action", ["save", "load"])
+def test_pinned_aot_uses_the_native_path_and_remains_partial(tmp_path, version, action):
+    draft, artifact, check, world = _run(tmp_path, version, aot=action)
+    assert draft.status == ExecStatus.COMPLETED and draft.data_origin == DataOrigin.EXAMPLE
+    assert len(world.hash_calls) == 2 and len(world.metadata_reads) == 1 and not world.execs
+    observed = artifact["observation"]
+    assert observed["compilation"]["action"] == action
+    assert observed["compilation"]["reported_at"].endswith("534000712Z")
+    assert observed["cache_file_metadata"]["file_path_sha256"] == sha256_hex(AOT_PATH.encode())
+    assert observed["cache_file_metadata"]["file_inode"] == 100
+    assert artifact["installed_source_sha256"][AOT_SOURCE] == world.aot_pin
+    assert not any(row.attempted for row in draft.challenges)
+    observations = _normalize(check, draft)["observations"]
+    assert observations["supply_boot_native_consumption"]["collected"] is (action == "load")
+    assert observations["supply_boot_complete"]["value"] is False
+    assessed = RuleTableJudge().judge(check, evidence(check_id=check.id, observations=observations), check.judge.params, {})
+    assert assessed.verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
+def test_vllm_compile_contract_preserves_exact_aot_source_and_call_sites(tmp_path, version):
+    env, _, _, _ = startup_inputs(tmp_path, version)
+    digest, source, save, load = AOT_PINS[version]
+    engine = env.engine.model_copy(update={"image_digest": "docker.io/vllm/vllm-openai@sha256:" + digest})
+    provider = get_provider("vllm")
+    aot = provider.evidence_contract("compile_cache_source", env.model_copy(update={"engine": engine}))["aot"]
+    assert aot["file_sha256"] == {AOT_SOURCE: source}
+    assert (aot["save_call_linenumber"], aot["load_call_linenumber"]) == (save, load)
+    for update in ({"image_digest": "docker.io/vllm/vllm-openai@sha256:" + "0" * 64},
+                   {"version": "0.99.0"}, {"source_commit": "0" * 40}, {"name": "another-engine"}):
+        candidate = env.model_copy(update={"engine": engine.model_copy(update=update)})
+        with pytest.raises(ValueError, match="SUP07_COMPILE_CACHE_SOURCE_UNQUALIFIED"):
+            provider.evidence_contract("compile_cache_source", candidate)
+
+
+def test_classic_normal_path_ignores_aot_log_without_optional_contract(tmp_path):
+    draft, artifact, _, world = _run(tmp_path, "0.31.0", legacy_aot_line=True)
+    assert draft.status == ExecStatus.COMPLETED
+    assert artifact["observation"]["compilation"]["scope"] == "native_ordinary_compile_monitor"
+    assert not draft.observations["supply_boot_native_consumption"].collected
+    assert len(world.metadata_reads) == 1 and world.metadata_reads[0][10] == compile_cache._METADATA_PROGRAM
+
+
+def test_malformed_aot_contract_is_rejected_at_source_validation():
+    class InvalidAdapter(CompileAdapter):
+        def compile_cache_source(self, env):
+            return {**super().compile_cache_source(env),
+                    "aot": {"file_sha256": {AOT_SOURCE: "0" * 64},
+                            "save_call_linenumber": 717, "load_call_linenumber": 312, "log_pattern": "("}}
+
+    with pytest.raises(ValueError, match="SUP07_COMPILE_AOT_SOURCE_UNQUALIFIED"):
+        compile_cache._compile_profile(InvalidAdapter(5354), None)
+
+
+def test_other_provider_can_supply_classic_contract_without_aot(tmp_path, monkeypatch):
+    env, target, _, world = startup_inputs(tmp_path, "0.31.0")
+    classic = CompileAdapter(world.adapter.line).compile_cache_source(env)
+    provider = EngineProvider("another-engine", lambda: world.adapter)
+    monkeypatch.setattr(provider, "evidence_contract",
+                        lambda name, _: classic if name == "compile_cache_source" else None)
+    monkeypatch.setattr(compile_cache, "get_provider", lambda name: provider if name == provider.name else None)
+    env = env.model_copy(update={"engine": env.engine.model_copy(update={"name": provider.name})})
+    source = compile_cache._compile_profile(world.adapter, env)
+    raw = CompileWorld(target, CompileAdapter(world.adapter.line), True, None).raw
+    window = {"container_started_at": STARTED, "ready_at": "2026-10-26T00:00:12Z"}
+    assert compile_cache._aot_observation(raw, window, source) is None
+    assert compile_cache._compile_observation(raw, window, source)[1]["reported_compile_elapsed_ms"] == 3270
+
+
+@pytest.mark.parametrize(("fault", "stat_called"), [
+    ("wrong-aot-line", False), ("duplicate-aot", False), ("wrong-aot-source", False),
+    ("after-boot-aot-file", True), ("changed-after-stat", True),
+])
+def test_aot_rejects_unbound_or_inconsistent_live_facts(tmp_path, fault, stat_called):
+    draft, artifact, _, world = _run(tmp_path, "0.31.0", fault, aot="load")
+    assert draft.status == ExecStatus.ABORTED and artifact["observation"] is None
+    assert bool(world.metadata_reads) is stat_called
+    assert not draft.observations["supply_boot_native_consumption"].collected
+
+
 @pytest.mark.parametrize(("fault", "stat_called"), [
     ("wrong-installed-source", False), ("prefix-changed", False), ("wrong-directory", False), ("overlay", False),
     ("compile-override", False),
@@ -210,6 +363,7 @@ def test_retains_verified_native_compile_report_when_file_metadata_is_unavailabl
         "scope": "native_ordinary_compile_monitor",
         "selected_at": "2026-10-26T00:00:04.517000+00:00",
         "completed_at": "2026-10-26T00:00:08.534000+00:00",
+        "log_process_labels_matched": version == "0.31.0",
         "reported_compile_elapsed_ms": 3270,
         "reported_directory_sha256": sha256_hex(CACHE_PATH.encode()),
     }

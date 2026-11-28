@@ -43,12 +43,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from guard.configuration import (CILIUM_EGRESS_STATUS_OPTION, GATEWAY_RECORD_SNAPSHOT_OPTION,
+                                 BOOT_IDENTITY_OPTIONS,
                                  INSTALLED_PLUGIN_INVENTORY_OPTION, KUBERNETES_BOUND_CHECK_OPTIONS,
                                  NORMAL_COMPILE_CACHE_OPTION, NORMAL_FILE_READS_OPTION, NORMAL_REQUEST_LATENCY_OPTION,
                                  NORMAL_GRAPH_CAPTURE_OPTION,
                                  NORMAL_SAFETENSORS_READER_OPTION,
                                  NORMAL_SERVING_READINESS_OPTION, NORMAL_STARTUP_LOAD_OPTION,
-                                 NORMAL_STREAM_OPTION, RETRY_RECORD_SNAPSHOT_OPTION)
+                                 NORMAL_STREAM_OPTION, RETRY_RECORD_SNAPSHOT_OPTION, SUP05_CONFIG_PARSER_OPTION)
 from guard.models import canonical_json, sha256_hex
 
 SCHEMA = 'guard-run-binding/1'
@@ -59,6 +60,8 @@ SUPPLY_RECORD_CHECKS = frozenset({'SUP-15', 'SUP-16'})
 # Pack 38 moved the OBS-06 subject plan from POL to binding at check revision 10.
 OBS06_STAGE4_MIN_CHECK_REVISION = 10
 _TARGET_ONLY_NORMAL_MODES = {
+    **{check: ('supply_boot', option, 'supply_target_sha256') for check, option in BOOT_IDENTITY_OPTIONS.items()},
+    'SUP-05': ('supply_boot', SUP05_CONFIG_PARSER_OPTION, 'supply_target_sha256'),
     'LIF-01': ('supply_boot', NORMAL_STARTUP_LOAD_OPTION, 'supply_target_sha256'),
     'LIF-03': ('stream_buffer', NORMAL_REQUEST_LATENCY_OPTION, 'buffer_target_sha256'),
     'OBS-02': ('observation_state', NORMAL_SERVING_READINESS_OPTION, 'observation_state_target_sha256'),

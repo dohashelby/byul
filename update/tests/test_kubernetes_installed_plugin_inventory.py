@@ -21,16 +21,23 @@ from tests.test_gpu_a_run_inputs import UPDATE
 from tests.test_kubernetes_sampling import World, normal_sampling_inputs
 
 
+def _venv_path(prefix, key):
+    return Path(sysconfig.get_path(key, scheme="venv", vars={"base": str(prefix), "platbase": str(prefix)}))
+
+
 def _installed_fixture(prefix, version, fault):
     bin_dir = prefix / "bin"
     bin_dir.mkdir(parents=True)
     interpreter = bin_dir / "python3"
     interpreter.symlink_to(Path(sys.executable).resolve())
-    (prefix / "pyvenv.cfg").write_text("include-system-site-packages = false\n")
-    lib = Path(sysconfig.get_path("purelib", vars={"base": str(prefix), "platbase": str(prefix)}))
+    (prefix / "pyvenv.cfg").write_text(
+        f"home = {Path(sys.executable).resolve().parent}\ninclude-system-site-packages = false\n")
     if fault == "missing-root":
         return interpreter
-    lib.mkdir(parents=True)
+    pure, plat = (_venv_path(prefix, key) for key in ("purelib", "platlib"))
+    for path in {pure, plat}:
+        path.mkdir(parents=True)
+    lib = pure
 
     def dist(name, revision, entries=None):
         metadata = lib / f"{name}-{revision}.dist-info"
@@ -55,6 +62,10 @@ def _installed_fixture(prefix, version, fault):
             points.symlink_to(original.name)
         elif fault == "ambiguous":
             (first / "entry_points.txt").write_text(f"[{GROUPS[0]}]\nentry = one:fn\nentry = two:fn\n")
+        elif fault in {"at-list-limit", "many-entries"}:
+            count = 15 if fault == "at-list-limit" else 16
+            entries = [f"private-member-{n} = private_fixture:activate" for n in range(count)]
+            (first / "entry_points.txt").write_text(f"[{GROUPS[0]}]\n" + "\n".join(entries) + "\n")
     (lib / "private_fixture.py").write_text("raise AssertionError('the metadata reader must not import entry points')\n")
     (lib / "fixture.pth").write_text("import private_fixture\n")
     return interpreter
@@ -64,6 +75,7 @@ def _installed_fixture(prefix, version, fault):
     ("0.30.0", None), ("0.31.0", "empty-groups"), ("0.30.0", "wrong-version"),
     ("0.31.0", "duplicate-version"), ("0.30.0", "symlink"), ("0.31.0", "ambiguous"),
     ("0.31.0", "owner-changed"), ("0.31.0", "missing-root"), ("0.30.0", "missing-engine"),
+    ("0.31.0", "at-list-limit"), ("0.31.0", "many-entries"), ("0.30.0", "inconsistent-entry"),
 ])
 def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tmp_path, version, fault):
     interpreter = _installed_fixture(tmp_path / "private-venv", version, fault)
@@ -83,6 +95,10 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
             dispatches.append(command)
             self.after_exec = True
             capture = capture_pipes([str(interpreter), *command[1:]], **kwargs)
+            if fault == "inconsistent-entry":
+                inventory_row = json.loads(capture["stdout_bytes"])
+                inventory_row["groups"][0]["entry_fingerprints"][0] = "0" * 64
+                capture["stdout_bytes"] = canonical_json(inventory_row)
             child_stderr.append(capture["stderr_bytes"])
             return capture
 
@@ -102,7 +118,7 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
         runner=world.runner, expected_target_sha256=sha256_hex(path.read_bytes()))
     draft = executor.run(check, env, {}, VllmAdapter(), tmp_path / "work")
 
-    collected = fault in {None, "empty-groups"}
+    collected = fault in {None, "empty-groups", "at-list-limit", "many-entries"}
     assert len(dispatches) == 1 and not world.execs
     assert child_stderr == [b""]
     assert draft.status == (ExecStatus.COMPLETED if collected else ExecStatus.ABORTED)
@@ -110,21 +126,27 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
     assert draft.normal_control.attempted is False
     assert [step.attempted for step in draft.challenges] == [collected, False, False]
     raw = draft.artifacts[0].path.read_text()
-    assert all(text not in raw for text in ("private-entry", "private_fixture", "private-venv", "private-distribution", *GROUPS))
+    assert all(text not in raw for text in ("private-entry", "private-member", "private_fixture", "private-venv", "private-distribution", *GROUPS))
     assert not list((tmp_path / "private-venv").rglob("*.pyc"))
     doc = json.loads(raw)
     if collected:
         sample = doc["observed_session"]["inventory"]
         assert sample["engine_distribution_sha256"] == sha256_hex(canonical_json(["vllm", version]))
         assert [row["group_sha256"] for row in sample["groups"]] == [sha256_hex(canonical_json(group)) for group in GROUPS]
-        assert [row["entry_count"] for row in sample["groups"]] == ([2, 0, 0, 0] if fault is None else [0, 0, 0, 0])
         entries = []
-        if fault is None:
+        if fault != "empty-groups":
             for name, revision in (("private-distribution-one", "1.0"), ("private-distribution-two", "2.0")):
                 provider = sha256_hex(canonical_json([name, revision]))
-                entries.append(sha256_hex(canonical_json([provider, GROUPS[0], "private-entry", "private_fixture:activate"])))
+                names = ["private-entry"]
+                if fault in {"at-list-limit", "many-entries"} and revision == "1.0":
+                    count = 15 if fault == "at-list-limit" else 16
+                    names = [f"private-member-{n}" for n in range(count)]
+                entries.extend(sha256_hex(canonical_json([provider, GROUPS[0], item, "private_fixture:activate"])) for item in names)
+        assert [row["entry_count"] for row in sample["groups"]] == [len(entries), 0, 0, 0]
         assert [row["entries_sha256"] for row in sample["groups"]] == [sha256_hex(canonical_json(sorted(entries))),
             *([sha256_hex(canonical_json([]))] * 3)]
+        assert [row["entry_fingerprints"] for row in sample["groups"]] == [
+            None if fault == "many-entries" else sorted(entries), [], [], []]
     else:
         assert doc["observed_session"] is None and "installed_metadata_inventory" in doc["missing"]
     observations = _normalize(check, draft)["observations"]
@@ -133,6 +155,13 @@ def test_sup10_exact_isolated_reader_reports_only_bound_installation_metadata(tm
     assert not observations["supply_boot_normal_verified"]["collected"] and not observations["supply_boot_violations"]["collected"]
     evd = evidence(check_id=check.id, observations=observations, normal=draft.normal_control.model_dump())
     assert RuleTableJudge().judge(check, evd, check.judge.params, {}).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("members", [None, [], ["a" * 64, "c" * 64], ["b" * 64, "a" * 64], [1, 2]])
+def test_sup10_rejects_incomplete_or_inconsistent_entry_identity_list(members):
+    group_digest = sha256_hex(canonical_json(["a" * 64, "b" * 64]))
+    assert not inventory._valid_entry_fingerprints({
+        "entry_count": 2, "entries_sha256": group_digest, "entry_fingerprints": members})
 
 
 @pytest.mark.parametrize("version", ["0.30.0", "0.31.0"])
@@ -191,7 +220,7 @@ def test_sup10_rejects_metadata_changed_after_individual_read(tmp_path, monkeypa
     version = "0.31.0"
     prefix = tmp_path / "private-venv"
     _installed_fixture(prefix, version, None)
-    root = Path(sysconfig.get_path("purelib", vars={"base": str(prefix), "platbase": str(prefix)}))
+    root = _venv_path(prefix, "purelib")
     distribution = root / f"vllm-{version}.dist-info"
     source = distribution / "METADATA"
     selected = distribution.stat()

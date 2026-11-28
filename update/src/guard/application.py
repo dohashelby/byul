@@ -14,6 +14,8 @@ import secrets
 from guard.adapters.model_inventory import inventory
 from guard.adapters.engine_provider import get_provider
 from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, COLLECTION_STATUS_SNAPSHOT_SCOPE_ERROR,
+                                 BOOT_IDENTITY_OPTIONS, BOOT_IDENTITY_SCOPE_ERROR, boot_identity_requested,
+                                 REVIEWED_NORMAL_OPTION, reviewed_normal_executors,
                                  GATEWAY_RECORD_SNAPSHOT_OPTION,
                                  INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR,
                                  KUBERNETES_BOUND_CHECK_OPTIONS,
@@ -23,6 +25,8 @@ from guard.configuration import (CILIUM_EGRESS_STATUS_SCOPE_ERROR, COLLECTION_ST
                                  NORMAL_SAFETENSORS_READER_SCOPE_ERROR,
                                  NORMAL_STARTUP_LOAD_SCOPE_ERROR,
                                  RETRY_RECORD_SNAPSHOT_SCOPE_ERROR,
+                                 SUP05_CONFIG_PARSER_OPTION, approved_config_parser_requested, kubernetes_bound_option,
+                                 STAGED_PASSIVE_HOP_EXECUTORS, staged_observer_executors,
                                  for_side, merge_config, validate_requested_config,
                                  bounded_metadata_scopes, cilium_egress_status_requested, collection_status_snapshot_requested, for_check,
                                  installed_plugin_inventory_requested,
@@ -43,7 +47,7 @@ from guard.executors import passive_api_hop
 from guard.collectors.change import read_change, resolve_plan, save_change
 from guard.core.change_selection import build_context
 from guard.input_matrix_policy import PROFILE as INPUT_MATRIX_PROFILE
-from guard.models import Evidence, ExecStatus, Mode, Side, new_id, sha256_hex, utcnow
+from guard.models import DataOrigin, Evidence, ExecStatus, Mode, Side, new_id, sha256_hex, utcnow
 from guard.models.objects import Artifact
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
@@ -111,6 +115,18 @@ def _kubernetes_transition(envs, side_configs, options):
 
 def _kubernetes_transition_configurations(side_cfgs):
     """The scoped REQ-09 observer uses a bound target without a lifecycle transition."""
+    reviewed = [reviewed_normal_executors(c) for c in side_cfgs.values()]
+    if len(reviewed) == 2 and reviewed[0] and reviewed[0] == reviewed[1]:
+        return side_cfgs, tuple(sorted(reviewed[0]))
+    if len(side_cfgs) == 2 and all(staged_observer_executors(c) == STAGED_PASSIVE_HOP_EXECUTORS
+                                  for c in side_cfgs.values()):
+        return side_cfgs, ("container_config", "api_transport")
+    if len(side_cfgs) == 2 and all(staged_observer_executors(c) == {"supply_boot"}
+                                  for c in side_cfgs.values()):
+        return side_cfgs, ("supply_boot",)
+    if len(side_cfgs) == 2 and all(staged_observer_executors(c) == {"observation_state"}
+                                  for c in side_cfgs.values()):
+        return side_cfgs, ("observation_state",)
     if any(normal_token_input_requested(c) for c in side_cfgs.values()):
         # Even an invalid request must reach the scope validator without
         # implicitly activating legacy input validation.
@@ -185,8 +201,11 @@ def _update_config_for_execution(pack, cfg, allowed_checks):
 def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
     sides = cfg.get("sides", {})
     if (cilium_egress_status_requested(cfg) or installed_plugin_inventory_requested(cfg)
+            or REVIEWED_NORMAL_OPTION in cfg.get("update", {})
             or collection_status_snapshot_requested(cfg)
             or normal_compile_cache_requested(cfg)
+            or approved_config_parser_requested(cfg)
+            or boot_identity_requested(cfg)
             or normal_file_reads_requested(cfg)
             or normal_graph_capture_requested(cfg)
             or normal_request_latency_requested(cfg)
@@ -202,7 +221,7 @@ def _validate_requested_normal_scopes(cfg, pack, allowed_checks):
 
 def _bounded_kubernetes_targets(raw, selected):
     paths = {}
-    for check_id, option in KUBERNETES_BOUND_CHECK_OPTIONS.items():
+    for check_id in KUBERNETES_BOUND_CHECK_OPTIONS:
         name = selected.get(check_id)
         if raw.get("executors", {}).get(name) != "kubernetes":
             continue
@@ -210,9 +229,10 @@ def _bounded_kubernetes_targets(raw, selected):
             effective = for_check(raw, name, check_id).get(name, {})
         except ValueError:
             continue  # Per-check execution reports the malformed configuration.
+        option = kubernetes_bound_option(check_id, effective)
         if type(effective) is not dict or effective.get(option) is not True:
             continue
-        section = effective.get("normal") if check_id == "SUP-05" else effective
+        section = effective.get("normal") if check_id == "SUP-05" and option != SUP05_CONFIG_PARSER_OPTION else effective
         target = section.get("target") if type(section) is dict else None
         paths[check_id] = Path(target) if isinstance(target, (str, Path)) else None
     return paths
@@ -235,14 +255,14 @@ def _pin_prebound_kubernetes_targets(raw, env, paths, target_snapshots):
             continue  # The scoped executor will withhold dispatch without a verified hash.
 
 
-def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=None):
+def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=None, config_parser=False):
     from guard.models import canonical_json, sha256_hex
     from guard.runtime.bounded import strict_json
     from guard.runtime.kubernetes_http import KubernetesBindingError, _validate as validate_target_binding
 
     try:
         target = strict_json(content, limit=65536)
-        if scoped_check == "SUP-05":
+        if scoped_check == "SUP-05" and not config_parser:
             from guard.runtime.kubernetes_binding import validate_capture_target
             validate_capture_target(target, env)
             return sha256_hex(canonical_json(target))
@@ -278,6 +298,12 @@ def _scoped_target_sha256(content, env, *, gateway_snapshot=False, scoped_check=
                 if get_provider(env.engine.name).evidence_contract("compile_cache_source", env) is None:
                     raise ValueError("SUP07_COMPILE_CACHE_SOURCE_UNQUALIFIED")
                 normal_compile_cache_transport(target, env, duration=1)
+            elif scoped_check == "SUP-05" and config_parser:
+                from guard.executors.kubernetes_normal_config_parser import parser_transport
+                parser_transport(target, env, duration=1)
+            elif scoped_check in BOOT_IDENTITY_OPTIONS:
+                from guard.executors.kubernetes_normal_config_parser import parser_transport
+                parser_transport(target, env, duration=1)
             elif scoped_check == "SUP-10":
                 from guard.executors.kubernetes_installed_plugin_inventory import installed_plugin_inventory_transport
                 installed_plugin_inventory_transport(target, env, duration=1)
@@ -428,6 +454,7 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
         result.evidence.extend(run_plan_locked(store, pack, plan, rc, only_side=side))
     kube_transition = None
     transition_cfgs, transition_executors = _kubernetes_transition_configurations(side_cfgs)
+    reviewed = bool(side_cfgs) and all(reviewed_normal_executors(c) for c in side_cfgs.values())
     if transition_executors:
         kube_transition = _kubernetes_transition(envs, transition_cfgs, cfg.get("update", {}))
     candidate_blocked = None
@@ -445,7 +472,15 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
                     else:
                         previous_evidence = [e for e in result.evidence if e.side == Side.baseline
                                              and e.execution.attempt_id == rc.attempt_id]
-                        if not _baseline_ran_without_abort(previous_evidence):
+                        if reviewed:
+                            if (not any(e.execution.status == ExecStatus.COMPLETED and e.data_origin == DataOrigin.MEASURED
+                                        for e in previous_evidence)
+                                    or any(e.execution.cleanup_errors for e in previous_evidence)):
+                                raise ValueError("BASELINE_EXECUTION_FAILED")
+                            for earlier in previous_evidence:
+                                if earlier.execution.status == ExecStatus.ABORTED:
+                                    side_cfg.check_abort_reasons[earlier.check_id] = "REVIEWED_NORMAL_BASELINE_CHECK_ABORTED"
+                        elif not _baseline_ran_without_abort(previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
                     side_cfg.kubernetes_target_pins = {
@@ -454,12 +489,12 @@ def _run_update_sides(store, pack, plan, envs, cfg, run_dir, prepared, leases, r
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     result.errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
-            if target_paths.get(side.value):
+            if target_paths.get(side.value) and (kube_transition is None or kube_transition.candidate_binding != "after_baseline"):
                 _pin_prebound_kubernetes_targets(side_cfg.raw, env, target_paths[side.value], target_snapshots)
             dispatch(side)
             if side == Side.baseline and any(
                 e.execution.cleanup_errors or
-                (e.execution.status == ExecStatus.ABORTED and not offline_comparison) for e in result.evidence
+                (e.execution.status == ExecStatus.ABORTED and not offline_comparison and not reviewed) for e in result.evidence
             ):
                 candidate_blocked = 'BASELINE_EXECUTION_FAILED'
             continue
@@ -630,6 +665,8 @@ def _managed_diagnostic_reference(docker, folder: Path, keys: dict, side: str, *
 def _validation_inputs(env, cfg: dict):
     """One managed engine, using the same launch contract as update."""
     validate_requested_config(cfg)
+    if REVIEWED_NORMAL_OPTION in cfg.get("update", {}):
+        raise ValueError("REVIEWED_NORMAL_CAMPAIGN_SCOPE_INVALID")
     if passive_api_hop.requested(cfg):
         raise ValueError("PASSIVE_API_HOP_EXECUTION_SCOPE_INVALID")
     if cilium_egress_status_requested(cfg):
@@ -642,8 +679,10 @@ def _validation_inputs(env, cfg: dict):
         raise ValueError(INSTALLED_PLUGIN_INVENTORY_SCOPE_ERROR)
     if normal_compile_cache_requested(cfg):
         raise ValueError(NORMAL_COMPILE_CACHE_SCOPE_ERROR)
-    if normal_file_reads_requested(cfg):
+    if normal_file_reads_requested(cfg) or approved_config_parser_requested(cfg):
         raise ValueError(NORMAL_FILE_READS_SCOPE_ERROR)
+    if boot_identity_requested(cfg):
+        raise ValueError(BOOT_IDENTITY_SCOPE_ERROR)
     if normal_graph_capture_requested(cfg):
         raise ValueError(NORMAL_GRAPH_CAPTURE_SCOPE_ERROR)
     if normal_safetensors_reader_requested(cfg):
@@ -852,7 +891,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     c = side_cfg
                     if passive_hop and item.check_id == passive_api_hop.CHECK:
                         passive_api_hop.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
-                        passive_api_hop.read_target(c[item.executor]["target"], selected_env)
+                        if side != "candidate" or not STAGED_PASSIVE_HOP_EXECUTORS <= staged_observer_executors(c):
+                            passive_api_hop.read_target(c[item.executor]["target"], selected_env)
                         continue
                     implementation = c.get("executors", {}).get(item.executor, "")
                     factory = registry.resolve_executor(item.executor, implementation,
@@ -884,12 +924,13 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                             raise run_binding.RunBindingUnavailable("RUN_BINDING_UNAVAILABLE") from None
                         binding_options["expected_supply_record_digests"] = digests
                         c = {**c, "_supply_prepared_sha256_by_role": {role: digests[role] for role in ("normal", "challenge")}}
-                    option = KUBERNETES_BOUND_CHECK_OPTIONS.get(item.check_id)
+                    option = kubernetes_bound_option(item.check_id, settings)
                     explicit_observer = (item.check_id in {"LIF-01", "LIF-03", "OBS-02", "OBS-04", "PLT-06", "PLT-07", "REQ-09",
-                                                           "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12"}
+                                                           "REQ-20", "SUP-05", "SUP-07", "SUP-10", "SUP-12", *BOOT_IDENTITY_OPTIONS}
                                          and type(settings) is dict
                                          and option in settings)
-                    normal_file_read = explicit_observer and item.check_id == "SUP-05"
+                    config_parser = explicit_observer and option == SUP05_CONFIG_PARSER_OPTION
+                    normal_file_read = explicit_observer and item.check_id == "SUP-05" and not config_parser
                     expected_target = None
                     if kube and option and type(settings) is dict and settings.get(option) is True:
                         path = Path(settings["normal"]["target"] if normal_file_read else settings["target"])
@@ -898,7 +939,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         with path.open("rb") as stream:
                             expected_target = _scoped_target_sha256(stream.read(65537), selected_env,
                                 gateway_snapshot=settings.get(GATEWAY_RECORD_SNAPSHOT_OPTION) is True,
-                                scoped_check=item.check_id)
+                                scoped_check=item.check_id, config_parser=config_parser)
                     executor = (registry.build_executor(item.executor, implementation, c,
                                     engine=selected_env.engine.name, version=selected_env.engine.version, factory=factory)
                                 if explicit_observer else factory(c))
@@ -918,7 +959,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                             # Static preparation computes the same per-run binding guard run will compute.
                             if not supplied_roles:
                                 run_cfg = run_binding.run_config(c, item.check_id)
-                            if normal_file_read:
+                            if normal_file_read or config_parser or item.check_id in BOOT_IDENTITY_OPTIONS:
                                 binding_options["expected_target_sha256"] = expected_target
                             _, values = run_binding.effective_values(
                                 check_def, settings, selected_env, values, side=side, attempt_id=None,

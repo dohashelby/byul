@@ -104,15 +104,16 @@ def test_child_identity_shutdown_and_fresh_generation_use_only_owned_pidfds(chil
         unrelated.terminate();unrelated.wait(timeout=3)
 
 
-def test_remaining_group_or_incomplete_inventory_refuses_restart(child_config,monkeypatch):
+@pytest.mark.parametrize('inventory_error', ['EXAMPLE-partial inventory', 'SUPERVISOR_PROCESS_INVENTORY_CHANGED'])
+def test_remaining_group_or_incomplete_inventory_refuses_restart(child_config,monkeypatch,inventory_error):
     supervisor=harness.Supervisor(child_config)
     try:
         supervisor.launch();supervisor.shutdown_child();supervisor.generations[0].child.wait(timeout=3)
         monkeypatch.setattr(harness,'group_members',lambda group:[{'pid':123,'EXAMPLE':'remaining reference'}])
         with pytest.raises(ValueError,match='PREVIOUS_GROUP_REMAINS'):supervisor.launch()
-        def unavailable(group):raise ValueError('EXAMPLE-partial inventory')
+        def unavailable(group):raise ValueError(inventory_error)
         monkeypatch.setattr(harness,'group_members',unavailable)
-        with pytest.raises(ValueError,match='EXAMPLE-partial inventory'):supervisor.launch()
+        with pytest.raises(ValueError,match=inventory_error):supervisor.launch()
         assert len(supervisor.generations)==1
     finally:supervisor.close()
 
@@ -201,6 +202,21 @@ cfg={'schema':h.SCHEMA,'session':'a'*32,'key':'b'*64,'module':'EXAMPLE_owned_orp
      'arguments':[str(release)],'maximum_seconds':30,'maximum_generations':3}
 supervisor=h.Supervisor(cfg)
 unrelated=subprocess.Popen([sys.executable,'-c','import time;time.sleep(10)'],start_new_session=True)
+
+def launch_with_stable_inventory():
+    # Parallel test workers can change /proc between the two inventory reads.
+    # A rejected launch must leave the generation count unchanged.
+    generations=len(supervisor.generations)
+    deadline=time.monotonic()+5
+    while True:
+        try:
+            return supervisor.launch()
+        except ValueError as error:
+            if str(error)!='SUPERVISOR_PROCESS_INVENTORY_CHANGED' or time.monotonic()>=deadline:
+                raise
+            assert len(supervisor.generations)==generations
+            time.sleep(.01)
+
 try:
     with h.child_adoption():
         assert adoption()==1
@@ -208,7 +224,7 @@ try:
         assert first.child.wait(timeout=3)==0
         supervisor.reap_exited_descendants()
         assert not supervisor.reaped and unrelated.poll()is None
-        try:supervisor.launch()
+        try:launch_with_stable_inventory()
         except ValueError as error:assert str(error)=='SUPERVISOR_PREVIOUS_GROUP_REMAINS'
         else:raise AssertionError('live adopted child must block restart')
         release.touch()
@@ -219,7 +235,7 @@ try:
         row=supervisor.reaped[0]
         assert row['generation']==0 and row['group']==row['session']==first.identity['pid']
         assert row['pid']!=first.identity['pid']and not Path('/proc',str(row['pid'])).exists()
-        supervisor.launch();second=supervisor.generations[1]
+        launch_with_stable_inventory();second=supervisor.generations[1]
         assert second.child.wait(timeout=3)==0
         deadline=time.monotonic()+5
         while len(supervisor.reaped)<2 and time.monotonic()<deadline:

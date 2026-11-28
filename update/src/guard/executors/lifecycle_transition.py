@@ -5,6 +5,7 @@ are declarations: neither elapsed time nor two snapshots prove that it happened.
 Only session/owner scoped native request IDs link model configuration observations.
 """
 from __future__ import annotations
+from collections import Counter
 from copy import deepcopy
 
 from guard.adapters.engine_profiles import supports
@@ -310,18 +311,58 @@ def _chat_assignment(domain, chat, request):
     return (assignments[0], row['event']) if len(assignments) == 1 else (None, None)
 
 
-def project(samples, trials, *, retain_receipts=False):
+def _recording_owner_attributed(recording):
+    capture = recording.get('capture')
+    return bool(capture and recording.get('session_owner_match') is True
+        and recording.get('listed_file_identity_match') is True
+        and capture.get('process_context_verified') is True
+        and capture.get('provenance', {}).get('owner_binding_verified') is True)
+
+
+def _reader_coverage(packet):
+    """Aggregate the actual native reader results without exposing records or process IDs."""
+    def listed(boundary):
+        inventory = packet.get(boundary)
+        return len(inventory['metadata']['files']) if inventory is not None else None
+
+    recordings = packet.get('recordings', [])
+    parsed = [row for row in recordings if row.get('capture') is not None]
+    prefixed = [row for row in parsed if row['capture'].get('checkpoint_prefix') is not None]
+    codes = Counter(code for row in recordings
+        for code in set(row.get('diagnostic_codes', [])) | set((row.get('capture') or {}).get('diagnostic_codes', []))
+        if type(code) is str and re.fullmatch(r'LIFECYCLE_[A-Z0-9_]{1,96}',code))
+    return {
+        'capture_mode':packet.get('capture_mode'),
+        'before_files_listed':listed('before'), 'after_files_listed':listed('after'),
+        'live_census_stable':packet.get('live_census_stable') is True,
+        'recordings_attempted':len(recordings), 'recordings_parsed':len(parsed),
+        'recordings_matching_listed_file':sum(row.get('listed_file_identity_match') is True for row in parsed),
+        'recordings_matching_session_owner':sum(row.get('session_owner_match') is True for row in parsed),
+        'live_checkpoint_ack_rows_observed':sum(record['event'] == 'CHECKPOINT' for row in parsed
+            for record in row['capture'].get('records', [])) if parsed else None,
+        'checkpoint_prefixes_observed':len(prefixed),
+        'checkpoint_prefixes_attributed':sum(_recording_owner_attributed(row) for row in prefixed),
+        'recording_diagnostic_counts':dict(sorted(codes.items())),
+    }
+
+
+def project(samples, trials, *, retain_receipts=False, strict_generation=False, chat_cases=()):
     """Rebuild the existing producer index from individually verified recordings.
 
     A configured model/revision is not consumed weights or cache identity. Keep the
     original event reference for offline judging and never merge across sessions.
     """
     facts = []; bindings = []; seen = set(); binding_seen = set(); missing = []
-    request_ids = {t['request_id_sha256'] for t in trials}
+    request_ids = {t['request_id_sha256'] for t in trials
+                   if not strict_generation or (t['attempted'] and _sha(t['request_id_sha256'])
+                       and t.get('transport_dispatched') is True
+                       and t.get('stock_generation_attribution_verified') is True)}
+    chat_ids = request_ids if retain_receipts else {
+        t['request_id_sha256'] for t in trials if t['case_id'] in chat_cases} & request_ids
     planned_generations = {}
     observed_invocations = {}
     ambiguous_requests = set()
-    if retain_receipts:
+    if chat_ids or strict_generation:
         for trial in trials:
             request = trial['request_id_sha256']
             planned_generations[request] = None if request in planned_generations else trial['generation']
@@ -332,28 +373,27 @@ def project(samples, trials, *, retain_receipts=False):
             continue
         recordings = []
         for recording in packet.get('recordings', []):
-            capture = recording.get('capture')
-            good = bool(capture and recording.get('session_owner_match') is True
-                and recording.get('listed_file_identity_match') is True and capture.get('process_context_verified') is True
-                and capture.get('provenance', {}).get('owner_binding_verified') is True)
-            if good and retain_receipts:
-                provenance = capture['provenance']
+            good = _recording_owner_attributed(recording)
+            if good and chat_ids:
+                provenance = recording['capture']['provenance']
                 good = _sha(provenance.get('capture_sha256')) and type(provenance.get('file_identity')) is dict
             recordings.append(recording if good else {'capture': None})
         index = request_index(recordings)
-        if retain_receipts:
+        if chat_ids:
             chat, invocations = _chat_selection(recordings)
             for invocation, row in invocations.items():
                 request = row['asgi_request_sha256']
-                if (planned_generations.get(request) == sample['generation']
+                if (request in chat_ids and planned_generations.get(request) == sample['generation']
                         and observed_invocations.setdefault(request, invocation) != invocation):
                     ambiguous_requests.add(request)
-            if not index['stored_record_index_complete']:
-                continue
         for domain_id, domain in index['domains'].items():
             for request in request_ids:
-                if retain_receipts:
-                    if request in ambiguous_requests or planned_generations[request] != sample['generation']:
+                if strict_generation and planned_generations.get(request) != sample['generation']:
+                    continue
+                from_chat = request in chat_ids
+                if from_chat:
+                    if (not index['stored_record_index_complete'] or request in ambiguous_requests
+                            or planned_generations[request] != sample['generation']):
                         continue
                     assignment, selection_event = _chat_assignment(domain, chat, request)
                     if assignment is None:
@@ -371,12 +411,12 @@ def project(samples, trials, *, retain_receipts=False):
                     binding = {'generation': sample['generation'], 'session': packet['session'],
                         'domain': domain_id, 'request_id_sha256': request, 'internal_request_sha256': internal,
                         'sample': sample_number, 'actual_consumption_verified': False}
-                    if retain_receipts:
+                    if from_chat:
                         binding['source_receipt'] = _record_receipt(recordings, assignment['event'])
                         binding['selection_source_receipt'] = _record_receipt(recordings, selection_event)
                     bindings.append(binding)
                 for row in domain['model_observations']:
-                    if internal not in row['request_sha256'] or retain_receipts and row['event'][0] != assignment['event'][0]:
+                    if internal not in row['request_sha256'] or from_chat and row['event'][0] != assignment['event'][0]:
                         continue
                     metadata = row['metadata']
                     configured = [metadata.get('configured_model_sha256'), metadata.get('configured_revision_sha256')]
@@ -391,7 +431,7 @@ def project(samples, trials, *, retain_receipts=False):
                         'request_id_sha256': request, 'internal_request_sha256': internal,
                         'configured_generation': configured, 'point': row['point'], 'phase': row['phase'],
                         'sample': sample_number, 'event': row['event'], 'actual_consumption_verified': False}
-                    if retain_receipts:
+                    if from_chat:
                         fact['source_receipt'] = _record_receipt(recordings, row['event'])
                     facts.append(fact)
         if not packet.get('recorded_files_covered'):
@@ -416,7 +456,7 @@ def project(samples, trials, *, retain_receipts=False):
         'missing': sorted(set(missing)), 'actual_weights_cache_consumption_verified': False}
 
 
-def _canonical_live_observations(projection, trials, manifest, missing):
+def _canonical_live_observations(projection, trials, manifest, missing, *, include_native=True):
     controls = []
     for trial in trials:
         transport = trial.get('transport', {})
@@ -428,14 +468,24 @@ def _canonical_live_observations(projection, trials, manifest, missing):
                 'started_at', 'finished_at', 'normal_shape_verified')})
     if {row['case_id'] for row in controls} != set(PHASES):
         missing = [*missing, 'selected_phase_normal_control_incomplete']
-    bindings = projection['request_generation_bindings']
-    facts = projection['request_configuration_facts']
-    if not facts:
-        missing = [*missing, 'selected_request_configuration_observation_unavailable']
-    steps = [{'step': 'passive-selected-transition-observation', 'prepared_scopes': manifest,
-        'normal_controls': controls, 'request_generation_bindings': bindings, 'request_configuration_facts': facts,
-        'request_configuration_conflict_candidates': projection['request_configuration_conflicts'],
-        'transition_activation_verified': False, 'actual_consumption_verified': False}] if controls or bindings or facts else []
+    native = {}
+    has_observations = bool(controls)
+    if include_native:
+        bindings = projection['request_generation_bindings']
+        facts = projection['request_configuration_facts']
+        has_observations = has_observations or bool(bindings or facts)
+        if not facts:
+            missing = [*missing, 'selected_request_configuration_observation_unavailable']
+        native = {'request_generation_bindings': bindings, 'request_configuration_facts': facts,
+            'request_configuration_conflict_candidates': projection['request_configuration_conflicts']}
+    else:
+        observed_generations = {row['generation'] for row in controls}
+        manifest = [row for row in manifest if row['id'] in observed_generations]
+    steps = []
+    if has_observations:
+        steps.append({'step': 'passive-selected-transition-observation', 'prepared_scopes': manifest,
+            'normal_controls': controls, **native,
+            'transition_activation_verified': False, 'actual_consumption_verified': False})
     return {'activation_steps': steps, 'activation_missing': sorted(set(missing)),
         'activation_violations': [], 'activation_scope_complete': False}
 
@@ -445,10 +495,14 @@ class LifecycleTransitionExecutor:
     version = '0.1.0'
 
     def __init__(self, cfg, *, runner=None, clock=None, wait=None, expected_target_sha256=None,
-                 expected_manifest_sha256=None):
+                 expected_manifest_sha256=None, staged_lif05=None):
+        from .lif05_stages import SETTING
         self.b_common_inputs = deepcopy(cfg.get('common_inputs'))
         self.b_cpu_support_input = deepcopy(cfg.get('cpu_support_input'))
-        self.cfg = {k: v for k, v in cfg.items() if k not in {'common_inputs', 'cpu_support_input'}}; self.runner = runner; self.clock = clock or utcnow
+        self.stage_digest = cfg.get(SETTING)
+        self.stage_requested = SETTING in cfg
+        self.stage = staged_lif05
+        self.cfg = {k: v for k, v in cfg.items() if k not in {'common_inputs', 'cpu_support_input', SETTING}}; self.runner = runner; self.clock = clock or utcnow
         self.wait = wait or time.sleep
         self.expected_target = expected_target_sha256
         self.expected_manifest = expected_manifest_sha256
@@ -594,6 +648,16 @@ class LifecycleTransitionExecutor:
                 matches = self.expected_target == next(iter(approved.values()))
             if not matches:
                 raise ValueError('TRANSITION_EXPLICIT_GENERATION_TARGET_APPROVAL_REQUIRED')
+        if self.stage_requested:
+            from .lif05_stages import StagedLif05
+            if (check.id != 'LIF-05' or not pinned_redeployment or self.runner is not None
+                    or type(self.stage) is not StagedLif05):
+                raise ValueError('LIF05_STAGE_COORDINATOR_REQUIRED')
+            capture, retirement = self.stage.consume(
+                self.stage_digest, generations, schedule, policy_values['transition_phase_generation'])
+            return self._draft(check, env, policy_values, workdir, generations, manifest, schedule,
+                               capture['samples'], capture['trials'], capture['diagnostics'], capture['cleanup'],
+                               retirement, self.stage.started_at, stage=self.stage, request_trace=capture['request_trace'])
         timeout, _, _ = self._transport_settings()
         started = self.clock()
         if not started <= schedule['before'] or (schedule['recovered'] - started).total_seconds() > 250:
@@ -662,7 +726,13 @@ class LifecycleTransitionExecutor:
             except Exception:
                 cleanup.append('TRANSITION_READER_REPORT_UNAVAILABLE:' + generation.key)
         sample('final' if read_only else 'sealed', retired_generation=retired_generation)
-        projection = project(samples, trials, retain_receipts=check.id == 'LIF-06')
+        return self._draft(check, env, policy_values, workdir, generations, manifest, schedule,
+                           samples, trials, diagnostics, cleanup, retirement, started)
+
+    def _draft(self, check, env, policy_values, workdir, generations, manifest, schedule,
+               samples, trials, diagnostics, cleanup, retirement, started, *, stage=None, request_trace=()):
+        projection = project(samples, trials, retain_receipts=check.id == 'LIF-06', strict_generation=stage is not None,
+                             chat_cases=PHASES if stage is not None else ())
         before = next(t for t in trials if t['case_id'] == 'before')
         inflight_row = next(t for t in trials if t['case_id'] == 'inflight')
         # A label/time overlap is only scheduling coverage, never a native join.
@@ -679,6 +749,25 @@ class LifecycleTransitionExecutor:
             'drain_and_external_admission_gate_unverified']
         if retirement is not None:
             missing.append('retired_generation_native_terminal_tail_unobserved')
+        reader_coverage = []
+        if stage is not None:
+            missing.append('request_kv_generation_and_release_unverified')
+            for trial in trials:
+                if ('client_response_headers' in trial['dispatch_evidence']
+                        and trial['stock_generation_attribution_verified'] is not True):
+                    missing.append('TRANSITION_CLIENT_HTTP_UNATTRIBUTED:' + trial['case_id'])
+                if trial['transport_dispatched'] is None:
+                    missing.append('TRANSITION_TRANSPORT_DISPATCH_UNVERIFIED:' + trial['case_id'])
+            for sample in samples:
+                coverage = _reader_coverage(sample['native']) if sample['native'] is not None else None
+                reader_coverage.append(coverage)
+                if coverage is None:
+                    continue
+                label = f"{sample['phase']}:{sample['generation']}:"
+                if coverage['live_checkpoint_ack_rows_observed'] == 0:
+                    missing.append(label + 'native_live_checkpoint_ack_unobserved')
+                if coverage['checkpoint_prefixes_attributed'] == 0:
+                    missing.append(label + 'native_live_checkpoint_prefix_attribution_unverified')
         if check.id == 'LIF-06':
             missing.extend(['selected_feature_activation_unverified', 'partial_failure_activation_unverified'])
         if check.id == 'LIF-16':
@@ -714,11 +803,40 @@ class LifecycleTransitionExecutor:
                 activation_violations=[],
                 activation_scope_complete=False,
             )
-        elif check.id == 'LIF-06':
-            observations.update(_canonical_live_observations(projection, trials, manifest, missing))
+        elif check.id in {'LIF-06', 'LIF-16'}:
+            observations.update(_canonical_live_observations(
+                projection, trials, manifest, missing, include_native=check.id == 'LIF-06'))
+        challenges = [{'step': 'passive externally controlled transition', 'attempted': True,
+                       'observations': {'transition_activation_verified': False}}]
+        if stage is not None:
+            from .lif05_stages import LIF05_STEPS
+            if tuple(check.challenge_steps) != LIF05_STEPS:
+                raise ValueError('LIF05_STAGE_CHECK_DEFINITION_MISMATCH')
+            traced = [case for row in request_trace for case in row['cases'] if case['request_observer_invoked']]
+            observations['transition_owned_request_trace'] = request_trace
+            challenges = [{'step': LIF05_STEPS[0], 'attempted': inflight_row['attempted']},
+                          {'step': LIF05_STEPS[1], 'attempted': retirement is not None},
+                          {'step': LIF05_STEPS[2], 'attempted': bool(traced),
+                           'observations': {'request_observer_invoked_cases': [case['case_id'] for case in traced],
+                               'bound_assignment_cases': [case['case_id'] for case in traced if case['assignment_bound']],
+                               'all_phase_resource_and_routing_observations_verified': False}}]
+            observations = stage.scrub(observations)
+            observations['activation_steps'][0]['owned_sequential_generation_receipt'] = stage.public_receipt()
+            # Keep the bounded native projection in observations. The held
+            # checkpoint records may carry the legacy producer's request digests.
+            samples = [{**{k: v for k, v in row.items() if k != 'native'},
+                        'native': None if row['native'] is None else {
+                            'session': row['native']['session'],
+                            'recordings_seen': len(row['native'].get('recordings', [])),
+                            'recorded_files_covered': row['native'].get('recorded_files_covered'),
+                            'diagnostic_codes': row['native'].get('diagnostic_codes', []),
+                            'reader_coverage': coverage,
+                        }} for row, coverage in zip(samples, reader_coverage, strict=True)]
         summary = {'profile': check.collection_profile, 'manifest': manifest, 'samples': samples,
             'observations': observations, 'engine_started': False, 'transition_control_implemented': False,
             'producer_authenticated': False, 'whole_run_coverage_verified': False}
+        if stage is not None:
+            summary['measurement_source'] = 'owned-live-sequential-checkpoints'
         workdir = Path(workdir); artifacts = []; workdir.mkdir(parents=True, exist_ok=True)
         try:
             path = workdir / 'lifecycle-transition.json'; path.write_bytes(canonical_json(summary))
@@ -729,10 +847,10 @@ class LifecycleTransitionExecutor:
             data_origin=DataOrigin.EXAMPLE if self.runner is not None or any(g.target.get('lab') for g in generations.values()) else DataOrigin.DECLARED,
             normal_control={'attempted': before['attempted'], 'succeeded': all(t['normal_shape_verified'] for t in trials if t['case_id'] in PHASES),
                 'detail': 'Scheduled normal HTTP shapes; native generation, consumption and admission guarantees are separate observations.'},
-            challenges=[{'step': 'passive externally controlled transition', 'attempted': True,
-                'observations': {'transition_activation_verified': False}}],
+            challenges=challenges,
             observations={k: {'value': v, 'collected': True} for k, v in observations.items()}, artifacts=artifacts,
-            config={'profile': check.collection_profile, 'manifest': manifest, 'sample_at': policy_values['transition_sample_at']},
+            config={'profile': check.collection_profile, 'manifest': manifest, 'sample_at': policy_values['transition_sample_at'],
+                    **({'staged_lif05_sha256': stage.digest()} if stage is not None else {})},
             cleanup_errors=cleanup, started_at=started, finished_at=self.clock())
 
         from .lifecycle_common_input_consumption import attach_inputs
